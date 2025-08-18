@@ -1,12 +1,13 @@
 services:
   - type: web
+    runtime: python            # modern key; replaces `env: python`
     name: orderops-api-v1
-    env: python
     plan: starter
     buildCommand: cd backend && pip install -r requirements.txt
+    preDeployCommand: cd backend && alembic upgrade head   # <<-- FIX
     startCommand: cd backend && gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT
     healthCheckPath: /healthz
-    autoDeploy: true
+    autoDeployTrigger: commit    # modern key; replaces deprecated `autoDeploy: true`
     envVars:
       - key: DATABASE_URL
         fromDatabase:
@@ -38,15 +39,14 @@ services:
         value: "SST"
       - key: TAX_PERCENT
         value: "0"
-    postdeployCommand: cd backend && alembic upgrade head
 
   - type: worker
+    runtime: python            # modern key; replaces `env: python`
     name: orderops-worker-v1
-    env: python
     plan: starter
     buildCommand: cd backend && pip install -r requirements.txt
     startCommand: cd backend && python -m app.worker
-    autoDeploy: true
+    autoDeployTrigger: commit
     envVars:
       - key: DATABASE_URL
         fromDatabase:
