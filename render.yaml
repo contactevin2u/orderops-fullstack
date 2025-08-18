@@ -1,0 +1,82 @@
+services:
+  - type: web
+    name: orderops-api-v1
+    env: python
+    plan: starter
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:$PORT
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: orderops-db-v1
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: CORS_ORIGIN
+        value: https://orderops-frontend-v1.vercel.app,http://localhost:3000
+      - key: APP_VERSION
+        value: "v1-fullstack"
+      - key: FEATURE_PARSE_REAL
+        value: "1"
+      - key: WORKER_BATCH_SIZE
+        value: "10"
+      - key: WORKER_POLL_SECS
+        value: "1.0"
+      - key: WORKER_MAX_ATTEMPTS
+        value: "5"
+      - key: COMPANY_NAME
+        value: "AA Alive Sdn Bhd"
+      - key: COMPANY_PHONE
+        value: "+6011 2868 6592"
+      - key: COMPANY_EMAIL
+        value: "contact@evin2u.com"
+      - key: COMPANY_ADDRESS
+        value: "10 Jalan Perusahaan Amari, Batu Caves, Kuala Lumpur"
+      - key: TAX_LABEL
+        value: "SST"
+      - key: TAX_PERCENT
+        value: "0"
+    postdeployCommand: cd backend && alembic upgrade head
+
+  - type: worker
+    name: orderops-worker-v1
+    env: python
+    plan: starter
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && python -m app.worker
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: orderops-db-v1
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: APP_VERSION
+        value: "v1-worker"
+      - key: FEATURE_PARSE_REAL
+        value: "1"
+      - key: WORKER_BATCH_SIZE
+        value: "10"
+      - key: WORKER_POLL_SECS
+        value: "1.0"
+      - key: WORKER_MAX_ATTEMPTS
+        value: "5"
+      - key: COMPANY_NAME
+        value: "AA Alive Sdn Bhd"
+      - key: COMPANY_PHONE
+        value: "+6011 2868 6592"
+      - key: COMPANY_EMAIL
+        value: "contact@evin2u.com"
+      - key: COMPANY_ADDRESS
+        value: "10 Jalan Perusahaan Amari, Batu Caves, Kuala Lumpur"
+      - key: TAX_LABEL
+        value: "SST"
+      - key: TAX_PERCENT
+        value: "0"
+
+databases:
+  - name: orderops-db-v1
+    plan: starter
