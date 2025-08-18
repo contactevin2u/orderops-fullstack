@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from pydantic import BaseModel
+from decimal import Decimal
+
 from ..db import get_session
 from ..models import Order, OrderItem, Plan, Customer
 from ..schemas import OrderOut
@@ -14,13 +16,18 @@ class OrderListOut(OrderOut):
 
 @router.get("", response_model=list[OrderListOut])
 def list_orders(limit: int = Query(50, ge=1, le=500), db: Session = Depends(get_session)):
-    rows = db.query(Order, Customer).join(Customer, Customer.id==Order.customer_id).order_by(Order.id.desc()).limit(limit).all()
-    out = []
-    for o,c in rows:
-        out.append(OrderListOut.model_validate({
-            "id": o.id, "code": o.code, "type": o.type, "status": o.status, "subtotal": float(o.subtotal), "total": float(o.total),
-            "paid_amount": float(o.paid_amount), "balance": float(o.balance), "customer_name": c.name
-        }))
+    stmt = (
+        select(Order, Customer.name.label("customer_name"))
+        .join(Customer, Customer.id == Order.customer_id)
+        .order_by(Order.created_at.desc())
+        .limit(limit)
+    )
+    rows = db.execute(stmt).all()
+    out: list[OrderListOut] = []
+    for (order, customer_name) in rows:
+        dto = OrderOut.model_validate(order).model_dump()
+        dto["customer_name"] = customer_name
+        out.append(OrderListOut.model_validate(dto))
     return out
 
 class ManualOrderIn(BaseModel):
@@ -38,40 +45,50 @@ def create_order(body: ManualOrderIn, db: Session = Depends(get_session)):
 @router.get("/{order_id}", response_model=OrderOut)
 def get_order(order_id: int, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
-    if not order: raise HTTPException(404, "Not found")
+    if not order:
+        raise HTTPException(404, "Order not found")
     return OrderOut.model_validate(order)
 
-class CancelInstallmentIn(BaseModel):
-    penalty_fee: float = 0
-    return_delivery_fee: float = 0
-    reason: str | None = None
-
-@router.post("/{order_id}/cancel-installment", response_model=OrderOut)
-def cancel_installment(order_id: int, body: CancelInstallmentIn, db: Session = Depends(get_session)):
+@router.put("/{order_id}", response_model=dict)
+def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
-    if not order: raise HTTPException(404, "Not found")
-    if order.type != "INSTALLMENT": raise HTTPException(400, "Not an installment order")
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    for k in ["notes", "status"]:
+        if k in body:
+            setattr(order, k, body[k])
+
+    money_fields = [
+        "subtotal", "discount", "delivery_fee",
+        "return_delivery_fee", "penalty_fee",
+        "total", "balance"
+    ]
+    for k in money_fields:
+        if k in body and body[k] is not None:
+            setattr(order, k, Decimal(str(body[k])))
+
+    db.commit()
+    db.refresh(order)
+    return {"ok": True, "order_id": order.id}
+
+@router.post("/{order_id}/void", response_model=dict)
+def void_order(order_id: int, body: dict | None = None, db: Session = Depends(get_session)):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    reason = (body or {}).get("reason") if body else None
     order.status = "CANCELLED"
-    order.penalty_fee = (order.penalty_fee or 0) + (body.penalty_fee or 0)
-    order.return_delivery_fee = (order.return_delivery_fee or 0) + (body.return_delivery_fee or 0)
-    order.total = (order.subtotal or 0) - (order.discount or 0) + (order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0)
-    order.balance = order.total - (order.paid_amount or 0)
-    db.commit(); db.refresh(order)
-    return OrderOut.model_validate(order)
+    if hasattr(order, "notes") and reason:
+        order.notes = (order.notes or "") + f"\n[VOID] {reason}"
 
-class BuybackIn(BaseModel):
-    buyback_amount: float = 0
-    return_delivery_fee: float = 0
-    note: str | None = None
+    # If no posted payments, zero out totals
+    paid_total = sum([p.amount for p in order.payments if getattr(p, "status", "POSTED") == "POSTED"], Decimal("0.00"))
+    if paid_total == Decimal("0"):
+        order.total = Decimal("0.00")
+        order.balance = Decimal("0.00")
 
-@router.post("/{order_id}/buyback", response_model=OrderOut)
-def buyback(order_id: int, body: BuybackIn, db: Session = Depends(get_session)):
-    order = db.get(Order, order_id)
-    if not order: raise HTTPException(404, "Not found")
-    # apply negative amount as discount + add return fee
-    order.discount = (order.discount or 0) + float(body.buyback_amount or 0)
-    order.return_delivery_fee = (order.return_delivery_fee or 0) + (body.return_delivery_fee or 0)
-    order.total = (order.subtotal or 0) - (order.discount or 0) + (order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0)
-    order.balance = order.total - (order.paid_amount or 0)
-    db.commit(); db.refresh(order)
-    return OrderOut.model_validate(order)
+    db.commit()
+    db.refresh(order)
+    return {"ok": True, "order_id": order.id, "status": order.status}

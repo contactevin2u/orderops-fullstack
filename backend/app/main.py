@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from .core.config import settings, cors_origins_list
-from .routers import health, parse, orders, payments, export, documents, queue
+from .routers import health, parse, orders, payments, export, documents, queue, reports
 
 app = FastAPI(title="OrderOps Fullstack v1", default_response_class=ORJSONResponse)
 
@@ -21,5 +21,5 @@ app.include_router(orders.router)
 app.include_router(payments.router)
 app.include_router(export.router)
 app.include_router(documents.router)
-
 app.include_router(queue.router)
+app.include_router(reports.router)
