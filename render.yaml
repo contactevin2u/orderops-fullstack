@@ -79,4 +79,4 @@ services:
 
 databases:
   - name: orderops-db-v1
-    plan: starter
+    plan: basic-1gb
