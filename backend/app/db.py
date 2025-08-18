@@ -1,9 +1,9 @@
-# backend/app/db.py
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 def _coerce_psycopg(url: str) -> str:
+    # Force SQLAlchemy to use psycopg v3 driver
     if url.startswith("postgres://"):
         return "postgresql+psycopg://" + url[len("postgres://"):]
     if url.startswith("postgresql://") and "+psycopg" not in url:
@@ -23,3 +23,12 @@ if DATABASE_URL:
 
 engine = create_engine(DATABASE_URL) if DATABASE_URL else None
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True) if engine else None
+
+def get_session():
+    if SessionLocal is None:
+        raise RuntimeError("DATABASE_URL not configured for this environment.")
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
