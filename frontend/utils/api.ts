@@ -1,3 +1,4 @@
+// utils/api.ts
 export type Json = Record<string, any> | any[];
 
 function normalizeBase(s?: string) {
@@ -6,6 +7,7 @@ function normalizeBase(s?: string) {
 }
 
 const ENV_BASE = normalizeBase(process.env.NEXT_PUBLIC_API_URL);
+// When next.config.js rewrites are active, API_BASE can be "/_api"
 const API_BASE = ENV_BASE || "/_api";
 
 function pathJoin(p: string) {
@@ -27,9 +29,7 @@ async function request<T = any>(
     body: json ? JSON.stringify(json) : rest.body,
     ...rest,
   }).catch((e: any) => {
-    throw new Error(
-      `Network error calling ${path}: ${e?.message || "failed to fetch"}`
-    );
+    throw new Error(`Network error calling ${path}: ${e?.message || "failed to fetch"}`);
   });
 
   const text = await res.text();
@@ -49,78 +49,86 @@ async function request<T = any>(
   return data as T;
 }
 
-// ---------- Helpers ----------
-/** Accepts whatever /parse returns and produces {customer, order} */
-export function normalizeParsedForOrder(input: any) {
-  // unwrap { ok, parsed } or { parsed }
-  const payload = input && typeof input === "object" && "parsed" in input
-    ? (input as any).parsed
-    : input;
-
-  // Some backends might nest under 'data'
-  const core = payload && payload.data ? payload.data : payload;
-
-  // If somehow customer/order are one level deeper, attempt to surface them
-  if (core?.customer && core?.order) return { customer: core.customer, order: core.order };
-
-  // If parse returned only order details, try to split
-  if (!core?.customer && (core?.order || core?.items)) {
-    return { customer: core.customer || {}, order: core.order || core };
-  }
-
-  return core; // best effort; caller will still validate
-}
-
-// ---------- Health ----------
+// -------- Health
 export function ping() {
   return request<{ ok: boolean } | string>("/healthz");
 }
 
-// ---------- Parse ----------
+// -------- Parse
 export function parseMessage(text: string) {
-  // Compatible with either backends expecting {text} or {message}
   return request<Json>("/parse", { json: { text, message: text } });
 }
 
-// ---------- Orders ----------
-export function listOrders(q?: string, status?: string, type?: string) {
+// -------- Orders (normalized)
+type OrdersList = { items: any[]; total?: number };
+
+export async function listOrders(
+  q?: string,
+  status?: string,
+  type?: string
+): Promise<OrdersList> {
   const sp = new URLSearchParams();
   if (q) sp.set("q", q);
   if (status) sp.set("status", status);
   if (type) sp.set("type", type);
   const qs = sp.toString();
-  return request<{ items?: any[]; total?: number } | any[]>(`/orders${qs ? `?${qs}` : ""}`);
+
+  const data = await request<any>(`/orders${qs ? `?${qs}` : ""}`);
+  // Normalize: backend may return array or { items, total }
+  if (Array.isArray(data)) return { items: data, total: data.length };
+  if (data && typeof data === "object") {
+    const items = Array.isArray(data.items) ? data.items : [];
+    const total =
+      typeof data.total === "number"
+        ? data.total
+        : (Array.isArray(data.items) ? data.items.length : undefined);
+    return { items, total };
+  }
+  return { items: [], total: 0 };
 }
 
 export function getOrder(id: number | string) {
   return request<any>(`/orders/${id}`);
 }
 
-/**
- * Accepts either:
- *  - {customer, order}
- *  - {ok, parsed: {customer, order}}
- *  - {parsed: {customer, order}}
- * and posts the correct shape to the backend.
- */
+// Optional: tweak parsed payload before posting if your parser is loose
+function normalizeParsedForOrder(input: any) {
+  if (!input) return input;
+  // many backends return { ok, parsed }; accept both shapes safely
+  const parsed = input?.parsed ? input.parsed : input;
+
+  // Allow both "code" or "sku" mixups; do NOT force if already correct
+  if (parsed?.order) {
+    const order = parsed.order;
+    // If someone put order code into first item.sku by mistake, you could move it back here
+    // but only when order.code is empty.
+    if (!order.code && Array.isArray(order.items) && order.items.length) {
+      const guess = order.items.find((it: any) => it?.sku && typeof it.sku === "string");
+      if (guess && /^[A-Za-z]{1,3}\d{3,5}$/.test(guess.sku)) {
+        order.code = guess.sku;
+        guess.sku = null;
+      }
+    }
+  }
+  return parsed;
+}
+
 export async function createOrderFromParsed(parsed: any) {
   const normalized = normalizeParsedForOrder(parsed);
+  const payload = normalized?.parsed ? normalized.parsed : normalized;
 
-  // Hard-validate shape before POST
-  const customer = normalized?.customer;
-  const order = normalized?.order;
+  const customer = payload?.customer;
+  const order = payload?.order;
 
   if (!customer || !order) {
-    throw new Error(
-      "Parsed payload missing {customer, order}. Please re-parse the message."
-    );
+    throw new Error("Parsed payload missing {customer, order}. Please re-parse or edit JSON.");
   }
 
   try {
     // Primary: top-level {customer, order}
     return await request<any>("/orders", { json: { customer, order } });
   } catch (e: any) {
-    // Fallback: some backends accept {parsed: {...}}
+    // Fallback: some backends accept { parsed: { customer, order } }
     if (e?.status === 422 || e?.status === 400) {
       return request<any>("/orders", { json: { parsed: { customer, order } } });
     }
@@ -129,13 +137,10 @@ export async function createOrderFromParsed(parsed: any) {
 }
 
 export function updateOrder(id: number, patch: any) {
-  return request<any>(`/orders/${id}`, { method: "PATCH", json: patch }).catch(
-    (e: any) => {
-      if (e?.status === 405)
-        return request<any>(`/orders/${id}`, { method: "PUT", json: patch });
-      throw e;
-    }
-  );
+  return request<any>(`/orders/${id}`, { method: "PATCH", json: patch }).catch((e: any) => {
+    if (e?.status === 405) return request<any>(`/orders/${id}`, { method: "PUT", json: patch });
+    throw e;
+  });
 }
 
 export async function voidOrder(id: number, reason?: string) {
@@ -147,10 +152,7 @@ export async function voidOrder(id: number, reason?: string) {
         return await request<any>(`/orders/${id}/cancel`, { json: { reason } });
       } catch (e2: any) {
         if (e2?.status === 404 || e2?.status === 405)
-          return await updateOrder(id, {
-            status: "CANCELLED",
-            cancel_reason: reason || "",
-          });
+          return await updateOrder(id, { status: "CANCELLED", cancel_reason: reason || "" });
         throw e2;
       }
     }
@@ -166,7 +168,7 @@ export function markBuyback(id: number, amount: number) {
   return request<any>(`/orders/${id}/buyback`, { json: { amount } });
 }
 
-// ---------- Payments ----------
+// -------- Payments
 export function addPayment(payload: {
   order_id: number;
   amount: number;
@@ -177,18 +179,17 @@ export function addPayment(payload: {
 }) {
   return request<any>("/payments", { json: payload });
 }
-
 export function voidPayment(paymentId: number, reason?: string) {
   return request<any>(`/payments/${paymentId}/void`, { json: { reason } });
 }
 
-// ---------- Reports ----------
+// -------- Reports
 export function outstanding(type?: "INSTALLMENT" | "RENTAL") {
   const qs = type ? `?type=${encodeURIComponent(type)}` : "";
-  return request<{ items: any[] } | any[]>(`/reports/outstanding${qs}`);
+  return request<{ items: any[] }>(`/reports/outstanding${qs}`);
 }
 
-// ---------- Documents ----------
+// -------- Documents
 export function invoicePdfUrl(orderId: number) {
   const base = API_BASE;
   return `${base}/documents/invoice/${orderId}.pdf`;
