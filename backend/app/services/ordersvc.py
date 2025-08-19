@@ -1,154 +1,188 @@
 from __future__ import annotations
 
-from datetime import datetime, date, time
-from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
-import uuid
+from typing import Any, Dict, Optional, List, Tuple
+from decimal import Decimal
+from datetime import datetime, date
+import re
+import random
 
 from sqlalchemy.orm import Session
-from sqlalchemy import select
 
-from ..models import Customer, Order, OrderItem, Plan, Payment
-from ..utils.codegen import generate_order_code
+from ..models import Customer, Order, OrderItem, Plan
 
-TWO_DP = Decimal("0.01")
-
-def d(x) -> Decimal:
-    if isinstance(x, Decimal):
-        return x.quantize(TWO_DP, rounding=ROUND_HALF_UP)
-    if x is None:
-        return Decimal("0.00")
+def _d(val: Any) -> Decimal:
+    if isinstance(val, Decimal):
+        return val.quantize(Decimal("0.01"))
     try:
-        return Decimal(str(x)).quantize(TWO_DP, rounding=ROUND_HALF_UP)
-    except (InvalidOperation, ValueError):
-        return Decimal("0.00")
-
-def _unique_temp_code(db: Session) -> str:
-    base = f"TEMP-{uuid.uuid4().hex[:8].upper()}"
-    attempt = base
-    i = 2
-    while db.execute(select(Order.id).where(Order.code == attempt)).first():
-        attempt = f"{base}-{i}"
-        i += 1
-    return attempt
-
-def _parse_delivery_dt(s: str | None):
-    if not s:
-        return None
-    try:
-        # try ISO first (YYYY-MM-DD or with time)
-        dt = datetime.fromisoformat(s)
-        return dt
+        return Decimal(str(val or "0")).quantize(Decimal("0.01"))
     except Exception:
-        # fallback: if just a date-like 'YYYY-MM-DD'
-        try:
-            y, m, d_ = s[:4], s[5:7], s[8:10]
-            dt = datetime(int(y), int(m), int(d_), 0, 0, 0)
-            return dt
-        except Exception:
-            return None
+        return Decimal("0.00")
 
-def create_order_from_parsed(db: Session, parsed: dict) -> Order:
-    pdata = parsed.get("customer") or {}
-    odata = parsed.get("order") or {}
+def _parse_date_like(txt: Optional[str]) -> Optional[str]:
+    if not txt:
+        return None
+    m = re.search(r"([0-3]?\d)[/.-]([01]?\d)(?:[/.-](\d{2,4}))?", str(txt))
+    if not m:
+        return None
+    d = int(m.group(1)); mth = int(m.group(2))
+    y = int(m.group(3)) if m.group(3) else datetime.utcnow().year
+    if y < 100:
+        y += 2000
+    try:
+        return date(y, mth, d).isoformat()
+    except ValueError:
+        return None
 
-    # --- upsert customer by phone if available ---
-    phone = (pdata.get("phone") or "").strip()
+def _ensure_unique_code(db: Session, code: Optional[str]) -> str:
+    base = (code or "").strip() or ""
+    if base:
+        exists = db.query(Order).filter(Order.code == base).first()
+        if not exists:
+            return base
+    # Generate TMP-YYMMDD-HHMMSS-XXXX
+    while True:
+        tmp = f"TMP-{datetime.utcnow():%y%m%d-%H%M%S}-{random.randrange(1000,9999)}"
+        if not db.query(Order).filter(Order.code == tmp).first():
+            return tmp
+
+def _first_phone(raw: Optional[str]) -> Optional[str]:
+    if not raw:
+        return None
+    # Pick the first 9-14 digit sequence
+    m = re.search(r"(\+?\d{9,14})", raw.replace("/", " "))
+    return m.group(1) if m else None
+
+def _order_to_dto(order: Order) -> Dict[str, Any]:
+    return {
+        "id": order.id,
+        "code": order.code,
+        "type": order.type,
+        "status": order.status,
+        "customer": {
+            "id": order.customer.id if order.customer else None,
+            "name": order.customer.name if order.customer else None,
+            "phone": order.customer.phone if order.customer else None,
+            "address": order.customer.address if order.customer else None,
+        },
+        "delivery_date": order.delivery_date.isoformat() if getattr(order, "delivery_date", None) else None,
+        "notes": order.notes,
+        "subtotal": float(order.subtotal or 0),
+        "discount": float(order.discount or 0),
+        "delivery_fee": float(order.delivery_fee or 0),
+        "return_delivery_fee": float(order.return_delivery_fee or 0),
+        "penalty_fee": float(order.penalty_fee or 0),
+        "total": float(order.total or 0),
+        "paid_amount": float(order.paid_amount or 0),
+        "balance": float(order.balance or 0),
+        "items": [
+            {
+                "id": it.id,
+                "name": it.name,
+                "sku": it.sku,
+                "qty": it.qty,
+                "unit_price": float(it.unit_price or 0),
+                "line_total": float(it.line_total or 0),
+                "category": it.category,
+                "item_type": it.item_type,
+            }
+            for it in (order.items or [])
+        ],
+        "plan": {
+            "id": order.plan.id if order.plan else None,
+            "plan_type": order.plan.plan_type if order.plan else None,
+            "months": order.plan.months if order.plan else None,
+            "monthly_amount": float(order.plan.monthly_amount or 0) if order.plan else 0,
+            "start_date": order.plan.start_date.isoformat() if (order.plan and order.plan.start_date) else None,
+        } if order.plan else None,
+        "created_at": order.created_at.isoformat() if getattr(order, "created_at", None) else None,
+        "updated_at": order.updated_at.isoformat() if getattr(order, "updated_at", None) else None,
+    }
+
+def create_order_from_parsed(db: Session, parsed: Dict[str, Any]) -> Dict[str, Any]:
+    cust = (parsed or {}).get("customer") or {}
+    oin = (parsed or {}).get("order") or {}
+    charges = oin.get("charges") or {}
+    plan_in = oin.get("plan") or {}
+
+    # Upsert/find customer by phone (fallback by name)
+    phone = _first_phone(cust.get("phone"))
     customer = None
     if phone:
-        customer = db.execute(select(Customer).where(Customer.phone == phone)).scalar_one_or_none()
+        customer = db.query(Customer).filter(Customer.phone == phone).first()
     if not customer:
         customer = Customer(
-            name=pdata.get("name") or "Unknown",
-            phone=phone or None,
-            address=pdata.get("address") or None,
-            map_url=pdata.get("map_url") or None,
+            name=(cust.get("name") or "").strip() or "Unknown",
+            phone=phone,
+            address=(cust.get("address") or "").strip() or None,
         )
         db.add(customer)
         db.flush()
 
-    # --- initial order (use unique temp code to avoid unique constraint crash) ---
-    temp_code = _unique_temp_code(db)
-    delivery_dt = _parse_delivery_dt(odata.get("delivery_date"))
+    # Unique code
+    code = _ensure_unique_code(db, oin.get("code"))
+
+    # Delivery date
+    delivery_iso = _parse_date_like(oin.get("delivery_date"))
+    delivery_date = datetime.fromisoformat(delivery_iso) if delivery_iso else None
+
+    # Build Order
     order = Order(
-        code=temp_code,
-        type=odata.get("type", "OUTRIGHT"),
-        status="ACTIVE" if odata.get("type") in ("RENTAL", "INSTALLMENT") else "NEW",
+        code=code,
+        type=(oin.get("type") or "OUTRIGHT").upper(),
+        status="NEW",
         customer_id=customer.id,
-        delivery_date=delivery_dt,
-        notes=odata.get("notes") or None,
+        delivery_date=delivery_date,
+        notes=(oin.get("notes") or "").strip() or None,
+        subtotal=_d(oin.get("totals", {}).get("subtotal")),
+        discount=_d(charges.get("discount")),
+        delivery_fee=_d(charges.get("delivery_fee")),
+        return_delivery_fee=_d(charges.get("return_delivery_fee")),
+        penalty_fee=_d(charges.get("penalty_fee")),
+        total=_d(oin.get("totals", {}).get("total")),
+        paid_amount=_d(oin.get("totals", {}).get("paid")),
+        balance=_d(oin.get("totals", {}).get("to_collect")),
     )
     db.add(order)
-    db.flush()  # need order.id
+    db.flush()
 
-    # --- items ---
-    items = odata.get("items") or []
-    subtotal = Decimal("0.00")
+    # Items
+    items = oin.get("items") or []
     for it in items:
-        qty = d(it.get("qty") or 1)
-        unit_price = d(it.get("unit_price") or it.get("price") or 0)
-        line_total = d(it.get("line_total") or (qty * unit_price))
-        oi = OrderItem(
+        unit_price = _d(it.get("unit_price") if it.get("unit_price") is not None else it.get("line_total"))
+        qty = int(it.get("qty") or 1)
+        from decimal import Decimal as _Dec
+        line_total = (unit_price * qty).quantize(_Dec("0.01"))
+        db.add(OrderItem(
             order_id=order.id,
-            name=it.get("name") or "Item",
-            sku=it.get("sku") or None,
-            category=it.get("category") or None,
-            item_type=it.get("item_type") or odata.get("type") or "OUTRIGHT",
-            qty=int(qty),
+            name=(it.get("name") or "").strip(),
+            sku=(it.get("sku") or None),
+            qty=qty,
             unit_price=unit_price,
             line_total=line_total,
-        )
-        db.add(oi)
-        subtotal += line_total
+            category=(it.get("category") or None),
+            item_type=(it.get("item_type") or order.type),
+        ))
 
-    # --- charges ---
-    charges = odata.get("charges") or {}
-    delivery_fee = d(charges.get("delivery_fee"))
-    return_delivery_fee = d(charges.get("return_delivery_fee"))
-    penalty_fee = d(charges.get("penalty_fee"))
-    discount = d(charges.get("discount"))
-
-    # --- totals ---
-    provided_totals = odata.get("totals") or {}
-    computed_total = (subtotal - discount + delivery_fee + return_delivery_fee + penalty_fee).quantize(TWO_DP)
-    total = d(provided_totals.get("total")) or computed_total
-    paid = d(provided_totals.get("paid"))
-    balance = (total - paid).quantize(TWO_DP)
-
-    order.subtotal = subtotal
-    order.discount = discount
-    order.delivery_fee = delivery_fee
-    order.return_delivery_fee = return_delivery_fee
-    order.penalty_fee = penalty_fee
-    order.total = total
-    order.paid_amount = paid
-    order.balance = balance
-
-    # --- plan ---
-    plan_data = odata.get("plan") or {}
-    plan_type = plan_data.get("plan_type")
-    if not plan_type and odata.get("type") in ("RENTAL", "INSTALLMENT"):
-        plan_type = odata.get("type")
-    if plan_type in ("RENTAL", "INSTALLMENT"):
-        months = plan_data.get("months")
-        monthly_amount = d(plan_data.get("monthly_amount"))
-        start_d = delivery_dt.date() if delivery_dt else date.today()
+    # Plan (only for RENTAL / INSTALLMENT)
+    if order.type in ("RENTAL", "INSTALLMENT"):
+        monthly_amount = _d(plan_in.get("monthly_amount") or oin.get("totals", {}).get("monthly_amount"))
+        months = plan_in.get("months")
         plan = Plan(
             order_id=order.id,
-            plan_type=plan_type,
-            months=int(months) if months is not None and str(months).isdigit() else None,
+            plan_type=order.type,
+            months=int(months) if months else None,
             monthly_amount=monthly_amount,
-            start_date=start_d,
+            start_date=datetime.fromisoformat(plan_in["start_date"]) if plan_in.get("start_date") else delivery_date,
         )
         db.add(plan)
 
-    # --- payment (cash-basis immediate) ---
-    if paid > Decimal("0.00"):
-        p = Payment(
-            order_id=order.id,
-            date=date.today(),
-            amount=paid,
-            method="cash",
-            reference="intake",
-            category="ORDER",
-        )
-        db.add(p)
+    # If totals missing, recompute conservatively
+    if order.total == Decimal("0.00"):
+        sum_items = sum((i.line_total for i in order.items), Decimal("0.00"))
+        order.subtotal = sum_items
+        order.total = (sum_items + order.delivery_fee + order.return_delivery_fee + order.penalty_fee - order.discount).quantize(Decimal("0.01"))
+        order.balance = (order.total - order.paid_amount).quantize(Decimal("0.01"))
+
+    db.commit()
+    db.refresh(order)
+    return _order_to_dto(order)
