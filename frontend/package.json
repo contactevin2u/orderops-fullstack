@@ -1,21 +1,28 @@
 {
-  "name": "orderops-frontend-v1",
+  "name": "orderops-frontend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint --max-warnings 0"
   },
   "dependencies": {
+    "clsx": "2.1.0",
     "next": "14.2.5",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "swr": "2.3.0"
   },
   "devDependencies": {
-    "typescript": "5.5.4",
-    "@types/react": "18.2.45",
-    "@types/node": "20.12.12"
+    "@types/node": "22.5.4",
+    "@types/react": "18.3.8",
+    "@types/react-dom": "18.3.0",
+    "eslint": "9.12.0",
+    "eslint-config-next": "14.2.5",
+    "postcss": "8.4.47",
+    "autoprefixer": "10.4.20",
+    "typescript": "5.5.4"
   }
 }

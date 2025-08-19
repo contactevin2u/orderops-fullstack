@@ -1,42 +1,29 @@
-import { useState } from 'react'
-import { api } from '../lib/api'
+import Layout from "@/components/Layout";
+import Link from "next/link";
+import useSWR from "swr";
+import { ping } from "@/utils/api";
 
 export default function Home() {
-  const [text, setText] = useState('')
-  const [parsed, setParsed] = useState<any>(null)
-  const [creating, setCreating] = useState(false)
-  const [resultMsg, setResultMsg] = useState('')
-
-  async function handleParse(createOrder=false) {
-    setResultMsg('')
-    const data = await api('/parse', { method:'POST', body: JSON.stringify({ text, create_order:createOrder }) })
-    setParsed(data.parsed || data)
-    if (data.created_order_id) {
-      setResultMsg(`Order created: ${data.order_code} (ID ${data.created_order_id})`)
-    }
-  }
-
+  const { data, error } = useSWR("healthz", ping, { refreshInterval: 30000 });
   return (
-    <div className="container">
-      <h1>Order Intake (WhatsApp → Order)</h1>
-      <div className="card">
-        <label>Paste WhatsApp message:</label>
-        <textarea rows={10} style={{width:'100%'}} value={text} onChange={e=>setText(e.target.value)} />
-        <div className="actions">
-          <button onClick={()=>handleParse(false)}>Parse Only</button>
-          <button onClick={()=>handleParse(true)}>Parse & Create Order</button>
+    <Layout>
+      <h2 style={{marginTop:0}}>Dashboard</h2>
+      <div className="row">
+        <div className="col card">
+          <h3>Quick Actions</h3>
+          <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+            <Link href="/parse" className="btn">Parse & Create</Link>
+            <Link href="/orders" className="btn ghost">Orders</Link>
+            <Link href="/reports/outstanding" className="btn ghost">Outstanding</Link>
+          </div>
         </div>
-        {resultMsg && <p><b>{resultMsg}</b></p>}
-      </div>
-      {parsed && (
-        <div className="card">
-          <h3>Parsed Preview</h3>
-          <pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(parsed, null, 2)}</pre>
+        <div className="col card">
+          <h3>API Health</h3>
+          {error && <div style={{color:"var(--err)"}}>Backend unreachable: {String(error)}</div>}
+          {!error && <div>Health: <span className="badge">{typeof data === "string" ? data : "OK"}</span></div>}
+          <small>Polling every 30s</small>
         </div>
-      )}
-      <div className="card">
-        <a href="/ops">Go to Operations</a>
       </div>
-    </div>
-  )
+    </Layout>
+  );
 }

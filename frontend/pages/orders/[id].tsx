@@ -1,137 +1,150 @@
+import Layout from "@/components/Layout";
 import { useRouter } from "next/router";
+import useSWR from "swr";
+import { addPayment, getOrder, invoicePdfUrl, updateOrder, voidOrder, voidPayment } from "@/utils/api";
 import { useEffect, useState } from "react";
-import { getOrders, updateOrder, voidOrder, addPayment } from "../../lib/api";
+import OrderForm from "@/components/OrderForm";
 
 export default function OrderDetailPage() {
   const router = useRouter();
-  const { id } = router.query;
+  const id = router.query.id as string | undefined;
+  const { data: order, error, isLoading, mutate } = useSWR(id ? `orders/${id}` : null, () => getOrder(id!));
+  const [msg, setMsg] = useState<string| null>(null);
 
-  const [order, setOrder] = useState<any>(null);
-  const [note, setNote] = useState<string>("");
-  const [status, setStatus] = useState<string>("NEW");
-  const [payAmt, setPayAmt] = useState<string>("");
-  const [voidReason, setVoidReason] = useState<string>("");
-  const [msg, setMsg] = useState<string>("");
+  useEffect(()=>{ if (error) setMsg(String(error)); }, [error]);
 
-  useEffect(() => {
-    if (!id) return;
-    (async () => {
-      try {
-        const list = await getOrders();
-        const found = list.find((o: any) => String(o.id) === String(id));
-        if (found) {
-          setOrder(found);
-          setNote(found.notes || "");
-          setStatus(found.status || "NEW");
-        } else {
-          setMsg("Order not found");
-        }
-      } catch (e: any) {
-        setMsg(e.message || "Failed to load order");
-      }
-    })();
-  }, [id]);
-
-  const save = async () => {
-    if (!id) return;
+  async function postPayment() {
+    setMsg(null);
     try {
-      await updateOrder(Number(id), { notes: note, status });
-      setMsg("Saved");
-    } catch (e: any) {
-      setMsg(e.message || "Failed to save");
+      const amountRaw = prompt("Amount (RM)?", "0");
+      if (!amountRaw) return;
+      const amount = Number(amountRaw);
+      const date = prompt("Date (YYYY-MM-DD, optional)?") || undefined;
+      const method = prompt("Method (CASH/FPX/OTHER)?") || undefined;
+      const reference = prompt("Reference (optional)?") || undefined;
+      await addPayment({ order_id: Number(id), amount, date, method, reference, category: "ORDER" });
+      await mutate();
+      setMsg("Payment posted.");
+    } catch (e:any) {
+      setMsg(e.message || "Failed");
     }
-  };
+  }
 
-  const record = async () => {
-    if (!id) return;
+  async function doVoidPayment(pid: number) {
+    const reason = prompt("Reason for void?") || "";
     try {
-      await addPayment({ order_id: Number(id), amount: payAmt });
-      setMsg("Payment added");
-    } catch (e: any) {
-      setMsg(e.message || "Failed to add payment");
-    }
-  };
+      await voidPayment(pid, reason);
+      await mutate();
+      setMsg("Payment voided.");
+    } catch (e:any) { setMsg(e.message || "Failed"); }
+  }
 
-  const voidOrd = async () => {
-    if (!id) return;
+  async function doVoidOrder() {
+    const reason = prompt("Reason to void/cancel order?") || "";
     try {
-      await voidOrder(Number(id), voidReason);
-      setMsg("Order voided");
-    } catch (e: any) {
-      setMsg(e.message || "Failed to void order");
-    }
-  };
+      try { await voidOrder(Number(id), reason); }
+      catch { await updateOrder(Number(id), { status: "CANCELLED", void_reason: reason }); }
+      await mutate();
+      setMsg("Order voided/cancelled.");
+    } catch (e:any) { setMsg(e.message || "Failed"); }
+  }
 
-  if (!order) return <div className="p-4">Loading...</div>;
+  async function setStatus(s: string) {
+    try {
+      await updateOrder(Number(id), { status: s });
+      await mutate();
+      setMsg(`Status -> ${s}`);
+    } catch (e:any) { setMsg(e.message || "Failed"); }
+  }
+
+  async function applyFees() {
+    const delivery = Number(prompt("Delivery fee RM", String(order?.delivery_fee ?? 0)) || 0);
+    const returnFee = Number(prompt("Return delivery fee RM", String(order?.return_delivery_fee ?? 0)) || 0);
+    const penalty = Number(prompt("Penalty RM", String(order?.penalty_fee ?? 0)) || 0);
+    const discount = Number(prompt("Discount RM", String(order?.discount ?? 0)) || 0);
+    try {
+      await updateOrder(Number(id), { delivery_fee: delivery, return_delivery_fee: returnFee, penalty_fee: penalty, discount });
+      await mutate();
+      setMsg("Charges updated.");
+    } catch (e:any) { setMsg(e.message || "Failed"); }
+  }
+
+  if (!id) return <Layout><div>Loading...</div></Layout>;
+  if (isLoading) return <Layout><div>Loading...</div></Layout>;
 
   return (
-    <div className="p-4 space-y-4">
-      <h1 className="text-2xl font-bold">
-        Order #{order.id}{order.code ? ` - ${order.code}` : ""}
-      </h1>
+    <Layout>
+      <h2 style={{marginTop:0}}>Order #{order?.code}</h2>
+      {msg && <div className="card" style={{marginBottom:8}}>{msg}</div>}
+      {error && <div style={{color:"var(--err)"}}>{String(error)}</div>}
+      {!order ? (<div>Not found</div>) : (
+        <>
+          <div className="row">
+            <div className="col">
+              <div className="card">
+                <h3 style={{marginTop:0}}>Summary</h3>
+                <div><b>Customer:</b> {order.customer?.name} <small>({order.customer?.phone})</small></div>
+                <div><b>Type:</b> {order.type} <span className="badge">{order.status}</span></div>
+                <div><b>Total:</b> RM {Number(order.total||0).toFixed(2)} | <b>Paid:</b> RM {Number(order.paid_amount||0).toFixed(2)} | <b>Balance:</b> RM {Number(order.balance||0).toFixed(2)}</div>
+                <div style={{marginTop:8, display:'flex', gap:8, flexWrap:'wrap'}}>
+                  <button className="btn ok" onClick={postPayment}>Add Payment</button>
+                  <button className="btn warn" onClick={applyFees}>Fees/Discount</button>
+                  <a className="btn ghost" target="_blank" rel="noreferrer" href={invoicePdfUrl(Number(id))}>Invoice PDF</a>
+                  <button className="btn err" onClick={doVoidOrder}>Void Order</button>
+                  <button className="btn ghost" onClick={()=>setStatus("RETURNED")}>Mark Returned (Rental)</button>
+                  <button className="btn ghost" onClick={()=>setStatus("BUYBACK")}>Mark Buyback</button>
+                </div>
+              </div>
+            </div>
+            <div className="col">
+              <div className="card">
+                <h3 style={{marginTop:0}}>Edit (inline)</h3>
+                <OrderForm orderId={Number(id)} onSaved={()=>mutate()} />
+              </div>
+            </div>
+          </div>
 
-      <div className="space-y-1">
-        <div>Type: {order.type}</div>
-        <div>
-          Customer: {order.customer?.name} ({order.customer?.phone})
-        </div>
-        <div>Address: {order.customer?.address}</div>
-        <div>
-          Total: RM {order.total} | Paid: RM {order.paid_amount} | Balance: RM {order.balance}
-        </div>
-      </div>
+          <div className="card" style={{marginTop:12}}>
+            <h3 style={{marginTop:0}}>Items</h3>
+            <table className="table">
+              <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Total</th></tr></thead>
+              <tbody>
+                {(order.items||[]).map((it:any)=> (
+                  <tr key={it.id}>
+                    <td>{it.name}</td>
+                    <td>{it.item_type}</td>
+                    <td>{Number(it.qty||0)}</td>
+                    <td>RM {Number(it.unit_price||0).toFixed(2)}</td>
+                    <td>RM {Number(it.line_total||0).toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="space-y-2 border p-3 rounded">
-        <h3 className="font-semibold">Edit</h3>
-        <textarea
-          className="border p-2 w-full"
-          placeholder="Notes"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <select
-          className="border p-2"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-        >
-          <option value="NEW">NEW</option>
-          <option value="ACTIVE">ACTIVE</option>
-          <option value="RETURNED">RETURNED</option>
-          <option value="CANCELLED">CANCELLED</option>
-          <option value="COMPLETED">COMPLETED</option>
-        </select>
-        <button className="px-3 py-2 bg-black text-white rounded" onClick={save}>
-          Save
-        </button>
-      </div>
-
-      <div className="space-y-2 border p-3 rounded">
-        <h3 className="font-semibold">Record Payment</h3>
-        <input
-          className="border p-2 w-40"
-          placeholder="Amount"
-          value={payAmt}
-          onChange={(e) => setPayAmt(e.target.value)}
-        />
-        <button className="px-3 py-2 bg-green-600 text-white rounded" onClick={record}>
-          Add Payment
-        </button>
-      </div>
-
-      <div className="space-y-2 border p-3 rounded">
-        <h3 className="font-semibold">Void Order</h3>
-        <input
-          className="border p-2 w-full"
-          placeholder="Reason (optional)"
-          value={voidReason}
-          onChange={(e) => setVoidReason(e.target.value)}
-        />
-        <button className="px-3 py-2 bg-red-600 text-white rounded" onClick={voidOrd}>
-          Void Entire Order
-        </button>
-      </div>
-
-      {msg && <div className="text-blue-700">{msg}</div>}
-    </div>
+          <div className="card" style={{marginTop:12}}>
+            <h3 style={{marginTop:0}}>Payments</h3>
+            <table className="table">
+              <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th><th></th></tr></thead>
+              <tbody>
+                {(order.payments||[]).map((p:any)=> (
+                  <tr key={p.id}>
+                    <td>{p.date}</td>
+                    <td>RM {Number(p.amount||0).toFixed(2)}</td>
+                    <td>{p.method || "-"}</td>
+                    <td>{p.status}</td>
+                    <td>
+                      {p.status !== "VOIDED" && (
+                        <button className="btn err" onClick={()=>doVoidPayment(p.id)}>Void</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Layout>
   );
 }
