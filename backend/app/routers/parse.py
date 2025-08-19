@@ -1,198 +1,210 @@
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal, ROUND_HALF_UP
+import re
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from datetime import datetime
-from decimal import Decimal, InvalidOperation
-import re
 
 from ..db import get_session
-from ..services import ordersvc
-from ..services.parser import parse_text  # your existing LLM/regex parser
+# IMPORTANT: the real parser lives in services/parser.py as `parse_whatsapp_text`.
+# To avoid another mismatch, we alias it as parse_text here.
+from ..services.parser import parse_whatsapp_text as parse_text
+from ..services.ordersvc import create_from_parsed
 
 router = APIRouter(prefix="/parse", tags=["parse"])
 
+
 class ParseIn(BaseModel):
     text: str
-    create: bool | None = False
+    create_order: bool = False
 
-class ParseOut(BaseModel):
-    ok: bool
-    parsed: dict | None = None
-    order_id: int | None = None
-    message: str | None = None
 
-NUM0 = Decimal("0.00")
-
-def _to_decimal(x) -> Decimal:
-    if x is None:
-        return NUM0
-    if isinstance(x, Decimal):
-        return x
+def _d(val: Any) -> Decimal:
+    """Decimal with 2dp, tolerant of None/str/float/int."""
+    if val is None:
+        return Decimal("0.00")
+    if isinstance(val, Decimal):
+        return val.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     try:
-        # Accept ints/floats/strings safely
-        return Decimal(str(x).strip().replace(",", ""))
-    except (InvalidOperation, AttributeError):
-        return NUM0
+        return Decimal(str(val)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
 
-def _ensure_dict(d):
-    return d if isinstance(d, dict) else {}
 
-def _extract_code_if_missing(raw_text: str) -> str | None:
-    # Examples: KP2010, Kp2017, WC2009, etc.
-    m = re.search(r"\b([A-Za-z]{1,3}\d{3,6})\b", raw_text)
-    return m.group(1).upper() if m else None
+def _ensure_dict(x: Any) -> Dict[str, Any]:
+    return x if isinstance(x, dict) else {}
 
-def _normalize_datestr(s: str | None) -> str | None:
-    if not s:
+
+def _ensure_list(x: Any) -> List[Any]:
+    return x if isinstance(x, list) else []
+
+
+def _maybe_parse_delivery_date(raw: str) -> Optional[datetime]:
+    # try dd/mm or d/m patterns mentioned near the word delivery/hantar
+    m = re.search(r"(?:deliver|delivery|hantar)\s*(?:on|:)?\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", raw, re.I)
+    if not m:
+        m = re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))\b", raw)
+    if not m:
         return None
-    # Accept things like "delivery 19/8", "19/8", "17/08", "17/8 before 9pm"
-    mm = re.search(r"(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?", s)
-    if not mm:
-        return s
-    d, m, y = mm.group(1), mm.group(2), mm.group(3)
-    now = datetime.now()
-    year = int(y) if y else now.year
+    d, mth, yr = int(m.group(1)), int(m.group(2)), m.group(3)
+    year = int(yr) if yr else date.today().year
+    if year < 100:
+        year += 2000
     try:
-        dt = datetime(year=int(year), month=int(m), day=int(d))
-        return dt.date().isoformat()
+        return datetime(year, mth, d)
     except ValueError:
-        return s
+        return None
 
-def _post_normalize(parsed: dict, raw_text: str) -> dict:
-    if not isinstance(parsed, dict):
-        parsed = {}
 
+def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
+    """
+    Make the parser output safe for order creation:
+    - default missing objects
+    - coerce numerics to Decimal
+    - infer plan_type from order.type when absent
+    - compute totals when missing or zero-ish
+    """
+    parsed = _ensure_dict(parsed)
     customer = _ensure_dict(parsed.get("customer"))
     order = _ensure_dict(parsed.get("order"))
 
-    # --- plan safe dict
+    # Normalise plan
     plan = _ensure_dict(order.get("plan"))
-    # If someone put plan fields at root of order, still OK.
-    if not plan and ("months" in order or "monthly_amount" in order):
-        plan = {"months": order.get("months"), "monthly_amount": order.get("monthly_amount")}
-    order["plan"] = plan
+    if "type" in order and "plan_type" not in plan and order.get("type"):
+        plan["plan_type"] = order["type"]
 
-    # --- charges & totals normalization
-    charges = _ensure_dict(order.get("charges"))
-    totals = _ensure_dict(order.get("totals"))
+    # Try to derive delivery_date if it's a short "19/8" or embedded
+    dd = str(order.get("delivery_date") or "").strip()
+    dt: Optional[datetime] = None
+    if dd:
+        m = re.match(r"^\D*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\D*$", dd)
+        if m:
+            d, mth, yr = int(m.group(1)), int(m.group(2)), m.group(3)
+            year = int(yr) if yr else date.today().year
+            if year < 100:
+                year += 2000
+            try:
+                dt = datetime(year, mth, d)
+            except ValueError:
+                dt = None
+    if not dt:
+        dt = _maybe_parse_delivery_date(raw_text)
+    order["delivery_date"] = dt
 
-    # Some models accidentally put totals under charges
-    # Promote if present & totals empty
-    for k in ("total", "paid", "to_collect", "subtotal"):
-        if k in charges and k not in totals:
-            totals[k] = charges.pop(k)
+    # Items
+    items = []
+    for it in _ensure_list(order.get("items")):
+        it = _ensure_dict(it)
+        qty = _d(it.get("qty") or 1).quantize(Decimal("1"))
+        unit_price = _d(it.get("unit_price"))
+        line_total = _d(it.get("line_total"))
+        monthly_amount = _d(it.get("monthly_amount"))
+        item_type = (it.get("item_type") or order.get("type") or "").upper() or "OUTRIGHT"
 
-    # Ensure numeric shapes
-    for key in ("subtotal", "total", "paid", "to_collect"):
-        totals[key] = float(_to_decimal(totals.get(key)))
+        # If instalment/rental line without price, treat monthly_amount as line total
+        if item_type in {"INSTALLMENT", "RENTAL"} and line_total == Decimal("0.00") and monthly_amount > 0:
+            unit_price = monthly_amount
+            line_total = monthly_amount
 
-    for key in ("delivery_fee", "return_delivery_fee", "penalty_fee", "discount"):
-        charges[key] = float(_to_decimal(charges.get(key)))
-
-    order["charges"] = charges
-    order["totals"] = totals
-
-    # --- delivery date normalization
-    order["delivery_date"] = _normalize_datestr(order.get("delivery_date"))
-
-    # --- type & plan_type sanity
-    otype = (order.get("type") or "").upper()
-    if otype not in ("OUTRIGHT", "INSTALLMENT", "RENTAL"):
-        # derive from raw text hints
-        if re.search(r"\b(ANSURAN|INSTALLMENT)\b", raw_text, re.I):
-            otype = "INSTALLMENT"
-        elif re.search(r"\b(SEWA|RENTAL)\b", raw_text, re.I):
-            otype = "RENTAL"
-        else:
-            otype = "OUTRIGHT"
-    order["type"] = otype
-
-    if "plan_type" not in plan and otype in ("INSTALLMENT", "RENTAL"):
-        plan["plan_type"] = otype
-
-    # months / monthly_amount can be text – coerce to numbers
-    plan["months"] = int(plan.get("months") or 0)
-    plan["monthly_amount"] = float(_to_decimal(plan.get("monthly_amount")))
-
-    # --- items normalization
-    items = order.get("items") or []
-    norm_items = []
-    for it in items:
-        if not isinstance(it, dict):
-            continue
-        name = (it.get("name") or "").strip() or "Item"
-        qty = int(it.get("qty") or 1)
-        item_type = (it.get("item_type") or "").upper()
-        monthly_amount = float(_to_decimal(it.get("monthly_amount")))
-        unit_price = float(_to_decimal(it.get("unit_price")))
-        line_total = float(_to_decimal(it.get("line_total")))
-        # Fix common mislabels:
-        # - If monthly_amount > 0, it's recurring (match order type)
-        if monthly_amount > 0 and otype in ("INSTALLMENT", "RENTAL"):
-            item_type = otype
-            # keep unit_price as monthly for record
-            if unit_price == 0:
-                unit_price = monthly_amount
-            if line_total == 0:
-                line_total = monthly_amount * qty
-        # - If name contains "(Beli)" or looks like outright and there's a single number with no '/bulan'
-        if re.search(r"\(beli\)", name, re.I) and item_type in ("", "INSTALLMENT", "RENTAL"):
-            item_type = "OUTRIGHT"
-
-        norm_items.append({
-            "name": name,
-            "sku": it.get("sku"),
+        items.append({
+            "name": it.get("name") or "Item",
+            "sku": it.get("sku") or None,
+            "category": it.get("category") or None,
+            "item_type": item_type,
             "qty": qty,
             "unit_price": unit_price,
-            "line_total": line_total if line_total else unit_price * qty,
-            "category": it.get("category"),
-            "item_type": item_type or ("OUTRIGHT" if otype == "OUTRIGHT" else otype),
-            "monthly_amount": monthly_amount,
+            "line_total": line_total,
         })
+    order["items"] = items
 
-    order["items"] = norm_items
+    # Charges
+    ch = _ensure_dict(order.get("charges"))
+    delivery_fee = _d(ch.get("delivery_fee"))
+    return_delivery_fee = _d(ch.get("return_delivery_fee"))
+    penalty_fee = _d(ch.get("penalty_fee"))
+    discount = _d(ch.get("discount"))
 
-    # --- code normalization / fallback
-    code = (order.get("code") or "").strip()
-    if not code:
-        code = _extract_code_if_missing(raw_text) or ""
-    order["code"] = code.upper() if code else ""
+    # Totals (recompute when missing/zero)
+    totals = _ensure_dict(order.get("totals"))
+    subtotal = _d(totals.get("subtotal"))
+    total = _d(totals.get("total"))
+    paid = _d(totals.get("paid"))
+    to_collect = _d(totals.get("to_collect"))
+
+    if subtotal == Decimal("0.00"):
+        subtotal = sum(_d(i.get("line_total")) for i in items)
+
+    fees = delivery_fee + return_delivery_fee + penalty_fee - discount
+    computed_total = (subtotal + fees).quantize(Decimal("0.01"))
+    if total == Decimal("0.00") or total != computed_total:
+        total = computed_total
+    if to_collect == Decimal("0.00"):
+        to_collect = (total - paid).quantize(Decimal("0.01"))
+
+    order["charges"] = {
+        "delivery_fee": delivery_fee,
+        "return_delivery_fee": return_delivery_fee,
+        "penalty_fee": penalty_fee,
+        "discount": discount,
+    }
+    order["totals"] = {
+        "subtotal": subtotal,
+        "total": total,
+        "paid": paid,
+        "to_collect": to_collect,
+    }
+    order["plan"] = plan
 
     parsed["customer"] = customer
     parsed["order"] = order
     return parsed
 
-@router.post("", response_model=ParseOut)
+
+def _jsonify_for_frontend(parsed: Dict[str, Any]) -> Dict[str, Any]:
+    """Front-end expects plain numbers; convert Decimals and datetimes."""
+    def conv(v):
+        if isinstance(v, Decimal):
+            return float(v)
+        if isinstance(v, (datetime, date)):
+            return v.isoformat()
+        if isinstance(v, dict):
+            return {k: conv(v) for k, v in v.items()}
+        if isinstance(v, list):
+            return [conv(x) for x in v]
+        return v
+    return conv(parsed)  # type: ignore
+
+
+@router.post("", response_model=dict)
 def parse_message(body: ParseIn, db: Session = Depends(get_session)):
-    """
-    1) Parse raw WhatsApp text to structured order
-    2) Normalize & fix common shape/typing issues
-    3) Optionally create the order in DB (unique code, totals computed)
-    """
-    text = (body.text or "").strip()
-    if not text:
+    raw = (body.text or "").strip()
+    if not raw:
         raise HTTPException(400, "text is required")
 
     try:
-        raw = parse_text(text)  # your existing parser (LLM or rules)
+        parsed = parse_text(raw) or {}
     except Exception as e:
-        raise HTTPException(500, f"Parser error: {e}")
+        # Surface a 400 so the UI can show message and still allow manual entry
+        raise HTTPException(400, f"parse failed: {e}")
 
-    try:
-        parsed = _post_normalize(raw, text)
-    except Exception as e:
-        # Make absolutely sure parse endpoint never 500s on shape issues
-        raise HTTPException(400, f"normalize error: {e}")
+    parsed = _post_normalize(parsed, raw)
 
-    if not body.create:
-        return ParseOut(ok=True, parsed=parsed, order_id=None, message="Parsed only")
+    created = {}
+    if body.create_order:
+        try:
+            order_id, code = create_from_parsed(parsed, db)
+            created = {"order_id": order_id, "code": code}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(400, f"could not create order: {e}")
 
-    # Create in DB safely
-    try:
-        created = ordersvc.create_from_parsed(db=db, parsed=parsed)
-        return ParseOut(ok=True, parsed=parsed, order_id=created.id, message="Order created")
-    except HTTPException:
-        raise
-    except Exception as e:
-        # Return as 400 to surface problems but not crash worker
-        raise HTTPException(400, f"create error: {e}")
+    return {
+        "ok": True,
+        "parsed": _jsonify_for_frontend(parsed),
+        **({"created": created} if created else {}),
+    }
