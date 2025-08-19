@@ -1,49 +1,51 @@
 import Layout from "@/components/Layout";
-import useSWR from "swr";
+import React from "react";
 import { outstanding } from "@/utils/api";
-import { useState } from "react";
-
-function Block({ title, rows}:{ title:string; rows:any[] }){
-  const total = rows.reduce((s,r)=> s + Number(r.balance||0), 0);
-  return (
-    <div className="card">
-      <h3 style={{marginTop:0}}>{title} <small>({rows.length} orders)</small></h3>
-      <table className="table">
-        <thead><tr><th>Code</th><th>Customer</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead>
-        <tbody>
-          {rows.map((r:any)=> (
-            <tr key={r.id}>
-              <td>{r.code}</td>
-              <td>{r.customer?.name}</td>
-              <td>RM {Number(r.total||0).toFixed(2)}</td>
-              <td>RM {Number(r.paid_amount||0).toFixed(2)}</td>
-              <td>RM {Number(r.balance||0).toFixed(2)}</td>
-              <td>{r.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <div style={{marginTop:8}}><b>Total Outstanding:</b> RM {total.toFixed(2)}</div>
-    </div>
-  );
-}
+import Link from "next/link";
 
 export default function OutstandingPage(){
-  const [tab, setTab] = useState<"INSTALLMENT"|"RENTAL">("INSTALLMENT");
-  const { data: inst, error: e1 } = useSWR(tab==="INSTALLMENT" ? "outstanding-inst" : null, () => outstanding("INSTALLMENT"), { refreshInterval: 60000 });
-  const { data: rent, error: e2 } = useSWR(tab==="RENTAL" ? "outstanding-rent" : null, () => outstanding("RENTAL"), { refreshInterval: 60000 });
+  const [tab,setTab] = React.useState<"INSTALLMENT"|"RENTAL">("INSTALLMENT");
+  const [rows,setRows] = React.useState<any[]>([]);
+  const [loading,setLoading] = React.useState(false);
+
+  async function load(){
+    setLoading(true);
+    try{
+      const r = await outstanding(tab);
+      setRows(r.items || []);
+    }catch(e){ console.error(e); }
+    setLoading(false);
+  }
+
+  React.useEffect(()=>{ load(); },[tab]);
 
   return (
     <Layout>
-      <h2 style={{marginTop:0}}>Outstanding</h2>
-      <div style={{display:'flex', gap:8, marginBottom:8}}>
-        <button className={"btn " + (tab==="INSTALLMENT"?"":"ghost")} onClick={()=>setTab("INSTALLMENT")}>Installments</button>
-        <button className={"btn " + (tab==="RENTAL"?"":"ghost")} onClick={()=>setTab("RENTAL")}>Rentals</button>
+      <div className="card">
+        <h2 style={{marginTop:0}}>Outstanding</h2>
+        <div className="nav">
+          <button className="btn" onClick={()=>setTab("INSTALLMENT")} disabled={tab==="INSTALLMENT"}>Installments</button>
+          <button className="btn secondary" onClick={()=>setTab("RENTAL")} disabled={tab==="RENTAL"}>Rentals</button>
+          <button className="btn secondary" onClick={load} disabled={loading}>{loading?"Refreshing...":"Refresh"}</button>
+        </div>
+        <div style={{overflowX:"auto"}}>
+          <table className="table">
+            <thead><tr><th>Code</th><th>Customer</th><th>Type</th><th>Status</th><th>Balance</th></tr></thead>
+            <tbody>
+              {rows.map((r:any)=>(
+                <tr key={r.id}>
+                  <td><Link href={`/orders/${r.id}`}>{r.code||r.id}</Link></td>
+                  <td>{r.customer?.name}</td>
+                  <td>{r.type}</td>
+                  <td><span className="badge">{r.status}</span></td>
+                  <td style={{textAlign:"right"}}>RM {Number(r.balance||0).toFixed(2)}</td>
+                </tr>
+              ))}
+              {rows.length===0 && <tr><td colSpan={5} style={{opacity:.7}}>No data</td></tr>}
+            </tbody>
+          </table>
+        </div>
       </div>
-      {e1 && <div style={{color:"var(--err)"}}>{String(e1)}</div>}
-      {e2 && <div style={{color:"var(--err)"}}>{String(e2)}</div>}
-      {tab==="INSTALLMENT" && inst && <Block title="Installment Orders" rows={inst} />}
-      {tab==="RENTAL" && rent && <Block title="Rental Orders" rows={rent} />}
     </Layout>
   );
 }
