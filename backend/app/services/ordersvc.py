@@ -1,188 +1,193 @@
 from __future__ import annotations
-
-from typing import Any, Dict, Optional, List, Tuple
-from decimal import Decimal
-from datetime import datetime, date
-import re
-import random
-
 from sqlalchemy.orm import Session
+from sqlalchemy import select, func
+from decimal import Decimal, InvalidOperation
+from datetime import datetime
 
 from ..models import Customer, Order, OrderItem, Plan
 
-def _d(val: Any) -> Decimal:
-    if isinstance(val, Decimal):
-        return val.quantize(Decimal("0.01"))
+NUM0 = Decimal("0.00")
+
+def _D(x) -> Decimal:
+    if x is None:
+        return NUM0
+    if isinstance(x, Decimal):
+        return x
     try:
-        return Decimal(str(val or "0")).quantize(Decimal("0.01"))
-    except Exception:
-        return Decimal("0.00")
+        return Decimal(str(x).strip().replace(",", ""))
+    except (InvalidOperation, AttributeError):
+        return NUM0
 
-def _parse_date_like(txt: Optional[str]) -> Optional[str]:
-    if not txt:
-        return None
-    m = re.search(r"([0-3]?\d)[/.-]([01]?\d)(?:[/.-](\d{2,4}))?", str(txt))
-    if not m:
-        return None
-    d = int(m.group(1)); mth = int(m.group(2))
-    y = int(m.group(3)) if m.group(3) else datetime.utcnow().year
-    if y < 100:
-        y += 2000
-    try:
-        return date(y, mth, d).isoformat()
-    except ValueError:
-        return None
+def _unique_code(db: Session, desired: str | None) -> str:
+    base = (desired or "").strip().upper()
+    if not base:
+        base = f"TMP-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+    code = base
+    # Ensure uniqueness by suffixing -2, -3, ...
+    i = 2
+    while db.execute(select(Order.id).where(Order.code == code)).first():
+        code = f"{base}-{i}"
+        i += 1
+    return code
 
-def _ensure_unique_code(db: Session, code: Optional[str]) -> str:
-    base = (code or "").strip() or ""
-    if base:
-        exists = db.query(Order).filter(Order.code == base).first()
-        if not exists:
-            return base
-    # Generate TMP-YYMMDD-HHMMSS-XXXX
-    while True:
-        tmp = f"TMP-{datetime.utcnow():%y%m%d-%H%M%S}-{random.randrange(1000,9999)}"
-        if not db.query(Order).filter(Order.code == tmp).first():
-            return tmp
-
-def _first_phone(raw: Optional[str]) -> Optional[str]:
-    if not raw:
-        return None
-    # Pick the first 9-14 digit sequence
-    m = re.search(r"(\+?\d{9,14})", raw.replace("/", " "))
-    return m.group(1) if m else None
-
-def _order_to_dto(order: Order) -> Dict[str, Any]:
-    return {
-        "id": order.id,
-        "code": order.code,
-        "type": order.type,
-        "status": order.status,
-        "customer": {
-            "id": order.customer.id if order.customer else None,
-            "name": order.customer.name if order.customer else None,
-            "phone": order.customer.phone if order.customer else None,
-            "address": order.customer.address if order.customer else None,
-        },
-        "delivery_date": order.delivery_date.isoformat() if getattr(order, "delivery_date", None) else None,
-        "notes": order.notes,
-        "subtotal": float(order.subtotal or 0),
-        "discount": float(order.discount or 0),
-        "delivery_fee": float(order.delivery_fee or 0),
-        "return_delivery_fee": float(order.return_delivery_fee or 0),
-        "penalty_fee": float(order.penalty_fee or 0),
-        "total": float(order.total or 0),
-        "paid_amount": float(order.paid_amount or 0),
-        "balance": float(order.balance or 0),
-        "items": [
-            {
-                "id": it.id,
-                "name": it.name,
-                "sku": it.sku,
-                "qty": it.qty,
-                "unit_price": float(it.unit_price or 0),
-                "line_total": float(it.line_total or 0),
-                "category": it.category,
-                "item_type": it.item_type,
-            }
-            for it in (order.items or [])
-        ],
-        "plan": {
-            "id": order.plan.id if order.plan else None,
-            "plan_type": order.plan.plan_type if order.plan else None,
-            "months": order.plan.months if order.plan else None,
-            "monthly_amount": float(order.plan.monthly_amount or 0) if order.plan else 0,
-            "start_date": order.plan.start_date.isoformat() if (order.plan and order.plan.start_date) else None,
-        } if order.plan else None,
-        "created_at": order.created_at.isoformat() if getattr(order, "created_at", None) else None,
-        "updated_at": order.updated_at.isoformat() if getattr(order, "updated_at", None) else None,
-    }
-
-def create_order_from_parsed(db: Session, parsed: Dict[str, Any]) -> Dict[str, Any]:
-    cust = (parsed or {}).get("customer") or {}
-    oin = (parsed or {}).get("order") or {}
-    charges = oin.get("charges") or {}
-    plan_in = oin.get("plan") or {}
-
-    # Upsert/find customer by phone (fallback by name)
-    phone = _first_phone(cust.get("phone"))
-    customer = None
-    if phone:
-        customer = db.query(Customer).filter(Customer.phone == phone).first()
-    if not customer:
-        customer = Customer(
-            name=(cust.get("name") or "").strip() or "Unknown",
-            phone=phone,
-            address=(cust.get("address") or "").strip() or None,
+def _get_or_create_customer(db: Session, name: str, phone: str, address: str) -> Customer:
+    q = db.execute(
+        select(Customer).where(
+            func.replace(func.replace(Customer.phone, " ", ""), "-", "") ==
+            func.replace(func.replace(phone or "", " ", ""), "-", "")
         )
-        db.add(customer)
-        db.flush()
+    ).scalar_one_or_none()
+    if q:
+        # update sparse fields if missing
+        updated = False
+        if (name or "").strip() and q.name != name:
+            q.name = name.strip(); updated = True
+        if (address or "").strip() and q.address != address:
+            q.address = address.strip(); updated = True
+        if updated:
+            db.add(q)
+        return q
+    c = Customer(
+        name=(name or "").strip() or "Unknown",
+        phone=(phone or "").strip(),
+        address=(address or "").strip(),
+    )
+    db.add(c)
+    db.flush()
+    return c
 
-    # Unique code
-    code = _ensure_unique_code(db, oin.get("code"))
+def _compute_totals(order_type: str, items: list[dict], charges: dict, plan: dict, totals: dict) -> tuple[Decimal, Decimal]:
+    """
+    Returns (total_due_today, one_time_subtotal)
+    """
+    delivery_fee = _D(charges.get("delivery_fee"))
+    return_delivery_fee = _D(charges.get("return_delivery_fee"))
+    penalty_fee = _D(charges.get("penalty_fee"))
+    discount = _D(charges.get("discount"))
 
-    # Delivery date
-    delivery_iso = _parse_date_like(oin.get("delivery_date"))
-    delivery_date = datetime.fromisoformat(delivery_iso) if delivery_iso else None
+    # OUTRIGHT items contribute to one-time subtotal
+    one_time_subtotal = NUM0
+    for it in items:
+        it_type = (it.get("item_type") or "").upper()
+        qty = int(it.get("qty") or 1)
+        if it_type == "OUTRIGHT":
+            one_time_subtotal += _D(it.get("unit_price")) * qty
 
-    # Build Order
-    order = Order(
+    # Initial recurring for INSTALLMENT/RENTAL is the first month
+    initial_recurring = NUM0
+    if order_type in ("INSTALLMENT", "RENTAL"):
+        # Prefer plan.monthly_amount
+        initial_recurring = _D(plan.get("monthly_amount"))
+        # Fallback: any item monthly_amount (max)
+        if initial_recurring == NUM0:
+            for it in items:
+                initial_recurring = max(initial_recurring, _D(it.get("monthly_amount")))
+
+    total_due_today = (
+        one_time_subtotal
+        + delivery_fee
+        + return_delivery_fee
+        + penalty_fee
+        + initial_recurring
+        - discount
+    )
+    # If the parser provided a confident 'total', prefer it if > 0
+    provided_total = _D((totals or {}).get("total"))
+    if provided_total > NUM0 and abs(provided_total - total_due_today) <= _D("0.05"):
+        # within 5 sen -> trust either; keep computed
+        pass
+    elif provided_total > NUM0 and initial_recurring == NUM0 and one_time_subtotal == NUM0:
+        # in badly parsed cases, accept provided total
+        total_due_today = provided_total
+
+    return total_due_today, one_time_subtotal
+
+def create_from_parsed(db: Session, parsed: dict) -> Order:
+    cust = (parsed or {}).get("customer") or {}
+    order_in = (parsed or {}).get("order") or {}
+
+    # customer
+    customer = _get_or_create_customer(
+        db=db,
+        name=cust.get("name") or "",
+        phone=cust.get("phone") or "",
+        address=cust.get("address") or "",
+    )
+
+    # core order fields
+    otype = (order_in.get("type") or "OUTRIGHT").upper()
+    code = _unique_code(db, order_in.get("code"))
+    delivery_date = order_in.get("delivery_date")  # already ISO date or free text
+
+    charges = order_in.get("charges") or {}
+    totals = order_in.get("totals") or {}
+    plan_in = order_in.get("plan") or {}
+    items_in = order_in.get("items") or []
+
+    total_due_today, one_time_subtotal = _compute_totals(otype, items_in, charges, plan_in, totals)
+
+    paid_amount = _D(totals.get("paid"))
+    balance = (total_due_today - paid_amount)
+
+    o = Order(
         code=code,
-        type=(oin.get("type") or "OUTRIGHT").upper(),
-        status="NEW",
+        type=otype,
+        status="NEW",  # will be updated by your lifecycle actions
         customer_id=customer.id,
         delivery_date=delivery_date,
-        notes=(oin.get("notes") or "").strip() or None,
-        subtotal=_d(oin.get("totals", {}).get("subtotal")),
-        discount=_d(charges.get("discount")),
-        delivery_fee=_d(charges.get("delivery_fee")),
-        return_delivery_fee=_d(charges.get("return_delivery_fee")),
-        penalty_fee=_d(charges.get("penalty_fee")),
-        total=_d(oin.get("totals", {}).get("total")),
-        paid_amount=_d(oin.get("totals", {}).get("paid")),
-        balance=_d(oin.get("totals", {}).get("to_collect")),
+        notes=(order_in.get("notes") or "").strip(),
+        subtotal=one_time_subtotal,
+        discount=_D(charges.get("discount")),
+        delivery_fee=_D(charges.get("delivery_fee")),
+        return_delivery_fee=_D(charges.get("return_delivery_fee")),
+        penalty_fee=_D(charges.get("penalty_fee")),
+        total=total_due_today,
+        paid_amount=paid_amount,
+        balance=balance,
     )
-    db.add(order)
+    db.add(o)
     db.flush()
 
     # Items
-    items = oin.get("items") or []
-    for it in items:
-        unit_price = _d(it.get("unit_price") if it.get("unit_price") is not None else it.get("line_total"))
+    for it in items_in:
+        name = (it.get("name") or "Item").strip()
         qty = int(it.get("qty") or 1)
-        from decimal import Decimal as _Dec
-        line_total = (unit_price * qty).quantize(_Dec("0.01"))
-        db.add(OrderItem(
-            order_id=order.id,
-            name=(it.get("name") or "").strip(),
+        item_type = (it.get("item_type") or otype).upper()
+        unit_price = _D(it.get("unit_price"))
+        line_total = _D(it.get("line_total"))
+        monthly_amount = _D(it.get("monthly_amount"))
+
+        if line_total == NUM0 and unit_price > NUM0:
+            line_total = unit_price * qty
+        if item_type in ("INSTALLMENT", "RENTAL") and monthly_amount == NUM0 and unit_price > NUM0:
+            monthly_amount = unit_price
+
+        oi = OrderItem(
+            order_id=o.id,
+            name=name,
             sku=(it.get("sku") or None),
+            item_type=item_type,
             qty=qty,
             unit_price=unit_price,
             line_total=line_total,
             category=(it.get("category") or None),
-            item_type=(it.get("item_type") or order.type),
-        ))
-
-    # Plan (only for RENTAL / INSTALLMENT)
-    if order.type in ("RENTAL", "INSTALLMENT"):
-        monthly_amount = _d(plan_in.get("monthly_amount") or oin.get("totals", {}).get("monthly_amount"))
-        months = plan_in.get("months")
-        plan = Plan(
-            order_id=order.id,
-            plan_type=order.type,
-            months=int(months) if months else None,
-            monthly_amount=monthly_amount,
-            start_date=datetime.fromisoformat(plan_in["start_date"]) if plan_in.get("start_date") else delivery_date,
+            monthly_amount=monthly_amount if monthly_amount > NUM0 else None,
         )
-        db.add(plan)
+        db.add(oi)
 
-    # If totals missing, recompute conservatively
-    if order.total == Decimal("0.00"):
-        sum_items = sum((i.line_total for i in order.items), Decimal("0.00"))
-        order.subtotal = sum_items
-        order.total = (sum_items + order.delivery_fee + order.return_delivery_fee + order.penalty_fee - order.discount).quantize(Decimal("0.01"))
-        order.balance = (order.total - order.paid_amount).quantize(Decimal("0.01"))
+    # Plan (for recurring types)
+    if otype in ("INSTALLMENT", "RENTAL"):
+        months = int(plan_in.get("months") or (0 if otype == "RENTAL" else 1))
+        monthly_amount = _D(plan_in.get("monthly_amount"))
+        pl = Plan(
+            order_id=o.id,
+            plan_type=otype,
+            months=None if otype == "RENTAL" else months,
+            monthly_amount=monthly_amount if monthly_amount > NUM0 else None,
+            start_date=order_in.get("delivery_date"),
+        )
+        db.add(pl)
 
     db.commit()
-    db.refresh(order)
-    return _order_to_dto(order)
+    db.refresh(o)
+    return o
