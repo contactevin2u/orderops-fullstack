@@ -15,13 +15,9 @@ class DummyClient:
                 data = {
                     "customer": {"name": "Ali"},
                     "order": {
-                        "type": "MIXED",
-                        "items": [
-                            {"name": "Wheelchair", "qty": 1, "unit_price": 500, "line_total": 500, "item_type": "OUTRIGHT"},
-                            {"name": "Hospital Bed", "qty": 1, "monthly_amount": 200, "item_type": "RENTAL"},
-                        ],
+                        "type": "OUTRIGHT",
+                        "items": [],
                         "charges": {},
-                        "plan": {"months": 1, "monthly_amount": 200},
                         "totals": {},
                     },
                 }
@@ -48,11 +44,19 @@ def test_parse_mixed_items(monkeypatch):
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
     monkeypatch.setattr("app.services.parser._openai_client", lambda: DummyClient())
 
-    text = "WC2009\nBeli Wheelchair RM500\nSewa Bed RM200"
+    text = (
+        "WC2009\n"
+        "Beli Wheelchair RM500\n"
+        "Sewa Bed RM200\n"
+        "Ventilator RM1000 x5"
+    )
     data = parse_whatsapp_text(text)
     norm = _post_normalize(data, text)
 
     assert norm["order"]["type"] == "MIXED"
     assert norm["order"]["items"][0]["item_type"] == "OUTRIGHT"
     assert norm["order"]["items"][1]["item_type"] == "RENTAL"
-    assert norm["order"]["plan"]["plan_type"] == "RENTAL"
+    assert norm["order"]["items"][2]["item_type"] == "INSTALLMENT"
+    assert norm["order"]["plan"]["plan_type"] == "INSTALLMENT"
+    assert float(norm["order"]["plan"]["monthly_amount"]) == 1000
+    assert norm["order"]["plan"]["months"] == 5

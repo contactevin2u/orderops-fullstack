@@ -78,7 +78,7 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
 
     m_inst = re.search(r"RM\s*([\d.,]+)\s*[xX]\s*(\d+)", text)
     plan = {}
-    if t == "INSTALLMENT" and m_inst:
+    if m_inst:
         monthly = rm2f(m_inst.group(1))
         months = int(m_inst.group(2))
         plan = {"plan_type": "INSTALLMENT", "months": months, "monthly_amount": monthly}
@@ -89,6 +89,7 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     m_collect = re.search(r"(?:to\s*collect|balance)\s*[:：]?\s*RM\s*([\d.,]+)", text, flags=re.I)
 
     items = []
+    seen_types = set()
     for line in text.splitlines():
         m_item = re.search(r"(.*)RM\s*([\d.,]+)", line, flags=re.I)
         if not m_item:
@@ -97,8 +98,31 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
             continue
         desc = m_item.group(1).strip().strip(':- ')
         price = rm2f(m_item.group(2))
-        if desc:
-            items.append({"name": desc, "qty": 1, "unit_price": price, "line_total": price, "item_type": t})
+        if not desc:
+            continue
+
+        line_type = "OUTRIGHT"
+        if re.search(r"RM\s*[\d.,]+\s*[xX]\s*\d+", line):
+            line_type = "INSTALLMENT"
+        elif re.search(r"sewa", line, flags=re.I):
+            line_type = "RENTAL"
+        elif re.search(r"beli", line, flags=re.I):
+            line_type = "OUTRIGHT"
+        seen_types.add(line_type)
+
+        items.append({
+            "name": desc,
+            "qty": 1,
+            "unit_price": price,
+            "line_total": price,
+            "item_type": line_type,
+        })
+
+    if seen_types:
+        if len(seen_types) > 1:
+            t = "MIXED"
+        else:
+            t = next(iter(seen_types))
 
     data = {
         "customer": {
