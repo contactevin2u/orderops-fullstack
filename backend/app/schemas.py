@@ -79,7 +79,7 @@ class OrderItemOut(BaseModel):
 class PaymentOut(BaseModel):
     id: int
     amount: float
-    # Use ``date`` so ORM values validate and FastAPI serializes to ISO strings.
+    # Store as ``date`` so ORM values validate and FastAPI emits ISO strings.
     date: Optional[date] = None
     method: Optional[str] = None
     reference: Optional[str] = None
