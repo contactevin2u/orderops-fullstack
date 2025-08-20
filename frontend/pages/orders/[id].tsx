@@ -86,14 +86,21 @@ export default function OrderDetailPage(){
 
   async function onReturned(){
     setBusy(true); setErr(""); setMsg("");
-    try{ await markReturned(order.id); setMsg("Marked as returned"); await load(); }
-    catch(e:any){ setError(e); } finally{ setBusy(false); }
+    try{
+      const out = await markReturned(order.id);
+      setOrder(out?.order || out);
+      setMsg("Marked as returned");
+    }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
 
   async function onBuyback(){
     setBusy(true); setErr(""); setMsg("");
-    try{ await markBuyback(order.id, Number(buybackAmt||0)); setMsg("Buyback recorded"); await load(); }
-    catch(e:any){ setError(e); } finally{ setBusy(false); }
+    try{
+      const out = await markBuyback(order.id, Number(buybackAmt||0));
+      setOrder(out?.order || out);
+      setBuybackAmt("");
+      setMsg("Buyback recorded");
+    }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
 
   return (
