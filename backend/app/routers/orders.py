@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from pydantic import BaseModel
 from decimal import Decimal
 from datetime import datetime, date
@@ -17,13 +17,24 @@ class OrderListOut(OrderOut):
     customer_name: str
 
 @router.get("", response_model=list[OrderListOut])
-def list_orders(limit: int = Query(50, ge=1, le=500), db: Session = Depends(get_session)):
-    stmt = (
-        select(Order, Customer.name.label("customer_name"))
-        .join(Customer, Customer.id == Order.customer_id)
-        .order_by(Order.created_at.desc())
-        .limit(limit)
+def list_orders(
+    q: str | None = None,
+    status: str | None = None,
+    type: str | None = None,
+    limit: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_session),
+):
+    stmt = select(Order, Customer.name.label("customer_name")).join(
+        Customer, Customer.id == Order.customer_id
     )
+    if q:
+        like = f"%{q}%"
+        stmt = stmt.where(or_(Order.code.ilike(like), Customer.name.ilike(like)))
+    if status:
+        stmt = stmt.where(Order.status == status)
+    if type:
+        stmt = stmt.where(Order.type == type)
+    stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
     for (order, customer_name) in rows:
@@ -75,28 +86,69 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
         "balance": float(balance),
     }
 
-@router.put("/{order_id}", response_model=dict)
+@router.put("/{order_id}", response_model=OrderOut)
 def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
 
-    for k in ["notes", "status"]:
-        if k in body:
+    for k in ["notes", "status", "delivery_date"]:
+        if k in body and body[k] is not None:
             setattr(order, k, body[k])
 
     money_fields = [
-        "subtotal", "discount", "delivery_fee",
-        "return_delivery_fee", "penalty_fee",
-        "total", "balance"
+        "subtotal",
+        "discount",
+        "delivery_fee",
+        "return_delivery_fee",
+        "penalty_fee",
+        "total",
+        "balance",
     ]
     for k in money_fields:
         if k in body and body[k] is not None:
             setattr(order, k, Decimal(str(body[k])))
 
+    # Optional plan update
+    if "plan" in body and order.plan:
+        plan_patch = body.get("plan") or {}
+        for k in ["plan_type", "months", "monthly_amount", "status"]:
+            if k in plan_patch and plan_patch[k] is not None:
+                setattr(order.plan, k, plan_patch[k])
+        if plan_patch.get("start_date"):
+            try:
+                order.plan.start_date = datetime.fromisoformat(plan_patch["start_date"]).date()
+            except Exception:
+                pass
+
+    # Optional items update
+    if "items" in body:
+        items_patch = body.get("items") or []
+        for ip in items_patch:
+            iid = ip.get("id")
+            if not iid:
+                continue
+            item = next((it for it in order.items if it.id == iid), None)
+            if not item:
+                continue
+            for k in ["name", "item_type", "sku", "category"]:
+                if k in ip and ip[k] is not None:
+                    setattr(item, k, ip[k])
+            if "qty" in ip and ip["qty"] is not None:
+                item.qty = int(ip["qty"])
+            for k in ["unit_price", "line_total"]:
+                if k in ip and ip[k] is not None:
+                    setattr(item, k, Decimal(str(ip[k])))
+
+        # Recompute subtotal and totals when items change
+        subtotal = sum((itm.line_total or (itm.unit_price * itm.qty)) for itm in order.items)
+        order.subtotal = subtotal
+        order.total = subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee
+        order.balance = order.total - order.paid_amount
+
     db.commit()
     db.refresh(order)
-    return {"ok": True, "order_id": order.id}
+    return OrderOut.model_validate(order)
 
 @router.post("/{order_id}/void", response_model=dict)
 def void_order(order_id: int, body: dict | None = None, db: Session = Depends(get_session)):
