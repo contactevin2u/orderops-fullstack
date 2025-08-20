@@ -158,30 +158,37 @@ def parse_whatsapp_text(text: str) -> Dict[str, Any]:
     if settings.FEATURE_PARSE_REAL and settings.OPENAI_API_KEY:
         client = _openai_client()
         try:
-            resp = client.chat.completions.create(
+            resp = client.responses.create(
                 model="gpt-4o-mini",
                 temperature=0.1,
-                response_format={"type": "json_object"},
-                messages=[
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "OrderSchema", "schema": SCHEMA},
+                },
+                input=[
                     {"role": "system", "content": SYSTEM},
                     {"role": "user", "content": "Schema:\n" + json.dumps(SCHEMA)},
                     {"role": "user", "content": "Parse this message into the schema:\n" + text},
                 ],
             )
-            raw = resp.choices[0].message.content or "{}"
+            raw = getattr(resp, "output_text", "{}") or "{}"
             data = json.loads(raw)
         except Exception:
             data = _heuristic_fallback(text)
     else:
         data = _heuristic_fallback(text)
 
-    heur = _heuristic_fallback(text)
     order = data.setdefault("order", {})
-    if not order.get("items"):
-        order["items"] = heur.get("order", {}).get("items", [])
+    need_heur = not order.get("items")
     charges = order.setdefault("charges", {})
-    if not charges.get("delivery_fee") and heur.get("order", {}).get("charges", {}).get("delivery_fee"):
-        charges["delivery_fee"] = heur["order"]["charges"]["delivery_fee"]
+    if not charges.get("delivery_fee"):
+        need_heur = True
+    if need_heur:
+        heur = _heuristic_fallback(text)
+        if not order.get("items"):
+            order["items"] = heur.get("order", {}).get("items", [])
+        if not charges.get("delivery_fee") and heur.get("order", {}).get("charges", {}).get("delivery_fee"):
+            charges["delivery_fee"] = heur["order"]["charges"]["delivery_fee"]
 
     # Ensure code on first line
     first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
