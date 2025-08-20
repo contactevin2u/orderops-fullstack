@@ -24,6 +24,10 @@ export default function OrderDetailPage(){
   const [notes,setNotes] = React.useState<string>("");
   const [deliveryDate,setDeliveryDate] = React.useState<string>("");
 
+  const [planType,setPlanType] = React.useState<string>("");
+  const [planMonths,setPlanMonths] = React.useState<string>("");
+  const [planMonthly,setPlanMonthly] = React.useState<string>("");
+
   const [buybackAmt,setBuybackAmt] = React.useState<string>("");
 
   const [due,setDue] = React.useState<any>(null);
@@ -42,6 +46,9 @@ export default function OrderDetailPage(){
       setRetDelFee(String(o?.return_delivery_fee ?? ""));
       setNotes(String(o?.notes ?? ""));
       setDeliveryDate(o?.delivery_date ? (o.delivery_date as string).slice(0,10) : "");
+      setPlanType(String(o?.plan?.plan_type ?? ""));
+      setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
+      setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
       await loadDue(o.id, asOf);
     }catch(e:any){ setError(e); }
   }
@@ -70,6 +77,13 @@ export default function OrderDetailPage(){
         notes,
       };
       if(deliveryDate) patch.delivery_date = deliveryDate; // ISO
+      if(planType || planMonths || planMonthly){
+        patch.plan = {
+          plan_type: planType || undefined,
+          months: planMonths ? Number(planMonths) : undefined,
+          monthly_amount: planMonthly ? Number(planMonthly) : undefined,
+        };
+      }
       const out = await updateOrder(order.id, patch);
       setMsg("Order updated"); setOrder(out);
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
@@ -198,6 +212,18 @@ export default function OrderDetailPage(){
             <div className="row">
               <div className="col"><label>Delivery Fee</label><input className="input" value={delFee} onChange={e=>setDelFee(e.target.value)} /></div>
               <div className="col"><label>Return Delivery Fee</label><input className="input" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} /></div>
+            </div>
+            <div className="row">
+              <div className="col">
+                <label>Plan Type</label>
+                <select className="select" value={planType} onChange={e=>setPlanType(e.target.value)}>
+                  <option value="">None</option>
+                  <option>INSTALLMENT</option>
+                  <option>RENTAL</option>
+                </select>
+              </div>
+              <div className="col"><label>Months</label><input className="input" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
+              <div className="col"><label>Monthly Amount</label><input className="input" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
             </div>
             <div style={{marginTop:8}}>
               <label>Notes</label>

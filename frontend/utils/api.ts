@@ -136,6 +136,10 @@ export async function createOrderFromParsed(parsed: any) {
   }
 }
 
+export function createManualOrder(payload: { customer: any; order: any }) {
+  return request<any>("/orders", { json: payload });
+}
+
 export function updateOrder(id: number, patch: any) {
   return request<any>(`/orders/${id}`, { method: "PATCH", json: patch }).catch((e: any) => {
     if (e?.status === 405) return request<any>(`/orders/${id}`, { method: "PUT", json: patch });
