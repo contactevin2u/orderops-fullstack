@@ -9,6 +9,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <nav className="nav">
           <Link href="/">Dashboard</Link>
           <Link href="/parse">Parse & Create</Link>
+          <Link href="/orders/new">New Order</Link>
           <Link href="/orders">Orders</Link>
           <Link href="/reports/outstanding">Outstanding</Link>
         </nav>

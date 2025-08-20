@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import date
 
 class CustomerIn(BaseModel):
     name: str
@@ -50,15 +51,77 @@ class ParsedOrder(BaseModel):
 class OrderCreateIn(BaseModel):
     parsed: ParsedOrder
 
+class CustomerOut(BaseModel):
+    id: int
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    address: Optional[str] = None
+    map_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class OrderItemOut(BaseModel):
+    id: int
+    name: str
+    sku: Optional[str] = None
+    category: Optional[str] = None
+    item_type: str
+    qty: float
+    unit_price: float
+    line_total: float
+
+    class Config:
+        from_attributes = True
+
+
+class PaymentOut(BaseModel):
+    id: int
+    amount: float
+    # Store payment date as a real date so validation succeeds when the ORM
+    # returns ``datetime.date`` objects. FastAPI will automatically render this
+    # as an ISO formatted string in JSON responses.
+    date: Optional[date] = None
+    method: Optional[str] = None
+    reference: Optional[str] = None
+    status: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class PlanOut(BaseModel):
+    id: int
+    plan_type: str
+    start_date: Optional[date] = None
+    months: Optional[int] = None
+    monthly_amount: float = 0
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
 class OrderOut(BaseModel):
     id: int
     code: str
     type: str
     status: str
+    delivery_date: Optional[date] = None
+    notes: Optional[str] = None
     subtotal: float
+    discount: float | None = 0
+    delivery_fee: float | None = 0
+    return_delivery_fee: float | None = 0
+    penalty_fee: float | None = 0
     total: float
     paid_amount: float
     balance: float
+    customer: Optional[CustomerOut] = None
+    items: List[OrderItemOut] = Field(default_factory=list)
+    payments: List[PaymentOut] = Field(default_factory=list)
+    plan: Optional[PlanOut] = None
 
     class Config:
         from_attributes = True

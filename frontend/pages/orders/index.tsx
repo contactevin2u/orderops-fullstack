@@ -41,6 +41,7 @@ export default function OrdersPage(){
           </div>
           <div className="col" style={{display:"flex",alignItems:"center",gap:8}}>
             <button className="btn" onClick={load} disabled={loading}>{loading?"Loading...":"Search"}</button>
+            <Link className="btn secondary" href="/orders/new">Create Manually</Link>
             <Link className="btn secondary" href="/parse">Create from Parse</Link>
           </div>
         </div>
