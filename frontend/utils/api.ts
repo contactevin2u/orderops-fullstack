@@ -161,7 +161,9 @@ export async function voidOrder(id: number, reason?: string) {
 }
 
 export function markReturned(id: number, date?: string) {
-  return request<any>(`/orders/${id}/return`, { json: { date } });
+  const body: any = {};
+  if (date) body.date = date;
+  return request<any>(`/orders/${id}/return`, { json: body });
 }
 
 export function markBuyback(id: number, amount: number) {

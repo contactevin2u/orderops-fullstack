@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from pydantic import BaseModel
 from decimal import Decimal
+from datetime import datetime
 
 from ..db import get_session
 from ..models import Order, OrderItem, Plan, Customer
@@ -92,3 +93,59 @@ def void_order(order_id: int, body: dict | None = None, db: Session = Depends(ge
     db.commit()
     db.refresh(order)
     return {"ok": True, "order_id": order.id, "status": order.status}
+
+
+class ReturnIn(BaseModel):
+    date: str | None = None
+
+
+@router.post("/{order_id}/return", response_model=OrderOut)
+def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depends(get_session)):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    # Optional return date – reuse delivery_date field
+    if body and body.date:
+        try:
+            order.delivery_date = datetime.fromisoformat(body.date)
+        except Exception:
+            pass
+
+    order.status = "RETURNED"
+
+    total = (order.subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee)
+    order.total = total
+    order.balance = total - order.paid_amount
+
+    db.commit()
+    db.refresh(order)
+    return OrderOut.model_validate(order)
+
+
+class BuybackIn(BaseModel):
+    amount: float
+
+
+@router.post("/{order_id}/buyback", response_model=OrderOut)
+def buyback_order(order_id: int, body: BuybackIn, db: Session = Depends(get_session)):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    if order.type != "OUTRIGHT":
+        raise HTTPException(400, "Buyback only allowed for OUTRIGHT orders")
+
+    amt = Decimal(str(body.amount))
+    if amt <= Decimal("0"):
+        raise HTTPException(400, "Invalid buyback amount")
+
+    order.discount += amt
+    order.status = "RETURNED"
+
+    total = (order.subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee)
+    order.total = total
+    order.balance = total - order.paid_amount
+
+    db.commit()
+    db.refresh(order)
+    return OrderOut.model_validate(order)
