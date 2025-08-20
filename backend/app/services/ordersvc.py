@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, date
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
-import re
 import secrets
 from typing import Any, Dict, Optional, Tuple
 
@@ -11,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 
 from ..models import Customer, Order, OrderItem, Plan  # models/__init__.py exports these
+from ..utils.dates import parse_relaxed_date
 
 
 # -------------------------------
@@ -32,39 +32,6 @@ def _d(x: Any, default: Decimal = DEC0) -> Decimal:
         return default
 
 
-def _parse_relaxed_date(s: Optional[str]) -> Optional[date]:
-    """
-    Parse loose strings like 'delivery 19/8', '19-08', '28/8', '2025-08-19'.
-    Assumes DD/MM when ambiguous. Adds current year if missing.
-    """
-    if not s:
-        return None
-    s = s.strip().lower()
-    # grab first dd[/|-]mm[/|-]yyyy? occurrence
-    m = re.search(r"(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", s)
-    if not m:
-        # Try ISO-like yyyy-mm-dd
-        try:
-            return datetime.fromisoformat(s).date()
-        except Exception:
-            return None
-
-    dd = int(m.group(1))
-    mm = int(m.group(2))
-    yy = m.group(3)
-
-    if yy is None:
-        year = datetime.utcnow().year
-    else:
-        year = int(yy)
-        if year < 100:
-            # 25 -> 2025 heuristic
-            year += 2000
-
-    try:
-        return date(year, mm, dd)
-    except ValueError:
-        return None
 
 
 def _unique_temp_code(db: Session, prefix: str = "TMP") -> str:
@@ -221,7 +188,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
     if otype not in ("OUTRIGHT", "INSTALLMENT", "RENTAL"):
         otype = "OUTRIGHT"
 
-    delivery_date = _parse_relaxed_date(order_data.get("delivery_date"))
+    delivery_date = parse_relaxed_date(order_data.get("delivery_date") or "")
     notes = (order_data.get("notes") or "").strip() or None
 
     # money fields
@@ -299,7 +266,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
             if monthly_candidates:
                 monthly_amount = max(monthly_candidates)
 
-        start_date = _parse_relaxed_date(plan_in.get("start_date")) or delivery_date
+        start_date = parse_relaxed_date(plan_in.get("start_date") or "") or delivery_date
 
         db.add(
             Plan(
