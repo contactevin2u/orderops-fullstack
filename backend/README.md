@@ -1,7 +1,7 @@
 # Backend (FastAPI + Postgres) — OrderOps Full Stack
 
 - Queue-driven parsing using Postgres `FOR UPDATE SKIP LOCKED`
-- OpenAI structured parsing (flip off by setting `FEATURE_PARSE_REAL=0` to dry-run)
+- OpenAI structured parsing with heuristic fallback when the OpenAI API is unavailable
 - Orders, Items, Plans (RENTAL/INSTALLMENT), Payments (POSTED/VOIDED)
 - Documents: invoice, receipt, installment agreement (simple PDFs)
 - Export: cash-basis payments to Excel

@@ -155,7 +155,7 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     return data
 
 def parse_whatsapp_text(text: str) -> Dict[str, Any]:
-    if settings.FEATURE_PARSE_REAL and settings.OPENAI_API_KEY:
+    if settings.OPENAI_API_KEY:
         client = _openai_client()
         try:
             resp = client.chat.completions.create(
