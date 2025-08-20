@@ -41,7 +41,9 @@ SCHEMA = {
 
 SYSTEM = """You are a robust parser that outputs ONLY JSON that strictly conforms to a provided JSON Schema.
 - Interpret Malaysian order messages for medical equipment sales/rentals.
+- Use each original item's line text (before any price) as the item's name.
 - Emit every line describing an item under order.items and assign item_type for each line (OUTRIGHT, INSTALLMENT, RENTAL, or FEE).
+- Map any 'penghantaran' or 'delivery' amounts into order.charges.delivery_fee.
 - If a line like RM <amount> x <months> exists, set that item's item_type=INSTALLMENT and plan = {months, monthly_amount, plan_type:"INSTALLMENT"}.
 - If 'Sewa' is present and no x <months>, set that item's item_type=RENTAL.
 - If 'Beli' and no x <months>, set that item's item_type=OUTRIGHT.
@@ -61,7 +63,7 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     t = "OUTRIGHT"
     if re.search(r"sewa", text, flags=re.I):
         t = "RENTAL"
-    if re.search(r"\bRM\s*[\d.,]+\s*[xX]\s*\d+\b", text):
+    if re.search(r"RM\s*[\d.,]+\s*[xX]\s*\d+", text):
         t = "INSTALLMENT"
 
     m_delivery = re.search(r"(?:deliver|delivery|hantar|antar)\s*(\d{1,2}[/\-]\d{1,2})", text, flags=re.I)
@@ -86,19 +88,31 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     m_paid = re.search(r"paid\s*[:：]?\s*RM\s*([\d.,]+)", text, flags=re.I)
     m_collect = re.search(r"(?:to\s*collect|balance)\s*[:：]?\s*RM\s*([\d.,]+)", text, flags=re.I)
 
+    items = []
+    for line in text.splitlines():
+        m_item = re.search(r"(.*)RM\s*([\d.,]+)", line, flags=re.I)
+        if not m_item:
+            continue
+        if re.search(r"(total|deposit|paid|balance|collect|penghantaran|delivery|antar|hantar)", line, flags=re.I):
+            continue
+        desc = m_item.group(1).strip().strip(':- ')
+        price = rm2f(m_item.group(2))
+        if desc:
+            items.append({"name": desc, "qty": 1, "unit_price": price, "line_total": price, "item_type": t})
+
     data = {
         "customer": {
             "name": (m_name.group(1).strip() if m_name else ""),
             "phone": (m_phone.group(0).strip() if m_phone else ""),
             "address": (m_addr.group(1).strip() if m_addr else ""),
-            "map_url": ""
+            "map_url": "",
         },
         "order": {
             "type": t,
             "code": m_code.group(1) if m_code else "",
             "delivery_date": delivery,
             "notes": "",
-            "items": [],
+            "items": items,
             "charges": {
                 "delivery_fee": rm2f(m_deliv_fee.group(1)) if m_deliv_fee else 0,
                 "return_delivery_fee": 0,
@@ -136,6 +150,14 @@ def parse_whatsapp_text(text: str) -> Dict[str, Any]:
             data = _heuristic_fallback(text)
     else:
         data = _heuristic_fallback(text)
+
+    heur = _heuristic_fallback(text)
+    order = data.setdefault("order", {})
+    if not order.get("items"):
+        order["items"] = heur.get("order", {}).get("items", [])
+    charges = order.setdefault("charges", {})
+    if not charges.get("delivery_fee") and heur.get("order", {}).get("charges", {}).get("delivery_fee"):
+        charges["delivery_fee"] = heur["order"]["charges"]["delivery_fee"]
 
     # Ensure code on first line
     first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
