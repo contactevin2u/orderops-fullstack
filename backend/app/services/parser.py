@@ -28,10 +28,47 @@ SCHEMA = {
         "code": {"type": "string"},
         "delivery_date": {"type": "string"},
         "notes": {"type": "string"},
-        "items": {"type": "array"},
-        "charges": {"type": "object"},
-        "plan": {"type": "object"},
-        "totals": {"type": "object"}
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {"type": "string"},
+              "qty": {"type": "number"},
+              "unit_price": {"type": "number"},
+              "line_total": {"type": "number"},
+              "item_type": {"type": "string", "enum": ["OUTRIGHT","INSTALLMENT","RENTAL","FEE"]},
+              "monthly_amount": {"type": "number"}
+            },
+            "required": ["name","qty","unit_price","line_total","item_type"]
+          }
+        },
+        "charges": {
+          "type": "object",
+          "properties": {
+            "delivery_fee": {"type": "number"},
+            "return_delivery_fee": {"type": "number"},
+            "penalty_fee": {"type": "number"},
+            "discount": {"type": "number"}
+          }
+        },
+        "plan": {
+          "type": "object",
+          "properties": {
+            "plan_type": {"type": "string"},
+            "months": {"type": "integer"},
+            "monthly_amount": {"type": "number"}
+          }
+        },
+        "totals": {
+          "type": "object",
+          "properties": {
+            "subtotal": {"type": "number"},
+            "total": {"type": "number"},
+            "paid": {"type": "number"},
+            "to_collect": {"type": "number"}
+          }
+        }
       },
       "required": ["type"]
     }
@@ -43,7 +80,8 @@ SYSTEM = """You are a robust parser that outputs ONLY JSON that strictly conform
 - Interpret Malaysian order messages for medical equipment sales/rentals.
 - Use each original item's line text (before any price) as the item's name.
 - Emit every line describing an item under order.items and assign item_type for each line (OUTRIGHT, INSTALLMENT, RENTAL, or FEE).
-- Map any 'penghantaran' or 'delivery' amounts into order.charges.delivery_fee.
+- Each order.items entry must include name, qty, unit_price, line_total, and item_type; include monthly_amount when relevant.
+- Map any 'penghantaran' or 'delivery' amounts into order.charges.delivery_fee. order.charges supports delivery_fee, return_delivery_fee, penalty_fee, and discount.
 - If a line like RM <amount> x <months> exists, set that item's item_type=INSTALLMENT and plan = {months, monthly_amount, plan_type:"INSTALLMENT"}.
 - If 'Sewa' is present and no x <months>, set that item's item_type=RENTAL.
 - If 'Beli' and no x <months>, set that item's item_type=OUTRIGHT.
@@ -51,6 +89,7 @@ SYSTEM = """You are a robust parser that outputs ONLY JSON that strictly conform
 - Try to capture 'code' if the first line contains a token like WC2009 (letters+digits).
 - delivery_date can be DD/MM or DD-MM or 'Deliver 28/8'. Keep as provided string (do not reformat).
 - Keep monetary numbers as numbers (no currency text) with 2 decimals where applicable.
+- Populate order.totals with subtotal, total, paid, and to_collect (use 0 when unknown).
 - Do not hallucinate fields you cannot infer."""
 
 def _heuristic_fallback(text: str) -> Dict[str, Any]:
