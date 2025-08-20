@@ -10,7 +10,7 @@ class Order(Base):
     __tablename__ = "orders"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     code: Mapped[str] = mapped_column(String(32), unique=True, index=True)
-    type: Mapped[str] = mapped_column(String(20))  # OUTRIGHT | INSTALLMENT | RENTAL
+    type: Mapped[str] = mapped_column(String(20))  # OUTRIGHT | INSTALLMENT | RENTAL | MIXED
     status: Mapped[str] = mapped_column(String(20), default="NEW")  # NEW|ACTIVE|RETURNED|CANCELLED|COMPLETED
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
     delivery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
