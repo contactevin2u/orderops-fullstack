@@ -201,7 +201,6 @@ def parse_whatsapp_text(text: str) -> Dict[str, Any]:
         try:
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
-                temperature=0.1,
                 response_format={
                     "type": "json_schema",
                     "json_schema": {"name": "order", "schema": SCHEMA, "strict": True},
