@@ -170,6 +170,11 @@ export function markBuyback(id: number, amount: number) {
   return request<any>(`/orders/${id}/buyback`, { json: { amount } });
 }
 
+export function orderDue(id: number, asOf?: string) {
+  const qs = asOf ? `?as_of=${encodeURIComponent(asOf)}` : "";
+  return request<any>(`/orders/${id}/due${qs}`);
+}
+
 // -------- Payments
 export function addPayment(payload: {
   order_id: number;

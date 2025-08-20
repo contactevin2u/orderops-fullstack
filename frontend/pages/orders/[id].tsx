@@ -2,7 +2,7 @@ import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl } from "@/utils/api";
+import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue } from "@/utils/api";
 
 export default function OrderDetailPage(){
   const router = useRouter();
@@ -26,6 +26,9 @@ export default function OrderDetailPage(){
 
   const [buybackAmt,setBuybackAmt] = React.useState<string>("");
 
+  const [due,setDue] = React.useState<any>(null);
+  const [asOf,setAsOf] = React.useState<string>("");
+
   function setError(e:any){ setErr(e?.message || "Failed"); }
 
   async function load(){
@@ -39,10 +42,20 @@ export default function OrderDetailPage(){
       setRetDelFee(String(o?.return_delivery_fee ?? ""));
       setNotes(String(o?.notes ?? ""));
       setDeliveryDate(o?.delivery_date ? (o.delivery_date as string).slice(0,10) : "");
+      await loadDue(o.id, asOf);
+    }catch(e:any){ setError(e); }
+  }
+
+  async function loadDue(orderId:number, date?:string){
+    try{
+      const d = await orderDue(orderId, date);
+      setDue(d);
     }catch(e:any){ setError(e); }
   }
 
   React.useEffect(()=>{ load(); },[id]);
+
+  React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[asOf]);
 
   if(!order) return <Layout><div className="card">Loading...</div></Layout>;
 
@@ -140,6 +153,10 @@ export default function OrderDetailPage(){
             </div>
 
             <div className="hr" />
+            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+              <label>As of</label>
+              <input className="input" type="date" value={asOf} onChange={e=>setAsOf(e.target.value)} />
+            </div>
             <div className="kv">
               <div>Subtotal</div><div>RM {Number(order.subtotal||0).toFixed(2)}</div>
               <div>Delivery Fee</div><div>RM {Number(order.delivery_fee||0).toFixed(2)}</div>
@@ -149,6 +166,10 @@ export default function OrderDetailPage(){
               <div>Total</div><div><b>RM {Number(order.total||0).toFixed(2)}</b></div>
               <div>Paid</div><div>RM {Number(order.paid_amount||0).toFixed(2)}</div>
               <div>Balance</div><div><b>RM {Number(order.balance||0).toFixed(2)}</b></div>
+              {due && (<>
+                <div>Accrued</div><div>RM {Number(due.accrued||0).toFixed(2)}</div>
+                <div>Outstanding</div><div><b>RM {Number(due.outstanding||0).toFixed(2)}</b></div>
+              </>)}
             </div>
 
             <div className="hr" />
