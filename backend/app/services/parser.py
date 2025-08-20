@@ -155,25 +155,31 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
     return data
 
 def parse_whatsapp_text(text: str) -> Dict[str, Any]:
-    if settings.OPENAI_API_KEY:
+    if not settings.OPENAI_API_KEY:
+        data = _heuristic_fallback(text)
+    else:
         client = _openai_client()
         try:
             resp = client.chat.completions.create(
                 model="gpt-4o-mini",
                 temperature=0.1,
-                response_format={"type": "json_object"},
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {"name": "order", "schema": SCHEMA, "strict": True},
+                },
                 messages=[
                     {"role": "system", "content": SYSTEM},
-                    {"role": "user", "content": "Schema:\n" + json.dumps(SCHEMA)},
-                    {"role": "user", "content": "Parse this message into the schema:\n" + text},
+                    {"role": "user", "content": text},
                 ],
             )
-            raw = resp.choices[0].message.content or "{}"
-            data = json.loads(raw)
+            msg = resp.choices[0].message
+            raw = getattr(msg, "content", None) or getattr(msg, "parsed", "{}")
+            if isinstance(raw, dict):
+                data = raw
+            else:
+                data = json.loads(raw or "{}")
         except Exception:
             data = _heuristic_fallback(text)
-    else:
-        data = _heuristic_fallback(text)
 
     heur = _heuristic_fallback(text)
     order = data.setdefault("order", {})
