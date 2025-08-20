@@ -4,17 +4,9 @@ from datetime import datetime
 from decimal import Decimal
 from ..db import get_session
 from ..models import Order
+from ..services.plan_math import calculate_plan_due
 
 router = APIRouter(prefix="/reports", tags=["reports"])
-
-def months_elapsed(start: datetime, end: datetime | None = None) -> int:
-    if not isinstance(start, datetime):
-        return 0
-    end = end or datetime.utcnow()
-    y = end.year - start.year
-    m = end.month - start.month
-    d = end.day - start.day
-    return max(y * 12 + m + (1 if d >= 0 else 0), 0)
 
 @router.get("/outstanding", response_model=dict)
 def outstanding(type: str | None = Query(default=None), db: Session = Depends(get_session)):
@@ -37,8 +29,7 @@ def outstanding(type: str | None = Query(default=None), db: Session = Depends(ge
 
         plan = o.plan
         if o.type in ("INSTALLMENT", "RENTAL") and plan:
-            months = months_elapsed(o.delivery_date)
-            expected = Decimal(str(plan.monthly_amount)) * Decimal(months)
+            expected = calculate_plan_due(plan, datetime.utcnow().date())
         else:
             expected = Decimal("0.00")
 
