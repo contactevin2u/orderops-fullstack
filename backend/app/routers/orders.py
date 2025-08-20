@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 from pydantic import BaseModel
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, date
 
 from ..db import get_session
 from ..models import Order, OrderItem, Plan, Customer
 from ..schemas import OrderOut
 from ..services.ordersvc import create_order_from_parsed
+from ..services.plan_math import calculate_plan_due
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -49,6 +50,30 @@ def get_order(order_id: int, db: Session = Depends(get_session)):
     if not order:
         raise HTTPException(404, "Order not found")
     return OrderOut.model_validate(order)
+
+
+@router.get("/{order_id}/due", response_model=dict)
+def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depends(get_session)):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+
+    as_of = as_of or date.today()
+    plan = order.plan
+    if order.type in ("INSTALLMENT", "RENTAL") and plan:
+        expected = calculate_plan_due(plan, as_of)
+    else:
+        expected = Decimal("0.00")
+
+    paid = order.paid_amount or Decimal("0.00")
+    add_fees = (order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0)
+    balance = (expected + Decimal(str(add_fees)) - paid).quantize(Decimal("0.01"))
+
+    return {
+        "expected": float(expected),
+        "paid": float(paid),
+        "balance": float(balance),
+    }
 
 @router.put("/{order_id}", response_model=dict)
 def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
