@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal, ROUND_HALF_UP
-import re
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -14,6 +13,7 @@ from ..db import get_session
 # To avoid another mismatch, we alias it as parse_text here.
 from ..services.parser import parse_whatsapp_text as parse_text
 from ..services.ordersvc import create_from_parsed
+from ..utils.dates import parse_relaxed_date
 
 router = APIRouter(prefix="/parse", tags=["parse"])
 
@@ -43,23 +43,6 @@ def _ensure_list(x: Any) -> List[Any]:
     return x if isinstance(x, list) else []
 
 
-def _maybe_parse_delivery_date(raw: str) -> Optional[datetime]:
-    # try dd/mm or d/m patterns mentioned near the word delivery/hantar
-    m = re.search(r"(?:deliver|delivery|hantar)\s*(?:on|:)?\s*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", raw, re.I)
-    if not m:
-        m = re.search(r"\b(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))\b", raw)
-    if not m:
-        return None
-    d, mth, yr = int(m.group(1)), int(m.group(2)), m.group(3)
-    year = int(yr) if yr else date.today().year
-    if year < 100:
-        year += 2000
-    try:
-        return datetime(year, mth, d)
-    except ValueError:
-        return None
-
-
 def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     """
     Make the parser output safe for order creation:
@@ -79,21 +62,12 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
 
     # Try to derive delivery_date if it's a short "19/8" or embedded
     dd = str(order.get("delivery_date") or "").strip()
-    dt: Optional[datetime] = None
-    if dd:
-        m = re.match(r"^\D*(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\D*$", dd)
-        if m:
-            d, mth, yr = int(m.group(1)), int(m.group(2)), m.group(3)
-            year = int(yr) if yr else date.today().year
-            if year < 100:
-                year += 2000
-            try:
-                dt = datetime(year, mth, d)
-            except ValueError:
-                dt = None
-    if not dt:
-        dt = _maybe_parse_delivery_date(raw_text)
-    order["delivery_date"] = dt
+    d_obj = parse_relaxed_date(dd) if dd else None
+    if not d_obj:
+        d_obj = parse_relaxed_date(raw_text)
+    order["delivery_date"] = (
+        datetime(d_obj.year, d_obj.month, d_obj.day) if d_obj else None
+    )
 
     # Items
     items = []
