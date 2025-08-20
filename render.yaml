@@ -19,8 +19,6 @@ services:
         value: https://orderops-frontend-v1.vercel.app,http://localhost:3000
       - key: APP_VERSION
         value: "v1-fullstack"
-      - key: FEATURE_PARSE_REAL
-        value: "1"
       - key: WORKER_BATCH_SIZE
         value: "10"
       - key: WORKER_POLL_SECS
@@ -56,8 +54,6 @@ services:
         sync: false
       - key: APP_VERSION
         value: "v1-worker"
-      - key: FEATURE_PARSE_REAL
-        value: "1"
       - key: WORKER_BATCH_SIZE
         value: "10"
       - key: WORKER_POLL_SECS

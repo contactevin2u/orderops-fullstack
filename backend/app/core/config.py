@@ -15,9 +15,6 @@ class Settings(BaseSettings):
     TAX_LABEL: str = "SST"
     TAX_PERCENT: float = 0.0
 
-    # Features
-    FEATURE_PARSE_REAL: bool = True
-
     # Worker
     WORKER_BATCH_SIZE: int = 10
     WORKER_POLL_SECS: float = 1.0

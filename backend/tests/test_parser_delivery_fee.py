@@ -38,7 +38,6 @@ class DummyClient:
         self.chat = DummyClient.Chat()
 
 def test_parse_item_and_delivery_fee(monkeypatch):
-    monkeypatch.setattr(settings, "FEATURE_PARSE_REAL", True)
     monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
     monkeypatch.setattr("app.services.parser._openai_client", lambda: DummyClient())
 
