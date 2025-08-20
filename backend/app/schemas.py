@@ -79,9 +79,7 @@ class OrderItemOut(BaseModel):
 class PaymentOut(BaseModel):
     id: int
     amount: float
-    # Store payment date as a real date so validation succeeds when the ORM
-    # returns ``datetime.date`` objects. FastAPI will automatically render this
-    # as an ISO formatted string in JSON responses.
+    # Use ``date`` so ORM values validate and FastAPI serializes to ISO strings.
     date: Optional[date] = None
     method: Optional[str] = None
     reference: Optional[str] = None
