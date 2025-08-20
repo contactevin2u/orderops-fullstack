@@ -18,6 +18,7 @@ def outstanding(type: str | None = Query(default=None), db: Session = Depends(ge
     filter by order type.
     """
 
+    today = datetime.utcnow().date()
     rows = db.query(Order).all()
     items: list[dict] = []
 
@@ -27,15 +28,18 @@ def outstanding(type: str | None = Query(default=None), db: Session = Depends(ge
         if not o.delivery_date:
             continue
 
-        plan = o.plan
-        if o.type in ("INSTALLMENT", "RENTAL") and plan:
-            expected = calculate_plan_due(plan, datetime.utcnow().date())
-        else:
-            expected = Decimal("0.00")
+        paid = Decimal(o.paid_amount or 0)
 
-        paid = o.paid_amount or Decimal("0.00")
-        add_fees = (o.delivery_fee or 0) + (o.return_delivery_fee or 0) + (o.penalty_fee or 0)
-        bal = (expected + Decimal(str(add_fees)) - paid).quantize(Decimal("0.01"))
+        if o.type in ("INSTALLMENT", "RENTAL") and o.plan:
+            # Amount expected to be paid as of today plus any additional fees
+            expected = calculate_plan_due(o.plan, today)
+            fees = (o.delivery_fee or 0) + (o.return_delivery_fee or 0) + (o.penalty_fee or 0)
+            expected += Decimal(str(fees))
+        else:
+            # For outright and other orders rely on stored total
+            expected = Decimal(o.total or 0)
+
+        bal = (expected - paid).quantize(Decimal("0.01"))
 
         items.append(
             {
@@ -44,7 +48,7 @@ def outstanding(type: str | None = Query(default=None), db: Session = Depends(ge
                 "customer": {"name": getattr(o.customer, "name", "")},
                 "type": o.type,
                 "status": o.status,
-                "balance": str(bal),
+                "balance": float(bal),
             }
         )
 

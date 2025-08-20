@@ -79,7 +79,13 @@ class OrderItemOut(BaseModel):
 class PaymentOut(BaseModel):
     id: int
     amount: float
+
+
+    date: Optional[date] = None
+
     date: Optional[str] = None
+
+      >>>>>>> main
     method: Optional[str] = None
     reference: Optional[str] = None
     status: Optional[str] = None
