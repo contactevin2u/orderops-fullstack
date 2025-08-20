@@ -160,7 +160,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
     {
       "customer": {...},
       "order": {
-        "type": "OUTRIGHT|INSTALLMENT|RENTAL",
+        "type": "OUTRIGHT|INSTALLMENT|RENTAL|MIXED",
         "code": "KP2017",
         "delivery_date": "19/8",
         "notes": "...",
@@ -185,7 +185,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
     code = _ensure_unique_code(db, desired_code)
 
     otype = (order_data.get("type") or "OUTRIGHT").strip().upper()
-    if otype not in ("OUTRIGHT", "INSTALLMENT", "RENTAL"):
+    if otype not in ("OUTRIGHT", "INSTALLMENT", "RENTAL", "MIXED"):
         otype = "OUTRIGHT"
 
     delivery_date = parse_relaxed_date(order_data.get("delivery_date") or "")
@@ -251,12 +251,28 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
     # plan (optional)
     plan_in = order_data.get("plan") or {}
     has_plan_data = any(k in plan_in for k in ("plan_type", "months", "monthly_amount", "start_date"))
-    should_create_plan = (otype in ("INSTALLMENT", "RENTAL")) or has_plan_data
+    should_create_plan = (
+        otype in ("INSTALLMENT", "RENTAL")
+        or has_plan_data
+        or any((it.get("item_type") or "").strip().upper() in ("INSTALLMENT", "RENTAL") for it in items)
+    )
 
     if should_create_plan:
         plan_type = (plan_in.get("plan_type") or otype).strip().upper()
+        if plan_type not in ("INSTALLMENT", "RENTAL"):
+            for it in items:
+                itype = (it.get("item_type") or "").strip().upper()
+                if itype in ("INSTALLMENT", "RENTAL"):
+                    plan_type = itype
+                    break
+            if plan_type not in ("INSTALLMENT", "RENTAL"):
+                plan_type = "RENTAL"
         months_raw = plan_in.get("months")
-        months = int(months_raw) if isinstance(months_raw, (int, float, str)) and str(months_raw).strip().isdigit() else None
+        months = (
+            int(months_raw)
+            if isinstance(months_raw, (int, float, str)) and str(months_raw).strip().isdigit()
+            else None
+        )
 
         monthly_amount = _d(plan_in.get("monthly_amount"))
         # As a fallback, if not present and single-item monthly was parsed, try to infer the max monthly amount

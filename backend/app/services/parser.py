@@ -24,7 +24,7 @@ SCHEMA = {
     "order": {
       "type": "object",
       "properties": {
-        "type": {"type": "string", "enum": ["OUTRIGHT","INSTALLMENT","RENTAL"]},
+        "type": {"type": "string", "enum": ["OUTRIGHT","INSTALLMENT","RENTAL","MIXED"]},
         "code": {"type": "string"},
         "delivery_date": {"type": "string"},
         "notes": {"type": "string"},
@@ -39,11 +39,13 @@ SCHEMA = {
   "required": ["customer","order"]
 }
 
-SYSTEM = """You are a robust parser that outputs ONLY JSON that strictly conforms to a provided JSON Schema. 
+SYSTEM = """You are a robust parser that outputs ONLY JSON that strictly conforms to a provided JSON Schema.
 - Interpret Malaysian order messages for medical equipment sales/rentals.
-- If a line like RM <amount> x <months> exists, set order.type=INSTALLMENT and plan = {months, monthly_amount, plan_type:"INSTALLMENT"}.
-- If 'Sewa' is present and no x <months>, set type=RENTAL.
-- If 'Beli' and no x <months>, set type=OUTRIGHT.
+- Emit every line describing an item under order.items and assign item_type for each line (OUTRIGHT, INSTALLMENT, RENTAL, or FEE).
+- If a line like RM <amount> x <months> exists, set that item's item_type=INSTALLMENT and plan = {months, monthly_amount, plan_type:"INSTALLMENT"}.
+- If 'Sewa' is present and no x <months>, set that item's item_type=RENTAL.
+- If 'Beli' and no x <months>, set that item's item_type=OUTRIGHT.
+- When multiple item types are present, set order.type="MIXED"; otherwise set it to the sole item_type.
 - Try to capture 'code' if the first line contains a token like WC2009 (letters+digits).
 - delivery_date can be DD/MM or DD-MM or 'Deliver 28/8'. Keep as provided string (do not reformat).
 - Keep monetary numbers as numbers (no currency text) with 2 decimals where applicable.

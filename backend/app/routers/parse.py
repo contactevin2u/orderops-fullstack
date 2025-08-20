@@ -55,20 +55,6 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     customer = _ensure_dict(parsed.get("customer"))
     order = _ensure_dict(parsed.get("order"))
 
-    # Normalise plan
-    plan = _ensure_dict(order.get("plan"))
-    if "type" in order and "plan_type" not in plan and order.get("type"):
-        plan["plan_type"] = order["type"]
-
-    # Try to derive delivery_date if it's a short "19/8" or embedded
-    dd = str(order.get("delivery_date") or "").strip()
-    d_obj = parse_relaxed_date(dd) if dd else None
-    if not d_obj:
-        d_obj = parse_relaxed_date(raw_text)
-    order["delivery_date"] = (
-        datetime(d_obj.year, d_obj.month, d_obj.day) if d_obj else None
-    )
-
     # Items
     items = []
     for it in _ensure_list(order.get("items")):
@@ -94,6 +80,35 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
             "line_total": line_total,
         })
     order["items"] = items
+
+    # Determine order.type based on item types
+    item_types = {it["item_type"] for it in items if it.get("item_type") and it["item_type"] != "FEE"}
+    if len(item_types) > 1:
+        order["type"] = "MIXED"
+    elif item_types:
+        order["type"] = next(iter(item_types))
+
+    # Normalise plan
+    plan = _ensure_dict(order.get("plan"))
+    if "plan_type" not in plan:
+        otype = order.get("type")
+        if otype in {"RENTAL", "INSTALLMENT"}:
+            plan["plan_type"] = otype
+        else:
+            for it in items:
+                if it["item_type"] in {"RENTAL", "INSTALLMENT"}:
+                    plan["plan_type"] = it["item_type"]
+                    break
+    order["plan"] = plan
+
+    # Try to derive delivery_date if it's a short "19/8" or embedded
+    dd = str(order.get("delivery_date") or "").strip()
+    d_obj = parse_relaxed_date(dd) if dd else None
+    if not d_obj:
+        d_obj = parse_relaxed_date(raw_text)
+    order["delivery_date"] = (
+        datetime(d_obj.year, d_obj.month, d_obj.day) if d_obj else None
+    )
 
     # Charges
     ch = _ensure_dict(order.get("charges"))

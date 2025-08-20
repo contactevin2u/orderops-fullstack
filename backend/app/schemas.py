@@ -35,7 +35,7 @@ class TotalsIn(BaseModel):
     to_collect: float = 0
 
 class OrderBlock(BaseModel):
-    type: str  # OUTRIGHT|INSTALLMENT|RENTAL
+    type: str  # OUTRIGHT|INSTALLMENT|RENTAL|MIXED
     delivery_date: Optional[str] = None
     notes: Optional[str] = None
     items: List[ItemIn] = Field(default_factory=list)
