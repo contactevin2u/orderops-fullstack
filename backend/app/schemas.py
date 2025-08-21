@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import date
+import datetime as dt
 
 class CustomerIn(BaseModel):
     name: str
@@ -79,7 +79,7 @@ class OrderItemOut(BaseModel):
 class PaymentOut(BaseModel):
     id: int
     amount: float
-    date: Optional[date] = None
+    date: Optional[dt.date] = None
     method: Optional[str] = None
     reference: Optional[str] = None
     status: Optional[str] = None
@@ -91,7 +91,7 @@ class PaymentOut(BaseModel):
 class PlanOut(BaseModel):
     id: int
     plan_type: str
-    start_date: Optional[date] = None
+    start_date: Optional[dt.date] = None
     months: Optional[int] = None
     monthly_amount: float = 0
     status: str
@@ -105,7 +105,7 @@ class OrderOut(BaseModel):
     code: str
     type: str
     status: str
-    delivery_date: Optional[date] = None
+    delivery_date: Optional[dt.date] = None
     notes: Optional[str] = None
     subtotal: float
     discount: float | None = 0
