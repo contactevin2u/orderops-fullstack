@@ -49,3 +49,15 @@ def test_parse_item_and_delivery_fee(monkeypatch):
     assert norm["order"]["items"][0]["name"].lower() == "tilam canvas"
     assert float(norm["order"]["items"][0]["line_total"]) == 199
     assert float(norm["order"]["charges"]["delivery_fee"]) == 20
+
+
+def test_parse_delivery_fee_foc(monkeypatch):
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
+    monkeypatch.setattr("app.services.parser._openai_client", lambda: DummyClient())
+
+    text = "Auto travel steel wheelchair RM2200\nDelivery FOC"
+    data = parse_whatsapp_text(text)
+    norm = _post_normalize(data, text)
+
+    assert float(norm["order"]["charges"].get("delivery_fee", 0)) == 0
+    assert float(norm["order"]["totals"]["total"]) == 2200
