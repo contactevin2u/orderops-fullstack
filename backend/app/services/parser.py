@@ -122,7 +122,16 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
         months = int(m_inst.group(2))
         plan = {"plan_type": "INSTALLMENT", "months": months, "monthly_amount": monthly}
 
-    m_deliv_fee = re.search(r"(?:penghantaran|delivery)[^\d]*RM\s*([\d.,]+)", text, flags=re.I)
+    deliv_fee = None
+    for ln in text.splitlines():
+        if re.search(r"(penghantaran|delivery)", ln, flags=re.I):
+            m_price = re.search(r"RM\s*([\d.,]+)", ln, flags=re.I)
+            if m_price:
+                deliv_fee = rm2f(m_price.group(1))
+                break
+            if re.search(r"(foc|percuma|free)", ln, flags=re.I):
+                deliv_fee = 0.0
+                break
     m_total = re.search(r"total\s*[:：]?\s*RM\s*([\d.,]+)", text, flags=re.I)
     m_paid = re.search(r"paid\s*[:：]?\s*RM\s*([\d.,]+)", text, flags=re.I)
     m_collect = re.search(r"(?:to\s*collect|balance)\s*[:：]?\s*RM\s*([\d.,]+)", text, flags=re.I)
@@ -176,12 +185,12 @@ def _heuristic_fallback(text: str) -> Dict[str, Any]:
             "delivery_date": delivery,
             "notes": "",
             "items": items,
-            "charges": {
-                "delivery_fee": rm2f(m_deliv_fee.group(1)) if m_deliv_fee else 0,
+            "charges": ({
+                **({"delivery_fee": deliv_fee} if deliv_fee is not None else {}),
                 "return_delivery_fee": 0,
                 "penalty_fee": 0,
-                "discount": 0
-            },
+                "discount": 0,
+            }),
             "plan": plan,
             "totals": {
                 "subtotal": rm2f(m_total.group(1)) if m_total else 0,
@@ -224,8 +233,9 @@ def parse_whatsapp_text(text: str) -> Dict[str, Any]:
     if not order.get("items"):
         order["items"] = heur.get("order", {}).get("items", [])
     charges = order.setdefault("charges", {})
-    if not charges.get("delivery_fee") and heur.get("order", {}).get("charges", {}).get("delivery_fee"):
-        charges["delivery_fee"] = heur["order"]["charges"]["delivery_fee"]
+    heur_ch = heur.get("order", {}).get("charges", {})
+    if "delivery_fee" in heur_ch:
+        charges["delivery_fee"] = heur_ch["delivery_fee"]
 
     # Ensure code on first line
     first_line = next((ln.strip() for ln in text.splitlines() if ln.strip()), "")
