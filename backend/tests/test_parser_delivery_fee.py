@@ -13,7 +13,59 @@ class DummyClient:
         class Completions:
             def create(self, **kwargs):
                 text = kwargs["messages"][-1]["content"].lower()
-                if "penghantaran" in text and "rm20" in text.replace(" ", ""):
+                compact = text.replace(" ", "")
+
+                if "deliverycharge" in compact and "rm20" in compact:
+                    data = {
+                        "customer": {"name": "Ali"},
+                        "order": {
+                            "type": "OUTRIGHT",
+                            "items": [
+                                {
+                                    "name": "tilam canvas",
+                                    "qty": 1,
+                                    "unit_price": 199,
+                                    "line_total": 199,
+                                    "item_type": "OUTRIGHT",
+                                },
+                                {
+                                    "name": "Delivery Charge",
+                                    "qty": 1,
+                                    "unit_price": 20,
+                                    "line_total": 20,
+                                    "item_type": "FEE",
+                                },
+                            ],
+                            "charges": {},
+                            "totals": {},
+                        },
+                    }
+                elif "penghantarandanpasang" in compact and "rm20" in compact:
+                    data = {
+                        "customer": {"name": "Ali"},
+                        "order": {
+                            "type": "OUTRIGHT",
+                            "items": [
+                                {
+                                    "name": "tilam canvas",
+                                    "qty": 1,
+                                    "unit_price": 199,
+                                    "line_total": 199,
+                                    "item_type": "OUTRIGHT",
+                                },
+                                {
+                                    "name": "Penghantaran dan pasang",
+                                    "qty": 1,
+                                    "unit_price": 20,
+                                    "line_total": 20,
+                                    "item_type": "FEE",
+                                },
+                            ],
+                            "charges": {},
+                            "totals": {},
+                        },
+                    }
+                elif "penghantaran" in text and "rm20" in compact:
                     data = {
                         "customer": {"name": "Ali"},
                         "order": {
@@ -31,7 +83,7 @@ class DummyClient:
                             "totals": {},
                         },
                     }
-                elif "delivery foc" in text:
+                elif "deliveryfoc" in compact:
                     data = {
                         "customer": {"name": "Ali"},
                         "order": {
@@ -101,3 +153,30 @@ def test_parse_delivery_fee_foc(monkeypatch):
 
     assert float(norm["order"]["charges"].get("delivery_fee", 0)) == 0
     assert float(norm["order"]["totals"]["total"]) == 2200
+
+
+def test_remove_delivery_charge_item(monkeypatch):
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
+    monkeypatch.setattr("app.services.parser._openai_client", lambda: DummyClient())
+
+    text = "tilam canvas RM199\nDelivery charge RM20"
+    data = parse_whatsapp_text(text)
+    norm = _post_normalize(data, text)
+
+    # Only the canvas item should remain
+    assert len(norm["order"]["items"]) == 1
+    assert norm["order"]["items"][0]["name"].lower() == "tilam canvas"
+    assert float(norm["order"]["charges"]["delivery_fee"]) == 20
+
+
+def test_remove_penghantaran_dan_pasang_item(monkeypatch):
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test")
+    monkeypatch.setattr("app.services.parser._openai_client", lambda: DummyClient())
+
+    text = "tilam canvas RM199\nPenghantaran dan pasang RM20"
+    data = parse_whatsapp_text(text)
+    norm = _post_normalize(data, text)
+
+    assert len(norm["order"]["items"]) == 1
+    assert norm["order"]["items"][0]["name"].lower() == "tilam canvas"
+    assert float(norm["order"]["charges"]["delivery_fee"]) == 20
