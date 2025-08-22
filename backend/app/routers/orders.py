@@ -14,14 +14,16 @@ from ..services.status_updates import (
     apply_buyback,
     mark_cancelled,
     mark_returned,
+    recompute_financials,
 )
+from ..utils.responses import envelope
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 class OrderListOut(OrderOut):
     customer_name: str
 
-@router.get("", response_model=list[OrderListOut])
+@router.get("", response_model=dict)
 def list_orders(
     q: str | None = None,
     status: str | None = None,
@@ -46,26 +48,60 @@ def list_orders(
         dto = OrderOut.model_validate(order).model_dump()
         dto["customer_name"] = customer_name
         out.append(OrderListOut.model_validate(dto))
-    return out
+    return envelope(out)
 
 class ManualOrderIn(BaseModel):
     customer: dict
     order: dict
 
-@router.post("", response_model=OrderOut, status_code=201)
+
+class PlanPatch(BaseModel):
+    plan_type: str | None = None
+    months: int | None = None
+    monthly_amount: float | None = None
+    status: str | None = None
+    start_date: str | None = None
+
+
+class OrderItemPatch(BaseModel):
+    id: int
+    name: str | None = None
+    item_type: str | None = None
+    sku: str | None = None
+    category: str | None = None
+    qty: int | None = None
+    unit_price: float | None = None
+    line_total: float | None = None
+
+
+class OrderPatch(BaseModel):
+    notes: str | None = None
+    status: str | None = None
+    delivery_date: str | None = None
+    subtotal: float | None = None
+    discount: float | None = None
+    delivery_fee: float | None = None
+    return_delivery_fee: float | None = None
+    penalty_fee: float | None = None
+    total: float | None = None
+    balance: float | None = None
+    plan: PlanPatch | None = None
+    items: list[OrderItemPatch] | None = None
+
+@router.post("", response_model=dict, status_code=201)
 def create_order(body: ManualOrderIn, db: Session = Depends(get_session)):
     try:
         order = create_order_from_parsed(db, {"customer": body.customer, "order": body.order})
-        return OrderOut.model_validate(order)
+        return envelope(OrderOut.model_validate(order))
     except Exception as e:
         raise HTTPException(400, f"Create failed: {e}")
 
-@router.get("/{order_id}", response_model=OrderOut)
+@router.get("/{order_id}", response_model=dict)
 def get_order(order_id: int, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
-    return OrderOut.model_validate(order)
+    return envelope(OrderOut.model_validate(order))
 
 
 @router.get("/{order_id}/due", response_model=dict)
@@ -85,21 +121,24 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
     add_fees = (order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0)
     balance = (expected + Decimal(str(add_fees)) - paid).quantize(Decimal("0.01"))
 
-    return {
+    return envelope({
         "expected": float(expected),
         "paid": float(paid),
         "balance": float(balance),
-    }
+    })
 
-@router.put("/{order_id}", response_model=OrderOut)
-def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
+
+@router.patch("/{order_id}", response_model=dict)
+def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
 
+    data = body.model_dump(exclude_none=True)
+
     for k in ["notes", "status", "delivery_date"]:
-        if k in body and body[k] is not None:
-            setattr(order, k, body[k])
+        if k in data:
+            setattr(order, k, data[k])
 
     money_fields = [
         "subtotal",
@@ -111,14 +150,13 @@ def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
         "balance",
     ]
     for k in money_fields:
-        if k in body and body[k] is not None:
-            setattr(order, k, Decimal(str(body[k])))
+        if k in data:
+            setattr(order, k, Decimal(str(data[k])))
 
-    # Optional plan update
-    if "plan" in body and order.plan:
-        plan_patch = body.get("plan") or {}
+    if "plan" in data and order.plan:
+        plan_patch = data["plan"]
         for k in ["plan_type", "months", "monthly_amount", "status"]:
-            if k in plan_patch and plan_patch[k] is not None:
+            if k in plan_patch:
                 setattr(order.plan, k, plan_patch[k])
         if plan_patch.get("start_date"):
             try:
@@ -126,10 +164,8 @@ def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
             except Exception:
                 pass
 
-    # Optional items update
-    if "items" in body:
-        items_patch = body.get("items") or []
-        for ip in items_patch:
+    if "items" in data:
+        for ip in data["items"]:
             iid = ip.get("id")
             if not iid:
                 continue
@@ -137,23 +173,19 @@ def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
             if not item:
                 continue
             for k in ["name", "item_type", "sku", "category"]:
-                if k in ip and ip[k] is not None:
+                if k in ip:
                     setattr(item, k, ip[k])
-            if "qty" in ip and ip["qty"] is not None:
+            if "qty" in ip:
                 item.qty = int(ip["qty"])
             for k in ["unit_price", "line_total"]:
-                if k in ip and ip[k] is not None:
+                if k in ip:
                     setattr(item, k, Decimal(str(ip[k])))
 
-        # Recompute subtotal and totals when items change
-        subtotal = sum((itm.line_total or (itm.unit_price * itm.qty)) for itm in order.items)
-        order.subtotal = subtotal
-        order.total = subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee
-        order.balance = order.total - order.paid_amount
-
+    recompute_financials(order)
     db.commit()
     db.refresh(order)
-    return OrderOut.model_validate(order)
+    return envelope(OrderOut.model_validate(order))
+
 
 @router.post("/{order_id}/void", response_model=dict)
 def void_order(order_id: int, body: dict | None = None, db: Session = Depends(get_session)):
@@ -166,14 +198,14 @@ def void_order(order_id: int, body: dict | None = None, db: Session = Depends(ge
         mark_cancelled(db, order, reason)
     except Exception as e:
         raise HTTPException(400, str(e))
-    return {"ok": True, "order_id": order.id, "status": order.status}
+    return envelope({"order_id": order.id, "status": order.status})
 
 
 class ReturnIn(BaseModel):
     date: str | None = None
 
 
-@router.post("/{order_id}/return", response_model=OrderOut)
+@router.post("/{order_id}/return", response_model=dict)
 def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
@@ -189,14 +221,14 @@ def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depe
         mark_returned(db, order, ret_date)
     except Exception as e:
         raise HTTPException(400, str(e))
-    return OrderOut.model_validate(order)
+    return envelope(OrderOut.model_validate(order))
 
 
 class BuybackIn(BaseModel):
     amount: float
 
 
-@router.post("/{order_id}/buyback", response_model=OrderOut)
+@router.post("/{order_id}/buyback", response_model=dict)
 def buyback_order(order_id: int, body: BuybackIn, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
@@ -205,4 +237,4 @@ def buyback_order(order_id: int, body: BuybackIn, db: Session = Depends(get_sess
         order = apply_buyback(db, order, Decimal(str(body.amount)))
     except ValueError as e:
         raise HTTPException(400, str(e))
-    return OrderOut.model_validate(order)
+    return envelope(OrderOut.model_validate(order))
