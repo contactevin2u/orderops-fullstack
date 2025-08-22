@@ -3,7 +3,7 @@ import AppShell from '@/components/AppShell';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { useTranslation } from 'react-i18next';
-import { parseMessage, createOrderFromParsed } from '@/utils/api';
+import { parseMessage } from '@/utils/api';
 
 function normalizeParsedForOrder(input: any) {
   if (!input) return null;
@@ -42,8 +42,10 @@ export default function IntakePage() {
   async function onCreate() {
     setBusy(true); setErr(''); setMsg('');
     try {
-      const out = await createOrderFromParsed(parsed);
-      setMsg('Order created: ID ' + (out?.id || out?.order_id || JSON.stringify(out)));
+      const out = await parseMessage(text, true);
+      setParsed(out);
+      const info = out?.created;
+      setMsg('Order created: ID ' + (info?.order_id || info?.code || JSON.stringify(info)));
     } catch (e: any) {
       setErr(e?.message || 'Create failed');
     } finally {
@@ -66,7 +68,7 @@ export default function IntakePage() {
           />
           <div className="row" style={{ justifyContent: 'flex-end' }}>
             <Button disabled={busy || !text} onClick={onParse}>{t('intake.parse')}</Button>
-            <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>{t('intake.create')}</Button>
+            <Button variant="secondary" disabled={busy || !text} onClick={onCreate}>{t('intake.create')}</Button>
           </div>
           {err && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
           {msg && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}

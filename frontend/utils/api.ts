@@ -55,8 +55,8 @@ export function ping() {
 }
 
 // -------- Parse
-export function parseMessage(text: string) {
-  return request<Json>("/parse", { json: { text, message: text } });
+export function parseMessage(text: string, createOrder?: boolean) {
+  return request<Json>("/parse", { json: { text, create_order: createOrder } });
 }
 
 // -------- Orders (normalized)
