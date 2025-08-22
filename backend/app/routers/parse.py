@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Dict
+import hashlib
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -15,6 +16,8 @@ from ..services.parser import parse_whatsapp_text as parse_text
 from ..services.ordersvc import create_from_parsed
 from ..utils.dates import parse_relaxed_date
 from ..utils.normalize import ensure_dict, ensure_list, to_decimal
+from ..models.order import Order
+from ..utils.responses import envelope
 
 router = APIRouter(prefix="/parse", tags=["parse"])
 
@@ -180,18 +183,24 @@ def parse_message(body: ParseIn, db: Session = Depends(get_session)):
 
     parsed = _post_normalize(parsed, raw)
 
-    created = {}
+    created: dict = {}
     if body.create_order:
-        try:
-            order = create_from_parsed(db, parsed)
-            created = {"order_id": order.id, "code": order.code}
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(400, f"could not create order: {e}")
+        idem_key = hashlib.sha1(raw.encode()).hexdigest()
+        existing = db.query(Order).filter(Order.idempotency_key == idem_key).one_or_none()
+        if existing:
+            created = {"order_id": existing.id, "code": existing.code}
+        else:
+            try:
+                order = create_from_parsed(db, parsed, idem_key)
+                created = {"order_id": order.id, "code": order.code}
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(400, f"could not create order: {e}")
 
-    return {
-        "ok": True,
-        "parsed": _jsonify_for_frontend(parsed),
-        **({"created": created} if created else {}),
-    }
+    return envelope(
+        {
+            "parsed": _jsonify_for_frontend(parsed),
+            **({"created": created} if created else {}),
+        }
+    )
