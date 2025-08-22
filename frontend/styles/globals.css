@@ -4,8 +4,6 @@
 
 @layer base {
   body {
-    background-color: #fff7ed;
-    color: #0b1220;
-    font-family: ui-sans-serif, system-ui, sans-serif;
+    @apply bg-gradient-to-br from-brand-50 to-white text-ink-900 antialiased;
   }
 }
