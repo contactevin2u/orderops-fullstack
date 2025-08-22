@@ -12,28 +12,68 @@ class DummyClient:
     class Chat:
         class Completions:
             def create(self, **kwargs):
-                data = {
-                    "customer": {"name": "Ali"},
-                    "order": {
-                        "type": "OUTRIGHT",
-                        "items": [],
-                        "charges": {},
-                        "totals": {},
-                    },
-                }
+                text = kwargs["messages"][-1]["content"].lower()
+                if "penghantaran" in text and "rm20" in text.replace(" ", ""):
+                    data = {
+                        "customer": {"name": "Ali"},
+                        "order": {
+                            "type": "OUTRIGHT",
+                            "items": [
+                                {
+                                    "name": "tilam canvas",
+                                    "qty": 1,
+                                    "unit_price": 199,
+                                    "line_total": 199,
+                                    "item_type": "OUTRIGHT",
+                                }
+                            ],
+                            "charges": {"delivery_fee": 20},
+                            "totals": {},
+                        },
+                    }
+                elif "delivery foc" in text:
+                    data = {
+                        "customer": {"name": "Ali"},
+                        "order": {
+                            "type": "OUTRIGHT",
+                            "items": [
+                                {
+                                    "name": "Auto travel steel wheelchair",
+                                    "qty": 1,
+                                    "unit_price": 2200,
+                                    "line_total": 2200,
+                                    "item_type": "OUTRIGHT",
+                                }
+                            ],
+                            "charges": {"delivery_fee": 0},
+                            "totals": {"total": 2200},
+                        },
+                    }
+                else:
+                    data = {
+                        "customer": {"name": "Ali"},
+                        "order": {"type": "OUTRIGHT", "items": [], "charges": {}, "totals": {}},
+                    }
+
                 content = json.dumps(data)
+
                 class Message:
                     def __init__(self, content):
                         self.content = content
+
                 class Choice:
                     def __init__(self, content):
                         self.message = Message(content)
+
                 class Resp:
                     def __init__(self, content):
                         self.choices = [Choice(content)]
+
                 return Resp(content)
+
         def __init__(self):
             self.completions = DummyClient.Chat.Completions()
+
     def __init__(self):
         self.chat = DummyClient.Chat()
 
