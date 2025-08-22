@@ -34,19 +34,23 @@ async function request<T = any>(
 
   const text = await res.text();
   const isJSON = res.headers.get("content-type")?.includes("application/json");
-  const data: any = isJSON && text ? JSON.parse(text) : text;
+  const payload: any = isJSON && text ? JSON.parse(text) : text;
+  const unwrapped =
+    payload && typeof payload === "object" && "data" in payload
+      ? (payload as any).data
+      : payload;
 
   if (!res.ok) {
     const msg =
-      (isJSON && (data?.detail || data?.message)) ||
-      (typeof data === "string" && data) ||
+      (isJSON && (unwrapped?.detail || unwrapped?.message)) ||
+      (typeof unwrapped === "string" && unwrapped) ||
       res.statusText;
     const err: any = new Error(msg || `HTTP ${res.status}`);
     err.status = res.status;
-    err.data = data;
+    err.data = unwrapped;
     throw err;
   }
-  return data as T;
+  return unwrapped as T;
 }
 
 // -------- Health
