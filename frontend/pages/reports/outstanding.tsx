@@ -28,30 +28,26 @@ export default function OutstandingPage() {
   }, [load]);
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-4">
+      <div className="container stack" style={{ maxWidth: '64rem' }}>
         <Card>
-          <h2 className="text-lg font-semibold mb-4">Outstanding</h2>
-          <div className="flex gap-2 mb-4">
-            <Button onClick={() => setTab("INSTALLMENT")} disabled={tab === "INSTALLMENT"}>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Outstanding</h2>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <Button onClick={() => setTab('INSTALLMENT')} disabled={tab === 'INSTALLMENT'}>
               Installments
             </Button>
             <Button
               variant="secondary"
-              onClick={() => setTab("RENTAL")}
-              disabled={tab === "RENTAL"}
+              onClick={() => setTab('RENTAL')}
+              disabled={tab === 'RENTAL'}
             >
               Rentals
             </Button>
-            <Button
-              variant="secondary"
-              onClick={load}
-              disabled={loading}
-            >
-              {loading ? "Refreshing..." : "Refresh"}
+            <Button variant="secondary" onClick={load} disabled={loading}>
+              {loading ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
-          <div className="overflow-x-auto">
-            <table className="table w-full">
+          <div style={{ overflowX: 'auto' }}>
+            <table className="table">
               <thead>
                 <tr>
                   <th>Code</th>
@@ -72,7 +68,7 @@ export default function OutstandingPage() {
                     <td>
                       <span className="badge">{r.status}</span>
                     </td>
-                    <td style={{ textAlign: "right" }}>
+                    <td style={{ textAlign: 'right' }}>
                       RM {Number(r.balance || 0).toFixed(2)}
                     </td>
                   </tr>
