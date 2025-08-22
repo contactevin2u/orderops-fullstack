@@ -10,6 +10,11 @@ from ..models import Order, OrderItem, Plan, Customer
 from ..schemas import OrderOut
 from ..services.ordersvc import create_order_from_parsed
 from ..services.plan_math import calculate_plan_due
+from ..services.status_updates import (
+    apply_buyback,
+    mark_cancelled,
+    mark_returned,
+)
 
 router = APIRouter(prefix="/orders", tags=["orders"])
 
@@ -157,18 +162,10 @@ def void_order(order_id: int, body: dict | None = None, db: Session = Depends(ge
         raise HTTPException(404, "Order not found")
 
     reason = (body or {}).get("reason") if body else None
-    order.status = "CANCELLED"
-    if hasattr(order, "notes") and reason:
-        order.notes = (order.notes or "") + f"\n[VOID] {reason}"
-
-    # If no posted payments, zero out totals
-    paid_total = sum([p.amount for p in order.payments if getattr(p, "status", "POSTED") == "POSTED"], Decimal("0.00"))
-    if paid_total == Decimal("0"):
-        order.total = Decimal("0.00")
-        order.balance = Decimal("0.00")
-
-    db.commit()
-    db.refresh(order)
+    try:
+        mark_cancelled(db, order, reason)
+    except Exception as e:
+        raise HTTPException(400, str(e))
     return {"ok": True, "order_id": order.id, "status": order.status}
 
 
@@ -182,21 +179,16 @@ def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depe
     if not order:
         raise HTTPException(404, "Order not found")
 
-    # Optional return date – reuse delivery_date field
+    ret_date = None
     if body and body.date:
         try:
-            order.delivery_date = datetime.fromisoformat(body.date)
+            ret_date = datetime.fromisoformat(body.date)
         except Exception:
-            pass
-
-    order.status = "RETURNED"
-
-    total = (order.subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee)
-    order.total = total
-    order.balance = total - order.paid_amount
-
-    db.commit()
-    db.refresh(order)
+            ret_date = None
+    try:
+        mark_returned(db, order, ret_date)
+    except Exception as e:
+        raise HTTPException(400, str(e))
     return OrderOut.model_validate(order)
 
 
@@ -209,20 +201,8 @@ def buyback_order(order_id: int, body: BuybackIn, db: Session = Depends(get_sess
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
-    if order.type != "OUTRIGHT":
-        raise HTTPException(400, "Buyback only allowed for OUTRIGHT orders")
-
-    amt = Decimal(str(body.amount))
-    if amt <= Decimal("0"):
-        raise HTTPException(400, "Invalid buyback amount")
-
-    order.discount += amt
-    order.status = "RETURNED"
-
-    total = (order.subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee)
-    order.total = total
-    order.balance = total - order.paid_amount
-
-    db.commit()
-    db.refresh(order)
+    try:
+        order = apply_buyback(db, order, Decimal(str(body.amount)))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
     return OrderOut.model_validate(order)
