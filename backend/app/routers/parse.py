@@ -12,7 +12,7 @@ from ..db import get_session
 # IMPORTANT: the real parser lives in services/parser.py as `parse_whatsapp_text`.
 # To avoid another mismatch, we alias it as parse_text here.
 from ..services.parser import parse_whatsapp_text as parse_text
-from ..services.ordersvc import create_from_parsed
+from ..services.ordersvc import create_from_parsed, _apply_charges_and_totals
 from ..utils.dates import parse_relaxed_date
 from ..utils.normalize import ensure_dict, ensure_list, to_decimal
 
@@ -30,7 +30,6 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     - default missing objects
     - coerce numerics to Decimal
     - infer plan_type from order.type when absent
-    - compute totals when missing or zero-ish
     """
     parsed = ensure_dict(parsed)
     customer = ensure_dict(parsed.get("customer"))
@@ -45,13 +44,18 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
 
     def _is_delivery_item(name: str) -> bool:
         n = name.lower()
-        if "return" in n:
-            return False
-        if "delivery" in n and ("charge" in n or "fee" in n):
-            return True
-        if "penghantaran" in n:
-            return True
-        return False
+        keywords = (
+            "delivery",
+            "penghantaran",
+            "pasang",
+            "installation",
+            "instalasi",
+            "pickup",
+            "collect",
+            "waive",
+            "percuma",
+        )
+        return any(k in n for k in keywords)
 
     # Items
     items = []
@@ -115,34 +119,11 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
         datetime(d_obj.year, d_obj.month, d_obj.day) if d_obj else None
     )
 
-    # Totals (recompute when missing/zero)
-    totals = ensure_dict(order.get("totals"))
-    subtotal = to_decimal(totals.get("subtotal"))
-    total = to_decimal(totals.get("total"))
-    paid = to_decimal(totals.get("paid"))
-    to_collect = to_decimal(totals.get("to_collect"))
-
-    if subtotal == Decimal("0.00"):
-        subtotal = sum(to_decimal(i.get("line_total")) for i in items)
-
-    fees = delivery_fee + return_delivery_fee + penalty_fee - discount
-    computed_total = (subtotal + fees).quantize(Decimal("0.01"))
-    if total == Decimal("0.00") or total != computed_total:
-        total = computed_total
-    if to_collect == Decimal("0.00"):
-        to_collect = (total - paid).quantize(Decimal("0.01"))
-
     order["charges"] = {
         "delivery_fee": delivery_fee,
         "return_delivery_fee": return_delivery_fee,
         "penalty_fee": penalty_fee,
         "discount": discount,
-    }
-    order["totals"] = {
-        "subtotal": subtotal,
-        "total": total,
-        "paid": paid,
-        "to_collect": to_collect,
     }
     order["plan"] = plan
 
@@ -179,6 +160,18 @@ def parse_message(body: ParseIn, db: Session = Depends(get_session)):
         raise HTTPException(400, f"parse failed: {e}")
 
     parsed = _post_normalize(parsed, raw)
+
+    o = parsed.get("order", {}) or {}
+    sub, disc, df, rdf, pf, tot, paid = _apply_charges_and_totals(
+        o.get("items") or [], o.get("charges") or {}, o.get("totals") or {}
+    )
+    o["totals"] = {
+        "subtotal": sub,
+        "total": tot,
+        "paid": paid,
+        "to_collect": (tot - paid),
+    }
+    parsed["order"] = o
 
     created = {}
     if body.create_order:
