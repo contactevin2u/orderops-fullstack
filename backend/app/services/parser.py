@@ -23,6 +23,7 @@ SCHEMA = {
                 "map_url": {"type": "string"},
             },
             "required": ["name"],
+            "additionalProperties": False,
         },
         "order": {
             "type": "object",
@@ -56,6 +57,7 @@ SCHEMA = {
                             "line_total",
                             "item_type",
                         ],
+                        "additionalProperties": False,
                     },
                 },
                 "charges": {
@@ -66,6 +68,7 @@ SCHEMA = {
                         "penalty_fee": {"type": "number"},
                         "discount": {"type": "number"},
                     },
+                    "additionalProperties": False,
                 },
                 "plan": {
                     "type": "object",
@@ -74,6 +77,7 @@ SCHEMA = {
                         "months": {"type": "integer"},
                         "monthly_amount": {"type": "number"},
                     },
+                    "additionalProperties": False,
                 },
                 "totals": {
                     "type": "object",
@@ -83,12 +87,15 @@ SCHEMA = {
                         "paid": {"type": "number"},
                         "to_collect": {"type": "number"},
                     },
+                    "additionalProperties": False,
                 },
             },
             "required": ["type"],
+            "additionalProperties": False,
         },
     },
     "required": ["customer", "order"],
+    "additionalProperties": False,
 }
 
 
