@@ -57,7 +57,7 @@ export default function OrdersPage(){
   );
 }
 
-function ErrorThrower({ error }: { error: any }) {
+function ErrorThrower({ error }: { error: any }): JSX.Element | null {
   throw error;
   return null;
 }

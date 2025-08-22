@@ -100,8 +100,9 @@ export default function OpsPage() {
   );
 }
 
-function ErrorThrower({ error }: { error: any }) {
+function ErrorThrower({ error }: { error: any }): JSX.Element | null {
   throw error;
+  return null;
 }
 
 function OrdersTable({ items }: { items: any[] }) {

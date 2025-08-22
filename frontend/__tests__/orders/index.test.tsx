@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import React from 'react';
 import useSWR from 'swr';
 import { vi } from 'vitest';
-import OrdersPage from './index';
+import OrdersPage from '@/pages/orders';
 
 vi.mock('next/link', () => ({ default: ({ children, ...props }: any) => <a {...props}>{children}</a> }));
 vi.mock('@/components/Layout', () => ({ default: ({ children }: any) => <div>{children}</div> }));
