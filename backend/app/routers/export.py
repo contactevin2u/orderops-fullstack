@@ -39,3 +39,14 @@ def cash_export(start: str, end: str, db: Session = Depends(get_session)):
 
     headers = {"Content-Disposition": f'attachment; filename="cash_{start}_{end}.xlsx"'}
     return Response(content=bio.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers=headers)
+
+
+@router.get("/payments_received.xlsx")
+def payments_received_export(start: str, end: str, db: Session = Depends(get_session)):
+    """Export posted payments by received date in Excel format.
+
+    This is an alias for :func:`cash_export` but exposes a more descriptive
+    endpoint name for consumers looking specifically for payment receipts on a
+    cash basis.
+    """
+    return cash_export(start, end, db)
