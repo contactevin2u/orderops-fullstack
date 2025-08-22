@@ -12,7 +12,7 @@ export default function OutstandingPage() {
   const [rows, setRows] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
 
-  const load = React.useCallback(async () => {
+
     setLoading(true);
     try {
       const r = await outstanding(tab);
@@ -25,7 +25,7 @@ export default function OutstandingPage() {
 
   React.useEffect(() => {
     load();
-  }, [load]);
+
 
   return (
     <Layout>

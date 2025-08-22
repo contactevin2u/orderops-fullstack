@@ -102,7 +102,6 @@ export default function OpsPage() {
 
 function ErrorThrower({ error }: { error: any }) {
   throw error;
-  return null;
 }
 
 function OrdersTable({ items }: { items: any[] }) {
