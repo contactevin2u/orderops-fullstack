@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 import re
 from typing import Optional
 
@@ -30,7 +30,7 @@ def parse_relaxed_date(text: str) -> Optional[date]:
         month = int(m.group(2))
         year_part = m.group(3)
         if year_part is None:
-            year = datetime.utcnow().year
+            year = datetime.now(timezone.utc).year
         else:
             year = int(year_part)
             if year < 100:
