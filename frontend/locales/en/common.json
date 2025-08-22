@@ -1,5 +1,12 @@
 {
-  "nav": { "intake": "Intake", "ops": "Operations" },
+  "nav": {
+    "intake": "Intake",
+    "ops": "Operations",
+    "orders": "Orders",
+    "parse": "Parse",
+    "export": "Export",
+    "reports": "Reports"
+  },
   "intake": {
     "placeholder": "Paste a message here…",
     "parse": "Parse",

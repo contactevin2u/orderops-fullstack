@@ -1,5 +1,12 @@
 {
-  "nav": { "intake": "Intake", "ops": "Operasi" },
+  "nav": {
+    "intake": "Intake",
+    "ops": "Operasi",
+    "orders": "Pesanan",
+    "parse": "Hurai",
+    "export": "Eksport",
+    "reports": "Laporan"
+  },
   "intake": {
     "placeholder": "Tampal mesej di sini…",
     "parse": "Hurai",
