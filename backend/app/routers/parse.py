@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Dict, List, Optional
+from decimal import Decimal
+from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -14,6 +14,7 @@ from ..db import get_session
 from ..services.parser import parse_whatsapp_text as parse_text
 from ..services.ordersvc import create_from_parsed
 from ..utils.dates import parse_relaxed_date
+from ..utils.normalize import ensure_dict, ensure_list, to_decimal
 
 router = APIRouter(prefix="/parse", tags=["parse"])
 
@@ -21,26 +22,6 @@ router = APIRouter(prefix="/parse", tags=["parse"])
 class ParseIn(BaseModel):
     text: str
     create_order: bool = False
-
-
-def _d(val: Any) -> Decimal:
-    """Decimal with 2dp, tolerant of None/str/float/int."""
-    if val is None:
-        return Decimal("0.00")
-    if isinstance(val, Decimal):
-        return val.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    try:
-        return Decimal(str(val)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    except Exception:
-        return Decimal("0.00")
-
-
-def _ensure_dict(x: Any) -> Dict[str, Any]:
-    return x if isinstance(x, dict) else {}
-
-
-def _ensure_list(x: Any) -> List[Any]:
-    return x if isinstance(x, list) else []
 
 
 def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
@@ -51,18 +32,18 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     - infer plan_type from order.type when absent
     - compute totals when missing or zero-ish
     """
-    parsed = _ensure_dict(parsed)
-    customer = _ensure_dict(parsed.get("customer"))
-    order = _ensure_dict(parsed.get("order"))
+    parsed = ensure_dict(parsed)
+    customer = ensure_dict(parsed.get("customer"))
+    order = ensure_dict(parsed.get("order"))
 
     # Items
     items = []
-    for it in _ensure_list(order.get("items")):
-        it = _ensure_dict(it)
-        qty = _d(it.get("qty") or 1).quantize(Decimal("1"))
-        unit_price = _d(it.get("unit_price"))
-        line_total = _d(it.get("line_total"))
-        monthly_amount = _d(it.get("monthly_amount"))
+    for it in ensure_list(order.get("items")):
+        it = ensure_dict(it)
+        qty = to_decimal(it.get("qty") or 1).quantize(Decimal("1"))
+        unit_price = to_decimal(it.get("unit_price"))
+        line_total = to_decimal(it.get("line_total"))
+        monthly_amount = to_decimal(it.get("monthly_amount"))
         item_type = (it.get("item_type") or order.get("type") or "").upper() or "OUTRIGHT"
 
         # If instalment/rental line without price, treat monthly_amount as line total
@@ -89,7 +70,7 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
         order["type"] = next(iter(item_types))
 
     # Normalise plan
-    plan = _ensure_dict(order.get("plan"))
+    plan = ensure_dict(order.get("plan"))
     if "plan_type" not in plan:
         otype = order.get("type")
         if otype in {"RENTAL", "INSTALLMENT"}:
@@ -111,21 +92,21 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     )
 
     # Charges
-    ch = _ensure_dict(order.get("charges"))
-    delivery_fee = _d(ch.get("delivery_fee"))
-    return_delivery_fee = _d(ch.get("return_delivery_fee"))
-    penalty_fee = _d(ch.get("penalty_fee"))
-    discount = _d(ch.get("discount"))
+    ch = ensure_dict(order.get("charges"))
+    delivery_fee = to_decimal(ch.get("delivery_fee"))
+    return_delivery_fee = to_decimal(ch.get("return_delivery_fee"))
+    penalty_fee = to_decimal(ch.get("penalty_fee"))
+    discount = to_decimal(ch.get("discount"))
 
     # Totals (recompute when missing/zero)
-    totals = _ensure_dict(order.get("totals"))
-    subtotal = _d(totals.get("subtotal"))
-    total = _d(totals.get("total"))
-    paid = _d(totals.get("paid"))
-    to_collect = _d(totals.get("to_collect"))
+    totals = ensure_dict(order.get("totals"))
+    subtotal = to_decimal(totals.get("subtotal"))
+    total = to_decimal(totals.get("total"))
+    paid = to_decimal(totals.get("paid"))
+    to_collect = to_decimal(totals.get("to_collect"))
 
     if subtotal == Decimal("0.00"):
-        subtotal = sum(_d(i.get("line_total")) for i in items)
+        subtotal = sum(to_decimal(i.get("line_total")) for i in items)
 
     fees = delivery_fee + return_delivery_fee + penalty_fee - discount
     computed_total = (subtotal + fees).quantize(Decimal("0.01"))
