@@ -142,7 +142,7 @@ def _apply_charges_and_totals(
 # Public API
 # -------------------------------
 
-def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
+def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: str | None = None) -> Order:
     """
     Create an Order (plus items/plan) from a parsed payload like:
 
@@ -203,6 +203,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
         total=total,
         paid_amount=paid,
         balance=balance,
+        idempotency_key=idempotency_key,
     )
     db.add(order)
     db.flush()  # get order.id
