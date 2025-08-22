@@ -55,20 +55,20 @@ export default function IntakePage() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto space-y-4">
+      <div className="mx-auto max-w-3xl space-y-6">
         <Card>
           <textarea
-            className="w-full h-40 p-3 border border-ink-200 rounded-xl"
+            className="h-40 w-full rounded-2xl border border-ink-200 bg-white/70 p-3 shadow-inner focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
             placeholder={t('intake.placeholder')}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <div className="mt-4 flex justify-end gap-2">
+          <div className="mt-4 flex justify-end gap-3">
             <Button disabled={busy || !text} onClick={onParse}>{t('intake.parse')}</Button>
             <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>{t('intake.create')}</Button>
           </div>
-          {err && <p className="mt-2 text-danger-500 text-sm">{err}</p>}
-          {msg && <p className="mt-2 text-success-500 text-sm">{msg}</p>}
+          {err && <p className="mt-2 text-sm text-danger-500">{err}</p>}
+          {msg && <p className="mt-2 text-sm text-success-500">{msg}</p>}
         </Card>
         {toPost && (
           <Card className="text-sm">
