@@ -7,6 +7,17 @@ from ..models import Plan
 
 
 def months_elapsed(start: datetime | None, end: datetime | None = None) -> int:
+    """Return whole months elapsed between ``start`` and ``end``.
+
+    A month counts as elapsed if the ``end`` day-of-month is greater than or
+    equal to the ``start`` day.  This mirrors billing cycles where payment is
+    due on the same day each month.  Examples::
+
+        start=15 Jan, end=14 Feb -> 1 month
+        start=15 Jan, end=15 Feb -> 2 months
+
+    ``start`` can be ``None``; in that case ``0`` is returned.
+    """
     if not isinstance(start, datetime):
         return 0
     end = end or datetime.utcnow()
