@@ -14,6 +14,7 @@ from ..services.status_updates import (
     apply_buyback,
     mark_cancelled,
     mark_returned,
+    recompute_financials,
 )
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -145,11 +146,8 @@ def update_order(order_id: int, body: dict, db: Session = Depends(get_session)):
                 if k in ip and ip[k] is not None:
                     setattr(item, k, Decimal(str(ip[k])))
 
-        # Recompute subtotal and totals when items change
-        subtotal = sum((itm.line_total or (itm.unit_price * itm.qty)) for itm in order.items)
-        order.subtotal = subtotal
-        order.total = subtotal - order.discount + order.delivery_fee + order.return_delivery_fee + order.penalty_fee
-        order.balance = order.total - order.paid_amount
+    # Recompute monetary totals based on current state
+    recompute_financials(order)
 
     db.commit()
     db.refresh(order)
@@ -193,7 +191,7 @@ def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depe
 
 
 class BuybackIn(BaseModel):
-    amount: float
+    amount: Decimal
 
 
 @router.post("/{order_id}/buyback", response_model=OrderOut)

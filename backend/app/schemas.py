@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
+from decimal import Decimal
 from typing import Optional, List
+
+from pydantic import BaseModel, Field
 import datetime as dt
 
 class CustomerIn(BaseModel):
@@ -13,27 +15,27 @@ class ItemIn(BaseModel):
     sku: Optional[str] = None
     category: Optional[str] = None  # BED|WHEELCHAIR|OXYGEN|ACCESSORY
     item_type: str  # OUTRIGHT|INSTALLMENT|RENTAL|FEE
-    qty: float = 1
-    unit_price: float = 0
-    line_total: float = 0
+    qty: Decimal = Decimal("1")
+    unit_price: Decimal = Decimal("0")
+    line_total: Decimal = Decimal("0")
 
 class PlanIn(BaseModel):
     plan_type: str  # RENTAL|INSTALLMENT
     months: Optional[int] = None
-    monthly_amount: float = 0
+    monthly_amount: Decimal = Decimal("0")
     start_date: Optional[str] = None
 
 class ChargesIn(BaseModel):
-    delivery_fee: float = 0
-    return_delivery_fee: float = 0
-    penalty_fee: float = 0
-    discount: float = 0
+    delivery_fee: Decimal = Decimal("0")
+    return_delivery_fee: Decimal = Decimal("0")
+    penalty_fee: Decimal = Decimal("0")
+    discount: Decimal = Decimal("0")
 
 class TotalsIn(BaseModel):
-    subtotal: float = 0
-    total: float = 0
-    paid: float = 0
-    to_collect: float = 0
+    subtotal: Decimal = Decimal("0")
+    total: Decimal = Decimal("0")
+    paid: Decimal = Decimal("0")
+    to_collect: Decimal = Decimal("0")
 
 class OrderBlock(BaseModel):
     type: str  # OUTRIGHT|INSTALLMENT|RENTAL|MIXED
@@ -68,9 +70,9 @@ class OrderItemOut(BaseModel):
     sku: Optional[str] = None
     category: Optional[str] = None
     item_type: str
-    qty: float
-    unit_price: float
-    line_total: float
+    qty: Decimal
+    unit_price: Decimal
+    line_total: Decimal
 
     class Config:
         from_attributes = True
@@ -78,7 +80,7 @@ class OrderItemOut(BaseModel):
 
 class PaymentOut(BaseModel):
     id: int
-    amount: float
+    amount: Decimal
     date: Optional[dt.date] = None
     method: Optional[str] = None
     reference: Optional[str] = None
@@ -93,7 +95,7 @@ class PlanOut(BaseModel):
     plan_type: str
     start_date: Optional[dt.date] = None
     months: Optional[int] = None
-    monthly_amount: float = 0
+    monthly_amount: Decimal = Decimal("0")
     status: str
 
     class Config:
@@ -107,14 +109,14 @@ class OrderOut(BaseModel):
     status: str
     delivery_date: Optional[dt.date] = None
     notes: Optional[str] = None
-    subtotal: float
-    discount: float | None = 0
-    delivery_fee: float | None = 0
-    return_delivery_fee: float | None = 0
-    penalty_fee: float | None = 0
-    total: float
-    paid_amount: float
-    balance: float
+    subtotal: Decimal
+    discount: Decimal | None = Decimal("0")
+    delivery_fee: Decimal | None = Decimal("0")
+    return_delivery_fee: Decimal | None = Decimal("0")
+    penalty_fee: Decimal | None = Decimal("0")
+    total: Decimal
+    paid_amount: Decimal
+    balance: Decimal
     customer: Optional[CustomerOut] = None
     items: List[OrderItemOut] = Field(default_factory=list)
     payments: List[PaymentOut] = Field(default_factory=list)
