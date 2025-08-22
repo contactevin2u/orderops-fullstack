@@ -1,21 +1,5 @@
-:root { --bg:#0b1020; --card:#11172a; --muted:#9ab; --text:#e8f0ff; --brand:#4f8cff; }
-html, body, #__next { height: 100%; }
-body { margin:0; background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, "Helvetica Neue", Arial; }
-a { color: var(--brand); text-decoration: none; }
-input, textarea, select, button { font: inherit; }
-.container { max-width: 1100px; margin: 0 auto; padding: 16px; }
-.card { background: var(--card); border:1px solid #1b2540; border-radius: 12px; padding: 16px; box-shadow: 0 6px 20px rgba(0,0,0,0.2); }
-.row { display: flex; gap: 16px; flex-wrap: wrap; }
-.col { flex:1 1 320px; }
-.table { width:100%; border-collapse: collapse; }
-.table th, .table td { border-bottom:1px solid #223; padding:10px; text-align:left; }
-.badge { display:inline-block; padding:2px 8px; border-radius:8px; font-size:12px; background:#203050; color:#cde; border:1px solid #2a3a60; }
-.btn { background:linear-gradient(180deg,#1a5fff,#174cd1); color:#fff; border:none; padding:10px 14px; border-radius:10px; cursor:pointer; }
-.btn:disabled { opacity:.6; cursor:not-allowed; }
-.btn.secondary { background:#202a44; border:1px solid #32436f; }
-.input, .select, .textarea { width:100%; background:#0e1428; border:1px solid #1f2d54; color:var(--text); padding:10px; border-radius:10px; }
-.kv { display:grid; grid-template-columns: 160px 1fr; gap:8px 12px; }
-.kv div { padding: 2px 0; }
-.hr { height:1px; background:#223; margin:12px 0; }
-.nav { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:16px; }
-.nav a { padding:8px 12px; border-radius:10px; background:#0f1730; border:1px solid #21315c; }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {@apply bg-brand-50 text-ink-900 font-sans;}

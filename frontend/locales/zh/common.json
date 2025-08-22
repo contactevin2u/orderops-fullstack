@@ -1,0 +1,8 @@
+{
+  "nav": { "intake": "Intake", "ops": "Operations" },
+  "intake": {
+    "placeholder": "把讯息贴在这里…",
+    "parse": "解析",
+    "create": "创建订单"
+  }
+}
