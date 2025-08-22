@@ -1,5 +1,5 @@
 import React from 'react';
-import Layout from '@/components/Layout';
+import AppShell from '@/components/AppShell';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { useTranslation } from 'react-i18next';
@@ -54,7 +54,7 @@ export default function IntakePage() {
   const toPost = normalizeParsedForOrder(parsed);
 
   return (
-    <Layout>
+    <AppShell>
       <div className="stack container" style={{ maxWidth: '48rem' }}>
         <Card>
           <textarea
@@ -77,6 +77,6 @@ export default function IntakePage() {
           </Card>
         )}
       </div>
-    </Layout>
+    </AppShell>
   );
 }

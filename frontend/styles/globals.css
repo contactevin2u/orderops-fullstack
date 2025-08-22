@@ -1,3 +1,13 @@
+:root {
+  --max-w-screen-2xl: 1536px;
+  --gutter-x-sm: 1rem;
+  --gutter-x-md: 1.5rem;
+  --gutter-x-lg: 2rem;
+  --radius-2xl: 1rem;
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
 body {
   min-height: 100vh;
   margin: 0;
