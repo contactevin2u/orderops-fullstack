@@ -2,4 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {@apply bg-brand-50 text-ink-900 font-sans;}
+@layer base {
+  body {@apply bg-brand-50 text-ink-900 font-sans;}
+}
