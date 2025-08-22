@@ -155,7 +155,9 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
 
     if "plan" in data and order.plan:
         plan_patch = data["plan"]
-        for k in ["plan_type", "months", "monthly_amount", "status"]:
+        if "monthly_amount" in plan_patch:
+            order.plan.monthly_amount = Decimal(str(plan_patch["monthly_amount"]))
+        for k in ["plan_type", "months", "status"]:
             if k in plan_patch:
                 setattr(order.plan, k, plan_patch[k])
         if plan_patch.get("start_date"):
