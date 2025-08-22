@@ -3,5 +3,9 @@
 @tailwind utilities;
 
 @layer base {
-  body {@apply bg-brand-50 text-ink-900 font-sans;}
+  body {
+    background-color: #f3f8ff;
+    color: #0b1220;
+    font-family: ui-sans-serif, system-ui, sans-serif;
+  }
 }

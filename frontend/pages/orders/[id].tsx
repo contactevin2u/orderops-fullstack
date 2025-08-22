@@ -35,7 +35,14 @@ export default function OrderDetailPage(){
 
   function setError(e:any){ setErr(e?.message || "Failed"); }
 
-  async function load(){
+  const loadDue = React.useCallback(async (orderId:number, date?:string) => {
+    try{
+      const d = await orderDue(orderId, date);
+      setDue(d);
+    }catch(e:any){ setError(e); }
+  }, []);
+
+  const load = React.useCallback(async () => {
     if(!id) return;
     try{
       const o = await getOrder(id as any);
@@ -49,20 +56,12 @@ export default function OrderDetailPage(){
       setPlanType(String(o?.plan?.plan_type ?? ""));
       setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
       setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
-      await loadDue(o.id, asOf);
     }catch(e:any){ setError(e); }
-  }
+  }, [id]);
 
-  async function loadDue(orderId:number, date?:string){
-    try{
-      const d = await orderDue(orderId, date);
-      setDue(d);
-    }catch(e:any){ setError(e); }
-  }
+  React.useEffect(()=>{ load(); },[load]);
 
-  React.useEffect(()=>{ load(); },[id]);
-
-  React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[asOf]);
+  React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[order, asOf, loadDue]);
 
   if(!order) return <Layout><div className="card">Loading...</div></Layout>;
 
@@ -137,8 +136,9 @@ export default function OrderDetailPage(){
           <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <h2 style={{marginTop:0}}>{order.code || order.id} <span className="badge">{order.status}</span></h2>
-              <a className="btn secondary" href={typeof window!=="undefined"? undefined : "#"} onClick={(e)=>{}} target="_blank" rel="noreferrer" 
-                hrefLang="en" {...{href: typeof window==="undefined" ? undefined : undefined}} />
+              <a className="btn secondary" href={invoicePdfUrl(order.id)} target="_blank" rel="noreferrer">
+                Invoice PDF
+              </a>
             </div>
             <div className="kv">
               <div>Type</div><div>{order.type}</div>
@@ -264,11 +264,6 @@ export default function OrderDetailPage(){
           </div>
 
           <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}}>{err || msg}</div>
-          <div style={{marginTop:8}}>
-            <a className="btn secondary" href={typeof window !== "undefined" ? undefined : undefined} onClick={(e)=>{ e.preventDefault(); window.open(require('@/utils/api').invoicePdfUrl(order.id), '_blank'); }}>
-              View Invoice PDF
-            </a>
-          </div>
         </div>
       </div>
     </Layout>
