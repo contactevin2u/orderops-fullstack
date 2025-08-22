@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     COMPANY_PHONE: str = "+6011 2868 6592"
     COMPANY_EMAIL: str = "contact@evin2u.com"
     COMPANY_ADDRESS: str = "10 Jalan Perusahaan Amari, Batu Caves, Kuala Lumpur"
+    COMPANY_BANK: str = "CIMB Bank 8011366127"
     TAX_LABEL: str = "SST"
     TAX_PERCENT: float = 0.0
 
