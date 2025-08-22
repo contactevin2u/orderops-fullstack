@@ -94,8 +94,9 @@ export function getOrder(id: number | string) {
 // Optional: tweak parsed payload before posting if your parser is loose
 function normalizeParsedForOrder(input: any) {
   if (!input) return input;
-  // many backends return { ok, parsed }; accept both shapes safely
-  const parsed = input?.parsed ? input.parsed : input;
+  // Unwrap common envelope shapes: { ok, data: { parsed } }
+  const payload = typeof input === "object" && "data" in input ? input.data : input;
+  const parsed = payload?.parsed ? payload.parsed : payload;
 
   // Allow both "code" or "sku" mixups; do NOT force if already correct
   if (parsed?.order) {
