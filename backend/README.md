@@ -1,7 +1,7 @@
 # Backend (FastAPI + Postgres) — OrderOps Full Stack
 
 - Orders, Items, Plans (RENTAL/INSTALLMENT), Payments (POSTED/VOIDED)
-- Documents: invoice, receipt, installment agreement (simple PDFs)
+- Documents: invoice (with terms & bank info), receipt, installment agreement (simple PDFs)
 - Export: cash-basis payments to Excel (``/export/cash.xlsx`` or ``/export/payments_received.xlsx``)
 
 ## Local dev (Windows)

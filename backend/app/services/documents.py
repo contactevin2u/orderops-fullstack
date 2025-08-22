@@ -16,6 +16,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from textwrap import wrap
 from io import BytesIO
+from datetime import date
 
 from ..core.config import settings
 from ..models.order import Order
@@ -39,10 +40,18 @@ def invoice_pdf(order: Order) -> bytes:
 
     c.setFont("Helvetica-Bold", 14)
     c.drawString(x*mm, y*mm, f"INVOICE {order.code}")
-    y -= 10
-
+    y -= 5
     c.setFont("Helvetica", 10)
-    company = [settings.COMPANY_NAME, settings.COMPANY_ADDRESS, f"Phone: {settings.COMPANY_PHONE}", f"Email: {settings.COMPANY_EMAIL}"]
+    inv_date = getattr(order, "created_at", date.today())
+    c.drawString(x*mm, y*mm, f"Invoice Date: {inv_date:%Y-%m-%d}")
+    y -= 5
+
+    company = [
+        settings.COMPANY_NAME,
+        settings.COMPANY_ADDRESS,
+        f"Phone: {settings.COMPANY_PHONE}",
+        f"Email: {settings.COMPANY_EMAIL}",
+    ]
     y = _draw_lines(c, x, y, company)
     y -= 5
 
@@ -73,6 +82,31 @@ def invoice_pdf(order: Order) -> bytes:
     for t in totals:
         c.drawString(x*mm, y*mm, t); y -= 5
 
+    y -= 10
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(x*mm, y*mm, "Payment Information:")
+    y -= 6
+    c.setFont("Helvetica", 10)
+    c.drawString(x*mm, y*mm, f"{settings.COMPANY_NAME} - {settings.COMPANY_BANK}")
+    y -= 5
+    c.drawString(x*mm, y*mm, f"Customer Service: {settings.COMPANY_PHONE}")
+
+    c.showPage()
+
+    y = 280
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(x*mm, y*mm, "Terms & Conditions")
+    y -= 10
+    c.setFont("Helvetica", 10)
+    terms = [
+        "Rentals: Payment is due on the first of each month. Late fees apply after a 7-day grace period.",
+        "Installments: Installment plans must be approved prior to delivery. Failure to remit payment by the due date may result in service interruption.",
+        "Warranty Coverage: Products include a one-year limited warranty against manufacturing defects. This warranty does not cover damage from misuse or unauthorized modifications.",
+        "Returns & Exchanges: Goods must be returned within 14 days in original packaging. Certain items may be non-refundable based on their condition or usage.",
+        f"Customer Service: For support, call {settings.COMPANY_PHONE}.",
+    ]
+    y = _draw_lines(c, x, y, terms, leading=12)
+
     c.showPage(); c.save()
     pdf = buf.getvalue(); buf.close()
     return pdf
@@ -85,13 +119,17 @@ def receipt_pdf(order: Order, payment: Payment) -> bytes:
     y -= 10
     c.setFont("Helvetica", 10)
     lines = [
-        settings.COMPANY_NAME, settings.COMPANY_ADDRESS,
-        f"Phone: {settings.COMPANY_PHONE}", f"Email: {settings.COMPANY_EMAIL}",
+        settings.COMPANY_NAME,
+        settings.COMPANY_ADDRESS,
+        f"Phone: {settings.COMPANY_PHONE}",
+        f"Email: {settings.COMPANY_EMAIL}",
         f"Customer: {order.customer.name}",
         f"Payment Date: {payment.date}",
         f"Amount: RM{float(payment.amount):.2f}",
         f"Method: {payment.method or '-'} Ref: {payment.reference or '-'}",
-        f"Status: {payment.status}"
+        f"Status: {payment.status}",
+        f"Bank: {settings.COMPANY_BANK}",
+        f"Customer Service: {settings.COMPANY_PHONE}",
     ]
     for t in lines:
         c.drawString(x*mm, y*mm, t); y -= 6
