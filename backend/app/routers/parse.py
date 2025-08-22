@@ -36,6 +36,23 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     customer = ensure_dict(parsed.get("customer"))
     order = ensure_dict(parsed.get("order"))
 
+    # Charges (initial values before item cleanup)
+    ch = ensure_dict(order.get("charges"))
+    delivery_fee = to_decimal(ch.get("delivery_fee"))
+    return_delivery_fee = to_decimal(ch.get("return_delivery_fee"))
+    penalty_fee = to_decimal(ch.get("penalty_fee"))
+    discount = to_decimal(ch.get("discount"))
+
+    def _is_delivery_item(name: str) -> bool:
+        n = name.lower()
+        if "return" in n:
+            return False
+        if "delivery" in n and ("charge" in n or "fee" in n):
+            return True
+        if "penghantaran" in n:
+            return True
+        return False
+
     # Items
     items = []
     for it in ensure_list(order.get("items")):
@@ -45,14 +62,21 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
         line_total = to_decimal(it.get("line_total"))
         monthly_amount = to_decimal(it.get("monthly_amount"))
         item_type = (it.get("item_type") or order.get("type") or "").upper() or "OUTRIGHT"
+        name = it.get("name") or "Item"
 
         # If instalment/rental line without price, treat monthly_amount as line total
         if item_type in {"INSTALLMENT", "RENTAL"} and line_total == Decimal("0.00") and monthly_amount > 0:
             unit_price = monthly_amount
             line_total = monthly_amount
 
+        if _is_delivery_item(name):
+            if delivery_fee == Decimal("0.00"):
+                delivery_fee = line_total
+            # Skip adding this item as it's treated as a delivery fee
+            continue
+
         items.append({
-            "name": it.get("name") or "Item",
+            "name": name,
             "sku": it.get("sku") or None,
             "category": it.get("category") or None,
             "item_type": item_type,
@@ -90,13 +114,6 @@ def _post_normalize(parsed: Dict[str, Any], raw_text: str) -> Dict[str, Any]:
     order["delivery_date"] = (
         datetime(d_obj.year, d_obj.month, d_obj.day) if d_obj else None
     )
-
-    # Charges
-    ch = ensure_dict(order.get("charges"))
-    delivery_fee = to_decimal(ch.get("delivery_fee"))
-    return_delivery_fee = to_decimal(ch.get("return_delivery_fee"))
-    penalty_fee = to_decimal(ch.get("penalty_fee"))
-    discount = to_decimal(ch.get("discount"))
 
     # Totals (recompute when missing/zero)
     totals = ensure_dict(order.get("totals"))
