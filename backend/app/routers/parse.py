@@ -173,7 +173,7 @@ def parse_message(body: ParseIn, db: Session = Depends(get_session)):
     }
     parsed["order"] = o
 
-    created = {}
+    created: dict = {}
     if body.create_order:
         try:
             order = create_from_parsed(db, parsed)
