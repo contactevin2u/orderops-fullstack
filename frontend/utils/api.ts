@@ -195,9 +195,12 @@ export function voidPayment(paymentId: number, reason?: string) {
 }
 
 // -------- Reports
-export function outstanding(type?: "INSTALLMENT" | "RENTAL") {
-  const qs = type ? `?type=${encodeURIComponent(type)}` : "";
-  return request<{ items: any[] }>(`/reports/outstanding${qs}`);
+export function outstanding(type?: string, asOf?: string) {
+  const sp = new URLSearchParams();
+  if (type && type !== "ALL") sp.set("type", type);
+  if (asOf) sp.set("as_of", asOf);
+  const qs = sp.toString();
+  return request<{ items: any[] }>(`/reports/outstanding${qs ? `?${qs}` : ""}`);
 }
 
 // -------- Documents
