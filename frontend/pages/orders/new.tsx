@@ -3,6 +3,14 @@ import React from "react";
 import { useRouter } from "next/router";
 import { createManualOrder } from "@/utils/api";
 
+interface ItemInput {
+  name: string;
+  item_type: string;
+  qty: number;
+  unit_price: string;
+  monthly_amount: string;
+}
+
 export default function NewOrderPage(){
   const router = useRouter();
   const [custName,setCustName] = React.useState("");
@@ -13,12 +21,12 @@ export default function NewOrderPage(){
   const [deliveryDate,setDeliveryDate] = React.useState("");
   const [notes,setNotes] = React.useState("");
 
-  const [items,setItems] = React.useState<any[]>([{ name:"", item_type:"OUTRIGHT", qty:1, unit_price:"", monthly_amount:"" }]);
+  const [items,setItems] = React.useState<ItemInput[]>([{ name:"", item_type:"OUTRIGHT", qty:1, unit_price:"", monthly_amount:"" }]);
 
   const [busy,setBusy] = React.useState(false);
   const [err,setErr] = React.useState("");
 
-  function updateItem(idx:number, field:string, value:any){
+  function updateItem(idx:number, field:string, value:unknown){
     const copy = [...items];
     copy[idx] = { ...copy[idx], [field]: value };
     setItems(copy);
@@ -54,7 +62,7 @@ export default function NewOrderPage(){
       const out = await createManualOrder(payload);
       const oid = out?.id || out?.order_id;
       if(oid) router.push(`/orders/${oid}`);
-    }catch(e:any){ setErr(e?.message || "Create failed"); }
+    }catch(e){ const err = e as { message?: string }; setErr(err?.message || "Create failed"); }
     finally{ setBusy(false); }
   }
 

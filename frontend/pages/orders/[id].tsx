@@ -2,12 +2,26 @@ import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
-import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue } from "@/utils/api";
+import {
+  getOrder,
+  updateOrder,
+  addPayment,
+  voidPayment,
+  voidOrder,
+  markReturned,
+  markBuyback,
+  invoicePdfUrl,
+  orderDue,
+  Order,
+  OrderItem,
+  Due,
+  Payment,
+} from "@/utils/api";
 
 export default function OrderDetailPage(){
   const router = useRouter();
   const { id } = router.query;
-  const [order,setOrder] = React.useState<any>(null);
+  const [order,setOrder] = React.useState<Order | null>(null);
   const [msg,setMsg] = React.useState<string>("");
   const [err,setErr] = React.useState<string>("");
   const [busy,setBusy] = React.useState<boolean>(false);
@@ -30,15 +44,18 @@ export default function OrderDetailPage(){
 
   const [buybackAmt,setBuybackAmt] = React.useState<string>("");
 
-  const [due,setDue] = React.useState<any>(null);
+  const [due,setDue] = React.useState<Due | null>(null);
   const [asOf,setAsOf] = React.useState<string>("");
 
-  function setError(e:any){ setErr(e?.message || "Failed"); }
+  function setError(e: unknown){
+    const err = e as { message?: string };
+    setErr(err?.message || "Failed");
+  }
 
   async function load(){
     if(!id) return;
     try{
-      const o = await getOrder(id as any);
+      const o = await getOrder(id as string);
       setOrder(o);
       setPenalty(String(o?.penalty_fee ?? ""));
       setDisc(String(o?.discount ?? ""));
@@ -50,14 +67,14 @@ export default function OrderDetailPage(){
       setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
       setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
       await loadDue(o.id, asOf);
-    }catch(e:any){ setError(e); }
+    }catch(e){ setError(e); }
   }
 
   async function loadDue(orderId:number, date?:string){
     try{
       const d = await orderDue(orderId, date);
       setDue(d);
-    }catch(e:any){ setError(e); }
+    }catch(e){ setError(e); }
   }
 
   React.useEffect(()=>{ load(); },[id]);
@@ -69,7 +86,7 @@ export default function OrderDetailPage(){
   async function savePricing(){
     setBusy(true); setErr(""); setMsg("");
     try{
-      const patch:any = {
+      const patch: Record<string, unknown> = {
         penalty_fee: Number(penalty||0),
         discount: Number(disc||0),
         delivery_fee: Number(delFee||0),
@@ -86,7 +103,7 @@ export default function OrderDetailPage(){
       }
       const out = await updateOrder(order.id, patch);
       setMsg("Order updated"); setOrder(out);
-    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+    } catch(e){ setError(e); } finally{ setBusy(false); }
   }
 
   async function postPayment(){
@@ -95,39 +112,39 @@ export default function OrderDetailPage(){
       const out = await addPayment({ order_id: order.id, amount: Number(payAmt||0), date: payDate || undefined, method: payMethod || undefined, reference: payRef || undefined });
       setMsg("Payment added"); await load();
       setPayAmt(""); setPayDate(""); setPayMethod(""); setPayRef("");
-    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+    }catch(e){ setError(e); } finally{ setBusy(false); }
   }
 
   async function onVoidPayment(pid:number){
     setBusy(true); setErr(""); setMsg("");
     try{ await voidPayment(pid, "Voided from UI"); setMsg("Payment voided"); await load(); }
-    catch(e:any){ setError(e); } finally{ setBusy(false); }
+    catch(e){ setError(e); } finally{ setBusy(false); }
   }
 
   async function onCancelOrder(){
     if(!confirm("Void/cancel entire order?")) return;
     setBusy(true); setErr(""); setMsg("");
     try{ await voidOrder(order.id, "Cancelled from UI"); setMsg("Order cancelled"); await load(); }
-    catch(e:any){ setError(e); } finally{ setBusy(false); }
+    catch(e){ setError(e); } finally{ setBusy(false); }
   }
 
   async function onReturned(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const out = await markReturned(order.id);
-      setOrder(out?.order || out);
+      setOrder((out as { order?: Order }).order || (out as Order));
       setMsg("Marked as returned");
-    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+    }catch(e){ setError(e); } finally{ setBusy(false); }
   }
 
   async function onBuyback(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const out = await markBuyback(order.id, Number(buybackAmt||0));
-      setOrder(out?.order || out);
+      setOrder((out as { order?: Order }).order || (out as Order));
       setBuybackAmt("");
       setMsg("Buyback recorded");
-    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+    }catch(e){ setError(e); } finally{ setBusy(false); }
   }
 
   return (
@@ -153,7 +170,7 @@ export default function OrderDetailPage(){
               <table className="table">
                 <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Line Total</th></tr></thead>
                 <tbody>
-                  {(order.items||[]).map((it:any)=>(
+                  {(order.items||[]).map((it:OrderItem)=>(
                     <tr key={it.id || it.name}>
                       <td>{it.name}</td><td>{it.item_type}</td>
                       <td>{Number(it.qty||1)}</td>
@@ -248,7 +265,7 @@ export default function OrderDetailPage(){
             <table className="table">
               <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref</th><th>Status</th><th></th></tr></thead>
               <tbody>
-                {(order.payments||[]).map((p:any)=>(
+                {(order.payments || []).map((p:Payment)=>(
                   <tr key={p.id}>
                     <td>{p.date}</td>
                     <td>RM {Number(p.amount||0).toFixed(2)}</td>

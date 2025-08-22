@@ -1,7 +1,8 @@
 import Link from "next/link";
 import StatusBadge from "./StatusBadge";
+import { Order } from "@/utils/api";
 
-export default function OrderMini({order}:{order:any}){
+export default function OrderMini({order}:{order:Order}){
   return (
     <tr>
       <td><Link href={`/orders/${order.id}`}>{order.code || order.id}</Link></td>

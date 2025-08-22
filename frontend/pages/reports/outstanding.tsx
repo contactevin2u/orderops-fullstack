@@ -1,11 +1,11 @@
 import Layout from "@/components/Layout";
 import React from "react";
-import { outstanding } from "@/utils/api";
+import { outstanding, Order } from "@/utils/api";
 import Link from "next/link";
 
 export default function OutstandingPage(){
   const [tab,setTab] = React.useState<"INSTALLMENT"|"RENTAL">("INSTALLMENT");
-  const [rows,setRows] = React.useState<any[]>([]);
+  const [rows,setRows] = React.useState<Order[]>([]);
   const [loading,setLoading] = React.useState(false);
 
   async function load(){
@@ -32,7 +32,7 @@ export default function OutstandingPage(){
           <table className="table">
             <thead><tr><th>Code</th><th>Customer</th><th>Type</th><th>Status</th><th>Balance</th></tr></thead>
             <tbody>
-              {rows.map((r:any)=>(
+              {rows.map((r:Order)=>(
                 <tr key={r.id}>
                   <td><Link href={`/orders/${r.id}`}>{r.code||r.id}</Link></td>
                   <td>{r.customer?.name}</td>

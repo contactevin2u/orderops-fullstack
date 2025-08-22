@@ -1,13 +1,13 @@
 import Layout from "@/components/Layout";
 import Link from "next/link";
 import React from "react";
-import { listOrders } from "@/utils/api";
+import { listOrders, Order } from "@/utils/api";
 
 export default function OrdersPage(){
   const [q,setQ] = React.useState("");
   const [status,setStatus] = React.useState("");
   const [type,setType] = React.useState("");
-  const [items,setItems] = React.useState<any[]>([]);
+  const [items,setItems] = React.useState<Order[]>([]);
   const [loading,setLoading] = React.useState(false);
 
   async function load(){
@@ -50,7 +50,7 @@ export default function OrdersPage(){
           <table className="table">
             <thead><tr><th>Code</th><th>Type</th><th>Status</th><th>Total</th><th>Paid</th><th>Balance</th></tr></thead>
             <tbody>
-              {items.map((o:any)=>(
+              {items.map((o:Order)=>(
                 <tr key={o.id}>
                   <td><Link href={`/orders/${o.id}`}>{o.code||o.id}</Link></td>
                   <td>{o.type}</td>
