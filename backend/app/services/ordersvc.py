@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, date
-from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
+from decimal import Decimal
 import secrets
 from typing import Any, Dict, Optional, Tuple
 
@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from ..models import Customer, Order, OrderItem, Plan  # models/__init__.py exports these
 from ..utils.dates import parse_relaxed_date
+from ..utils.normalize import to_decimal
 
 
 # -------------------------------
@@ -18,18 +19,6 @@ from ..utils.dates import parse_relaxed_date
 # -------------------------------
 
 DEC0 = Decimal("0.00")
-
-
-def _d(x: Any, default: Decimal = DEC0) -> Decimal:
-    """Coerce into Decimal safely; treat None/"" as 0.00."""
-    if x is None:
-        return default
-    if isinstance(x, Decimal):
-        return x.quantize(Decimal("0.01"))
-    try:
-        return Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    except (InvalidOperation, ValueError):
-        return default
 
 
 
@@ -106,10 +95,10 @@ def _get_or_create_customer(db: Session, data: Dict[str, Any]) -> Customer:
 def _compute_subtotal_from_items(items: list[dict]) -> Decimal:
     subtotal = DEC0
     for it in items:
-        lt = _d(it.get("line_total"))
-        up = _d(it.get("unit_price"))
-        qty = _d(it.get("qty") or 1)
-        monthly = _d(it.get("monthly_amount"))
+        lt = to_decimal(it.get("line_total"))
+        up = to_decimal(it.get("unit_price"))
+        qty = to_decimal(it.get("qty") or 1)
+        monthly = to_decimal(it.get("monthly_amount"))
         # For RENTAL/INSTALLMENT items, monthly amounts should not inflate outright subtotal
         # Only include explicit unit/line totals
         if lt > 0:
@@ -134,18 +123,18 @@ def _apply_charges_and_totals(
     totals = totals or {}
 
     subtotal = _compute_subtotal_from_items(items)
-    discount = _d(charges.get("discount"))
-    delivery_fee = _d(charges.get("delivery_fee"))
-    return_delivery_fee = _d(charges.get("return_delivery_fee"))
-    penalty_fee = _d(charges.get("penalty_fee"))
+    discount = to_decimal(charges.get("discount"))
+    delivery_fee = to_decimal(charges.get("delivery_fee"))
+    return_delivery_fee = to_decimal(charges.get("return_delivery_fee"))
+    penalty_fee = to_decimal(charges.get("penalty_fee"))
 
     # Primary formula if totals.total not trustworthy:
     computed_total = subtotal - discount + delivery_fee + return_delivery_fee + penalty_fee
 
-    total_from_payload = _d(totals.get("total"))
+    total_from_payload = to_decimal(totals.get("total"))
     total = total_from_payload if total_from_payload > 0 else computed_total
 
-    paid = _d(totals.get("paid"))
+    paid = to_decimal(totals.get("paid"))
     return (subtotal, discount, delivery_fee, return_delivery_fee, penalty_fee, total, paid)
 
 
@@ -224,10 +213,10 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
         sku = (it.get("sku") or it.get("code") or None)
         category = (it.get("category") or None)
         item_type = (it.get("item_type") or otype).strip().upper()
-        qty = _d(it.get("qty") or 1)
-        unit_price = _d(it.get("unit_price"))
-        line_total = _d(it.get("line_total"))
-        monthly_amount = _d(it.get("monthly_amount"))
+        qty = to_decimal(it.get("qty") or 1)
+        unit_price = to_decimal(it.get("unit_price"))
+        line_total = to_decimal(it.get("line_total"))
+        monthly_amount = to_decimal(it.get("monthly_amount"))
 
         # For rental/installment items, monthly amount is carried by Plan; keep monetary 0 at item level
         if item_type in ("RENTAL", "INSTALLMENT"):
@@ -274,11 +263,11 @@ def create_from_parsed(db: Session, payload: Dict[str, Any]) -> Order:
             else None
         )
 
-        monthly_amount = _d(plan_in.get("monthly_amount"))
+        monthly_amount = to_decimal(plan_in.get("monthly_amount"))
         # As a fallback, if not present and single-item monthly was parsed, try to infer the max monthly amount
         if monthly_amount <= 0:
             # Look for the largest 'monthly_amount' among items
-            monthly_candidates = [_d(it.get("monthly_amount")) for it in items if it.get("monthly_amount") is not None]
+            monthly_candidates = [to_decimal(it.get("monthly_amount")) for it in items if it.get("monthly_amount") is not None]
             if monthly_candidates:
                 monthly_amount = max(monthly_candidates)
 
