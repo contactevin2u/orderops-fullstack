@@ -1,9 +1,26 @@
-from reportlab.pdfgen import canvas
+"""PDF generation utilities using ReportLab.
+
+This module generates various PDF documents related to orders. ReportLab is an
+optional dependency, so we provide a clear error message if it's missing at
+runtime.
+"""
+
+try:  # pragma: no cover - exercised indirectly in tests
+    from reportlab.pdfgen import canvas
+except ImportError as exc:  # pragma: no cover - tested by import
+    raise ImportError(
+        "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'."
+    ) from exc
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from textwrap import wrap
 from io import BytesIO
+
 from ..core.config import settings
+from ..models.order import Order
+from ..models.payment import Payment
+from ..models.plan import Plan
 
 def _draw_lines(c, x, y, lines, max_width_mm=180, leading=14):
     width = max_width_mm * mm
@@ -15,7 +32,7 @@ def _draw_lines(c, x, y, lines, max_width_mm=180, leading=14):
             y -= leading/3.0
     return y
 
-def invoice_pdf(order) -> bytes:
+def invoice_pdf(order: Order) -> bytes:
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     x, y = 20, 280
@@ -60,7 +77,7 @@ def invoice_pdf(order) -> bytes:
     pdf = buf.getvalue(); buf.close()
     return pdf
 
-def receipt_pdf(order, payment) -> bytes:
+def receipt_pdf(order: Order, payment: Payment) -> bytes:
     buf = BytesIO(); c = canvas.Canvas(buf, pagesize=A4)
     x, y = 20, 280
     c.setFont("Helvetica-Bold", 14)
@@ -82,7 +99,7 @@ def receipt_pdf(order, payment) -> bytes:
     pdf = buf.getvalue(); buf.close()
     return pdf
 
-def installment_agreement_pdf(order, plan) -> bytes:
+def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
     buf = BytesIO(); c = canvas.Canvas(buf, pagesize=A4)
     x, y = 20, 280
     c.setFont("Helvetica-Bold", 14)
