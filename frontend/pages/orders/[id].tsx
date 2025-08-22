@@ -35,7 +35,14 @@ export default function OrderDetailPage(){
 
   function setError(e:any){ setErr(e?.message || "Failed"); }
 
-  async function load(){
+  const loadDue = React.useCallback(async (orderId:number, date?:string) => {
+    try{
+      const d = await orderDue(orderId, date);
+      setDue(d);
+    }catch(e:any){ setError(e); }
+  }, []);
+
+  const load = React.useCallback(async () => {
     if(!id) return;
     try{
       const o = await getOrder(id as any);
@@ -49,20 +56,12 @@ export default function OrderDetailPage(){
       setPlanType(String(o?.plan?.plan_type ?? ""));
       setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
       setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
-      await loadDue(o.id, asOf);
     }catch(e:any){ setError(e); }
-  }
+  }, [id]);
 
-  async function loadDue(orderId:number, date?:string){
-    try{
-      const d = await orderDue(orderId, date);
-      setDue(d);
-    }catch(e:any){ setError(e); }
-  }
+  React.useEffect(()=>{ load(); },[load]);
 
-  React.useEffect(()=>{ load(); },[id]);
-
-  React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[asOf]);
+  React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[order, asOf, loadDue]);
 
   if(!order) return <Layout><div className="card">Loading...</div></Layout>;
 
