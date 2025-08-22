@@ -38,10 +38,10 @@ def outstanding(
             .scalar_subquery()
     )
 
-    days_elapsed_expr = as_of - Order.delivery_date
+    days_elapsed_expr = func.DATE_PART("day", as_of - Order.delivery_date)
     months_elapsed_expr = cast(days_elapsed_expr / 30.0, Integer)
     months_expr = case(
-        (Plan.months != None, func.min(Plan.months, months_elapsed_expr)),
+        (Plan.months != None, func.least(Plan.months, months_elapsed_expr)),
         else_=months_elapsed_expr,
     )
 
