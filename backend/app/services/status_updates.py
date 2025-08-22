@@ -7,18 +7,27 @@ from sqlalchemy.orm import Session
 from ..models import Order
 
 
+DEC0 = Decimal("0.00")
+
+
 def recompute_financials(order: Order) -> None:
     """Recalculate subtotal, total and balance for ``order`` based on items and charges."""
-    subtotal = sum((itm.line_total or (itm.unit_price * itm.qty)) for itm in order.items)
+    subtotal = sum(
+        (
+            it.line_total if it.line_total is not None else (it.unit_price * it.qty)
+            for it in order.items
+        ),
+        DEC0,
+    )
     order.subtotal = subtotal
     order.total = (
         subtotal
-        - (order.discount or Decimal("0"))
-        + (order.delivery_fee or Decimal("0"))
-        + (order.return_delivery_fee or Decimal("0"))
-        + (order.penalty_fee or Decimal("0"))
+        - (order.discount or DEC0)
+        + (order.delivery_fee or DEC0)
+        + (order.return_delivery_fee or DEC0)
+        + (order.penalty_fee or DEC0)
     )
-    order.balance = order.total - (order.paid_amount or Decimal("0"))
+    order.balance = order.total - (order.paid_amount or DEC0)
 
 
 def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Order:

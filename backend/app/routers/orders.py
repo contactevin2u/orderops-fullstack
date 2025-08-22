@@ -181,6 +181,8 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
                 if k in ip:
                     setattr(item, k, Decimal(str(ip[k])))
 
+
+    # Recompute monetary totals based on current state
     recompute_financials(order)
     db.commit()
     db.refresh(order)
@@ -225,7 +227,7 @@ def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depe
 
 
 class BuybackIn(BaseModel):
-    amount: float
+    amount: Decimal
 
 
 @router.post("/{order_id}/buyback", response_model=dict)
