@@ -42,8 +42,7 @@ def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Orde
 
 def mark_returned(db: Session, order: Order, return_date: datetime | None = None) -> Order:
     """Mark an order as returned, optionally recording a return date."""
-    if return_date:
-        order.delivery_date = return_date
+    order.returned_at = return_date or datetime.utcnow()
     order.status = "RETURNED"
     recompute_financials(order)
     db.commit()

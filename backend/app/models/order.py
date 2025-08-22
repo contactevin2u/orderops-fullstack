@@ -14,6 +14,7 @@ class Order(Base):
     status: Mapped[str] = mapped_column(String(20), default="NEW")  # NEW|ACTIVE|RETURNED|CANCELLED|COMPLETED
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
     delivery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"))

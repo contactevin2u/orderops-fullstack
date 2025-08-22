@@ -183,8 +183,8 @@ def parse_message(body: ParseIn, db: Session = Depends(get_session)):
     created = {}
     if body.create_order:
         try:
-            order_id, code = create_from_parsed(parsed, db)
-            created = {"order_id": order_id, "code": code}
+            order = create_from_parsed(db, parsed)
+            created = {"order_id": order.id, "code": order.code}
         except HTTPException:
             raise
         except Exception as e:
