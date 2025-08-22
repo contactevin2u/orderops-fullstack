@@ -4,7 +4,7 @@ export default function LanguageSwitcher() {
   const { i18n } = useTranslation();
   return (
     <select
-      className="border border-ink-200 rounded-lg p-2 bg-white text-ink-900"
+      className="select"
       value={i18n.language}
       onChange={(e) => i18n.changeLanguage(e.target.value)}
     >

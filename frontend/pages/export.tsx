@@ -18,38 +18,35 @@ export default function ExportPage() {
 
   return (
     <Layout>
-      <div className="max-w-md mx-auto space-y-4">
+      <div className="small-container stack">
         <Card>
-          <h2 className="text-lg font-semibold mb-4">Export Payments</h2>
-          <div className="space-y-2">
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Export Payments</h2>
+          <div className="stack" style={{ gap: 8 }}>
             <div>
-              <label className="block mb-1">Start Date</label>
+              <label style={{ display: 'block', marginBottom: 4 }}>Start Date</label>
               <input
-                className="input w-full"
+                className="input"
                 type="date"
                 value={start}
                 onChange={(e) => setStart(e.target.value)}
               />
             </div>
             <div>
-              <label className="block mb-1">End Date</label>
+              <label style={{ display: 'block', marginBottom: 4 }}>End Date</label>
               <input
-                className="input w-full"
+                className="input"
                 type="date"
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
               />
             </div>
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={() => download("cash")}
-                disabled={!start || !end}
-              >
+            <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
+              <Button onClick={() => download('cash')} disabled={!start || !end}>
                 Cash Export
               </Button>
               <Button
                 variant="secondary"
-                onClick={() => download("payments_received")}
+                onClick={() => download('payments_received')}
                 disabled={!start || !end}
               >
                 Payments Received

@@ -55,24 +55,25 @@ export default function IntakePage() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-3xl space-y-6">
+      <div className="stack container" style={{ maxWidth: '48rem' }}>
         <Card>
           <textarea
-            className="h-40 w-full rounded-2xl border border-ink-200 bg-white/70 p-3 shadow-inner focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="textarea"
+            rows={10}
             placeholder={t('intake.placeholder')}
             value={text}
             onChange={(e) => setText(e.target.value)}
           />
-          <div className="mt-4 flex justify-end gap-3">
+          <div className="row" style={{ justifyContent: 'flex-end' }}>
             <Button disabled={busy || !text} onClick={onParse}>{t('intake.parse')}</Button>
             <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>{t('intake.create')}</Button>
           </div>
-          {err && <p className="mt-2 text-sm text-danger-500">{err}</p>}
-          {msg && <p className="mt-2 text-sm text-success-500">{msg}</p>}
+          {err && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
+          {msg && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}
         </Card>
         {toPost && (
-          <Card className="text-sm">
-            <pre className="whitespace-pre-wrap">{JSON.stringify(toPost, null, 2)}</pre>
+          <Card>
+            <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>{JSON.stringify(toPost, null, 2)}</pre>
           </Card>
         )}
       </div>
