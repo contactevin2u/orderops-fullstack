@@ -165,7 +165,7 @@ def parse_message(body: ParseIn, db: Session = Depends(get_session)):
     parsed = _post_normalize(parsed, raw)
 
 
-   o = parsed.get("order", {}) or {}
+    o = parsed.get("order", {}) or {}
     sub, disc, df, rdf, pf, tot, paid = _apply_charges_and_totals(
         o.get("items") or [], o.get("charges") or {}, o.get("totals") or {}
     )
