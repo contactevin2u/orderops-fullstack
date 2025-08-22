@@ -1,0 +1,8 @@
+{
+  "nav": { "intake": "Intake", "ops": "Operasi" },
+  "intake": {
+    "placeholder": "Tampal mesej di sini…",
+    "parse": "Hurai",
+    "create": "Cipta pesanan"
+  }
+}

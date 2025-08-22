@@ -1,94 +1,27 @@
-// pages/index.tsx
-import Layout from "@/components/Layout";
-import Link from "next/link";
-import React from "react";
-import { listOrders, ping } from "@/utils/api";
+import React from 'react';
+import Layout from '@/components/Layout';
+import Card from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import { useTranslation } from 'react-i18next';
 
-export default function HomePage() {
-  const [ok, setOk] = React.useState<string>("checking...");
-  const [recent, setRecent] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    (async () => {
-      try { await ping(); setOk("OK"); } catch (e: any) { setOk("ERROR: " + (e?.message || "failed")); }
-
-      try {
-        const r = await listOrders();
-        setRecent((r.items || []).slice(0, 5));
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
-
+export default function IntakePage() {
+  const { t } = useTranslation();
+  const [text, setText] = React.useState('');
   return (
     <Layout>
-      <div className="row">
-        <div className="col">
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>System</h2>
-            <div className="kv">
-              <div>Backend</div>
-              <div>
-                <b>{ok}</b>
-              </div>
-            </div>
-            <div className="hr" />
-            <div className="row">
-              <Link className="btn" href="/parse">
-                Parse & Create
-              </Link>
-              <Link className="btn secondary" href="/orders">
-                View Orders
-              </Link>
-              <Link className="btn secondary" href="/reports/outstanding">
-                Outstanding
-              </Link>
-            </div>
+      <div className="max-w-3xl mx-auto space-y-4">
+        <Card>
+          <textarea
+            className="w-full h-40 p-3 border border-ink-200 rounded-xl"
+            placeholder={t('intake.placeholder')}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <div className="mt-4 flex justify-end gap-2">
+            <Button disabled={!text}>{t('intake.parse')}</Button>
+            <Button variant="secondary">{t('intake.create')}</Button>
           </div>
-        </div>
-        <div className="col">
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>Recent Orders</h2>
-            <div style={{ overflowX: "auto" }}>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Code</th>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Total</th>
-                    <th>Paid</th>
-                    <th>Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recent.map((o: any) => (
-                    <tr key={o.id}>
-                      <td>
-                        <Link href={`/orders/${o.id}`}>{o.code || o.id}</Link>
-                      </td>
-                      <td>{o.type}</td>
-                      <td>
-                        <span className="badge">{o.status}</span>
-                      </td>
-                      <td style={{ textAlign: "right" }}>RM {Number(o.total || 0).toFixed(2)}</td>
-                      <td style={{ textAlign: "right" }}>RM {Number(o.paid_amount || 0).toFixed(2)}</td>
-                      <td style={{ textAlign: "right" }}>RM {Number(o.balance || 0).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  {recent.length === 0 && (
-                    <tr>
-                      <td colSpan={6} style={{ opacity: 0.7 }}>
-                        No data
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        </Card>
       </div>
     </Layout>
   );

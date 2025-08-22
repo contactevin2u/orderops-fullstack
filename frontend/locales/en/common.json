@@ -1,0 +1,8 @@
+{
+  "nav": { "intake": "Intake", "ops": "Operations" },
+  "intake": {
+    "placeholder": "Paste a message here…",
+    "parse": "Parse",
+    "create": "Create order"
+  }
+}
