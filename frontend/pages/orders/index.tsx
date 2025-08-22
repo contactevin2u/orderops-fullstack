@@ -1,13 +1,14 @@
 import Layout from "@/components/Layout";
 import Link from "next/link";
 import React from "react";
-import { listOrders } from "@/utils/api";
+import { listOrders, Order } from "@/utils/api";
+import OrderMini from "@/components/OrderMini";
 
 export default function OrdersPage(){
   const [q,setQ] = React.useState("");
   const [status,setStatus] = React.useState("");
   const [type,setType] = React.useState("");
-  const [items,setItems] = React.useState<any[]>([]);
+  const [items, setItems] = React.useState<Order[]>([]);
   const [loading,setLoading] = React.useState(false);
 
   async function load(){
@@ -50,15 +51,8 @@ export default function OrdersPage(){
           <table className="table">
             <thead><tr><th>Code</th><th>Type</th><th>Status</th><th>Total</th><th>Paid</th><th>Balance</th></tr></thead>
             <tbody>
-              {items.map((o:any)=>(
-                <tr key={o.id}>
-                  <td><Link href={`/orders/${o.id}`}>{o.code||o.id}</Link></td>
-                  <td>{o.type}</td>
-                  <td><span className="badge">{o.status}</span></td>
-                  <td style={{textAlign:"right"}}>RM {Number(o.total||0).toFixed(2)}</td>
-                  <td style={{textAlign:"right"}}>RM {Number(o.paid_amount||0).toFixed(2)}</td>
-                  <td style={{textAlign:"right"}}>RM {Number(o.balance||0).toFixed(2)}</td>
-                </tr>
+              {items.map((o: Order) => (
+                <OrderMini key={o.id} order={o} />
               ))}
               {items.length===0 && <tr><td colSpan={6} style={{opacity:.7}}>No orders found</td></tr>}
             </tbody>

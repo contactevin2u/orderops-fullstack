@@ -60,7 +60,17 @@ export function parseMessage(text: string) {
 }
 
 // -------- Orders (normalized)
-type OrdersList = { items: any[]; total?: number };
+export type Order = {
+  id: number;
+  code?: string;
+  type?: string;
+  status?: string;
+  total?: number;
+  paid_amount?: number;
+  balance?: number;
+};
+
+type OrdersList = { items: Order[]; total?: number };
 
 export async function listOrders(
   q?: string,
@@ -75,9 +85,9 @@ export async function listOrders(
 
   const data = await request<any>(`/orders${qs ? `?${qs}` : ""}`);
   // Normalize: backend may return array or { items, total }
-  if (Array.isArray(data)) return { items: data, total: data.length };
+  if (Array.isArray(data)) return { items: data as Order[], total: data.length };
   if (data && typeof data === "object") {
-    const items = Array.isArray(data.items) ? data.items : [];
+    const items = Array.isArray(data.items) ? (data.items as Order[]) : [];
     const total =
       typeof data.total === "number"
         ? data.total
