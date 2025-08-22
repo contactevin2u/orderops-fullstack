@@ -137,8 +137,9 @@ export default function OrderDetailPage(){
           <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <h2 style={{marginTop:0}}>{order.code || order.id} <span className="badge">{order.status}</span></h2>
-              <a className="btn secondary" href={typeof window!=="undefined"? undefined : "#"} onClick={(e)=>{}} target="_blank" rel="noreferrer" 
-                hrefLang="en" {...{href: typeof window==="undefined" ? undefined : undefined}} />
+              <a className="btn secondary" href={invoicePdfUrl(order.id)} target="_blank" rel="noreferrer">
+                Invoice PDF
+              </a>
             </div>
             <div className="kv">
               <div>Type</div><div>{order.type}</div>
@@ -264,11 +265,6 @@ export default function OrderDetailPage(){
           </div>
 
           <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}}>{err || msg}</div>
-          <div style={{marginTop:8}}>
-            <a className="btn secondary" href={typeof window !== "undefined" ? undefined : undefined} onClick={(e)=>{ e.preventDefault(); window.open(require('@/utils/api').invoicePdfUrl(order.id), '_blank'); }}>
-              View Invoice PDF
-            </a>
-          </div>
         </div>
       </div>
     </Layout>
