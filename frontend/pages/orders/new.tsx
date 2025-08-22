@@ -1,7 +1,7 @@
 import Layout from "@/components/Layout";
 import React from "react";
 import { useRouter } from "next/router";
-import { createManualOrder } from "@/utils/api";
+import { createManualOrder, parseMessage } from "@/utils/api";
 
 export default function NewOrderPage(){
   const router = useRouter();
@@ -17,6 +17,20 @@ export default function NewOrderPage(){
 
   const [busy,setBusy] = React.useState(false);
   const [err,setErr] = React.useState("");
+  const [rawText, setRawText] = React.useState("");
+
+  // Reuse helper from parse page to be tolerant of slightly different shapes
+  function normalizeParsedForOrder(input: any) {
+    if (!input) return null;
+    const payload = typeof input === "object" && "parsed" in input ? input.parsed : input;
+    const core = payload && payload.data ? payload.data : payload;
+    if (core?.customer && core?.order) return { customer: core.customer, order: core.order };
+    if (!core) return null;
+    if (!core.customer && (core.order || core.items)) {
+      return { customer: core.customer || {}, order: core.order || core };
+    }
+    return core;
+  }
 
   function updateItem(idx:number, field:string, value:any){
     const copy = [...items];
@@ -30,6 +44,41 @@ export default function NewOrderPage(){
 
   function removeItem(idx:number){
     setItems(items.filter((_,i)=>i!==idx));
+  }
+
+  async function onParse(){
+    setBusy(true); setErr("");
+    try {
+      const res = await parseMessage(rawText);
+      const parsed = normalizeParsedForOrder(res) || {};
+      const customer = parsed.customer || {};
+      const order = parsed.order || {};
+
+      const steps: Array<() => void> = [
+        () => setCustName(customer.name || ""),
+        () => setCustPhone(customer.phone || ""),
+        () => setCustAddress(customer.address || ""),
+        () => setType(order.type || "OUTRIGHT"),
+        () => setDeliveryDate((order.delivery_date || "").split("T")[0] || ""),
+        () => setNotes(order.notes || ""),
+        () => {
+          if (Array.isArray(order.items) && order.items.length) {
+            setItems(order.items.map((it: any) => ({
+              name: it.name || "",
+              item_type: it.item_type || "OUTRIGHT",
+              qty: String(it.qty ?? 1),
+              unit_price: String(it.unit_price ?? ""),
+              monthly_amount: String(it.monthly_amount ?? ""),
+            })));
+          }
+        },
+      ];
+      steps.forEach((fn, idx) => setTimeout(fn, idx * 150));
+    } catch (e: any) {
+      setErr(e?.message || "Parse failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function onCreate(){
@@ -62,6 +111,17 @@ export default function NewOrderPage(){
     <Layout>
       <div className="card">
         <h2 style={{marginTop:0}}>New Order</h2>
+        <div style={{marginBottom:12}}>
+          <label>Paste Message to Parse</label>
+          <textarea
+            className="textarea"
+            rows={4}
+            placeholder="Paste message here..."
+            value={rawText}
+            onChange={e=>setRawText(e.target.value)}
+          />
+          <button className="btn secondary" onClick={onParse} disabled={busy || !rawText.trim()} style={{marginTop:8}}>Parse</button>
+        </div>
         <div className="row">
           <div className="col"><label>Customer Name</label><input className="input" value={custName} onChange={e=>setCustName(e.target.value)} /></div>
           <div className="col"><label>Phone</label><input className="input" value={custPhone} onChange={e=>setCustPhone(e.target.value)} /></div>
