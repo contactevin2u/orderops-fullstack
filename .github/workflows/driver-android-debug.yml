@@ -14,6 +14,7 @@ jobs:
     env:
       API_BASE: https://orderops-api-v1.onrender.com
       EXPO_NO_TELEMETRY: 1
+      EXPO_DEBUG: 1
       NODE_ENV: production
       CI: true
 
@@ -45,8 +46,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # If you prefer NOT to commit google-services.json, add a repo secret
-      # GOOGLE_SERVICES_JSON with the file content and uncomment:
+      # If you don't commit google-services.json, add a repo secret GOOGLE_SERVICES_JSON and uncomment:
       # - name: Write google-services.json from secret
       #   run: |
       #     mkdir -p driver-app
@@ -76,19 +76,35 @@ jobs:
           fi
           npm ci
 
-      - name: Prebuild native Android project (clean)
+      - name: Check Expo CLI version
         working-directory: driver-app
-        run: npx expo prebuild --platform android --non-interactive --clean
+        run: npx --yes expo@^51.0.0 --version
+
+      - name: Prebuild native Android project (CLEAN + LOG)
+        working-directory: driver-app
+        run: |
+          set -o pipefail
+          npx --yes expo@^51.0.0 prebuild --platform android --non-interactive --clean 2>&1 | tee prebuild.log
+
+      - name: Upload prebuild log (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prebuild-log
+          path: driver-app/prebuild.log
+          if-no-files-found: ignore
 
       - name: Show generated Android identifiers
         working-directory: driver-app
         run: |
           echo "== AndroidManifest package =="
-          sed -n '1,120p' android/app/src/main/AndroidManifest.xml | grep -m1 'package=' || true
+          test -f android/app/src/main/AndroidManifest.xml && \
+            sed -n '1,120p' android/app/src/main/AndroidManifest.xml | grep -m1 'package=' || echo "AndroidManifest missing"
           echo "== app/build.gradle applicationId =="
-          grep -m1 'applicationId' android/app/build.gradle || true
+          test -f android/app/build.gradle && \
+            grep -m1 'applicationId' android/app/build.gradle || echo "app/build.gradle missing"
           echo "== google-services.json in android/app =="
-          ls -l android/app/google-services.json || true
+          ls -l android/app/google-services.json || echo "android/app/google-services.json missing"
 
       - name: Cache Gradle
         uses: actions/cache@v4
@@ -102,7 +118,8 @@ jobs:
 
       - name: Make gradlew executable
         working-directory: driver-app/android
-        run: chmod +x ./gradlew
+        run: |
+          if [ -f ./gradlew ]; then chmod +x ./gradlew; else echo "gradlew missing (prebuild likely failed)"; exit 1; fi
 
       - name: Build debug APK
         working-directory: driver-app/android
@@ -113,7 +130,9 @@ jobs:
         with:
           name: driver-app-debug-apk
           path: driver-app/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
 
+      # Diagnostics on failure without noisy warnings
       - name: Upload Gradle logs (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
@@ -125,3 +144,17 @@ jobs:
             driver-app/android/build.gradle
             driver-app/android/app/build.gradle
             driver-app/android/gradle/wrapper/gradle-wrapper.properties
+          if-no-files-found: ignore
+
+      - name: Upload driver-app tree (on failure)
+        if: failure()
+        run: |
+          (cd driver-app && ls -R) > driver-app-tree.txt || true
+        shell: bash
+      - name: Attach driver-app tree (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: driver-app-tree
+          path: driver-app-tree.txt
+          if-no-files-found: ignore
