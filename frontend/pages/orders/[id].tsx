@@ -263,7 +263,7 @@ export default function OrderDetailPage(){
                   <option>RENTAL</option>
                 </select>
               </div>
-              <div className="col"><label>Months</label><input className="input" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
+              <div className="col"><label>Months</label><input className="input" type="number" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
               <div className="col"><label>Monthly Amount</label><input className="input" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
             </div>
             <div style={{marginTop:8}}>

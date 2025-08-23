@@ -213,7 +213,6 @@ export default function NewOrderPage(){
               <option>RENTAL</option>
             </select>
           </div>
-          <div className="col"><label>Months</label><input className="input" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
           <div className="col"><label>Monthly Amount</label><input className="input" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
         </div>
 
