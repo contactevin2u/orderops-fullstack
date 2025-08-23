@@ -12,6 +12,7 @@ export default function OutstandingPage() {
   );
   const [rows, setRows] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const [sort, setSort] = React.useState<{key: string; asc: boolean}>({key: '', asc: true});
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -73,18 +74,31 @@ export default function OutstandingPage() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Code</th>
-                  <th>Customer</th>
-                  <th>Type</th>
-                  <th>Status</th>
-                  <th>Expected</th>
-                  <th>Paid</th>
-                  <th>Fees</th>
-                  <th>Balance</th>
+                  {['code','customer','type','status','expected','paid','fees','balance'].map((k) => (
+                    <th
+                      key={k}
+                      onClick={() =>
+                        setSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))
+                      }
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {k.charAt(0).toUpperCase() + k.slice(1)}
+                      {sort.key === k ? (sort.asc ? ' ▲' : ' ▼') : ''}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {rows.map((r: any) => (
+                {rows
+                  .slice()
+                  .sort((a: any, b: any) => {
+                    if (!sort.key) return 0;
+                    const av = a[sort.key];
+                    const bv = b[sort.key];
+                    if (av === bv) return 0;
+                    return av > bv ? (sort.asc ? 1 : -1) : sort.asc ? -1 : 1;
+                  })
+                  .map((r: any) => (
                   <tr key={r.id}>
                     <td>
                       <Link href={`/orders/${r.id}`}>{r.code || r.id}</Link>
@@ -117,6 +131,36 @@ export default function OutstandingPage() {
                 )}
               </tbody>
             </table>
+          </div>
+          <div style={{marginTop:8}}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const header = ['Code','Customer','Type','Status','Expected','Paid','Fees','Balance'];
+                const csv = [header.join(',')]
+                  .concat(
+                    rows.map((r:any)=>([
+                      r.code||r.id,
+                      r.customer?.name||'',
+                      r.type,
+                      r.status,
+                      r.expected,
+                      r.paid,
+                      r.fees,
+                      r.balance,
+                    ].join(',')))
+                  ).join('\n');
+                const blob = new Blob([csv], {type:'text/csv'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `outstanding_${asOf}.csv`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              Export CSV
+            </Button>
           </div>
         </Card>
       </div>

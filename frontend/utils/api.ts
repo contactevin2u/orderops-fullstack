@@ -70,12 +70,14 @@ type OrdersList = { items: any[]; total?: number };
 export async function listOrders(
   q?: string,
   status?: string,
-  type?: string
+  type?: string,
+  limit?: number
 ): Promise<OrdersList> {
   const sp = new URLSearchParams();
   if (q) sp.set("q", q);
   if (status) sp.set("status", status);
   if (type) sp.set("type", type);
+  if (limit) sp.set("limit", String(limit));
   const qs = sp.toString();
 
   const data = await request<any>(`/orders${qs ? `?${qs}` : ""}`);
@@ -170,14 +172,50 @@ export async function voidOrder(id: number, reason?: string) {
   }
 }
 
-export function markReturned(id: number, date?: string) {
-  const body: any = {};
+export function markReturned(
+  id: number,
+  date?: string,
+  opts?: {
+    collect?: boolean;
+    return_delivery_fee?: number;
+    method?: string;
+    reference?: string;
+  }
+) {
+  const body: any = { ...(opts || {}) };
   if (date) body.date = date;
-  return request<any>(`/orders/${id}/return`, { json: body });
+  return request<any>(`/orders/${id}/return`, {
+    json: body,
+    idempotencyKey: crypto.randomUUID(),
+  });
 }
 
-export function markBuyback(id: number, amount: number) {
-  return request<any>(`/orders/${id}/buyback`, { json: { amount } });
+export function markBuyback(
+  id: number,
+  amount: number,
+  opts?: { discount?: { type: 'percent' | 'fixed'; value: number }; method?: string; reference?: string }
+) {
+  const body: any = { amount, ...(opts || {}) };
+  return request<any>(`/orders/${id}/buyback`, {
+    json: body,
+    idempotencyKey: crypto.randomUUID(),
+  });
+}
+
+export function cancelInstallment(
+  id: number,
+  payload: {
+    penalty?: number;
+    return_delivery_fee?: number;
+    collect?: boolean;
+    method?: string;
+    reference?: string;
+  }
+) {
+  return request<any>(`/orders/${id}/cancel-installment`, {
+    json: payload,
+    idempotencyKey: crypto.randomUUID(),
+  });
 }
 
 export function orderDue(id: number, asOf?: string) {
