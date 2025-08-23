@@ -1,7 +1,9 @@
 from datetime import date
 from decimal import Decimal
 
-from app.models import Order, OrderItem
+import pytest
+
+from app.models import Order, OrderItem, Plan
 from app.services.status_updates import (
     mark_cancelled,
     mark_returned,
@@ -73,6 +75,34 @@ def _sample_order():
     return order
 
 
+def _rental_order():
+    order = Order(
+        code="TMP2",
+        type="RENTAL",
+        status="NEW",
+        customer_id=1,
+        subtotal=Decimal("100"),
+        discount=Decimal("0"),
+        delivery_fee=Decimal("0"),
+        return_delivery_fee=Decimal("0"),
+        penalty_fee=Decimal("0"),
+        total=Decimal("100"),
+        paid_amount=Decimal("0"),
+        balance=Decimal("100"),
+    )
+    item = OrderItem(
+        name="Rental Bed",
+        item_type="RENTAL",
+        qty=1,
+        unit_price=Decimal("100"),
+        line_total=Decimal("100"),
+    )
+    order.items = [item]
+    order.payments = []
+    order.plan = Plan(order_id=0, plan_type="RENTAL", monthly_amount=Decimal("100"), status="ACTIVE")
+    return order
+
+
 def test_mark_returned_creates_adjustment():
     db = DummySession()
     order = _sample_order()
@@ -132,3 +162,36 @@ def test_cancel_installment_collects_both_payments():
     assert any(p.category == "PENALTY" and float(p.amount) == 5.0 for p in pays)
     assert any(p.category == "DELIVERY" and float(p.amount) == 3.0 for p in pays)
     assert order.paid_amount == Decimal("508")
+    assert order.balance == Decimal("0")
+    assert order.status == "CANCELLED"
+
+
+def test_cancel_installment_leaves_charges_when_uncollected():
+    db = DummySession()
+    order = _sample_order()
+    cancel_installment(
+        db,
+        order,
+        penalty=Decimal("5"),
+        return_fee=Decimal("3"),
+        collect=False,
+    )
+    assert order.balance == Decimal("8")
+    assert order.paid_amount == Decimal("500")
+    assert order.status == "CANCELLED"
+
+
+def test_apply_buyback_only_allowed_for_outright():
+    db = DummySession()
+    order = _rental_order()
+    with pytest.raises(ValueError):
+        apply_buyback(db, order, Decimal("10"))
+
+
+def test_rental_return_cancels_plan():
+    db = DummySession()
+    order = _rental_order()
+    mark_returned(db, order)
+    assert order.status == "RETURNED"
+    assert order.plan.status == "CANCELLED"
+    assert any(getattr(o, "code", "").endswith("-R") for o in db.added if isinstance(o, Order))

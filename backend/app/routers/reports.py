@@ -66,7 +66,10 @@ def outstanding(
         0,
     )
 
-    expected_expr = outright_expr + monthly_expr * months_expr
+    expected_expr = case(
+        (Order.status == "CANCELLED", 0),
+        else_=outright_expr + monthly_expr * months_expr,
+    )
     fees_expr = (
         func.coalesce(Order.delivery_fee, 0)
         + func.coalesce(Order.return_delivery_fee, 0)
@@ -98,7 +101,12 @@ def outstanding(
 
     if exclude_cleared:
         stmt = stmt.where(Order.status != "RETURNED")
-        stmt = stmt.where(~and_(Order.status == "CANCELLED", Order.penalty_fee > 0))
+        stmt = stmt.where(
+            ~and_(
+                Order.status == "CANCELLED",
+                func.coalesce(Order.penalty_fee, 0) <= 0,
+            )
+        )
 
     stmt = stmt.group_by(
         Order.id,
