@@ -5,7 +5,9 @@
     "orders": "Orders",
     "parse": "Parse",
     "export": "Export",
-    "reports": "Reports"
+    "reports": "Reports",
+    "cashier": "Cashier",
+    "adjustments": "Adjustments"
   },
   "intake": {
     "placeholder": "Paste a message here…",

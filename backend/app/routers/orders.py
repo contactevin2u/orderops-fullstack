@@ -37,7 +37,9 @@ def list_orders(
     )
     if q:
         like = f"%{q}%"
-        stmt = stmt.where(or_(Order.code.ilike(like), Customer.name.ilike(like)))
+        stmt = stmt.where(
+            or_(Order.code.ilike(like), Customer.name.ilike(like), Customer.phone.ilike(like))
+        )
     if status:
         stmt = stmt.where(Order.status == status)
     if type:

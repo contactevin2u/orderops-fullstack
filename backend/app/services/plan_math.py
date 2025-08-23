@@ -28,21 +28,30 @@ def months_elapsed(
 
 def calculate_plan_due(plan: Plan | None, as_of: date) -> Decimal:
     """Return amount expected to be paid for ``plan`` as of ``as_of`` date."""
-    if (
-        not plan
-        or plan.status != "ACTIVE"
-        or not getattr(plan, "order", None)
-        or not plan.order.delivery_date
-    ):
+    if not plan or not getattr(plan, "order", None):
         return Decimal("0.00")
 
-    end_dt = datetime.combine(as_of, datetime.min.time()) if isinstance(as_of, date) else as_of
-    cutoff = getattr(plan.order, "returned_at", None)
-    months = months_elapsed(plan.order.delivery_date, end_dt, cutoff=cutoff)
+    start = getattr(plan, "start_date", None) or getattr(plan.order, "delivery_date", None)
+    if not start:
+        return Decimal("0.00")
 
-    if plan.plan_type == "INSTALLMENT" and plan.months:
+    start_dt = (
+        datetime.combine(start, datetime.min.time())
+        if isinstance(start, date)
+        else start
+    )
+    end_dt = (
+        datetime.combine(as_of, datetime.min.time())
+        if isinstance(as_of, date)
+        else as_of
+    )
+    cutoff = getattr(plan.order, "returned_at", None)
+    months = months_elapsed(start_dt, end_dt, cutoff=cutoff)
+
+    pmonths = getattr(plan, "months", None)
+    if pmonths is not None:
         try:
-            max_months = int(plan.months)
+            max_months = int(pmonths)
             months = min(months, max_months)
         except Exception:
             pass

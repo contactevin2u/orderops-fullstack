@@ -1,9 +1,13 @@
-from decimal import Decimal
-
+from datetime import date
 from decimal import Decimal
 
 from app.models import Order, OrderItem
-from app.services.status_updates import mark_cancelled, mark_returned, apply_buyback
+from app.services.status_updates import (
+    mark_cancelled,
+    mark_returned,
+    apply_buyback,
+    cancel_installment,
+)
 
 
 class DummySession:
@@ -99,3 +103,32 @@ def test_apply_buyback_creates_adjustment_with_discount():
     pay = next(p for p in db.added if hasattr(p, "category") and p.category == "BUYBACK")
     assert float(pay.amount) == -90.0
     assert order.paid_amount == Decimal("410")
+
+
+def test_mark_returned_collects_fee_payment():
+    db = DummySession()
+    order = _sample_order()
+    order.return_delivery_fee = Decimal("10")
+    mark_returned(db, order, collect=True, method="cash", reference="r1", payment_date=date.today())
+    payment = next(p for p in db.added if getattr(p, "category", "") == "DELIVERY")
+    assert float(payment.amount) == 10.0
+    assert order.paid_amount == Decimal("510")
+
+
+def test_cancel_installment_collects_both_payments():
+    db = DummySession()
+    order = _sample_order()
+    cancel_installment(
+        db,
+        order,
+        penalty=Decimal("5"),
+        return_fee=Decimal("3"),
+        collect=True,
+        method="cash",
+        reference="r2",
+        payment_date=date.today(),
+    )
+    pays = [p for p in db.added if getattr(p, "category", None)]
+    assert any(p.category == "PENALTY" and float(p.amount) == 5.0 for p in pays)
+    assert any(p.category == "DELIVERY" and float(p.amount) == 3.0 for p in pays)
+    assert order.paid_amount == Decimal("508")
