@@ -100,10 +100,10 @@ def _compute_subtotal_from_items(items: list[dict]) -> Decimal:
         qty = to_decimal(it.get("qty") or 1)
         monthly = to_decimal(it.get("monthly_amount"))
         # For RENTAL/INSTALLMENT items, monthly amounts should not inflate outright subtotal
-        # Only include explicit unit/line totals
-        if lt > 0:
+        # Only include explicit unit/line totals (including negatives for adjustments)
+        if lt != 0:
             subtotal += lt
-        elif up > 0:
+        elif up != 0:
             subtotal += (up * qty)
         # else: keep as 0.00
         # monthly is handled by Plan, not subtotal
@@ -141,6 +141,64 @@ def _apply_charges_and_totals(
 # -------------------------------
 # Public API
 # -------------------------------
+
+def create_adjustment_order(
+    db: Session,
+    parent: Order,
+    code_suffix: str,
+    lines: list[dict],
+    charges: dict,
+) -> Order:
+    """Create a child adjustment order linked to ``parent``."""
+    code = f"{parent.code}{code_suffix}"
+    subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(lines, charges, None)
+    balance = (total - paid).quantize(Decimal("0.01"))
+
+    adj = Order(
+        code=code,
+        type=parent.type,
+        status=parent.status,
+        customer_id=parent.customer_id,
+        parent_id=parent.id,
+        delivery_date=parent.delivery_date,
+        notes=None,
+        subtotal=subtotal,
+        discount=discount,
+        delivery_fee=df,
+        return_delivery_fee=rdf,
+        penalty_fee=pf,
+        total=total,
+        paid_amount=paid,
+        balance=balance,
+    )
+    db.add(adj)
+    db.flush()
+
+    for it in lines:
+        name = (it.get("name") or "").strip() or "Item"
+        item_type = (it.get("item_type") or parent.type).strip().upper()
+        qty = to_decimal(it.get("qty") or 1)
+        unit_price = to_decimal(it.get("unit_price"))
+        line_total = to_decimal(it.get("line_total"))
+        if item_type in ("RENTAL", "INSTALLMENT"):
+            if unit_price <= 0 and line_total <= 0:
+                unit_price = DEC0
+                line_total = DEC0
+
+        db.add(
+            OrderItem(
+                order_id=adj.id,
+                name=name,
+                sku=it.get("sku"),
+                category=it.get("category"),
+                item_type=item_type,
+                qty=int(qty),
+                unit_price=unit_price,
+                line_total=line_total,
+            )
+        )
+
+    return adj
 
 def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: str | None = None) -> Order:
     """

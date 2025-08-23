@@ -1,10 +1,33 @@
 from decimal import Decimal
 
+from decimal import Decimal
+
 from app.models import Order, OrderItem
 from app.services.status_updates import mark_cancelled, mark_returned, apply_buyback
 
 
 class DummySession:
+    def __init__(self):
+        self.added = []
+        self.next_id = 1
+
+    def add(self, obj):
+        if isinstance(obj, Order):
+            if getattr(obj, "id", None) is None:
+                obj.id = self.next_id
+                self.next_id += 1
+        elif isinstance(obj, OrderItem):
+            parent = next(
+                (o for o in self.added if isinstance(o, Order) and o.id == obj.order_id),
+                None,
+            )
+            if parent:
+                parent.items.append(obj)
+        self.added.append(obj)
+
+    def flush(self):
+        pass
+
     def commit(self):
         pass
 
@@ -39,28 +62,28 @@ def _sample_order():
     return order
 
 
-def test_mark_returned():
+def test_mark_returned_creates_adjustment():
     db = DummySession()
     order = _sample_order()
     mark_returned(db, order)
     assert order.status == "RETURNED"
-    assert float(order.balance) == 500.0
+    assert any(getattr(o, "code", "").endswith("-R") for o in db.added if isinstance(o, Order))
 
 
-def test_mark_cancelled_zero_totals():
+def test_mark_cancelled_creates_adjustment():
     db = DummySession()
     order = _sample_order()
-    order.paid_amount = Decimal("0")
     mark_cancelled(db, order, "customer cancelled")
     assert order.status == "CANCELLED"
-    assert float(order.total) == 0.0
+    assert any(getattr(o, "code", "").endswith("-I") for o in db.added if isinstance(o, Order))
     assert "VOID" in order.notes
 
 
-def test_apply_buyback():
+def test_apply_buyback_creates_adjustment_with_discount():
     db = DummySession()
     order = _sample_order()
-    apply_buyback(db, order, Decimal("100"))
-    assert order.status == "RETURNED"
-    assert float(order.discount) == 100.0
-    assert float(order.balance) == 400.0
+    apply_buyback(db, order, Decimal("100"), {"type": "percent", "value": Decimal("10")})
+    assert order.status == "CANCELLED"
+    adj = next(o for o in db.added if isinstance(o, Order) and o.code.endswith("-I"))
+    line = adj.items[0]
+    assert float(line.line_total) == -90.0

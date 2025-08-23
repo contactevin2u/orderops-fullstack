@@ -48,6 +48,13 @@ def test_invoice_pdf_generates_bytes():
     assert len(pdf) > 0
 
 
+def test_invoice_pdf_credit_note_title():
+    order = _sample_order()
+    order.total = -5.0
+    pdf = invoice_pdf(order)
+    assert b"CREDIT NOTE" in pdf
+
+
 def test_receipt_pdf_generates_bytes():
     order = _sample_order()
     payment = _sample_payment()

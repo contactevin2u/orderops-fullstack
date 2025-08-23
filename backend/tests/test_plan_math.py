@@ -18,6 +18,20 @@ def test_months_elapsed_rule():
 
 def test_calculate_plan_due_caps_to_plan_months():
     order = SimpleNamespace(delivery_date=datetime(2024, 1, 1))
-    plan = SimpleNamespace(plan_type="INSTALLMENT", months=3, monthly_amount=Decimal("100"), order=order)
+    plan = SimpleNamespace(plan_type="INSTALLMENT", months=3, monthly_amount=Decimal("100"), status="ACTIVE", order=order)
     due = calculate_plan_due(plan, date(2024, 6, 1))
     assert due == Decimal("300.00")
+
+
+def test_calculate_plan_due_stops_at_returned_at():
+    order = SimpleNamespace(delivery_date=datetime(2024, 1, 1), returned_at=datetime(2024, 2, 14))
+    plan = SimpleNamespace(plan_type="RENTAL", monthly_amount=Decimal("100"), status="ACTIVE", order=order)
+    due = calculate_plan_due(plan, date(2024, 4, 1))
+    assert due == Decimal("200.00")
+
+
+def test_calculate_plan_due_inactive_plan():
+    order = SimpleNamespace(delivery_date=datetime(2024, 1, 1))
+    plan = SimpleNamespace(plan_type="RENTAL", monthly_amount=Decimal("100"), status="CANCELLED", order=order)
+    due = calculate_plan_due(plan, date(2024, 3, 1))
+    assert due == Decimal("0.00")
