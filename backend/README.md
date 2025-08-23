@@ -15,6 +15,10 @@ uvicorn app.main:app --reload
 alembic upgrade head
 ```
 
+## Environment variables
+
+- `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON string for Firebase service account used to verify driver ID tokens.
+
 ## Worker configuration
 
 The background worker polls the database for queued jobs and can be configured

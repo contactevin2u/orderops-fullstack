@@ -6,6 +6,9 @@ from .plan import Plan
 from .payment import Payment
 from .job import Job
 from .idempotent_request import IdempotentRequest
+from .driver import Driver, DriverDevice
+from .trip import Trip, TripEvent
+from .commission import Commission
 
 __all__ = [
     "Base",
@@ -16,4 +19,9 @@ __all__ = [
     "Payment",
     "Job",
     "IdempotentRequest",
+    "Driver",
+    "DriverDevice",
+    "Trip",
+    "TripEvent",
+    "Commission",
 ]

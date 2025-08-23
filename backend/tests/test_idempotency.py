@@ -12,7 +12,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.main import app  # noqa: E402
 from app.db import get_session  # noqa: E402
-from app.models import Base, Order, Customer, IdempotentRequest, Plan, Payment, OrderItem  # noqa: E402
+from app.models import Base, Order, Customer, IdempotentRequest, Plan, Payment, OrderItem, Trip  # noqa: E402
 from app.routers import orders as orders_router  # noqa: E402
 
 
@@ -31,6 +31,9 @@ def _setup_db():
     Plan.__table__.c.order_id.type = Integer()
     OrderItem.__table__.c.id.type = Integer()
     OrderItem.__table__.c.order_id.type = Integer()
+    Trip.__table__.c.id.type = Integer()
+    Trip.__table__.c.order_id.type = Integer()
+    Trip.__table__.c.driver_id.type = Integer()
     Base.metadata.create_all(
         engine,
         tables=[
@@ -40,6 +43,7 @@ def _setup_db():
             Plan.__table__,
             Payment.__table__,
             OrderItem.__table__,
+            Trip.__table__,
         ],
     )
     return sessionmaker(bind=engine, expire_on_commit=False)
