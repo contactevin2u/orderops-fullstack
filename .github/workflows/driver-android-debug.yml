@@ -10,7 +10,6 @@ on:
 jobs:
   build-android-debug:
     runs-on: ubuntu-latest
-
     env:
       API_BASE: https://orderops-api-v1.onrender.com
       EXPO_NO_TELEMETRY: 1
@@ -101,6 +100,22 @@ jobs:
             echo "splashscreen_background already present"
           fi
 
+      # >>> KEY FIX: bundle JS into the Debug APK so it runs without Metro <<<
+      - name: Force JS bundling in Debug
+        working-directory: driver-app
+        run: |
+          ENTRY="App.tsx"; [ -f index.js ] && ENTRY="index.js"
+          {
+            echo "";
+            echo "// === Added by CI to run debug APK standalone ===";
+            echo "project.ext.react = [";
+            echo "  entryFile: \"$ENTRY\",";
+            echo "  bundleInDebug: true,";
+            echo "]";
+          } >> android/app/build.gradle
+          echo "Applied bundleInDebug with entryFile=$ENTRY"
+
+      # Make sure google-services.json is copied into android/app
       - name: Ensure google-services.json copied to android/app
         working-directory: driver-app
         run: |
@@ -114,12 +129,9 @@ jobs:
       - name: Show generated Android identifiers
         working-directory: driver-app
         run: |
-          echo "== AndroidManifest package =="
-          if [ -f android/app/src/main/AndroidManifest.xml ]; then grep -m1 'package=' android/app/src/main/AndroidManifest.xml || true; else echo "AndroidManifest missing"; fi
-          echo "== app/build.gradle applicationId =="
-          if [ -f android/app/build.gradle ]; then grep -m1 'applicationId' android/app/build.gradle || true; else echo "app/build.gradle missing"; fi
-          echo "== google-services.json in android/app =="
-          ls -l android/app/google-services.json || echo "android/app/google-services.json missing"
+          echo "== AndroidManifest package ==" && (grep -m1 'package=' android/app/src/main/AndroidManifest.xml || true)
+          echo "== app/build.gradle applicationId ==" && (grep -m1 'applicationId' android/app/build.gradle || true)
+          echo "== google-services.json in android/app ==" && (ls -l android/app/google-services.json || true)
 
       - name: Ensure gradlew exists
         id: gradle_check
@@ -134,7 +146,7 @@ jobs:
             exit 1
           fi
 
-      - name: Build debug APK
+      - name: Build debug APK (bundled)
         if: steps.gradle_check.outputs.found == 'true'
         working-directory: driver-app/android
         run: ./gradlew assembleDebug
@@ -146,17 +158,3 @@ jobs:
           name: driver-app-debug-apk
           path: driver-app/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-
-      # Diagnostics on failure
-      - name: Upload driver-app tree (on failure)
-        if: failure()
-        run: |
-          (cd driver-app && ls -R) > driver-app-tree.txt || true
-
-      - name: Attach driver-app tree (on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: driver-app-tree
-          path: driver-app-tree.txt
-          if-no-files-found: ignore
