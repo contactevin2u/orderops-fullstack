@@ -1,9 +1,7 @@
 {
   "nav": {
     "intake": "Intake",
-    "ops": "Operations",
     "orders": "Orders",
-    "parse": "Parse",
     "export": "Export",
     "reports": "Reports",
     "cashier": "收银",

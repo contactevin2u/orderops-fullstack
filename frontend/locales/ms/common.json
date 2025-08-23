@@ -1,9 +1,7 @@
 {
   "nav": {
     "intake": "Intake",
-    "ops": "Operasi",
     "orders": "Pesanan",
-    "parse": "Hurai",
     "export": "Eksport",
     "reports": "Laporan",
     "cashier": "Cashier",

@@ -46,7 +46,6 @@ export default function OrdersPage(){
           </div>
           <div className="col" style={{display:"flex",alignItems:"center",gap:8}}>
             <Link className="btn secondary" href="/orders/new">Create Manually</Link>
-            <Link className="btn secondary" href="/parse">Create from Parse</Link>
           </div>
         </div>
         <ErrorBoundary fallback={<div style={{opacity:.7}}>Failed to load orders</div>}>
