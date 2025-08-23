@@ -273,10 +273,10 @@ def return_order(
             db,
             order,
             ret_date,
-            body.return_delivery_fee,
-            bool(body.collect) if body and body.collect is not None else False,
-            body.method,
-            body.reference,
+            body.return_delivery_fee if body else None,
+            bool(body.collect) if body else False,
+            body.method if body else None,
+            body.reference if body else None,
             date.fromisoformat(body.date) if body and body.date else None,
         )
         db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="return"))
