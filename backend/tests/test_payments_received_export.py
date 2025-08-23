@@ -2,18 +2,21 @@ import sys
 from pathlib import Path
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
 
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, Integer
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
+from openpyxl import load_workbook
 
 # Ensure backend package importable
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.main import app  # noqa: E402
 from app.db import get_session  # noqa: E402
-from app.models import Base, Payment, Order, Customer  # noqa: E402
+from app.models import Base, Payment, Order, Customer, OrderItem, Plan  # noqa: E402
+from app.services.status_updates import apply_buyback  # noqa: E402
 
 
 def _setup_db():
@@ -24,9 +27,19 @@ def _setup_db():
     Customer.__table__.c.id.type = Integer()
     Order.__table__.c.id.type = Integer()
     Payment.__table__.c.id.type = Integer()
+    OrderItem.__table__.c.id.type = Integer()
+    OrderItem.__table__.c.order_id.type = Integer()
+    Plan.__table__.c.id.type = Integer()
+    Plan.__table__.c.order_id.type = Integer()
     Base.metadata.create_all(
         engine,
-        tables=[Customer.__table__, Order.__table__, Payment.__table__],
+        tables=[
+            Customer.__table__,
+            Order.__table__,
+            Payment.__table__,
+            OrderItem.__table__,
+            Plan.__table__,
+        ],
     )
     return sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -88,5 +101,54 @@ def test_payments_received_alias_ignores_mark_flag():
     with SessionLocal() as db:
         p = db.get(Payment, pid)
         assert p.exported_at is None
+
+    app.dependency_overrides.clear()
+
+
+def test_buyback_payment_included_in_export():
+    SessionLocal = _setup_db()
+
+    def override_get_session():
+        with SessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+    client = TestClient(app)
+
+    today = date.today()
+
+    with SessionLocal() as db:
+        cust = Customer(name="Test")
+        db.add(cust)
+        db.flush()
+        order = Order(
+            code="ORD2",
+            type="OUTRIGHT",
+            status="NEW",
+            customer_id=cust.id,
+            subtotal=Decimal("0"),
+            discount=Decimal("0"),
+            delivery_fee=Decimal("0"),
+            return_delivery_fee=Decimal("0"),
+            penalty_fee=Decimal("0"),
+            total=Decimal("0"),
+            paid_amount=Decimal("0"),
+            balance=Decimal("0"),
+        )
+        order.items = []
+        order.payments = []
+        db.add(order)
+        db.flush()
+        apply_buyback(db, order, Decimal("10"))
+        db.commit()
+
+    resp = client.get(
+        f"/export/payments_received.xlsx?start={today}&end={today}"
+    )
+    assert resp.status_code == 200
+    wb = load_workbook(BytesIO(resp.content))
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    assert any(row[3] == -10.0 and row[6] == "BUYBACK" for row in rows[1:-1])
 
     app.dependency_overrides.clear()
