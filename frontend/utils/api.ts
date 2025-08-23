@@ -16,14 +16,15 @@ function pathJoin(p: string) {
 
 async function request<T = any>(
   path: string,
-  init?: RequestInit & { json?: any }
+  init?: RequestInit & { json?: any; idempotencyKey?: string }
 ): Promise<T> {
-  const { json, headers, ...rest } = init || {};
+  const { json, headers, idempotencyKey, ...rest } = init || {};
   const res = await fetch(pathJoin(path), {
     method: json ? "POST" : (rest.method || "GET"),
     headers: {
       Accept: "application/json",
       ...(json ? { "Content-Type": "application/json" } : {}),
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       ...(headers || {}),
     },
     body: json ? JSON.stringify(json) : rest.body,
@@ -192,11 +193,19 @@ export function addPayment(payload: {
   method?: string;
   reference?: string;
   category?: string;
+  idempotencyKey?: string;
 }) {
-  return request<any>("/payments", { json: payload });
+  const { idempotencyKey, ...json } = payload as any;
+  return request<any>("/payments", { json, idempotencyKey });
 }
 export function voidPayment(paymentId: number, reason?: string) {
   return request<any>(`/payments/${paymentId}/void`, { json: { reason } });
+}
+
+export function exportPayments(start: string, end: string, opts?: { mark?: boolean }) {
+  const sp = new URLSearchParams({ start, end });
+  if (opts?.mark) sp.set("mark", "true");
+  return request<Blob>(`/export/cash.xlsx?${sp.toString()}`);
 }
 
 // -------- Reports

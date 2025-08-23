@@ -84,6 +84,7 @@ class PaymentOut(BaseModel):
     date: Optional[dt.date] = None
     method: Optional[str] = None
     reference: Optional[str] = None
+    category: Optional[str] = None
     status: Optional[str] = None
 
     class Config:

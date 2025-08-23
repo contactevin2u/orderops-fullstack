@@ -91,7 +91,7 @@ export default function OrderDetailPage(){
   async function postPayment(){
     setBusy(true); setErr(""); setMsg("");
     try{
-      const out = await addPayment({ order_id: order.id, amount: Number(payAmt||0), date: payDate || undefined, method: payMethod || undefined, reference: payRef || undefined });
+      const out = await addPayment({ order_id: order.id, amount: Number(payAmt||0), date: payDate || undefined, method: payMethod || undefined, reference: payRef || undefined, idempotencyKey: crypto.randomUUID() });
       setMsg("Payment added"); await load();
       setPayAmt(""); setPayDate(""); setPayMethod(""); setPayRef("");
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
