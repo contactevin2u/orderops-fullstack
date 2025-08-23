@@ -13,6 +13,7 @@ class Order(Base):
     type: Mapped[str] = mapped_column(String(20))  # OUTRIGHT | INSTALLMENT | RENTAL | MIXED
     status: Mapped[str] = mapped_column(String(20), default="NEW")  # NEW|ACTIVE|RETURNED|CANCELLED|COMPLETED
     customer_id: Mapped[int] = mapped_column(ForeignKey("customers.id"), nullable=False)
+    parent_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True, index=True)
     delivery_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     returned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -34,3 +35,4 @@ class Order(Base):
     items = relationship("OrderItem", cascade="all, delete-orphan")
     plan = relationship("Plan", uselist=False, cascade="all, delete-orphan")
     payments = relationship("Payment", cascade="all, delete-orphan")
+    parent = relationship("Order", remote_side=[id], backref="adjustments")

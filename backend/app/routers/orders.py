@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_
 from pydantic import BaseModel
@@ -6,7 +6,7 @@ from decimal import Decimal
 from datetime import datetime, date
 
 from ..db import get_session
-from ..models import Order, OrderItem, Plan, Customer
+from ..models import Order, OrderItem, Plan, Customer, IdempotentRequest
 from ..schemas import OrderOut
 from ..services.ordersvc import create_order_from_parsed
 from ..services.plan_math import calculate_plan_due
@@ -112,13 +112,17 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
 
     as_of = as_of or date.today()
     paid = order.paid_amount or Decimal("0.00")
-    if order.type in ("INSTALLMENT", "RENTAL") and order.plan:
-        expected = calculate_plan_due(order.plan, as_of)
-        expected += (
-            (order.delivery_fee or Decimal("0.00"))
-            + (order.return_delivery_fee or Decimal("0.00"))
-            + (order.penalty_fee or Decimal("0.00"))
-        )
+    fees = (
+        (order.delivery_fee or Decimal("0.00"))
+        + (order.return_delivery_fee or Decimal("0.00"))
+        + (order.penalty_fee or Decimal("0.00"))
+    )
+    if order.status in {"CANCELLED", "RETURNED"} or (
+        order.plan and order.plan.status != "ACTIVE"
+    ):
+        expected = fees
+    elif order.type in ("INSTALLMENT", "RENTAL") and order.plan:
+        expected = calculate_plan_due(order.plan, as_of) + fees
     else:
         expected = order.total or Decimal("0.00")
 
@@ -195,15 +199,28 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
 
 
 @router.post("/{order_id}/void", response_model=dict)
-def void_order(order_id: int, body: dict | None = None, db: Session = Depends(get_session)):
+def void_order(
+    order_id: int,
+    body: dict | None = None,
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    db: Session = Depends(get_session),
+):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
 
+    existing = db.query(IdempotentRequest).filter_by(key=idempotency_key).one_or_none()
+    if existing:
+        return envelope({"order_id": order.id, "status": order.status})
+
     reason = (body or {}).get("reason") if body else None
     try:
         mark_cancelled(db, order, reason)
+        db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="void"))
+        db.commit()
+        db.refresh(order)
     except Exception as e:
+        db.rollback()
         raise HTTPException(400, str(e))
     return envelope({"order_id": order.id, "status": order.status})
 
@@ -213,10 +230,19 @@ class ReturnIn(BaseModel):
 
 
 @router.post("/{order_id}/return", response_model=dict)
-def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depends(get_session)):
+def return_order(
+    order_id: int,
+    body: ReturnIn | None = None,
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    db: Session = Depends(get_session),
+):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
+
+    existing = db.query(IdempotentRequest).filter_by(key=idempotency_key).one_or_none()
+    if existing:
+        return envelope(OrderOut.model_validate(order))
 
     ret_date = None
     if body and body.date:
@@ -226,22 +252,47 @@ def return_order(order_id: int, body: ReturnIn | None = None, db: Session = Depe
             ret_date = None
     try:
         mark_returned(db, order, ret_date)
+        db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="return"))
+        db.commit()
+        db.refresh(order)
     except Exception as e:
+        db.rollback()
         raise HTTPException(400, str(e))
     return envelope(OrderOut.model_validate(order))
 
 
+class DiscountIn(BaseModel):
+    type: str
+    value: Decimal
+
+
 class BuybackIn(BaseModel):
     amount: Decimal
+    discount: DiscountIn | None = None
 
 
 @router.post("/{order_id}/buyback", response_model=dict)
-def buyback_order(order_id: int, body: BuybackIn, db: Session = Depends(get_session)):
+def buyback_order(
+    order_id: int,
+    body: BuybackIn,
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    db: Session = Depends(get_session),
+):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
+
+    existing = db.query(IdempotentRequest).filter_by(key=idempotency_key).one_or_none()
+    if existing:
+        return envelope(OrderOut.model_validate(order))
+
     try:
-        order = apply_buyback(db, order, Decimal(str(body.amount)))
+        discount = body.discount.model_dump() if body.discount else None
+        apply_buyback(db, order, Decimal(str(body.amount)), discount)
+        db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="buyback"))
+        db.commit()
+        db.refresh(order)
     except ValueError as e:
+        db.rollback()
         raise HTTPException(400, str(e))
     return envelope(OrderOut.model_validate(order))

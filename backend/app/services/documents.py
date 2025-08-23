@@ -40,10 +40,12 @@ def invoice_pdf(order: Order) -> bytes:
 
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
+    c.setPageCompression(0)
     x, y = 20, 280
 
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(x * mm, y * mm, f"INVOICE {order.code}")
+    title = "CREDIT NOTE" if float(getattr(order, "total", 0)) < 0 else "INVOICE"
+    c.drawString(x * mm, y * mm, f"{title} {order.code}")
     y -= 5
     c.setFont("Helvetica", 10)
     inv_date = getattr(order, "created_at", date.today())
