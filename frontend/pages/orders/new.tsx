@@ -10,6 +10,7 @@ export default function NewOrderPage(){
   const [custAddress,setCustAddress] = React.useState("");
 
   const [type,setType] = React.useState("OUTRIGHT");
+  const [orderCode,setOrderCode] = React.useState("");
   const [deliveryDate,setDeliveryDate] = React.useState("");
   const [notes,setNotes] = React.useState("");
 
@@ -59,6 +60,7 @@ export default function NewOrderPage(){
         () => setCustPhone(customer.phone || ""),
         () => setCustAddress(customer.address || ""),
         () => setType(order.type || "OUTRIGHT"),
+        () => setOrderCode(order.code || ""),
         () => setDeliveryDate((order.delivery_date || "").split("T")[0] || ""),
         () => setNotes(order.notes || ""),
         () => {
@@ -87,6 +89,7 @@ export default function NewOrderPage(){
       const payload = {
         customer: { name: custName, phone: custPhone || undefined, address: custAddress || undefined },
         order: {
+          code: orderCode || undefined,
           type,
           delivery_date: deliveryDate || undefined,
           notes: notes || undefined,
@@ -136,6 +139,7 @@ export default function NewOrderPage(){
               <option>MIXED</option>
             </select>
           </div>
+          <div className="col"><label>Order Code</label><input className="input" value={orderCode} onChange={e=>setOrderCode(e.target.value)} /></div>
           <div className="col"><label>Delivery Date</label><input className="input" type="date" value={deliveryDate} onChange={e=>setDeliveryDate(e.target.value)} /></div>
         </div>
         <div style={{marginTop:8}}><label>Notes</label><textarea className="textarea" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} /></div>
