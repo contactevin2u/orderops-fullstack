@@ -4,3 +4,4 @@ frontend/storybook-static/
 __pycache__/
 *.pyc
 .env
+driver-app/node_modules/
