@@ -18,7 +18,7 @@ def recompute_financials(order: Order) -> None:
             for it in order.items
         ),
         DEC0,
-    )
+    ).quantize(Decimal("0.01"))
     order.subtotal = subtotal
     order.total = (
         subtotal
@@ -26,8 +26,8 @@ def recompute_financials(order: Order) -> None:
         + (order.delivery_fee or DEC0)
         + (order.return_delivery_fee or DEC0)
         + (order.penalty_fee or DEC0)
-    )
-    order.balance = order.total - (order.paid_amount or DEC0)
+    ).quantize(Decimal("0.01"))
+    order.balance = (order.total - (order.paid_amount or DEC0)).quantize(Decimal("0.01"))
 
 
 def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Order:
