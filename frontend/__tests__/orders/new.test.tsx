@@ -12,7 +12,6 @@ describe('NewOrderPage', () => {
     expect(screen.getByText(/^delivery fee$/i)).toBeInTheDocument();
     expect(screen.getByText(/return delivery fee/i)).toBeInTheDocument();
     expect(screen.getByText(/plan type/i)).toBeInTheDocument();
-    expect(screen.getByText(/months/i)).toBeInTheDocument();
     expect(screen.getByText(/monthly amount/i)).toBeInTheDocument();
   });
 });

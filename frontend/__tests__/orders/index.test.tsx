@@ -18,8 +18,10 @@ describe('OrdersPage', () => {
   });
 
   it('shows error fallback', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockedUseSWR.mockReturnValue({ data: undefined, error: new Error('fail'), isLoading: false, mutate: vi.fn() });
-    render(<OrdersPage />);
+    expect(() => render(<OrdersPage />)).not.toThrow();
     expect(screen.getByText(/failed to load orders/i)).toBeInTheDocument();
+    spy.mockRestore();
   });
 });

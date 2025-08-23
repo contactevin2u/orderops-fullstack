@@ -27,9 +27,17 @@ export default function OrderDetailPage(){
   const [notes,setNotes] = React.useState<string>("");
   const [deliveryDate,setDeliveryDate] = React.useState<string>("");
 
+  const [orderCode,setOrderCode] = React.useState<string>("");
+  const [orderType,setOrderType] = React.useState<string>("");
+  const [custName,setCustName] = React.useState<string>("");
+  const [custPhone,setCustPhone] = React.useState<string>("");
+  const [custAddress,setCustAddress] = React.useState<string>("");
+
   const [planType,setPlanType] = React.useState<string>("");
   const [planMonths,setPlanMonths] = React.useState<string>("");
   const [planMonthly,setPlanMonthly] = React.useState<string>("");
+
+  const [items,setItems] = React.useState<any[]>([]);
 
   const [buybackAmt,setBuybackAmt] = React.useState<string>("");
   const [buybackDiscType,setBuybackDiscType] = React.useState<string>("");
@@ -60,9 +68,15 @@ export default function OrderDetailPage(){
       setRetDelFee(String(o?.return_delivery_fee ?? ""));
       setNotes(String(o?.notes ?? ""));
       setDeliveryDate(o?.delivery_date ? (o.delivery_date as string).slice(0,10) : "");
+      setOrderCode(String(o?.code ?? ""));
+      setOrderType(String(o?.type ?? ""));
+      setCustName(String(o?.customer?.name ?? ""));
+      setCustPhone(String(o?.customer?.phone ?? ""));
+      setCustAddress(String(o?.customer?.address ?? ""));
       setPlanType(String(o?.plan?.plan_type ?? ""));
       setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
       setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
+      setItems(o?.items ? o.items.map((it:any)=>({ ...it, qty: String(it.qty), monthly_amount: it.monthly_amount ? String(it.monthly_amount) : "" })) : []);
     }catch(e:any){ setError(e); }
   }, [id]);
 
@@ -72,10 +86,43 @@ export default function OrderDetailPage(){
 
   if(!order) return <Layout><div className="card">Loading...</div></Layout>;
 
-  async function savePricing(){
+  function updateItem(idx:number, field:string, value:any){
+    const copy = [...items];
+    copy[idx] = { ...copy[idx], [field]: value };
+    setItems(copy);
+  }
+
+  async function saveItems(){
+    setBusy(true); setErr(""); setMsg("");
+    try{
+      const patchItems = items.map((it:any)=>({
+        id: it.id,
+        name: it.name,
+        item_type: it.item_type,
+        qty: Number(it.qty||0),
+        unit_price: Number(it.unit_price||0),
+        line_total: Number(it.unit_price||0) * Number(it.qty||0),
+        ...(it.monthly_amount ? { monthly_amount: Number(it.monthly_amount||0) } : {}),
+      }));
+      const out = await updateOrder(order.id, { items: patchItems });
+      setMsg("Items updated");
+      setOrder(out);
+      setItems(out?.items ? out.items.map((it:any)=>({ ...it, qty: String(it.qty), monthly_amount: it.monthly_amount ? String(it.monthly_amount) : "" })) : []);
+      await loadDue(order.id, asOf);
+    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+  }
+
+  async function saveDetails(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const patch:any = {
+        code: orderCode || undefined,
+        type: orderType || undefined,
+        customer: {
+          name: custName,
+          phone: custPhone || undefined,
+          address: custAddress || undefined,
+        },
         penalty_fee: Number(penalty||0),
         discount: Number(disc||0),
         delivery_fee: Number(delFee||0),
@@ -171,23 +218,33 @@ export default function OrderDetailPage(){
             </div>
 
             <div className="hr" />
-            <h3>Items</h3>
-            <div style={{overflowX:"auto"}}>
-              <table className="table">
-                <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Line Total</th></tr></thead>
-                <tbody>
-                  {(order.items||[]).map((it:any)=>(
-                    <tr key={it.id || it.name}>
-                      <td>{it.name}</td><td>{it.item_type}</td>
-                      <td>{Number(it.qty||1)}</td>
-                      <td>RM {Number(it.unit_price||0).toFixed(2)}</td>
-                      <td>RM {Number(it.line_total||0).toFixed(2)}</td>
-                    </tr>
-                  ))}
-                  {(order.items||[]).length===0 && <tr><td colSpan={5} style={{opacity:.7}}>No items</td></tr>}
-                </tbody>
-              </table>
-            </div>
+              <h3>Items</h3>
+              <div style={{overflowX:"auto"}}>
+                <table className="table">
+                  <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Monthly</th><th>Line Total</th></tr></thead>
+                  <tbody>
+                    {items.map((it:any,idx:number)=>(
+                      <tr key={it.id || idx}>
+                        <td><input className="input" value={it.name} onChange={e=>updateItem(idx,'name',e.target.value)} /></td>
+                        <td>
+                          <select className="select" value={it.item_type} onChange={e=>updateItem(idx,'item_type',e.target.value)}>
+                            <option>OUTRIGHT</option>
+                            <option>INSTALLMENT</option>
+                            <option>RENTAL</option>
+                            <option>FEE</option>
+                          </select>
+                        </td>
+                        <td><input className="input" value={it.qty} onChange={e=>updateItem(idx,'qty',e.target.value)} /></td>
+                        <td><input className="input" value={it.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} /></td>
+                        <td><input className="input" value={it.monthly_amount} onChange={e=>updateItem(idx,'monthly_amount',e.target.value)} /></td>
+                        <td>RM {(Number(it.unit_price||0)*Number(it.qty||0)).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    {items.length===0 && <tr><td colSpan={6} style={{opacity:.7}}>No items</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{marginTop:8}}><button className="btn" onClick={saveItems} disabled={busy}>Save Items</button></div>
 
             <div className="hr" />
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
@@ -241,7 +298,23 @@ export default function OrderDetailPage(){
         </div>
         <div className="col">
           <div className="card">
-            <h3 style={{marginTop:0}}>Edit Pricing & Notes</h3>
+            <h3 style={{marginTop:0}}>Edit Order</h3>
+            <div className="row">
+              <div className="col"><label>Order Code</label><input className="input" value={orderCode} onChange={e=>setOrderCode(e.target.value)} /></div>
+              <div className="col"><label>Type</label>
+                <select className="select" value={orderType} onChange={e=>setOrderType(e.target.value)}>
+                  <option>OUTRIGHT</option>
+                  <option>INSTALLMENT</option>
+                  <option>RENTAL</option>
+                  <option>MIXED</option>
+                </select>
+              </div>
+            </div>
+            <div className="row">
+              <div className="col"><label>Customer Name</label><input className="input" value={custName} onChange={e=>setCustName(e.target.value)} /></div>
+              <div className="col"><label>Phone</label><input className="input" value={custPhone} onChange={e=>setCustPhone(e.target.value)} /></div>
+            </div>
+            <div style={{marginTop:8}}><label>Address</label><textarea className="textarea" rows={2} value={custAddress} onChange={e=>setCustAddress(e.target.value)} /></div>
             <div className="row">
               <div className="col">
                 <label>Delivery Date</label>
@@ -270,7 +343,7 @@ export default function OrderDetailPage(){
               <label>Notes</label>
               <textarea className="textarea" rows={4} value={notes} onChange={e=>setNotes(e.target.value)} />
             </div>
-            <div style={{marginTop:8}}><button className="btn" onClick={savePricing} disabled={busy}>Save</button></div>
+            <div style={{marginTop:8}}><button className="btn" onClick={saveDetails} disabled={busy}>Save</button></div>
           </div>
 
           <div className="card" style={{marginTop:16}}>
