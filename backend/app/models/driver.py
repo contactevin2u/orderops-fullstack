@@ -1,0 +1,34 @@
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from .base import Base
+
+
+class Driver(Base):
+    __tablename__ = "drivers"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
+    firebase_uid: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+    )
+
+    devices = relationship("DriverDevice", back_populates="driver", cascade="all, delete-orphan")
+
+
+class DriverDevice(Base):
+    __tablename__ = "driver_devices"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id"), index=True, nullable=False)
+    fcm_token: Mapped[str] = mapped_column(String(255), index=True)
+    platform: Mapped[str] = mapped_column(String(20))
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    driver = relationship("Driver", back_populates="devices")

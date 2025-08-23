@@ -1,0 +1,15 @@
+{
+  "cli": { "version": ">= 3.13.0" },
+  "build": {
+    "production": {
+      "ios": { "simulator": false },
+      "android": { "buildType": "app-bundle" }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": { "ascAppId": "1234567890" },
+      "android": {}
+    }
+  }
+}

@@ -125,3 +125,8 @@ class OrderOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DeviceRegisterIn(BaseModel):
+    fcm_token: str
+    platform: str
