@@ -111,15 +111,18 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
         raise HTTPException(404, "Order not found")
 
     as_of = as_of or date.today()
-    plan = order.plan
-    if order.type in ("INSTALLMENT", "RENTAL") and plan:
-        expected = calculate_plan_due(plan, as_of)
-    else:
-        expected = Decimal("0.00")
-
     paid = order.paid_amount or Decimal("0.00")
-    add_fees = (order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0)
-    balance = (expected + Decimal(str(add_fees)) - paid).quantize(Decimal("0.01"))
+    if order.type in ("INSTALLMENT", "RENTAL") and order.plan:
+        expected = calculate_plan_due(order.plan, as_of)
+        expected += (
+            (order.delivery_fee or Decimal("0.00"))
+            + (order.return_delivery_fee or Decimal("0.00"))
+            + (order.penalty_fee or Decimal("0.00"))
+        )
+    else:
+        expected = order.total or Decimal("0.00")
+
+    balance = (expected - paid).quantize(Decimal("0.01"))
 
     return envelope({
         "expected": float(expected),
