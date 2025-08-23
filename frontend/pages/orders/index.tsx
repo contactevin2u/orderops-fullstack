@@ -12,16 +12,17 @@ export default function OrdersPage(){
   const [params,setParams] = React.useState({ q:"", status:"", type:"" });
 
   const fetchOrders = React.useCallback(()=>{
-    return listOrders(params.q||undefined, params.status||undefined, params.type||undefined);
+    return listOrders(params.q||undefined, params.status||undefined, params.type||undefined, 200);
   },[params]);
 
   const { data, error, isLoading, mutate } = useSWR(["orders", params], fetchOrders, { revalidateOnMount: false });
 
   React.useEffect(()=>{ mutate(); }, [params, mutate]);
 
-  const search = React.useCallback(()=>{
-    setParams({ q, status, type });
-  },[q, status, type]);
+  React.useEffect(()=>{
+    const t = setTimeout(()=>setParams({ q, status, type }),300);
+    return ()=>clearTimeout(t);
+  },[q,status,type]);
 
   const items = data?.items || [];
 
@@ -44,7 +45,6 @@ export default function OrdersPage(){
             </select>
           </div>
           <div className="col" style={{display:"flex",alignItems:"center",gap:8}}>
-            <button className="btn" onClick={search} disabled={isLoading}>{isLoading?"Loading...":"Search"}</button>
             <Link className="btn secondary" href="/orders/new">Create Manually</Link>
             <Link className="btn secondary" href="/parse">Create from Parse</Link>
           </div>

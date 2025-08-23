@@ -15,7 +15,8 @@ export default function OpsPage() {
     return listOrders(
       params.q || undefined,
       params.status || undefined,
-      params.type || undefined
+      params.type || undefined,
+      200
     );
   }, [params]);
 
@@ -29,8 +30,9 @@ export default function OpsPage() {
     mutate();
   }, [params, mutate]);
 
-  const search = React.useCallback(() => {
-    setParams({ q, status, type });
+  React.useEffect(() => {
+    const t = setTimeout(() => setParams({ q, status, type }), 300);
+    return () => clearTimeout(t);
   }, [q, status, type]);
 
   const items = data?.items || [];
@@ -75,9 +77,6 @@ export default function OpsPage() {
             </select>
           </div>
           <div className="col" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <button className="btn" onClick={search} disabled={isLoading}>
-              {isLoading ? "Loading..." : "Search"}
-            </button>
             <Link className="btn secondary" href="/orders/new">
               Create Manually
             </Link>

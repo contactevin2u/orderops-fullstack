@@ -21,6 +21,9 @@ export default function OrderDetailPage(){
   const [disc,setDisc] = React.useState<string>("");
   const [delFee,setDelFee] = React.useState<string>("");
   const [retDelFee,setRetDelFee] = React.useState<string>("");
+  const [retCollect,setRetCollect] = React.useState<boolean>(false);
+  const [retMethod,setRetMethod] = React.useState<string>("");
+  const [retRef,setRetRef] = React.useState<string>("");
   const [notes,setNotes] = React.useState<string>("");
   const [deliveryDate,setDeliveryDate] = React.useState<string>("");
 
@@ -29,6 +32,10 @@ export default function OrderDetailPage(){
   const [planMonthly,setPlanMonthly] = React.useState<string>("");
 
   const [buybackAmt,setBuybackAmt] = React.useState<string>("");
+  const [buybackDiscType,setBuybackDiscType] = React.useState<string>("");
+  const [buybackDiscVal,setBuybackDiscVal] = React.useState<string>("");
+  const [buybackMethod,setBuybackMethod] = React.useState<string>("");
+  const [buybackRef,setBuybackRef] = React.useState<string>("");
 
   const [due,setDue] = React.useState<any>(null);
   const [asOf,setAsOf] = React.useState<string>("");
@@ -85,6 +92,7 @@ export default function OrderDetailPage(){
       }
       const out = await updateOrder(order.id, patch);
       setMsg("Order updated"); setOrder(out);
+      await loadDue(order.id, asOf);
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
 
@@ -92,7 +100,7 @@ export default function OrderDetailPage(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const out = await addPayment({ order_id: order.id, amount: Number(payAmt||0), date: payDate || undefined, method: payMethod || undefined, reference: payRef || undefined, idempotencyKey: crypto.randomUUID() });
-      setMsg("Payment added"); await load();
+      setMsg("Payment added"); await load(); await loadDue(order.id, asOf);
       setPayAmt(""); setPayDate(""); setPayMethod(""); setPayRef("");
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
@@ -113,8 +121,14 @@ export default function OrderDetailPage(){
   async function onReturned(){
     setBusy(true); setErr(""); setMsg("");
     try{
-      const out = await markReturned(order.id);
+      const out = await markReturned(order.id, undefined, {
+        collect: retCollect,
+        return_delivery_fee: retDelFee ? Number(retDelFee) : undefined,
+        method: retMethod || undefined,
+        reference: retRef || undefined,
+      });
       setOrder(out?.order || out);
+      await loadDue(order.id, asOf);
       setMsg("Marked as returned");
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
@@ -122,9 +136,18 @@ export default function OrderDetailPage(){
   async function onBuyback(){
     setBusy(true); setErr(""); setMsg("");
     try{
-      const out = await markBuyback(order.id, Number(buybackAmt||0));
+      const opts:any = { method: buybackMethod || undefined, reference: buybackRef || undefined };
+      if(buybackDiscType && buybackDiscVal){
+        opts.discount = { type: buybackDiscType, value: Number(buybackDiscVal) };
+      }
+      const out = await markBuyback(order.id, Number(buybackAmt||0), opts);
       setOrder(out?.order || out);
       setBuybackAmt("");
+      setBuybackDiscType("");
+      setBuybackDiscVal("");
+      setBuybackMethod("");
+      setBuybackRef("");
+      await loadDue(order.id, asOf);
       setMsg("Buyback recorded");
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
@@ -188,10 +211,28 @@ export default function OrderDetailPage(){
 
             <div className="hr" />
             <div className="row">
-              <div className="col"><button className="btn secondary" onClick={onCancelOrder} disabled={busy}>Void/Cancel Order</button></div>
-              <div className="col"><button className="btn secondary" onClick={onReturned} disabled={busy}>Mark Returned (Rental)</button></div>
-              <div className="col" style={{display:"flex",gap:8}}>
+              <div className="col">
+                <button className="btn secondary" onClick={onCancelOrder} disabled={busy}>Void/Cancel Order</button>
+              </div>
+              <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
+                <label><input type="checkbox" checked={retCollect} onChange={e=>setRetCollect(e.target.checked)} /> Collect</label>
+                <input className="input" placeholder="Return fee" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} />
+                <input className="input" placeholder="Method" value={retMethod} onChange={e=>setRetMethod(e.target.value)} />
+                <input className="input" placeholder="Reference" value={retRef} onChange={e=>setRetRef(e.target.value)} />
+                <button className="btn secondary" onClick={onReturned} disabled={busy}>Mark Returned (Rental)</button>
+              </div>
+              <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
                 <input className="input" placeholder="Buyback amount" value={buybackAmt} onChange={e=>setBuybackAmt(e.target.value)} />
+                <div style={{display:"flex",gap:4}}>
+                  <select className="select" value={buybackDiscType} onChange={e=>setBuybackDiscType(e.target.value)}>
+                    <option value="">No Discount</option>
+                    <option value="percent">% Off</option>
+                    <option value="fixed">Fixed</option>
+                  </select>
+                  <input className="input" placeholder="Value" value={buybackDiscVal} onChange={e=>setBuybackDiscVal(e.target.value)} />
+                </div>
+                <input className="input" placeholder="Method" value={buybackMethod} onChange={e=>setBuybackMethod(e.target.value)} />
+                <input className="input" placeholder="Reference" value={buybackRef} onChange={e=>setBuybackRef(e.target.value)} />
                 <button className="btn secondary" onClick={onBuyback} disabled={busy || !buybackAmt}>Record Buyback</button>
               </div>
             </div>
