@@ -66,7 +66,7 @@ jobs:
           fi
           npm ci
 
-      # Ensure expo-splash-screen is present (correct SDK version)
+      # Ensure expo-splash-screen is installed for SDK 51
       - name: Ensure expo-splash-screen installed
         working-directory: driver-app
         run: npx --yes expo@^51.0.0 install expo-splash-screen
@@ -89,7 +89,7 @@ jobs:
           path: driver-app/prebuild.log
           if-no-files-found: ignore
 
-      # Fallback: if splash color resource wasn't generated, create it
+      # Fallback: guarantee the missing color exists so AAPT can't fail
       - name: Ensure splash color exists
         working-directory: driver-app
         run: |
@@ -105,6 +105,17 @@ EOF
             echo "Created $FILE with splashscreen_background"
           else
             echo "splashscreen_background already present"
+          fi
+
+      # Make sure google-services.json is copied into android/app
+      - name: Ensure google-services.json copied to android/app
+        working-directory: driver-app
+        run: |
+          if [ ! -f android/app/google-services.json ]; then
+            cp google-services.json android/app/google-services.json
+            echo "Copied google-services.json to android/app/"
+          else
+            echo "google-services.json already in android/app/"
           fi
 
       - name: Show generated Android identifiers
