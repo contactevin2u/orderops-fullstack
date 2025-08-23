@@ -11,7 +11,7 @@ jobs:
   build-android-debug:
     runs-on: ubuntu-latest
     env:
-      API_BASE: https://orderops-api-v1.onrender.com   # 👈 set your backend URL here
+      API_BASE: https://orderops-api-v1.onrender.com
       EXPO_NO_TELEMETRY: 1
       CI: true
 
@@ -33,8 +33,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ── If you DON'T want to commit google-services.json, uncomment the next step
-      #    and add a repo secret named GOOGLE_SERVICES_JSON (content of the file).
+      # If you don't commit google-services.json, use a secret instead:
       # - name: Write google-services.json from secret
       #   run: |
       #     mkdir -p driver-app
@@ -42,14 +41,13 @@ jobs:
       #   env:
       #     GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
 
-- name: Install JS deps (create lockfile if missing)
-  working-directory: driver-app
-  run: |
-    if [ ! -f package-lock.json ]; then
-      npm i --package-lock-only
-    fi
-    npm ci
-
+      - name: Install JS deps (create lockfile if missing)
+        working-directory: driver-app
+        run: |
+          if [ ! -f package-lock.json ]; then
+            npm i --package-lock-only
+          fi
+          npm ci
 
       - name: Prebuild native Android project
         working-directory: driver-app
