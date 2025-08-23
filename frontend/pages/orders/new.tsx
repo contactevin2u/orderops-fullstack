@@ -16,6 +16,13 @@ export default function NewOrderPage(){
 
   const [items,setItems] = React.useState<any[]>([{ name:"", item_type:"OUTRIGHT", qty:1, unit_price:"", monthly_amount:"" }]);
 
+  const [deliveryFee,setDeliveryFee] = React.useState("");
+  const [returnDeliveryFee,setReturnDeliveryFee] = React.useState("");
+
+  const [planType,setPlanType] = React.useState("");
+  const [planMonths,setPlanMonths] = React.useState("");
+  const [planMonthly,setPlanMonthly] = React.useState("");
+
   const [busy,setBusy] = React.useState(false);
   const [err,setErr] = React.useState("");
   const [rawText, setRawText] = React.useState("");
@@ -63,6 +70,14 @@ export default function NewOrderPage(){
         () => setOrderCode(order.code || ""),
         () => setDeliveryDate((order.delivery_date || "").split("T")[0] || ""),
         () => setNotes(order.notes || ""),
+        () => setDeliveryFee(String(order?.charges?.delivery_fee ?? "")),
+        () => setReturnDeliveryFee(String(order?.charges?.return_delivery_fee ?? "")),
+        () => {
+          const pl = order.plan || {};
+          setPlanType(pl.plan_type || "");
+          setPlanMonths(pl.months ? String(pl.months) : "");
+          setPlanMonthly(pl.monthly_amount ? String(pl.monthly_amount) : "");
+        },
         () => {
           if (Array.isArray(order.items) && order.items.length) {
             setItems(order.items.map((it: any) => ({
@@ -100,7 +115,18 @@ export default function NewOrderPage(){
             unit_price: Number(it.unit_price||0),
             line_total: Number(it.unit_price||0) * Number(it.qty||0),
             ...(it.monthly_amount ? { monthly_amount: Number(it.monthly_amount||0) } : {})
-          }))
+          })),
+          charges: {
+            delivery_fee: Number(deliveryFee||0),
+            return_delivery_fee: Number(returnDeliveryFee||0)
+          },
+          ...(planType || planMonths || planMonthly ? {
+            plan: {
+              plan_type: planType || undefined,
+              months: planMonths ? Number(planMonths) : undefined,
+              monthly_amount: planMonthly ? Number(planMonthly) : undefined
+            }
+          } : {})
         }
       };
       const out = await createManualOrder(payload);
@@ -169,6 +195,27 @@ export default function NewOrderPage(){
             <tr><td colSpan={6}><button className="btn secondary" onClick={addItem}>Add Item</button></td></tr>
           </tbody>
         </table>
+
+        <div className="hr" />
+        <h3>Charges</h3>
+        <div className="row">
+          <div className="col"><label>Delivery Fee</label><input className="input" value={deliveryFee} onChange={e=>setDeliveryFee(e.target.value)} /></div>
+          <div className="col"><label>Return Delivery Fee</label><input className="input" value={returnDeliveryFee} onChange={e=>setReturnDeliveryFee(e.target.value)} /></div>
+        </div>
+
+        <div className="hr" />
+        <h3>Plan</h3>
+        <div className="row">
+          <div className="col"><label>Plan Type</label>
+            <select className="select" value={planType} onChange={e=>setPlanType(e.target.value)}>
+              <option value=""></option>
+              <option>INSTALLMENT</option>
+              <option>RENTAL</option>
+            </select>
+          </div>
+          <div className="col"><label>Months</label><input className="input" type="number" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
+          <div className="col"><label>Monthly Amount</label><input className="input" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
+        </div>
 
         {err && <div style={{marginTop:8,color:'#ffb3b3'}}>{err}</div>}
         <div style={{marginTop:8}}><button className="btn" onClick={onCreate} disabled={busy || !custName || items.length===0}>Create Order</button></div>
