@@ -98,13 +98,21 @@ def cancel_installment(
     reference: str | None = None,
     payment_date: date | None = None,
 ) -> Order:
-    """Cancel an installment plan and optionally collect penalty/return fees."""
+    """Cancel an installment plan voiding unpaid principal.
+
+    Only penalty and return delivery charges remain payable after
+    cancellation. When ``collect`` is true these fees are immediately
+    collected and the order balance becomes zero.
+    """
+    order.status = "CANCELLED"
     if getattr(order, "plan", None):
         order.plan.status = "CANCELLED"
     if penalty is not None:
         order.penalty_fee = to_decimal(penalty)
     if return_fee is not None:
         order.return_delivery_fee = to_decimal(return_fee)
+
+    charges_total = (order.penalty_fee or DEC0) + (order.return_delivery_fee or DEC0)
     payments: list[Payment] = []
     if collect:
         if order.penalty_fee and order.penalty_fee > DEC0:
@@ -132,7 +140,16 @@ def cancel_installment(
     for p in payments:
         db.add(p)
         order.paid_amount = to_decimal(order.paid_amount) + to_decimal(p.amount)
-    recompute_financials(order)
+
+    if collect:
+        order.total = to_decimal(order.paid_amount)
+        order.subtotal = order.total - charges_total
+        order.balance = DEC0
+    else:
+        order.total = to_decimal(order.paid_amount) + charges_total
+        order.subtotal = to_decimal(order.paid_amount)
+        order.balance = charges_total
+
     return order
 
 
