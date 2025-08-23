@@ -4,7 +4,10 @@ from datetime import datetime
 from decimal import Decimal
 from sqlalchemy.orm import Session
 
-from ..models import Order
+from datetime import date
+
+from ..models import Order, Payment
+from ..utils.normalize import to_decimal
 from .ordersvc import create_adjustment_order
 
 
@@ -47,10 +50,21 @@ def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Orde
     return order
 
 
-def mark_returned(db: Session, order: Order, return_date: datetime | None = None) -> Order:
-    """Mark an order as returned and create a return adjustment."""
+def mark_returned(
+    db: Session,
+    order: Order,
+    return_date: datetime | None = None,
+    return_delivery_fee: Decimal | None = None,
+    collect: bool = False,
+    method: str | None = None,
+    reference: str | None = None,
+    payment_date: date | None = None,
+) -> Order:
+    """Mark an order as returned and handle optional return delivery fee."""
     order.returned_at = return_date or datetime.utcnow()
     order.status = "RETURNED"
+    if return_delivery_fee is not None:
+        order.return_delivery_fee = to_decimal(return_delivery_fee)
     if getattr(order, "plan", None):
         order.plan.status = "CANCELLED"
     charges = {
@@ -59,13 +73,82 @@ def mark_returned(db: Session, order: Order, return_date: datetime | None = None
         if getattr(order, k)
     }
     create_adjustment_order(db, order, "-R", [], charges)
+    if collect and (order.return_delivery_fee or DEC0) > DEC0:
+        p = Payment(
+            order_id=order.id,
+            amount=to_decimal(order.return_delivery_fee),
+            date=payment_date or date.today(),
+            category="DELIVERY",
+            method=method,
+            reference=reference,
+        )
+        db.add(p)
+        order.paid_amount = to_decimal(order.paid_amount) + to_decimal(order.return_delivery_fee)
+    recompute_financials(order)
+    return order
+
+
+def cancel_installment(
+    db: Session,
+    order: Order,
+    penalty: Decimal | None = None,
+    return_fee: Decimal | None = None,
+    collect: bool = False,
+    method: str | None = None,
+    reference: str | None = None,
+    payment_date: date | None = None,
+) -> Order:
+    """Cancel an installment plan and optionally collect penalty/return fees."""
+    if getattr(order, "plan", None):
+        order.plan.status = "CANCELLED"
+    if penalty is not None:
+        order.penalty_fee = to_decimal(penalty)
+    if return_fee is not None:
+        order.return_delivery_fee = to_decimal(return_fee)
+    payments: list[Payment] = []
+    if collect:
+        if order.penalty_fee and order.penalty_fee > DEC0:
+            payments.append(
+                Payment(
+                    order_id=order.id,
+                    amount=to_decimal(order.penalty_fee),
+                    date=payment_date or date.today(),
+                    category="PENALTY",
+                    method=method,
+                    reference=reference,
+                )
+            )
+        if order.return_delivery_fee and order.return_delivery_fee > DEC0:
+            payments.append(
+                Payment(
+                    order_id=order.id,
+                    amount=to_decimal(order.return_delivery_fee),
+                    date=payment_date or date.today(),
+                    category="DELIVERY",
+                    method=method,
+                    reference=reference,
+                )
+            )
+    for p in payments:
+        db.add(p)
+        order.paid_amount = to_decimal(order.paid_amount) + to_decimal(p.amount)
+    recompute_financials(order)
     return order
 
 
 def apply_buyback(
-    db: Session, order: Order, amount: Decimal, discount: dict | None = None
+    db: Session,
+    order: Order,
+    amount: Decimal,
+    discount: dict | None = None,
+    method: str | None = None,
+    reference: str | None = None,
 ) -> Order:
-    """Apply a buyback amount to an order and generate an adjustment."""
+    """Apply a buyback amount to an order and generate an adjustment.
+
+    Creates a negative payment entry representing the refund and adjusts
+    order financials accordingly.
+    """
     if order.type != "OUTRIGHT":
         raise ValueError("Buyback only allowed for OUTRIGHT orders")
     amt = Decimal(str(amount))
@@ -95,4 +178,17 @@ def apply_buyback(
     order.status = "CANCELLED"
     if getattr(order, "plan", None):
         order.plan.status = "CANCELLED"
+
+    # Record refund as negative payment
+    p = Payment(
+        order_id=order.id,
+        amount=-line_amt,
+        date=date.today(),
+        category="BUYBACK",
+        method=method,
+        reference=reference,
+    )
+    db.add(p)
+    order.paid_amount = to_decimal(order.paid_amount) - line_amt
+    recompute_financials(order)
     return order

@@ -6,11 +6,14 @@ import React from "react";
 export default function ExportPage() {
   const [start, setStart] = React.useState("");
   const [end, setEnd] = React.useState("");
+  const [mark, setMark] = React.useState(false);
   const base = process.env.NEXT_PUBLIC_API_URL || "/_api";
 
   function download(kind: "cash" | "payments_received") {
     if (!start || !end) return;
-    const url = `${base}/export/${kind}.xlsx?start=${start}&end=${end}`;
+    const url = `${base}/export/${kind}.xlsx?start=${start}&end=${end}${
+      mark ? "&mark=true" : ""
+    }`;
     if (typeof window !== "undefined") {
       window.open(url, "_blank");
     }
@@ -39,6 +42,18 @@ export default function ExportPage() {
                 value={end}
                 onChange={(e) => setEnd(e.target.value)}
               />
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={mark}
+                onChange={(e) => setMark(e.target.checked)}
+              />
+              Mark as exported
+            </label>
+            <div style={{ fontSize: '0.9em', opacity: 0.8 }}>
+              Preview shows all payments; marking excludes already exported
+              payments in future runs.
             </div>
             <div style={{ display: 'flex', gap: 8, paddingTop: 8 }}>
               <Button onClick={() => download('cash')} disabled={!start || !end}>

@@ -23,6 +23,13 @@ class DummySession:
             )
             if parent:
                 parent.items.append(obj)
+        elif hasattr(obj, "order_id"):
+            parent = next(
+                (o for o in self.added if isinstance(o, Order) and o.id == obj.order_id),
+                None,
+            )
+            if parent and hasattr(parent, "payments"):
+                parent.payments.append(obj)
         self.added.append(obj)
 
     def flush(self):
@@ -87,3 +94,7 @@ def test_apply_buyback_creates_adjustment_with_discount():
     adj = next(o for o in db.added if isinstance(o, Order) and o.code.endswith("-I"))
     line = adj.items[0]
     assert float(line.line_total) == -90.0
+    # Payment recorded
+    pay = next(p for p in db.added if hasattr(p, "category") and p.category == "BUYBACK")
+    assert float(pay.amount) == -90.0
+    assert order.paid_amount == Decimal("410")

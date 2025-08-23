@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -23,10 +23,18 @@ class PaymentIn(BaseModel):
     category: str | None = "ORDER"
 
 @router.post("", response_model=dict, status_code=201)
-def add_payment(body: PaymentIn, db: Session = Depends(get_session)):
+def add_payment(
+    body: PaymentIn,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    db: Session = Depends(get_session),
+):
     order = db.get(Order, body.order_id)
     if not order:
         raise HTTPException(404, "Order not found")
+    if idempotency_key:
+        existing = db.query(Payment).filter_by(idempotency_key=idempotency_key).one_or_none()
+        if existing:
+            return {"payment_id": existing.id, "order_balance": float(order.balance)}
     pdate = date.fromisoformat(body.date) if body.date else date.today()
     amount = to_decimal(body.amount)
     p = Payment(
@@ -36,6 +44,7 @@ def add_payment(body: PaymentIn, db: Session = Depends(get_session)):
         method=body.method,
         reference=body.reference,
         category=body.category or "ORDER",
+        idempotency_key=idempotency_key,
     )
     db.add(p)
     order.paid_amount = to_decimal(order.paid_amount) + amount
