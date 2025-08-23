@@ -165,6 +165,9 @@ def apply_buyback(
             disc_amt = dval
 
     line_amt = amt - disc_amt
+    order.status = "RETURNED"
+    if getattr(order, "plan", None):
+        order.plan.status = "CANCELLED"
     lines = [
         {
             "name": "BUYBACK",
@@ -175,9 +178,6 @@ def apply_buyback(
         }
     ]
     create_adjustment_order(db, order, "-I", lines, {})
-    order.status = "CANCELLED"
-    if getattr(order, "plan", None):
-        order.plan.status = "CANCELLED"
 
     # Record refund as negative payment
     p = Payment(

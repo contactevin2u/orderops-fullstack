@@ -90,8 +90,9 @@ def test_apply_buyback_creates_adjustment_with_discount():
     db = DummySession()
     order = _sample_order()
     apply_buyback(db, order, Decimal("100"), {"type": "percent", "value": Decimal("10")})
-    assert order.status == "CANCELLED"
+    assert order.status == "RETURNED"
     adj = next(o for o in db.added if isinstance(o, Order) and o.code.endswith("-I"))
+    assert adj.status == "RETURNED"
     line = adj.items[0]
     assert float(line.line_total) == -90.0
     # Payment recorded
