@@ -66,4 +66,4 @@ def payments_received_export(start: str, end: str, db: Session = Depends(get_ses
     endpoint name for consumers looking specifically for payment receipts on a
     cash basis.
     """
-    return cash_export(start, end, db)
+    return cash_export(start, end, db=db)
