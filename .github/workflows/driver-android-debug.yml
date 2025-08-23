@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
   push:
     paths:
-      - 'driver-app/**'
-      - '.github/workflows/driver-android-debug.yml'
+      - "driver-app/**"
+      - ".github/workflows/driver-android-debug.yml"
 
 jobs:
   build-android-debug:
@@ -25,18 +25,18 @@ jobs:
       - name: Setup Node (no cache)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Setup Java (JDK 17)
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
+          distribution: "temurin"
+          java-version: "17"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # If you don't commit google-services.json, use a secret instead:
+      # If you don't commit driver-app/google-services.json, use a secret instead:
       # - name: Write google-services.json from secret
       #   run: |
       #     mkdir -p driver-app
@@ -55,7 +55,7 @@ jobs:
           const m=/android:\\s*\\{[\\s\\S]*?package:\\s*\"([^\"]+)\"/m.exec(conf);\
           if(!pkg){console.error('google-services.json: package_name not found');process.exit(1)}\
           if(!m){console.error('app.config.ts: android.package not found');process.exit(1)}\
-          if(pkg!==m[1]){console.error('\\nPACKAGE MISMATCH\\n  google-services.json = '+pkg+'\\n  app.config.ts        = '+m[1]+'\\nFix one to match the other.');process.exit(1)}\
+          if(pkg!==m[1]){console.error('PACKAGE MISMATCH\\n  google-services.json = '+pkg+'\\n  app.config.ts        = '+m[1]);process.exit(1)}\
           console.log('Package OK:', pkg);"
 
       - name: Install JS deps (lockfile-safe)
@@ -66,7 +66,6 @@ jobs:
           fi
           npm ci
 
-      # Ensure expo-splash-screen is installed for SDK 51
       - name: Ensure expo-splash-screen installed
         working-directory: driver-app
         run: npx --yes expo@^51.0.0 install expo-splash-screen
@@ -89,25 +88,19 @@ jobs:
           path: driver-app/prebuild.log
           if-no-files-found: ignore
 
-      # Fallback: guarantee the missing color exists so AAPT can't fail
+      # Fallback: guarantee splash color exists so AAPT can't fail
       - name: Ensure splash color exists
         working-directory: driver-app
         run: |
           mkdir -p android/app/src/main/res/values
           FILE="android/app/src/main/res/values/colors.xml"
           if [ ! -f "$FILE" ] || ! grep -q 'splashscreen_background' "$FILE"; then
-            cat > "$FILE" <<'EOF'
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-  <color name="splashscreen_background">#FFFFFF</color>
-</resources>
-EOF
+            printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' '<resources>' '  <color name="splashscreen_background">#FFFFFF</color>' '</resources>' > "$FILE"
             echo "Created $FILE with splashscreen_background"
           else
             echo "splashscreen_background already present"
           fi
 
-      # Make sure google-services.json is copied into android/app
       - name: Ensure google-services.json copied to android/app
         working-directory: driver-app
         run: |
@@ -122,11 +115,9 @@ EOF
         working-directory: driver-app
         run: |
           echo "== AndroidManifest package =="
-          test -f android/app/src/main/AndroidManifest.xml && \
-            sed -n '1,120p' android/app/src/main/AndroidManifest.xml | grep -m1 'package=' || echo "AndroidManifest missing"
+          if [ -f android/app/src/main/AndroidManifest.xml ]; then grep -m1 'package=' android/app/src/main/AndroidManifest.xml || true; else echo "AndroidManifest missing"; fi
           echo "== app/build.gradle applicationId =="
-          test -f android/app/build.gradle && \
-            grep -m1 'applicationId' android/app/build.gradle || echo "app/build.gradle missing"
+          if [ -f android/app/build.gradle ]; then grep -m1 'applicationId' android/app/build.gradle || true; else echo "app/build.gradle missing"; fi
           echo "== google-services.json in android/app =="
           ls -l android/app/google-services.json || echo "android/app/google-services.json missing"
 
@@ -161,7 +152,7 @@ EOF
         if: failure()
         run: |
           (cd driver-app && ls -R) > driver-app-tree.txt || true
-        shell: bash
+
       - name: Attach driver-app tree (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
