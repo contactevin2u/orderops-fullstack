@@ -5,7 +5,9 @@
     "orders": "Pesanan",
     "parse": "Hurai",
     "export": "Eksport",
-    "reports": "Laporan"
+    "reports": "Laporan",
+    "cashier": "Cashier",
+    "adjustments": "Pelarasan"
   },
   "intake": {
     "placeholder": "Tampal mesej di sini…",

@@ -9,6 +9,8 @@ import {
   FileInput,
   FileDown,
   BarChart2,
+  CircleDollarSign,
+  Wrench,
 } from 'lucide-react';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
@@ -20,6 +22,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     { href: '/parse', label: t('nav.parse'), Icon: FileInput },
     { href: '/export', label: t('nav.export'), Icon: FileDown },
     { href: '/reports/outstanding', label: t('nav.reports'), Icon: BarChart2 },
+    { href: '/cashier', label: t('nav.cashier'), Icon: CircleDollarSign },
+    { href: '/adjustments', label: t('nav.adjustments'), Icon: Wrench },
   ];
   return (
     <div className="layout">

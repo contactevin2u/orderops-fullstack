@@ -5,7 +5,9 @@
     "orders": "Orders",
     "parse": "Parse",
     "export": "Export",
-    "reports": "Reports"
+    "reports": "Reports",
+    "cashier": "收银",
+    "adjustments": "调整"
   },
   "intake": {
     "placeholder": "把讯息贴在这里…",
