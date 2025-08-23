@@ -42,9 +42,14 @@ jobs:
       #   env:
       #     GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
 
-      - name: Install JS deps
-        working-directory: driver-app
-        run: npm ci
+- name: Install JS deps (create lockfile if missing)
+  working-directory: driver-app
+  run: |
+    if [ ! -f package-lock.json ]; then
+      npm i --package-lock-only
+    fi
+    npm ci
+
 
       - name: Prebuild native Android project
         working-directory: driver-app
