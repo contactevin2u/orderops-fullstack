@@ -36,17 +36,13 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ─────────────────────────────────────────────────────────────
-      # If you DON'T commit driver-app/google-services.json:
-      # 1) Add a repo secret GOOGLE_SERVICES_JSON with the file content
-      # 2) Uncomment this step to write the file at build time
+      # If you don't commit google-services.json, use a secret instead:
       # - name: Write google-services.json from secret
       #   run: |
       #     mkdir -p driver-app
       #     echo "$GOOGLE_SERVICES_JSON" > driver-app/google-services.json
       #   env:
       #     GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-      # ─────────────────────────────────────────────────────────────
 
       - name: Sanity check (android.package vs google-services.json)
         run: |
@@ -70,6 +66,11 @@ jobs:
           fi
           npm ci
 
+      # Ensure expo-splash-screen is present (correct SDK version)
+      - name: Ensure expo-splash-screen installed
+        working-directory: driver-app
+        run: npx --yes expo@^51.0.0 install expo-splash-screen
+
       - name: Check Expo CLI version
         working-directory: driver-app
         run: npx --yes expo@^51.0.0 --version
@@ -87,6 +88,24 @@ jobs:
           name: prebuild-log
           path: driver-app/prebuild.log
           if-no-files-found: ignore
+
+      # Fallback: if splash color resource wasn't generated, create it
+      - name: Ensure splash color exists
+        working-directory: driver-app
+        run: |
+          mkdir -p android/app/src/main/res/values
+          FILE="android/app/src/main/res/values/colors.xml"
+          if [ ! -f "$FILE" ] || ! grep -q 'splashscreen_background' "$FILE"; then
+            cat > "$FILE" <<'EOF'
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <color name="splashscreen_background">#FFFFFF</color>
+</resources>
+EOF
+            echo "Created $FILE with splashscreen_background"
+          else
+            echo "splashscreen_background already present"
+          fi
 
       - name: Show generated Android identifiers
         working-directory: driver-app
@@ -126,41 +145,12 @@ jobs:
           path: driver-app/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
 
-      # Only try to upload Gradle logs if they actually exist
-      - name: Detect Gradle artifacts
-        id: gradle_artifacts
-        if: failure()
-        run: |
-          any=false
-          for p in \
-            "driver-app/android/.gradle" \
-            "driver-app/android/app/build/outputs/logs" \
-            "driver-app/android/build.gradle" \
-            "driver-app/android/app/build.gradle" \
-            "driver-app/android/gradle/wrapper/gradle-wrapper.properties"; do
-            if [ -e "$p" ]; then any=true; fi
-          done
-          echo "found=$any" >> $GITHUB_OUTPUT
-
-      - name: Upload Gradle logs (on failure)
-        if: failure() && steps.gradle_artifacts.outputs.found == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: gradle-logs
-          path: |
-            driver-app/android/.gradle
-            driver-app/android/app/build/outputs/logs
-            driver-app/android/build.gradle
-            driver-app/android/app/build.gradle
-            driver-app/android/gradle/wrapper/gradle-wrapper.properties
-          if-no-files-found: ignore
-
+      # Diagnostics on failure
       - name: Upload driver-app tree (on failure)
         if: failure()
         run: |
           (cd driver-app && ls -R) > driver-app-tree.txt || true
         shell: bash
-
       - name: Attach driver-app tree (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
