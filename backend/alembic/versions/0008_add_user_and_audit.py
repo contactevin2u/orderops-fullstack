@@ -18,11 +18,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_users_username', 'users', ['username'], unique=True)
 
-    op.execute(
-        "INSERT INTO users (username, password_hash, role) "
-        "VALUES ('admin', '$2b$12$ttum8dxqome/azGjJyGiCewJvMjOcHbbd6rs23ufRkUpyoa7EzhTe', 'ADMIN')"
-    )
-
     op.create_table(
         'audit_logs',
         sa.Column('id', sa.Integer(), primary_key=True),
