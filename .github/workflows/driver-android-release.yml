@@ -1,0 +1,51 @@
+name: Build Driver Android (Release)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "driver-app/**"
+      - ".github/workflows/driver-android-release.yml"
+
+jobs:
+  build-android-release:
+    runs-on: ubuntu-latest
+    env:
+      API_BASE: https://orderops-api-v1.onrender.com
+      EXPO_NO_TELEMETRY: 1
+      NODE_ENV: production
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Install JS deps (lockfile-safe)
+        working-directory: driver-app
+        run: |
+          if [ ! -f package-lock.json ]; then
+            npm i --package-lock-only
+          fi
+          npm ci
+
+      - name: Build Android AAB
+        working-directory: driver-app
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          eas build --platform android --profile production --non-interactive --wait
+          eas build:download --platform android --profile production --path app-release.aab --non-interactive
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: driver-app-release-aab
+          path: driver-app/app-release.aab
+          if-no-files-found: error
