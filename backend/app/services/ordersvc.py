@@ -323,12 +323,15 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
         )
 
         monthly_amount = to_decimal(plan_in.get("monthly_amount"))
-        # As a fallback, if not present and single-item monthly was parsed, try to infer the max monthly amount
+        # As a fallback, if not present, aggregate positive monthly amounts from items
         if monthly_amount <= 0:
-            # Look for the largest 'monthly_amount' among items
-            monthly_candidates = [to_decimal(it.get("monthly_amount")) for it in items if it.get("monthly_amount") is not None]
+            monthly_candidates = []
+            for it in items:
+                ma = to_decimal(it.get("monthly_amount"))
+                if ma > 0:
+                    monthly_candidates.append(ma)
             if monthly_candidates:
-                monthly_amount = max(monthly_candidates)
+                monthly_amount = sum(monthly_candidates, DEC0)
 
         start_date = parse_relaxed_date(plan_in.get("start_date") or "") or delivery_date
 
