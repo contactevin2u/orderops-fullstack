@@ -5,11 +5,63 @@
     "export": "Eksport",
     "reports": "Laporan",
     "cashier": "Cashier",
-    "adjustments": "Pelarasan"
+    "adjustments": "Pelarasan",
+    "menu": "Menu"
   },
   "intake": {
     "placeholder": "Tampal mesej di sini…",
     "parse": "Hurai",
     "create": "Cipta pesanan"
+  },
+  "orders": {
+    "search": "Cari...",
+    "status": "Status",
+    "allStatus": "Semua Status",
+    "type": "Jenis",
+    "allTypes": "Semua Jenis",
+    "create": "Cipta Manual",
+    "results": "{{count}} hasil",
+    "error": "Gagal memuat pesanan"
+  },
+  "help": {
+    "intake": {
+      "title": "Cara ia berfungsi",
+      "body": "Tampal mesej dan kami akan mengekstrak maklumat pelanggan dan pesanan. Tiada apa disimpan sehingga anda cipta pesanan.",
+      "sample": "Ali 0123456789 beli 1x Widget RM10"
+    },
+    "orders": {
+      "title": "Guna penapis",
+      "body": "Tapis mengikut status atau jenis, cari dengan kata kunci. Hanya 200 hasil pertama dipaparkan."
+    }
+  },
+  "documents": {
+    "title": "Dokumen",
+    "view": "Lihat Invois (PDF)",
+    "download": "Muat turun Invois",
+    "share": "Kongsi pautan",
+    "copied": "Pautan disalin",
+    "noLogo": "Tiada logo",
+    "noAddress": "Tiada alamat",
+    "noTax": "Tiada maklumat cukai",
+    "noBank": "Tiada bank/akaun",
+    "noFooter": "Tiada nota kaki"
+  },
+  "logout": "Log keluar",
+  "cancel": "Batal",
+  "accept": "Terima",
+  "terms": {
+    "title": "Terma & Syarat",
+    "payment": "Terma Pembayaran. Pembayaran perlu dibuat mengikut invois; baki lewat mungkin dikenakan faedah sehingga 1.5% sebulan atau maksimum dibenarkan undang-undang, mana-mana yang lebih rendah.",
+    "ownership": "Hak Milik. Untuk item SEWA/ANSURAN, hak milik kekal pada AA Alive Sdn Bhd sehingga bayaran penuh diterima.",
+    "default": "Ingkar & Remedi. Jika bayaran tidak dibuat, kami boleh (a) gantung perkhidmatan; (b) ambil balik item sewa/ansuran; dan/atau (c) serah kepada pihak ketiga untuk kutipan.",
+    "ctos": "Kebenaran Laporan Kredit (CTOS). Pelanggan membenarkan AA Alive Sdn Bhd mendedahkan data kredit kepada CTOS dan agensi lain serta mendapatkan maklumat kredit untuk penilaian.",
+    "pdpa": "Perlindungan Data (PDPA). Data peribadi diproses menurut notis PDPA kami untuk penilaian kredit, perkhidmatan akaun, bil, kutipan dan pematuhan undang-undang.",
+    "returns": "Pemulangan/Kutipan. Pelanggan bersetuju memberi akses munasabah untuk pengambilan apabila ingkar, tertakluk kepada keselamatan dan kemasukan sah.",
+    "warranty": "Waranti & Liabiliti. Waranti pengeluar standard terpakai; kerosakan tidak langsung atau berbangkit dikecualikan sejauh dibenarkan undang-undang.",
+    "governing": "Undang-undang Mentadbir. Undang-undang Malaysia; mahkamah Malaysia mempunyai bidang kuasa.",
+    "entire": "Keseluruhan Perjanjian; Perubahan. Perubahan mesti bertulis. Jika mana-mana peruntukan tidak sah, selebihnya kekal berkuat kuasa.",
+    "agree": "Saya telah membaca dan bersetuju dengan Terma & Syarat.",
+    "download": "Muat turun Terma (PDF)",
+    "disclaimer": "Templat ini untuk kemudahan operasi dan bukan nasihat undang-undang. Sila rujuk peguam anda."
   }
 }

@@ -21,7 +21,7 @@ describe('OrdersPage', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     mockedUseSWR.mockReturnValue({ data: undefined, error: new Error('fail'), isLoading: false, mutate: vi.fn() });
     expect(() => render(<OrdersPage />)).not.toThrow();
-    expect(screen.getByText(/failed to load orders/i)).toBeInTheDocument();
+    expect(screen.getByText('orders.error')).toBeInTheDocument();
     spy.mockRestore();
   });
 });

@@ -2,11 +2,13 @@ import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/router";
+import { useTranslation } from "react-i18next";
 import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue } from "@/utils/api";
 
 export default function OrderDetailPage(){
   const router = useRouter();
   const { id } = router.query;
+  const { t } = useTranslation();
   const [order,setOrder] = React.useState<any>(null);
   const [msg,setMsg] = React.useState<string>("");
   const [err,setErr] = React.useState<string>("");
@@ -86,6 +88,9 @@ export default function OrderDetailPage(){
   React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[order, asOf, loadDue]);
 
   if(!order) return <Layout><div className="card">Loading...</div></Layout>;
+  const profile = order.company_profile || {};
+  const invoiceUrl = invoicePdfUrl(order.id);
+  function copyInvoice(){ navigator.clipboard.writeText(invoiceUrl); alert(t('documents.copied')); }
 
   function updateItem(idx:number, field:string, value:any){
     const copy = [...items];
@@ -360,6 +365,22 @@ export default function OrderDetailPage(){
               <textarea className="textarea" rows={4} value={notes} onChange={e=>setNotes(e.target.value)} />
             </div>
             <div style={{marginTop:8}}><button className="btn" onClick={saveDetails} disabled={busy}>Save</button></div>
+          </div>
+
+          <div className="card" style={{marginTop:16}}>
+            <h3 style={{marginTop:0}}>{t('documents.title')}</h3>
+            <div className="row" style={{marginBottom:8}}>
+              <a className="btn" href={invoiceUrl} target="_blank" rel="noopener noreferrer">{t('documents.view')}</a>
+              <a className="btn secondary" href={invoiceUrl} download>{t('documents.download')}</a>
+              <button className="btn secondary" onClick={copyInvoice}>{t('documents.share')}</button>
+            </div>
+            <div className="card" style={{marginTop:8}}>
+              {profile.logo_url ? <img src={profile.logo_url} alt="logo" style={{maxHeight:40}}/> : <div>{t('documents.noLogo')}</div>}
+              <p>{profile.address || t('documents.noAddress')}</p>
+              <p>{profile.tax_label ? `${profile.tax_label} ${profile.tax_percent || ''}%` : t('documents.noTax')}</p>
+              <p>{profile.bank_account || t('documents.noBank')}</p>
+              <p>{profile.footer_note || t('documents.noFooter')}</p>
+            </div>
           </div>
 
           <div className="card" style={{marginTop:16}}>
