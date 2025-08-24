@@ -31,7 +31,9 @@ def recompute_financials(order: Order) -> None:
         + (order.return_delivery_fee or DEC0)
         + (order.penalty_fee or DEC0)
     ).quantize(Decimal("0.01"))
-    order.balance = (order.total - (order.paid_amount or DEC0)).quantize(Decimal("0.01"))
+    order.balance = (order.total - (order.paid_amount or DEC0)).quantize(
+        Decimal("0.01")
+    )
 
 
 def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Order:
@@ -72,18 +74,22 @@ def mark_returned(
         for k in ["return_delivery_fee", "penalty_fee"]
         if getattr(order, k)
     }
-    create_adjustment_order(db, order, "-R", [], charges)
-    if collect and (order.return_delivery_fee or DEC0) > DEC0:
+    adj = create_adjustment_order(db, order, "-R", [], charges)
+    rdf = to_decimal(order.return_delivery_fee or DEC0)
+    if collect and rdf > DEC0:
         p = Payment(
-            order_id=order.id,
-            amount=to_decimal(order.return_delivery_fee),
+            order_id=adj.id,
+            amount=rdf,
             date=payment_date or date.today(),
             category="DELIVERY",
             method=method,
             reference=reference,
         )
         db.add(p)
-        order.paid_amount = to_decimal(order.paid_amount) + to_decimal(order.return_delivery_fee)
+        adj.paid_amount = to_decimal(adj.paid_amount) + rdf
+        adj.balance = (adj.total - adj.paid_amount).quantize(Decimal("0.01"))
+    order.return_delivery_fee = DEC0
+    order.penalty_fee = DEC0
     recompute_financials(order)
     return order
 
