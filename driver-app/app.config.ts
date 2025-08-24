@@ -1,9 +1,5 @@
 import { ConfigContext, ExpoConfig } from "expo/config";
 
-/**
- * DriverApp (Android-only) with splash plugin enabled.
- * Ensure google-services.json exists at: driver-app/google-services.json
- */
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "DriverApp",
@@ -19,20 +15,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     permissions: ["POST_NOTIFICATIONS"],
   },
 
-  // Splash plugin generates @color/splashscreen_background, etc.
+  // plugins we rely on
   plugins: [
     ["expo-splash-screen", { backgroundColor: "#FFFFFF", resizeMode: "contain" }],
     "@react-native-firebase/app",
     "@react-native-firebase/messaging",
   ],
 
-  // Optional splash (plugin also reads this)
-  splash: {
-    backgroundColor: "#FFFFFF",
-    resizeMode: "contain",
-    // image: "./assets/splash.png",
-  },
+  // optional mirror (plugin reads it too)
+  splash: { backgroundColor: "#FFFFFF", resizeMode: "contain" },
 
+  // backend URL for the app
   extra: {
     apiBase: process.env.API_BASE || "https://orderops-api-v1.onrender.com",
   },
