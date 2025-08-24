@@ -104,15 +104,27 @@ def cancel_installment(
     cancellation. When ``collect`` is true these fees are immediately
     collected and the order balance becomes zero.
     """
+    if order.type != "INSTALLMENT":
+        raise ValueError("cancel_installment only allowed for INSTALLMENT orders")
+    if not getattr(order, "plan", None):
+        raise ValueError("Installment plan missing")
+
     order.status = "CANCELLED"
-    if getattr(order, "plan", None):
-        order.plan.status = "CANCELLED"
+    order.plan.status = "CANCELLED"
     if penalty is not None:
         order.penalty_fee = to_decimal(penalty)
     if return_fee is not None:
         order.return_delivery_fee = to_decimal(return_fee)
 
     charges_total = (order.penalty_fee or DEC0) + (order.return_delivery_fee or DEC0)
+    charges = {
+        k: getattr(order, k)
+        for k in ["return_delivery_fee", "penalty_fee"]
+        if getattr(order, k)
+    }
+    create_adjustment_order(db, order, "-I", [], charges)
+
+    original_paid = to_decimal(order.paid_amount or DEC0)
     payments: list[Payment] = []
     if collect:
         if order.penalty_fee and order.penalty_fee > DEC0:
@@ -141,15 +153,25 @@ def cancel_installment(
         db.add(p)
         order.paid_amount = to_decimal(order.paid_amount) + to_decimal(p.amount)
 
-    if collect:
-        order.total = to_decimal(order.paid_amount)
-        order.subtotal = order.total - charges_total
-        order.balance = DEC0
-    else:
-        order.total = to_decimal(order.paid_amount) + charges_total
-        order.subtotal = to_decimal(order.paid_amount)
-        order.balance = charges_total
+    principal_paid = original_paid
+    remaining = principal_paid
+    for it in order.items:
+        if getattr(it, "item_type", "") == "FEE":
+            continue
+        lt = to_decimal(it.line_total or DEC0)
+        if remaining <= DEC0:
+            it.unit_price = DEC0
+            it.line_total = DEC0
+        elif remaining >= lt:
+            remaining -= lt
+        else:
+            qty = to_decimal(it.qty or 1)
+            unit_price = (remaining / qty).quantize(Decimal("0.01"))
+            it.unit_price = unit_price
+            it.line_total = remaining
+            remaining = DEC0
 
+    recompute_financials(order)
     return order
 
 
