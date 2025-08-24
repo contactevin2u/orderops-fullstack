@@ -20,3 +20,4 @@ jsonschema>=4.21
 json-repair>=0.2
 rapidfuzz>=3.6
 firebase-admin>=6.5.0
+python-multipart>=0.0.7

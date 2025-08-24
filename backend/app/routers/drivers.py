@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..auth.firebase import driver_auth
 from ..db import get_session
-from ..models import DriverDevice
+from ..models import DriverDevice, Trip
 from ..schemas import DeviceRegisterIn
+from ..services.notifications import notify_trip_assignment
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -37,3 +38,12 @@ def register_device(
     device.last_seen_at = datetime.now(timezone.utc)
     db.commit()
     return {"status": "ok"}
+
+
+@router.post("/{driver_id}/notify", response_model=dict)
+def resend_trip_notification(driver_id: int, trip_id: int, db: Session = Depends(get_session)):
+    trip = db.get(Trip, trip_id)
+    if not trip or trip.driver_id != driver_id:
+        raise HTTPException(404, "Trip not found")
+    count = notify_trip_assignment(db, trip)
+    return {"sent": count}

@@ -130,3 +130,18 @@ class OrderOut(BaseModel):
 class DeviceRegisterIn(BaseModel):
     fcm_token: str
     platform: str
+
+
+class TripOut(BaseModel):
+    id: int
+    order_id: int
+    driver_id: int
+    status: str
+    planned_at: Optional[dt.datetime] = None
+    started_at: Optional[dt.datetime] = None
+    delivered_at: Optional[dt.datetime] = None
+    failure_reason: Optional[str] = None
+    pod_photo_url: Optional[str] = None
+
+    class Config:
+        from_attributes = True

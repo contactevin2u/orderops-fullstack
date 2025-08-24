@@ -3,6 +3,8 @@ import { ScrollView, View, Text, Platform, Pressable } from 'react-native';
 import Constants from 'expo-constants';
 import messaging from '@react-native-firebase/messaging';
 import auth from '@react-native-firebase/auth';
+import TripItem from './src/components/TripItem';
+import { useTripStore } from './src/stores/tripStore';
 
 type Status = string | null;
 
@@ -17,6 +19,7 @@ export default function App() {
   const [fcm, setFcm] = useState<Status>(null);
   const [registerStatus, setRegisterStatus] = useState<Status>(null);
   const [error, setError] = useState<Status>(null);
+  const trips = useTripStore((s) => s.trips);
 
   const checkHealth = useCallback(async () => {
     try {
@@ -57,16 +60,18 @@ export default function App() {
         body: JSON.stringify({ fcm_token: token, platform: Platform.OS }),
       });
       setRegisterStatus(res.ok ? 'OK' : `Failed: ${res.status}`);
+      await useTripStore.getState().load(idt);
     } catch (e: any) {
       setError(e?.message ?? String(e));
     }
   }, []);
 
   useEffect(() => {
-    // optional foreground handler
-    const sub = messaging().onMessage(async () => {});
+    const sub = messaging().onMessage(async () => {
+      if (idToken) await useTripStore.getState().load(idToken);
+    });
     return sub;
-  }, []);
+  }, [idToken]);
 
   useEffect(() => { checkHealth(); bootstrap(); }, [checkHealth, bootstrap]);
 
@@ -86,6 +91,10 @@ export default function App() {
       <Btn text="Retry Health" onPress={checkHealth} />
       <View style={{ height: 8 }} />
       <Btn text="Re-run Auth + Register" onPress={bootstrap} />
+
+      {trips.map((t) => (
+        <TripItem key={t.id} trip={t} token={idToken || ''} />
+      ))}
     </ScrollView>
   );
 }

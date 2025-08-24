@@ -202,6 +202,15 @@ export function markBuyback(
   });
 }
 
+// -------- Trips
+export function listTrips() {
+  return request<any>(`/trips`);
+}
+
+export function notifyTrip(id: number) {
+  return request<any>(`/trips/${id}/notify`, { method: 'POST' });
+}
+
 export function cancelInstallment(
   id: number,
   payload: {
