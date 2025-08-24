@@ -28,6 +28,7 @@ body {
   background: #4f46e5;
   color: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
 }
 
 .header-inner {
@@ -54,10 +55,26 @@ body {
   font-weight: 500;
   color: inherit;
   text-decoration: none;
+  padding: 8px 4px;
+  border-radius: 8px;
 }
 
-.nav-link:hover {
+.nav-link:hover,
+.nav-link:focus-visible {
   opacity: 0.8;
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+}
+
+.nav-link.active {
+  text-decoration: underline;
+}
+
+.nav-toggle {
+  display: none;
+  background: none;
+  border: none;
+  padding: 8px;
 }
 
 .main {
@@ -110,6 +127,8 @@ body {
   border: 1px solid #ccc;
   border-radius: 8px;
   background: #fff;
+  min-height: 44px;
+  font-size: 16px;
 }
 
 .textarea {
@@ -161,6 +180,14 @@ body {
   text-align: left;
 }
 
+.table th:first-child,
+.table td:first-child {
+  position: sticky;
+  left: 0;
+  background: #fff;
+  box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+}
+
 .hr {
   height: 1px;
   background: #e5e7eb;
@@ -171,4 +198,74 @@ body {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 4px 16px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.modal {
+  background: #fff;
+  padding: 16px;
+  border-radius: 16px;
+  max-width: 32rem;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 1024px) {
+  .header-inner {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .nav {
+    gap: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-inner {
+    flex-wrap: nowrap;
+  }
+  .nav-toggle {
+    display: flex;
+    margin-left: auto;
+  }
+  .nav {
+    display: none;
+    flex-direction: column;
+    background: #4f46e5;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 8px 16px;
+  }
+  .nav.open {
+    display: flex;
+  }
+  .main > .container {
+    padding-top: 64px;
+  }
+  .row {
+    flex-direction: column;
+  }
 }

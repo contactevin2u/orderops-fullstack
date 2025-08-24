@@ -5,11 +5,63 @@
     "export": "Export",
     "reports": "Reports",
     "cashier": "Cashier",
-    "adjustments": "Adjustments"
+    "adjustments": "Adjustments",
+    "menu": "Menu"
   },
   "intake": {
     "placeholder": "Paste a message here…",
     "parse": "Parse",
     "create": "Create order"
+  },
+  "orders": {
+    "search": "Search...",
+    "status": "Status",
+    "allStatus": "All Status",
+    "type": "Type",
+    "allTypes": "All Types",
+    "create": "Create Manually",
+    "results": "{{count}} results",
+    "error": "Failed to load orders"
+  },
+  "help": {
+    "intake": {
+      "title": "How it works",
+      "body": "Paste the message and we'll extract customer and order info. Nothing is saved until you create the order.",
+      "sample": "John 0123456789 buys 1x Widget RM10"
+    },
+    "orders": {
+      "title": "Using filters",
+      "body": "Filter by status or type, search by keyword. Only the first 200 results are shown."
+    }
+  },
+  "documents": {
+    "title": "Documents",
+    "view": "View Invoice (PDF)",
+    "download": "Download Invoice",
+    "share": "Share link",
+    "copied": "Link copied",
+    "noLogo": "No logo",
+    "noAddress": "No address",
+    "noTax": "No tax info",
+    "noBank": "No bank/account",
+    "noFooter": "No footer note"
+  },
+  "logout": "Logout",
+  "cancel": "Cancel",
+  "accept": "Accept",
+  "terms": {
+    "title": "Terms & Conditions",
+    "payment": "Payment Terms. Payment due as per invoice; late balances may accrue interest at up to 1.5% per month or the maximum permitted by law, whichever is lower.",
+    "ownership": "Ownership & Title. For RENTAL/INSTALLMENT items, title remains with AA Alive Sdn Bhd until full payment.",
+    "default": "Default & Remedies. If payment is not made when due, we may (a) suspend further services; (b) recover or collect back rental/installment items; and/or (c) assign or outsource recovery of unpaid invoices to a third-party collector.",
+    "ctos": "Credit Reporting Consent (CTOS). Customer consents to AA Alive Sdn Bhd disclosing credit data and payment history, including defaults, to CTOS Data Systems Sdn Bhd (CTOS) and other licensed credit reporting agencies, and to AA Alive obtaining credit information on Customer from such agencies for credit assessment, monitoring, and recovery purposes in accordance with applicable laws.",
+    "pdpa": "Data Protection (PDPA). Personal data is processed in accordance with our PDPA notice for credit assessment, account servicing, billing, collections (including third-party collectors) and legal compliance.",
+    "returns": "Returns/Collections. Customer agrees to provide reasonable access for pickup/collection upon default, subject to safety and lawful entry.",
+    "warranty": "Warranty & Liability. Standard manufacturer warranty applies unless stated; indirect, incidental or consequential damages are excluded to the extent permitted by law.",
+    "governing": "Governing Law. Malaysia law; courts of Malaysia have jurisdiction.",
+    "entire": "Entire Agreement; Variations. Changes must be in writing. If any provision is invalid, the rest remain effective.",
+    "agree": "I have read and agree to the Terms & Conditions.",
+    "download": "Download Terms (PDF)",
+    "disclaimer": "This template is provided for operational convenience and is not legal advice. Please have your counsel review for your specific use."
   }
 }

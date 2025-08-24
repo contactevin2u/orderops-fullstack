@@ -1,6 +1,7 @@
 import Layout from "@/components/Layout";
 import React from "react";
 import { useRouter } from "next/router";
+import TermsModal from "@/components/ui/TermsModal";
 import { createManualOrder, parseMessage } from "@/utils/api";
 
 export default function NewOrderPage(){
@@ -26,6 +27,8 @@ export default function NewOrderPage(){
   const [busy,setBusy] = React.useState(false);
   const [err,setErr] = React.useState("");
   const [rawText, setRawText] = React.useState("");
+  const [termsOpen,setTermsOpen] = React.useState(false);
+  const [accepted,setAccepted] = React.useState(false);
 
   // Reuse helper from parse page to be tolerant of slightly different shapes
   function normalizeParsedForOrder(input: any) {
@@ -98,7 +101,7 @@ export default function NewOrderPage(){
     }
   }
 
-  async function onCreate(){
+  async function createOrder(){
     setBusy(true); setErr("");
     try{
       const payload = {
@@ -134,6 +137,11 @@ export default function NewOrderPage(){
       if(oid) router.push(`/orders/${oid}`);
     }catch(e:any){ setErr(e?.message || "Create failed"); }
     finally{ setBusy(false); }
+  }
+
+  async function onCreate(){
+    if(!accepted){ setTermsOpen(true); return; }
+    await createOrder();
   }
 
   return (
@@ -219,6 +227,11 @@ export default function NewOrderPage(){
         {err && <div style={{marginTop:8,color:'#ffb3b3'}}>{err}</div>}
         <div style={{marginTop:8}}><button className="btn" onClick={onCreate} disabled={busy || !custName || items.length===0}>Create Order</button></div>
       </div>
+      <TermsModal
+        open={termsOpen}
+        onClose={()=>setTermsOpen(false)}
+        onAccept={()=>{ setAccepted(true); setTermsOpen(false); createOrder(); }}
+      />
     </Layout>
   );
 }

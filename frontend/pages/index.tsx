@@ -1,6 +1,7 @@
 import React from 'react';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
 import { parseMessage, createOrderFromParsed } from '@/utils/api';
 
@@ -24,6 +25,8 @@ export default function IntakePage() {
   const [busy, setBusy] = React.useState(false);
   const [err, setErr] = React.useState('');
   const [msg, setMsg] = React.useState('');
+  const [termsOpen, setTermsOpen] = React.useState(false);
+  const [accepted, setAccepted] = React.useState(false);
 
   async function onParse() {
     setBusy(true); setErr(''); setMsg('');
@@ -38,7 +41,7 @@ export default function IntakePage() {
     }
   }
 
-  async function onCreate() {
+  async function createOrder() {
     setBusy(true); setErr(''); setMsg('');
     try {
       const out = await createOrderFromParsed(parsed);
@@ -50,11 +53,24 @@ export default function IntakePage() {
     }
   }
 
+  async function onCreate() {
+    if (!accepted) {
+      setTermsOpen(true);
+      return;
+    }
+    await createOrder();
+  }
+
   const toPost = normalizeParsedForOrder(parsed);
 
   return (
     <div className="stack container" style={{ maxWidth: '48rem' }}>
       <Card>
+        <details style={{ marginBottom: 8 }}>
+          <summary>{t('help.intake.title')}</summary>
+          <p>{t('help.intake.body')}</p>
+          <pre style={{ whiteSpace: 'pre-wrap' }}>{t('help.intake.sample')}</pre>
+        </details>
         <textarea
           className="textarea"
           rows={10}
@@ -74,6 +90,15 @@ export default function IntakePage() {
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>{JSON.stringify(toPost, null, 2)}</pre>
         </Card>
       )}
+      <TermsModal
+        open={termsOpen}
+        onClose={() => setTermsOpen(false)}
+        onAccept={() => {
+          setAccepted(true);
+          setTermsOpen(false);
+          createOrder();
+        }}
+      />
     </div>
   );
 }

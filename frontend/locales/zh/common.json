@@ -5,11 +5,63 @@
     "export": "Export",
     "reports": "Reports",
     "cashier": "收银",
-    "adjustments": "调整"
+    "adjustments": "调整",
+    "menu": "菜单"
   },
   "intake": {
     "placeholder": "把讯息贴在这里…",
     "parse": "解析",
     "create": "创建订单"
+  },
+  "orders": {
+    "search": "搜索...",
+    "status": "状态",
+    "allStatus": "所有状态",
+    "type": "类型",
+    "allTypes": "所有类型",
+    "create": "手动创建",
+    "results": "{{count}} 个结果",
+    "error": "载入订单失败"
+  },
+  "help": {
+    "intake": {
+      "title": "如何操作",
+      "body": "粘贴客户讯息，我们会提取客户和订单资料。只有在您创建订单后才会保存。",
+      "sample": "张三 0123456789 购买 1x Widget RM10"
+    },
+    "orders": {
+      "title": "使用筛选",
+      "body": "可按状态或类型筛选，并按关键字搜索。仅显示前200个结果。"
+    }
+  },
+  "documents": {
+    "title": "文件",
+    "view": "查看发票 (PDF)",
+    "download": "下载发票",
+    "share": "分享链接",
+    "copied": "链接已复制",
+    "noLogo": "无标志",
+    "noAddress": "无地址",
+    "noTax": "无税务信息",
+    "noBank": "无银行/账户",
+    "noFooter": "无页脚备注"
+  },
+  "logout": "登出",
+  "cancel": "取消",
+  "accept": "同意",
+  "terms": {
+    "title": "条款与协议",
+    "payment": "付款条款。应按发票付款；逾期余额每月可能产生最高1.5%或法律允许的最低利息。",
+    "ownership": "所有权。对于租赁/分期物品，在全额付款前所有权归AA Alive Sdn Bhd所有。",
+    "default": "违约与补救。如果未按时付款，我们可(a)暂停服务；(b)取回租赁/分期物品；或(c)委托第三方催收。",
+    "ctos": "信用报告同意(CTOS)。客户同意AA Alive Sdn Bhd向CTOS及其他机构披露信用数据，并从中获取信用信息。",
+    "pdpa": "数据保护(PDPA)。个人数据按照我们的PDPA通知处理，用于信用评估、账户服务、账单、催收和合规。",
+    "returns": "退回/收取。违约时客户同意在安全合法情况下提供合理取件访问。",
+    "warranty": "保修与责任。除非另有说明，适用标准制造商保修；法律允许范围内不承担间接或附带损害。",
+    "governing": "适用法律。马来西亚法律；马来西亚法院具有管辖权。",
+    "entire": "完整协议；变更须书面。如任何条款无效，其余条款仍有效。",
+    "agree": "我已阅读并同意条款与协议。",
+    "download": "下载条款 (PDF)",
+    "disclaimer": "此模板仅供操作参考，不构成法律意见。请咨询您的律师。"
   }
 }
