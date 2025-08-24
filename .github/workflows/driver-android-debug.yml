@@ -35,7 +35,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # If you don't commit driver-app/google-services.json, use a secret instead:
+      # If you don't commit driver-app/google-services.json, you can load from a secret instead:
       # - name: Write google-services.json from secret
       #   run: |
       #     mkdir -p driver-app
@@ -100,23 +100,33 @@ jobs:
             echo "splashscreen_background already present"
           fi
 
-      # >>> KEY FIX: make Debug APK self-contained (no Metro needed)
+      # Make sure Metro config exists for offline bundling (does NOT run Metro at runtime)
+      - name: Ensure Metro config exists
+        working-directory: driver-app
+        run: |
+          if [ ! -f metro.config.js ]; then
+            printf "const { getDefaultConfig } = require('expo/metro-config');\nmodule.exports = getDefaultConfig(__dirname);\n" > metro.config.js
+            echo "Created metro.config.js"
+          else
+            echo "metro.config.js already present"
+          fi
+
+      # Embed JS so APK runs standalone (no Metro dev server)
       - name: Create JS bundle for Debug (offline)
         working-directory: driver-app
         run: |
           mkdir -p android/app/src/main/assets
           ENTRY="index.js"; [ -f "$ENTRY" ] || ENTRY="App.tsx"
-          npx react-native -v || true
           npx react-native bundle \
             --platform android \
             --dev false \
+            --config metro.config.js \
             --entry-file "$ENTRY" \
             --bundle-output android/app/src/main/assets/index.android.bundle \
             --assets-dest android/app/src/main/res
           test -f android/app/src/main/assets/index.android.bundle || (echo "::error::Bundle not created"; exit 1)
           echo "Bundled JS from $ENTRY"
 
-      # Ensure google-services.json exists under android/app
       - name: Ensure google-services.json copied to android/app
         working-directory: driver-app
         run: |
@@ -144,6 +154,12 @@ jobs:
         if: steps.gradle_check.outputs.found == 'true'
         working-directory: driver-app/android
         run: ./gradlew assembleDebug
+
+      - name: Verify JS bundle is embedded in APK
+        if: steps.gradle_check.outputs.found == 'true'
+        working-directory: driver-app/android/app/build/outputs/apk/debug
+        run: |
+          unzip -l app-debug.apk | grep "assets/index.android.bundle" || (echo "::error::Bundle missing"; exit 1)
 
       - name: Upload APK artifact
         if: steps.gradle_check.outputs.found == 'true'
