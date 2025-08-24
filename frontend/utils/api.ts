@@ -28,6 +28,7 @@ async function request<T = any>(
       ...(headers || {}),
     },
     body: json ? JSON.stringify(json) : rest.body,
+    credentials: 'include',
     ...rest,
   }).catch((e: any) => {
     throw new Error(`Network error calling ${path}: ${e?.message || "failed to fetch"}`);

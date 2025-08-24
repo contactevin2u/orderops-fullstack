@@ -6,11 +6,16 @@ from sqlalchemy import Integer, and_, cast, case, func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import Customer, Order, OrderItem, Payment, Plan
+from ..models import Customer, Order, OrderItem, Payment, Plan, Role
+from ..auth.deps import require_roles
 from ..services.plan_math import months_elapsed
 
 
-router = APIRouter(prefix="/reports", tags=["reports"])
+router = APIRouter(
+    prefix="/reports",
+    tags=["reports"],
+    dependencies=[Depends(require_roles(Role.ADMIN))],
+)
 
 
 @router.get("/outstanding", response_model=dict)

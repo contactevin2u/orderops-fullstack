@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     WORKER_POLL_SECS: float = 1.0
     WORKER_MAX_ATTEMPTS: int = 5
 
+    # Auth
+    JWT_SECRET: str = "change-me"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
     class Config:
         env_file = ".env"
         case_sensitive = True
