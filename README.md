@@ -2,6 +2,16 @@
 
 This repository contains a FastAPI backend and a Next.js frontend. The CI workflow checks code style, types, tests and build for both parts.
 
+## Authentication
+
+All application pages now require authentication and unauthenticated users are redirected to `/login`.
+Upon running the migration adding user support, a default administrator account is created:
+
+- username: `admin`
+- password: `admin123`
+
+Use these credentials to sign in initially and create additional users as needed.
+
 ## Running checks locally
 
 ### Backend
