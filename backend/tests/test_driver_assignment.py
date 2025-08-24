@@ -1,0 +1,80 @@
+import sys
+from pathlib import Path
+
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, Integer
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+# Ensure backend package importable
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
+from app.main import app  # noqa: E402
+from app.db import get_session  # noqa: E402
+from app.models import Base, Driver, Customer, Order, Trip, Role  # noqa: E402
+from app.routers import orders as orders_router  # noqa: E402
+
+
+def _setup_db():
+    engine = create_engine(
+        "sqlite://",
+        future=True,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Driver.__table__.c.id.type = Integer()
+    Customer.__table__.c.id.type = Integer()
+    Order.__table__.c.id.type = Integer()
+    Order.__table__.c.customer_id.type = Integer()
+    Trip.__table__.c.id.type = Integer()
+    Trip.__table__.c.order_id.type = Integer()
+    Trip.__table__.c.driver_id.type = Integer()
+    Base.metadata.create_all(
+        engine,
+        tables=[Driver.__table__, Customer.__table__, Order.__table__, Trip.__table__],
+    )
+    return sessionmaker(bind=engine, expire_on_commit=False)
+
+
+def test_assign_order_to_driver(monkeypatch):
+    SessionLocal = _setup_db()
+
+    def override_get_session():
+        with SessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    class DummyUser:
+        id = 1
+        role = Role.ADMIN
+
+    dep = orders_router.router.dependencies[0].dependency
+    app.dependency_overrides[dep] = lambda: DummyUser()
+
+    client = TestClient(app)
+
+    with SessionLocal() as db:
+        driver = Driver(firebase_uid="u1", name="D1")
+        customer = Customer(name="C1")
+        db.add_all([driver, customer])
+        db.flush()
+        order = Order(code="O1", type="OUTRIGHT", customer_id=customer.id)
+        db.add(order)
+        db.commit()
+        driver_id = driver.id
+        order_id = order.id
+
+    resp = client.get("/drivers")
+    assert resp.status_code == 200
+    assert any(d["id"] == driver_id for d in resp.json())
+
+    resp = client.post(f"/orders/{order_id}/assign", json={"driver_id": driver_id})
+    assert resp.status_code == 200
+    assert resp.json()["data"]["driver_id"] == driver_id
+
+    with SessionLocal() as db:
+        trip = db.query(Trip).filter_by(order_id=order_id).one()
+        assert trip.driver_id == driver_id
+
+    app.dependency_overrides.clear()
