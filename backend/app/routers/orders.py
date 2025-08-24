@@ -67,7 +67,7 @@ class PlanPatch(BaseModel):
 
 
 class OrderItemPatch(BaseModel):
-    id: int
+    id: int | None = None
     name: str | None = None
     item_type: str | None = None
     sku: str | None = None
@@ -90,6 +90,7 @@ class OrderPatch(BaseModel):
     balance: float | None = None
     plan: PlanPatch | None = None
     items: list[OrderItemPatch] | None = None
+    delete_items: list[int] | None = None
 
 @router.post("", response_model=dict, status_code=201)
 def create_order(
@@ -189,22 +190,49 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
             except Exception:
                 pass
 
+    if "delete_items" in data:
+        for iid in data["delete_items"]:
+            item = next((it for it in order.items if it.id == iid), None)
+            if item:
+                order.items.remove(item)
+                db.delete(item)
+
     if "items" in data:
         for ip in data["items"]:
             iid = ip.get("id")
-            if not iid:
-                continue
-            item = next((it for it in order.items if it.id == iid), None)
-            if not item:
-                continue
-            for k in ["name", "item_type", "sku", "category"]:
-                if k in ip:
-                    setattr(item, k, ip[k])
-            if "qty" in ip:
-                item.qty = int(ip["qty"])
-            for k in ["unit_price", "line_total"]:
-                if k in ip:
-                    setattr(item, k, Decimal(str(ip[k])))
+            if iid:
+                item = next((it for it in order.items if it.id == iid), None)
+                if not item:
+                    continue
+                for k in ["name", "item_type", "sku", "category"]:
+                    if k in ip:
+                        setattr(item, k, ip[k])
+                if "qty" in ip:
+                    item.qty = int(ip["qty"])
+                for k in ["unit_price", "line_total"]:
+                    if k in ip:
+                        setattr(item, k, Decimal(str(ip[k])))
+            else:
+                name = (ip.get("name") or "").strip() or "Item"
+                item_type = (ip.get("item_type") or "OUTRIGHT").strip().upper()
+                sku = ip.get("sku")
+                category = ip.get("category")
+                qty = int(ip.get("qty") or 0)
+                unit_price = Decimal(str(ip.get("unit_price") or 0))
+                line_total = Decimal(
+                    str(ip.get("line_total") or (unit_price * qty))
+                )
+                order.items.append(
+                    OrderItem(
+                        name=name,
+                        item_type=item_type,
+                        sku=sku,
+                        category=category,
+                        qty=qty,
+                        unit_price=unit_price,
+                        line_total=line_total,
+                    )
+                )
 
 
     # Recompute monetary totals based on current state

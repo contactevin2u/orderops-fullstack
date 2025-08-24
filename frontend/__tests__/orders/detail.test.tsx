@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { vi } from 'vitest';
 import OrderDetailPage from '@/pages/orders/[id]';
@@ -85,6 +85,63 @@ describe('OrderDetailPage', () => {
     await waitFor(() => expect(mockUpdateOrder).toHaveBeenCalled());
     expect(mockUpdateOrder).toHaveBeenCalledWith(1, {
       items: [expect.objectContaining({ id: 5, qty: 2, unit_price: 10, line_total: 20, monthly_amount: 60 })],
+    });
+  });
+
+  it('allows adding items', async () => {
+    mockGetOrder.mockResolvedValue({
+      id: 1,
+      code: 'ORD1',
+      status: 'NEW',
+      type: 'OUTRIGHT',
+      customer: {},
+      items: [],
+    });
+    mockOrderDue.mockResolvedValue({});
+    mockUpdateOrder.mockResolvedValue({ items: [] });
+
+    render(<OrderDetailPage />);
+
+    const addBtn = await screen.findByText('Add Item');
+    fireEvent.click(addBtn);
+
+    const table = screen.getAllByRole('table')[0];
+    const inputs = within(table).getAllByRole('textbox');
+    fireEvent.change(inputs[0], { target: { value: 'NewItem' } });
+    fireEvent.change(inputs[1], { target: { value: '3' } });
+    fireEvent.change(inputs[2], { target: { value: '5' } });
+
+    fireEvent.click(screen.getByText('Save Items'));
+
+    await waitFor(() => expect(mockUpdateOrder).toHaveBeenCalled());
+    expect(mockUpdateOrder).toHaveBeenCalledWith(1, {
+      items: [expect.objectContaining({ name: 'NewItem', item_type: 'OUTRIGHT', qty: 3, unit_price: 5, line_total: 15 })],
+    });
+  });
+
+  it('allows removing items', async () => {
+    mockGetOrder.mockResolvedValue({
+      id: 1,
+      code: 'ORD1',
+      status: 'NEW',
+      type: 'OUTRIGHT',
+      customer: {},
+      items: [{ id: 5, name: 'Item1', item_type: 'OUTRIGHT', qty: 1, unit_price: 10 }],
+    });
+    mockOrderDue.mockResolvedValue({});
+    mockUpdateOrder.mockResolvedValue({ items: [] });
+
+    render(<OrderDetailPage />);
+
+    const removeBtn = await screen.findByText('Remove');
+    fireEvent.click(removeBtn);
+
+    fireEvent.click(screen.getByText('Save Items'));
+
+    await waitFor(() => expect(mockUpdateOrder).toHaveBeenCalled());
+    expect(mockUpdateOrder).toHaveBeenCalledWith(1, {
+      items: [],
+      delete_items: [5],
     });
   });
 
