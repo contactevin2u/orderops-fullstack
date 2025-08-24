@@ -6,7 +6,8 @@
     "reports": "Reports",
     "cashier": "收银",
     "adjustments": "调整",
-    "menu": "菜单"
+    "menu": "菜单",
+    "admin": "Admin"
   },
   "intake": {
     "placeholder": "把讯息贴在这里…",

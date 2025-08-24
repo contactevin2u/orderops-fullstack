@@ -2,7 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import LanguageSwitcher from './LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
-import { Inbox, ClipboardList, FileDown, BarChart2, Menu } from 'lucide-react';
+import { Inbox, ClipboardList, FileDown, BarChart2, Menu, UserCog } from 'lucide-react';
 import { useRouter } from 'next/router';
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -32,6 +32,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     { href: '/orders', label: t('nav.orders'), Icon: ClipboardList, roles: ['ADMIN', 'CASHIER'] },
     { href: '/export', label: t('nav.export'), Icon: FileDown, roles: ['ADMIN'] },
     { href: '/reports/outstanding', label: t('nav.reports'), Icon: BarChart2, roles: ['ADMIN'] },
+    { href: '/admin', label: t('nav.admin'), Icon: UserCog, roles: ['ADMIN'] },
   ];
 
   const visible = nav.filter((n) => !n.roles || n.roles.includes(user?.role));

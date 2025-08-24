@@ -6,7 +6,8 @@
     "reports": "Laporan",
     "cashier": "Cashier",
     "adjustments": "Pelarasan",
-    "menu": "Menu"
+    "menu": "Menu",
+    "admin": "Admin"
   },
   "intake": {
     "placeholder": "Tampal mesej di sini…",
