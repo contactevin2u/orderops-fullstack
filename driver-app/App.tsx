@@ -19,9 +19,14 @@ export default function App() {
   const [error, setError] = useState<Status>(null);
 
   const checkHealth = useCallback(async () => {
+    async function ping(path: string) {
+      const r = await fetch(`${API_BASE}${path}`, { method: 'GET' });
+      return `${r.status} ${r.statusText}`;
+    }
     try {
-      const r = await fetch(`${API_BASE}/health`, { method: 'GET' });
-      setHealth(`${r.status} ${r.statusText}`);
+      let status = await ping('/healthz');
+      if (status.startsWith('404')) status = await ping('/health');
+      setHealth(status);
     } catch (e: any) {
       setHealth(`Network error: ${e?.message ?? String(e)}`);
     }
