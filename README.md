@@ -5,8 +5,23 @@ This repository contains a FastAPI backend and a Next.js frontend. The CI workfl
 ## Authentication
 
 All application pages now require authentication and unauthenticated users are redirected to `/login`.
+
 On first run when no users exist, visit `/register` to create an administrator account.
 Signed-in administrators can create additional users as needed.
+
+
+
+On first run when no users exist, visit `/register` to create an administrator account.
+Signed-in administrators can create additional users as needed.
+
+Upon running the migration adding user support, a default administrator account is created:
+
+- username: `admin`
+- password: `admin123`
+
+Use these credentials to sign in initially and create additional users as needed.
+
+
 
 ## Running checks locally
 
