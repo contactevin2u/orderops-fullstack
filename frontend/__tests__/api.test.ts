@@ -1,4 +1,4 @@
-import { listOrders, getOrder } from '@/utils/api';
+import { listOrders, getOrder, listDrivers, assignOrderToDriver } from '@/utils/api';
 
 // Use Vitest's vi to mock fetch
 
@@ -29,5 +29,34 @@ describe('api request unwrapping', () => {
 
     const result = await getOrder(123);
     expect(result).toEqual(order);
+  });
+
+  it('lists drivers', async () => {
+    const drivers = [{ id: 'd1', name: 'Driver One' }];
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(drivers),
+      headers: { get: () => 'application/json' },
+    });
+
+    const result = await listDrivers();
+    expect(result).toEqual(drivers);
+  });
+
+  it('posts assignment payload', async () => {
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({}),
+      headers: { get: () => 'application/json' },
+    });
+
+    await assignOrderToDriver(1, 'd1');
+    expect((global as any).fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/orders/1/assign'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ driver_id: 'd1' }),
+      }),
+    );
   });
 });

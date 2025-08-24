@@ -3,6 +3,8 @@ import { ScrollView, View, Text, Platform, Pressable } from 'react-native';
 import Constants from 'expo-constants';
 import messaging from '@react-native-firebase/messaging';
 import auth from '@react-native-firebase/auth';
+import OrderItem from './src/components/OrderItem';
+import { useOrderStore } from './src/stores/orderStore';
 
 type Status = string | null;
 
@@ -17,6 +19,8 @@ export default function App() {
   const [fcm, setFcm] = useState<Status>(null);
   const [registerStatus, setRegisterStatus] = useState<Status>(null);
   const [error, setError] = useState<Status>(null);
+  const orders = useOrderStore((s) => s.orders);
+  const setOrders = useOrderStore((s) => s.setOrders);
 
   const checkHealth = useCallback(async () => {
     async function ping(path: string) {
@@ -31,6 +35,23 @@ export default function App() {
       setHealth(`Network error: ${e?.message ?? String(e)}`);
     }
   }, []);
+  const fetchOrders = useCallback(
+    async (token: string) => {
+      try {
+        const r = await fetch(`${API_BASE}/drivers/orders`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (r.ok) {
+          const data = await r.json();
+          setOrders(data?.data ?? data);
+        }
+      } catch (e) {
+        // ignore fetch errors for now
+      }
+    },
+    [setOrders]
+  );
 
   const bootstrap = useCallback(async () => {
     setError(null);
@@ -62,10 +83,13 @@ export default function App() {
         body: JSON.stringify({ fcm_token: token, platform: Platform.OS }),
       });
       setRegisterStatus(res.ok ? 'OK' : `Failed: ${res.status}`);
+
+      // 6) Fetch assigned orders
+      if (res.ok) await fetchOrders(idt);
     } catch (e: any) {
       setError(e?.message ?? String(e));
     }
-  }, []);
+  }, [fetchOrders]);
 
   useEffect(() => {
     // optional foreground handler
@@ -91,6 +115,12 @@ export default function App() {
       <Btn text="Retry Health" onPress={checkHealth} />
       <View style={{ height: 8 }} />
       <Btn text="Re-run Auth + Register" onPress={bootstrap} />
+      <View style={{ height: 24 }} />
+      <Text style={styles.subtitle}>Assigned Orders</Text>
+      {orders.length === 0 && <Text>No orders assigned.</Text>}
+      {orders.map((o) => (
+        <OrderItem key={o.id} order={o} />
+      ))}
     </ScrollView>
   );
 }
@@ -115,6 +145,7 @@ function Btn({ text, onPress }: { text: string; onPress: () => void }) {
 const styles = {
   container: { flexGrow: 1 as const, padding: 16, justifyContent: 'center' as const, backgroundColor: '#fff' },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center' as const, marginBottom: 16 },
+  subtitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
   row: { marginVertical: 6 },
   label: { fontSize: 12, color: '#555', marginBottom: 2 },
   value: { fontSize: 14 },

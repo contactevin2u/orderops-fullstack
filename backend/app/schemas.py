@@ -130,3 +130,16 @@ class OrderOut(BaseModel):
 class DeviceRegisterIn(BaseModel):
     fcm_token: str
     platform: str
+
+
+class DriverOut(BaseModel):
+    id: int
+    name: str | None = None
+    phone: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
+class AssignDriverIn(BaseModel):
+    driver_id: int

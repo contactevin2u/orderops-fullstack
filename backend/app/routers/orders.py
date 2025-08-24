@@ -6,10 +6,20 @@ from decimal import Decimal
 from datetime import datetime, date
 
 from ..db import get_session
-from ..models import Order, OrderItem, Plan, Customer, IdempotentRequest, Role, User
+from ..models import (
+    Order,
+    OrderItem,
+    Plan,
+    Customer,
+    IdempotentRequest,
+    Role,
+    User,
+    Driver,
+    Trip,
+)
 from ..auth.deps import require_roles
 from ..utils.audit import log_action
-from ..schemas import OrderOut
+from ..schemas import OrderOut, AssignDriverIn
 from ..services.ordersvc import create_order_from_parsed
 from ..services.plan_math import calculate_plan_due
 from ..services.status_updates import (
@@ -271,6 +281,32 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
     db.commit()
     db.refresh(order)
     return envelope(OrderOut.model_validate(order))
+
+
+@router.post("/{order_id}/assign", response_model=dict)
+def assign_order(
+    order_id: int,
+    body: AssignDriverIn,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
+):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    driver = db.get(Driver, body.driver_id)
+    if not driver:
+        raise HTTPException(404, "Driver not found")
+    trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
+    if trip:
+        trip.driver_id = driver.id
+        trip.status = "ASSIGNED"
+    else:
+        trip = Trip(order_id=order.id, driver_id=driver.id, status="ASSIGNED")
+        db.add(trip)
+    db.commit()
+    db.refresh(trip)
+    log_action(db, current_user, "order.assign_driver", f"order_id={order.id},driver_id={driver.id}")
+    return envelope({"order_id": order.id, "driver_id": driver.id, "trip_id": trip.id})
 
 
 @router.post("/{order_id}/void", response_model=dict)

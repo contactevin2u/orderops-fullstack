@@ -5,10 +5,15 @@ from sqlalchemy.orm import Session
 
 from ..auth.firebase import driver_auth
 from ..db import get_session
-from ..models import DriverDevice
-from ..schemas import DeviceRegisterIn
+from ..models import Driver, DriverDevice
+from ..schemas import DeviceRegisterIn, DriverOut
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
+
+
+@router.get("", response_model=list[DriverOut])
+def list_drivers(db: Session = Depends(get_session)):
+    return db.query(Driver).filter(Driver.is_active == True).all()
 
 
 @router.post("/devices/register")

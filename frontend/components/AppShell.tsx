@@ -36,8 +36,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   const visible = nav.filter((n) => !n.roles || n.roles.includes(user?.role));
 
-  if (!user) return null;
-
   React.useEffect(() => {
     if (mobileOpen) {
       const first = menuRef.current?.querySelector<HTMLElement>('a,button');
@@ -66,6 +64,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [mobileOpen]);
+
+  if (!user) return null;
 
   return (
     <div className="layout">
