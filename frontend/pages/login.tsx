@@ -2,6 +2,10 @@ import React from 'react';
 
 import Link from 'next/link';
 
+
+import Link from 'next/link';
+
+
 import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
@@ -55,12 +59,18 @@ export default function LoginPage() {
         </button>
 
         <p style={{ textAlign: 'center' }}>
+
+          <Link href="/register">
+            {t('login.register', { defaultValue: 'Create an account' })}
+          </Link>
+
           <Link href="/register">{t('login.register', { defaultValue: 'Create an account' })}</Link>
         </p>
 
 
         <p style={{ textAlign: 'center' }}>
           <a href="/register">{t('login.register', { defaultValue: 'Create an account' })}</a>
+
         </p>
 
 
