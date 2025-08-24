@@ -1,6 +1,7 @@
 import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
 import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue } from "@/utils/api";
@@ -375,7 +376,17 @@ export default function OrderDetailPage(){
               <button className="btn secondary" onClick={copyInvoice}>{t('documents.share')}</button>
             </div>
             <div className="card" style={{marginTop:8}}>
-              {profile.logo_url ? <img src={profile.logo_url} alt="logo" style={{maxHeight:40}}/> : <div>{t('documents.noLogo')}</div>}
+              {profile.logo_url ? (
+                <Image
+                  src={profile.logo_url}
+                  alt="logo"
+                  width={160}
+                  height={40}
+                  style={{ maxHeight: 40, width: 'auto' }}
+                />
+              ) : (
+                <div>{t('documents.noLogo')}</div>
+              )}
               <p>{profile.address || t('documents.noAddress')}</p>
               <p>{profile.tax_label ? `${profile.tax_label} ${profile.tax_percent || ''}%` : t('documents.noTax')}</p>
               <p>{profile.bank_account || t('documents.noBank')}</p>
