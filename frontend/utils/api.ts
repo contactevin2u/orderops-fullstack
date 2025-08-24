@@ -261,3 +261,12 @@ export function invoicePdfUrl(orderId: number) {
   const base = API_BASE;
   return `${base}/documents/invoice/${orderId}.pdf`;
 }
+
+// -------- Drivers
+export function listDrivers() {
+  return request<any[]>("/drivers");
+}
+
+export function assignOrderToDriver(orderId: number | string, driverId: string) {
+  return request(`/orders/${orderId}/assign`, { json: { driver_id: driverId } });
+}
