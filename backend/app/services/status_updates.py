@@ -160,6 +160,8 @@ def apply_buyback(
     discount: dict | None = None,
     method: str | None = None,
     reference: str | None = None,
+    payment_date: date | None = None,
+    return_date: datetime | None = None,
 ) -> Order:
     """Apply a buyback amount to an order and generate an adjustment.
 
@@ -190,6 +192,8 @@ def apply_buyback(
 
     line_amt = amt - disc_amt
     order.status = "RETURNED"
+    # timestamp the buyback event
+    order.returned_at = return_date or datetime.utcnow()
     if getattr(order, "plan", None):
         order.plan.status = "CANCELLED"
     lines = [
@@ -207,7 +211,7 @@ def apply_buyback(
     p = Payment(
         order_id=order.id,
         amount=-line_amt,
-        date=date.today(),
+        date=payment_date or date.today(),
         category="BUYBACK",
         method=method,
         reference=reference,
