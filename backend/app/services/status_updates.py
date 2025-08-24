@@ -176,10 +176,17 @@ def apply_buyback(
     if discount:
         dtype = discount.get("type")
         dval = Decimal(str(discount.get("value", 0)))
+        if dval < 0:
+            raise ValueError("Invalid discount value")
         if dtype == "percent":
+            dval = min(max(dval, Decimal("0")), Decimal("100"))
             disc_amt = (amt * dval / Decimal("100")).quantize(Decimal("0.01"))
         elif dtype == "fixed":
+            if dval > amt:
+                raise ValueError("Discount exceeds buyback amount")
             disc_amt = dval
+        else:
+            raise ValueError("Invalid discount type")
 
     line_amt = amt - disc_amt
     order.status = "RETURNED"
