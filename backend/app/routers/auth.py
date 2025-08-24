@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..models import User, Role, AuditLog
+
+from ..core.security import verify_password, create_access_token, hash_password
+
 from ..core.security import verify_password, create_access_token
+
 from ..auth.deps import get_current_user
 from ..core.config import settings
 
@@ -18,6 +22,15 @@ class LoginIn(BaseModel):
     username: str
     password: str
     remember: bool | None = False
+
+
+
+class RegisterIn(BaseModel):
+    username: str
+    password: str
+    role: Role | None = None
+
+
 
 
 @router.post("/login")
@@ -39,6 +52,40 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
     db.add(AuditLog(user_id=user.id, action="login"))
     db.commit()
     return {"id": user.id, "username": user.username, "role": user.role.value}
+
+
+
+@router.post("/register")
+def register(
+    payload: RegisterIn,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+):
+    try:
+        count = db.query(User).count()
+    except Exception:  # pragma: no cover - tables may not exist yet
+        User.__table__.create(bind=db.get_bind(), checkfirst=True)
+        AuditLog.__table__.create(bind=db.get_bind(), checkfirst=True)
+        count = 0
+    if count > 0 and current_user.role != Role.ADMIN:
+        raise HTTPException(403, "Forbidden")
+    role = payload.role or (Role.ADMIN if count == 0 else Role.CASHIER)
+    user = User(
+        username=payload.username,
+        password_hash=hash_password(payload.password),
+        role=role,
+    )
+    db.add(user)
+    db.add(
+        AuditLog(
+            user_id=None if count == 0 else current_user.id,
+            action="create_user",
+            details=payload.username,
+        )
+    )
+    db.commit()
+    return {"id": user.id, "username": user.username, "role": user.role.value}
+
 
 
 @router.post("/logout")
