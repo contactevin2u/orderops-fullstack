@@ -1,6 +1,8 @@
 from decimal import Decimal
 
-from app.models import Order, Plan
+from datetime import date
+
+from app.models import Order, Plan, Payment
 from app.routers.orders import get_order_due
 
 
@@ -28,6 +30,14 @@ def test_get_order_due_for_outright_order():
         paid_amount=Decimal("40.00"),
         balance=Decimal("65.00"),
     )
+    order.payments = [
+        Payment(
+            order_id=1,
+            amount=Decimal("40.00"),
+            date=date.today(),
+            status="POSTED",
+        )
+    ]
     db = DummySession(order)
     resp = get_order_due(order_id=1, db=db)
     data = resp["data"]
@@ -60,3 +70,52 @@ def test_get_order_due_cancelled_order():
     assert data["expected"] == 10.0
     assert data["paid"] == 0.0
     assert data["balance"] == 10.0
+
+
+def test_get_order_due_returned_with_refund():
+    order = Order(
+        id=1,
+        code="ORD3",
+        type="OUTRIGHT",
+        status="RETURNED",
+        customer_id=1,
+        subtotal=Decimal("100.00"),
+        discount=Decimal("0.00"),
+        delivery_fee=Decimal("0.00"),
+        return_delivery_fee=Decimal("0.00"),
+        penalty_fee=Decimal("0.00"),
+        total=Decimal("100.00"),
+        paid_amount=Decimal("0.00"),
+        balance=Decimal("0.00"),
+    )
+    order.payments = [
+        Payment(
+            order_id=1,
+            amount=Decimal("-100.00"),
+            date=date.today(),
+            status="POSTED",
+        )
+    ]
+    adj = Order(
+        id=2,
+        code="ORD3-I",
+        type="OUTRIGHT",
+        status="RETURNED",
+        customer_id=1,
+        subtotal=Decimal("-100.00"),
+        discount=Decimal("0.00"),
+        delivery_fee=Decimal("0.00"),
+        return_delivery_fee=Decimal("0.00"),
+        penalty_fee=Decimal("0.00"),
+        total=Decimal("-100.00"),
+        paid_amount=Decimal("0.00"),
+        balance=Decimal("0.00"),
+    )
+    adj.payments = []
+    order.adjustments = [adj]
+    db = DummySession(order)
+    resp = get_order_due(order_id=1, db=db)
+    data = resp["data"]
+    assert data["expected"] == -100.0
+    assert data["paid"] == -100.0
+    assert data["balance"] == 0.0
