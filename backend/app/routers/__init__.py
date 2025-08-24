@@ -1,2 +1,2 @@
 from . import health, parse, orders, payments, export, documents, queue
-from . import reports, drivers
+from . import reports, drivers, auth
