@@ -32,9 +32,7 @@ def upgrade() -> None:
         sa.Column('created_at', sa.DateTime(), server_default=sa.func.now(), nullable=False),
     )
 
-
 def downgrade() -> None:
     op.drop_table('audit_logs')
     op.drop_index('ix_users_username', table_name='users')
     op.drop_table('users')
-
