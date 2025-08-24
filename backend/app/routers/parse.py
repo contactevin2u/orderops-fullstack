@@ -10,6 +10,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import get_session
+from ..models import Role
+from ..auth.deps import require_roles
 # IMPORTANT: the real parser lives in services/parser.py as `parse_whatsapp_text`.
 # To avoid another mismatch, we alias it as parse_text here.
 from ..services.parser import parse_whatsapp_text as parse_text
@@ -19,7 +21,11 @@ from ..utils.normalize import ensure_dict, ensure_list, to_decimal
 from ..models.order import Order
 from ..utils.responses import envelope
 
-router = APIRouter(prefix="/parse", tags=["parse"])
+router = APIRouter(
+    prefix="/parse",
+    tags=["parse"],
+    dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
+)
 
 
 class ParseIn(BaseModel):

@@ -6,7 +6,9 @@ from decimal import Decimal
 from datetime import datetime, date
 
 from ..db import get_session
-from ..models import Order, OrderItem, Plan, Customer, IdempotentRequest
+from ..models import Order, OrderItem, Plan, Customer, IdempotentRequest, Role, User
+from ..auth.deps import require_roles
+from ..utils.audit import log_action
 from ..schemas import OrderOut
 from ..services.ordersvc import create_order_from_parsed
 from ..services.plan_math import calculate_plan_due
@@ -19,7 +21,11 @@ from ..services.status_updates import (
 )
 from ..utils.responses import envelope
 
-router = APIRouter(prefix="/orders", tags=["orders"])
+router = APIRouter(
+    prefix="/orders",
+    tags=["orders"],
+    dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
+)
 
 class OrderListOut(OrderOut):
     customer_name: str
@@ -97,6 +103,7 @@ def create_order(
     body: ManualOrderIn,
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
 ):
     try:
         if idempotency_key:
@@ -108,6 +115,7 @@ def create_order(
             order.idempotency_key = idempotency_key
         db.commit()
         db.refresh(order)
+        log_action(db, current_user, "order.create", f"order_id={order.id}")
         return envelope(OrderOut.model_validate(order))
     except Exception as e:
         db.rollback()

@@ -9,6 +9,8 @@ from .idempotent_request import IdempotentRequest
 from .driver import Driver, DriverDevice
 from .trip import Trip, TripEvent
 from .commission import Commission
+from .user import User, Role
+from .audit_log import AuditLog
 
 __all__ = [
     "Base",
@@ -24,4 +26,7 @@ __all__ = [
     "Trip",
     "TripEvent",
     "Commission",
+    "User",
+    "Role",
+    "AuditLog",
 ]
