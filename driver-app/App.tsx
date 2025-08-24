@@ -1,4 +1,3 @@
-// driver-app/App.tsx
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, Text, Platform, Pressable } from 'react-native';
 import Constants from 'expo-constants';
@@ -28,30 +27,24 @@ export default function App() {
     }
   }, []);
 
-  const bootstrapAuthAndRegister = useCallback(async () => {
+  const bootstrap = useCallback(async () => {
     setError(null);
     try {
-      // 1) Firebase auth (anonymous for now — works without SHA)
-      if (!auth().currentUser) {
-        await auth().signInAnonymously();
-      }
+      // 1) Firebase auth (anonymous = no SHA fingerprints required)
+      if (!auth().currentUser) await auth().signInAnonymously();
       const user = auth().currentUser!;
       setUid(user.uid);
 
-      // 2) Ensure notif permission (Android 13+ / iOS)
-      try {
-        await messaging().requestPermission();
-      } catch {
-        // Non-fatal; continue (user can still get token)
-      }
+      // 2) Notifications permission (Android 13+ / iOS)
+      try { await messaging().requestPermission(); } catch {}
 
-      // 3) FCM token
+      // 3) Get FCM token
       const token = await messaging().getToken();
       setFcm(token);
 
-      // 4) ID token for backend auth
-      const tokenId = await user.getIdToken(true);
-      setIdToken(tokenId);
+      // 4) Get ID token to authenticate with your backend
+      const idt = await user.getIdToken(true);
+      setIdToken(idt);
 
       // 5) Register device with backend
       setRegisterStatus('registering…');
@@ -59,12 +52,9 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${tokenId}`,
+          Authorization: `Bearer ${idt}`,
         },
-        body: JSON.stringify({
-          fcm_token: token,
-          platform: Platform.OS,
-        }),
+        body: JSON.stringify({ fcm_token: token, platform: Platform.OS }),
       });
       setRegisterStatus(res.ok ? 'OK' : `Failed: ${res.status}`);
     } catch (e: any) {
@@ -73,18 +63,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // Foreground message handler (optional)
-    const sub = messaging().onMessage(async _msg => {
-      // Handle in-app push if you want
-    });
+    // optional foreground handler
+    const sub = messaging().onMessage(async () => {});
     return sub;
   }, []);
 
-  useEffect(() => {
-    // Kick off on first render
-    checkHealth();
-    bootstrapAuthAndRegister();
-  }, [checkHealth, bootstrapAuthAndRegister]);
+  useEffect(() => { checkHealth(); bootstrap(); }, [checkHealth, bootstrap]);
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -98,72 +82,38 @@ export default function App() {
       <Row label="Register" value={registerStatus ?? '…'} />
       {error && <Text style={styles.error}>Error: {error}</Text>}
 
-      <View style={{ height: 16 }} />
-
-      <Button text="Retry Health" onPress={checkHealth} />
+      <View style={{ height: 12 }} />
+      <Btn text="Retry Health" onPress={checkHealth} />
       <View style={{ height: 8 }} />
-      <Button text="Re-run Auth + Register" onPress={bootstrapAuthAndRegister} />
-
-      <View style={{ height: 24 }} />
-      <Text style={styles.small}>
-        Tip: For background/quit notifications, create driver-app/index.js with
-        {' '}
-        <Text style={{ fontFamily: 'monospace' }}>
-          messaging().setBackgroundMessageHandler(...)
-        </Text>
-        {' '}and set{" "}
-        <Text style={{ fontFamily: 'monospace' }}>"main": "index.js"</Text> in
-        package.json. Our CI bundles JS into the APK, so no Metro is required.
-      </Text>
+      <Btn text="Re-run Auth + Register" onPress={bootstrap} />
     </ScrollView>
   );
 }
 
 /* ---------- helpers & styles ---------- */
-
-function tail(s: string, n: number = 12) {
-  return s.length <= n ? s : `…${s.slice(-n)}`;
-}
-
+function tail(s: string, n = 12) { return s.length <= n ? s : `…${s.slice(-n)}`; }
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.row}>
       <Text style={styles.label}>{label}</Text>
-      <Text selectable style={styles.value}>
-        {value}
-      </Text>
+      <Text selectable style={styles.value}>{value}</Text>
     </View>
   );
 }
-
-function Button({ text, onPress }: { text: string; onPress: () => void }) {
+function Btn({ text, onPress }: { text: string; onPress: () => void }) {
   return (
     <Pressable onPress={onPress} style={styles.button}>
       <Text style={styles.buttonText}>{text}</Text>
     </Pressable>
   );
 }
-
 const styles = {
-  container: {
-    flexGrow: 1 as const,
-    padding: 16,
-    alignItems: 'stretch' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: '#fff',
-  },
+  container: { flexGrow: 1 as const, padding: 16, justifyContent: 'center' as const, backgroundColor: '#fff' },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center' as const, marginBottom: 16 },
   row: { marginVertical: 6 },
   label: { fontSize: 12, color: '#555', marginBottom: 2 },
   value: { fontSize: 14 },
   error: { marginTop: 12, color: '#b00020' },
-  button: {
-    backgroundColor: '#111827',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    alignItems: 'center' as const,
-  },
+  button: { backgroundColor: '#111827', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center' as const },
   buttonText: { color: '#fff', fontWeight: '600' as const },
-  small: { fontSize: 12, color: '#666', textAlign: 'center' as const },
 };
