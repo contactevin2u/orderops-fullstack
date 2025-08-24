@@ -103,6 +103,20 @@ def _rental_order():
     return order
 
 
+def _installment_order():
+    order = _sample_order()
+    order.type = "INSTALLMENT"
+    order.items[0].item_type = "INSTALLMENT"
+    order.plan = Plan(
+        order_id=0,
+        plan_type="INSTALLMENT",
+        months=Decimal("12"),
+        monthly_amount=Decimal("100"),
+        status="ACTIVE",
+    )
+    return order
+
+
 def test_mark_returned_creates_adjustment():
     db = DummySession()
     order = _sample_order()
@@ -147,7 +161,7 @@ def test_mark_returned_collects_fee_payment():
 
 def test_cancel_installment_collects_both_payments():
     db = DummySession()
-    order = _sample_order()
+    order = _installment_order()
     cancel_installment(
         db,
         order,
@@ -168,7 +182,7 @@ def test_cancel_installment_collects_both_payments():
 
 def test_cancel_installment_leaves_charges_when_uncollected():
     db = DummySession()
-    order = _sample_order()
+    order = _installment_order()
     cancel_installment(
         db,
         order,
