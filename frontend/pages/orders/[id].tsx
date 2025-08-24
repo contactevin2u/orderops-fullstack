@@ -38,6 +38,7 @@ export default function OrderDetailPage(){
   const [planMonthly,setPlanMonthly] = React.useState<string>("");
 
   const [items,setItems] = React.useState<any[]>([]);
+  const [removedIds, setRemovedIds] = React.useState<number[]>([]);
 
   const [buybackAmt,setBuybackAmt] = React.useState<string>("");
   const [buybackDiscType,setBuybackDiscType] = React.useState<string>("");
@@ -92,11 +93,21 @@ export default function OrderDetailPage(){
     setItems(copy);
   }
 
+  function addItem(){
+    setItems([...items, { name:"", item_type:"OUTRIGHT", qty:1, unit_price:"", monthly_amount:"" }]);
+  }
+
+  function removeItem(idx:number){
+    const item = items[idx];
+    if(item?.id) setRemovedIds([...removedIds, item.id]);
+    setItems(items.filter((_,i)=>i!==idx));
+  }
+
   async function saveItems(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const patchItems = items.map((it:any)=>({
-        id: it.id,
+        ...(it.id ? { id: it.id } : {}),
         name: it.name,
         item_type: it.item_type,
         qty: Number(it.qty||0),
@@ -104,10 +115,13 @@ export default function OrderDetailPage(){
         line_total: Number(it.unit_price||0) * Number(it.qty||0),
         ...(it.monthly_amount ? { monthly_amount: Number(it.monthly_amount||0) } : {}),
       }));
-      const out = await updateOrder(order.id, { items: patchItems });
+      const payload:any = { items: patchItems };
+      if(removedIds.length) payload.delete_items = removedIds;
+      const out = await updateOrder(order.id, payload);
       setMsg("Items updated");
       setOrder(out);
       setItems(out?.items ? out.items.map((it:any)=>({ ...it, qty: String(it.qty), monthly_amount: it.monthly_amount ? String(it.monthly_amount) : "" })) : []);
+      setRemovedIds([]);
       await loadDue(order.id, asOf);
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
@@ -221,7 +235,7 @@ export default function OrderDetailPage(){
               <h3>Items</h3>
               <div style={{overflowX:"auto"}}>
                 <table className="table">
-                  <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Monthly</th><th>Line Total</th></tr></thead>
+                  <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Monthly</th><th>Line Total</th><th></th></tr></thead>
                   <tbody>
                     {items.map((it:any,idx:number)=>(
                       <tr key={it.id || idx}>
@@ -238,9 +252,11 @@ export default function OrderDetailPage(){
                         <td><input className="input" value={it.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} /></td>
                         <td><input className="input" value={it.monthly_amount} onChange={e=>updateItem(idx,'monthly_amount',e.target.value)} /></td>
                         <td>RM {(Number(it.unit_price||0)*Number(it.qty||0)).toFixed(2)}</td>
+                        <td><button className="btn secondary" onClick={()=>removeItem(idx)}>Remove</button></td>
                       </tr>
                     ))}
-                    {items.length===0 && <tr><td colSpan={6} style={{opacity:.7}}>No items</td></tr>}
+                    {items.length===0 && <tr><td colSpan={7} style={{opacity:.7}}>No items</td></tr>}
+                    <tr><td colSpan={7}><button className="btn secondary" onClick={addItem}>Add Item</button></td></tr>
                   </tbody>
                 </table>
               </div>
