@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..models import User, Role, AuditLog
+
 from ..core.security import verify_password, create_access_token, hash_password
+
+from ..core.security import verify_password, create_access_token
+
 from ..auth.deps import get_current_user
 from ..core.config import settings
 
@@ -20,10 +24,13 @@ class LoginIn(BaseModel):
     remember: bool | None = False
 
 
+
 class RegisterIn(BaseModel):
     username: str
     password: str
     role: Role | None = None
+
+
 
 
 @router.post("/login")
@@ -45,6 +52,7 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
     db.add(AuditLog(user_id=user.id, action="login"))
     db.commit()
     return {"id": user.id, "username": user.username, "role": user.role.value}
+
 
 
 @router.post("/register")
@@ -77,6 +85,7 @@ def register(
     )
     db.commit()
     return {"id": user.id, "username": user.username, "role": user.role.value}
+
 
 
 @router.post("/logout")

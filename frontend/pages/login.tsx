@@ -50,9 +50,12 @@ export default function LoginPage() {
         <button className="button" type="submit">
           {t('login.submit', { defaultValue: 'Login' })}
         </button>
+
         <p style={{ textAlign: 'center' }}>
           <a href="/register">{t('login.register', { defaultValue: 'Create an account' })}</a>
         </p>
+
+
       </form>
     </div>
   );
