@@ -164,20 +164,32 @@ def parse_whatsapp_text(text: str) -> Dict[str, Any]:
         raise RuntimeError("OPENAI_API_KEY is not configured")
 
     client = _openai_client()
-    resp = client.chat.completions.create(
+    resp = client.responses.parse(
         model="gpt-4o-mini",
-        response_format={
-            "type": "json_schema",
-            "json_schema": {"name": "order", "schema": SCHEMA, "strict": True},
-        },
-        messages=[
+        input=[
             {"role": "system", "content": SYSTEM},
             {"role": "user", "content": text},
         ],
+        text={
+            "format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "order",
+                    "schema": SCHEMA,
+                    "strict": True,
+                },
+            }
+        },
     )
-    msg = resp.choices[0].message
-    raw = getattr(msg, "content", None) or getattr(msg, "parsed", "{}")
-    if isinstance(raw, dict):
-        return raw
-    return json.loads(raw or "{}")
+    parsed = resp.output_parsed
+    if isinstance(parsed, dict):
+        return parsed
+
+    raw = resp.output_text
+    if not raw and isinstance(parsed, str):
+        raw = parsed
+    try:
+        return json.loads(raw or "{}")
+    except Exception:
+        return {}
 
