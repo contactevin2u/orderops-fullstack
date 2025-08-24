@@ -136,15 +136,36 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
         raise HTTPException(404, "Order not found")
 
     as_of = as_of or date.today()
-    paid = order.paid_amount or Decimal("0.00")
+
+    def _sum_payments(o: Order) -> Decimal:
+        return sum(
+            (
+                p.amount
+                for p in getattr(o, "payments", [])
+                if p.status == "POSTED" and p.date <= as_of
+            ),
+            Decimal("0.00"),
+        )
+
+    paid = _sum_payments(order)
+
     fees = (
         (order.delivery_fee or Decimal("0.00"))
         + (order.return_delivery_fee or Decimal("0.00"))
         + (order.penalty_fee or Decimal("0.00"))
     )
-    if order.status in {"CANCELLED", "RETURNED"} or (
-        order.plan and order.plan.status != "ACTIVE"
-    ):
+
+    child_total = Decimal("0.00")
+    if order.status in {"CANCELLED", "RETURNED"}:
+        child_total = sum(
+            (adj.total or Decimal("0.00")) for adj in getattr(order, "adjustments", [])
+        )
+        for adj in getattr(order, "adjustments", []):
+            paid += _sum_payments(adj)
+
+    if order.status in {"CANCELLED", "RETURNED"}:
+        expected = fees + child_total
+    elif order.plan and order.plan.status != "ACTIVE":
         expected = fees
     elif order.type in ("INSTALLMENT", "RENTAL") and order.plan:
         expected = calculate_plan_due(order.plan, as_of) + fees
@@ -153,11 +174,13 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
 
     balance = (expected - paid).quantize(Decimal("0.01"))
 
-    return envelope({
-        "expected": float(expected),
-        "paid": float(paid),
-        "balance": float(balance),
-    })
+    return envelope(
+        {
+            "expected": float(expected),
+            "paid": float(paid),
+            "balance": float(balance),
+        }
+    )
 
 
 @router.patch("/{order_id}", response_model=dict)
