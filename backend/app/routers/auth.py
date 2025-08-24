@@ -9,7 +9,11 @@ from ..models import User, Role, AuditLog
 
 from ..core.security import verify_password, create_access_token, hash_password
 
+
+from ..core.security import verify_password, create_access_token, hash_password
+
 from ..core.security import verify_password, create_access_token
+
 
 from ..auth.deps import get_current_user
 from ..core.config import settings
@@ -29,7 +33,6 @@ class RegisterIn(BaseModel):
     username: str
     password: str
     role: Role | None = None
-
 
 
 
