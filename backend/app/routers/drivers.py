@@ -1,12 +1,13 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth.firebase import driver_auth
 from ..db import get_session
-from ..models import Driver, DriverDevice
-from ..schemas import DeviceRegisterIn, DriverOut
+from ..models import Driver, DriverDevice, Trip, Order
+from ..schemas import DeviceRegisterIn, DriverOut, DriverOrderOut
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -42,3 +43,21 @@ def register_device(
     device.last_seen_at = datetime.now(timezone.utc)
     db.commit()
     return {"status": "ok"}
+
+
+@router.get("/orders", response_model=list[DriverOrderOut])
+def list_assigned_orders(
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    stmt = (
+        select(Trip, Order)
+        .join(Order, Trip.order_id == Order.id)
+        .where(Trip.driver_id == driver.id)
+        .where(Trip.status == "ASSIGNED")
+    )
+    rows = db.execute(stmt).all()
+    return [
+        {"id": order.id, "description": order.code, "status": trip.status}
+        for trip, order in rows
+    ]

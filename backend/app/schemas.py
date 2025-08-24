@@ -141,5 +141,11 @@ class DriverOut(BaseModel):
         from_attributes = True
 
 
+class DriverOrderOut(BaseModel):
+    id: int
+    description: str
+    status: str
+
+
 class AssignDriverIn(BaseModel):
     driver_id: int
