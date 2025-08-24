@@ -9,6 +9,8 @@ const inter = Inter({ subsets: ['latin'] });
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
+  const noLayout = ['/login', '/register'];
+
 
   const noLayout = ['/login', '/register'];
 
