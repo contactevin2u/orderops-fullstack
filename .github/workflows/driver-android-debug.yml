@@ -87,7 +87,7 @@ jobs:
           path: driver-app/prebuild.log
           if-no-files-found: ignore
 
-      # Fallback: guarantee splash color exists so AAPT can't fail
+      # Prevent AAPT color error (belt & suspenders)
       - name: Ensure splash color exists
         working-directory: driver-app
         run: |
@@ -100,22 +100,23 @@ jobs:
             echo "splashscreen_background already present"
           fi
 
-      # >>> KEY FIX: bundle JS into the Debug APK so it runs without Metro <<<
-      - name: Force JS bundling in Debug
+      # >>> KEY FIX: make Debug APK self-contained (no Metro needed)
+      - name: Create JS bundle for Debug (offline)
         working-directory: driver-app
         run: |
-          ENTRY="App.tsx"; [ -f index.js ] && ENTRY="index.js"
-          {
-            echo "";
-            echo "// === Added by CI to run debug APK standalone ===";
-            echo "project.ext.react = [";
-            echo "  entryFile: \"$ENTRY\",";
-            echo "  bundleInDebug: true,";
-            echo "]";
-          } >> android/app/build.gradle
-          echo "Applied bundleInDebug with entryFile=$ENTRY"
+          mkdir -p android/app/src/main/assets
+          ENTRY="index.js"; [ -f "$ENTRY" ] || ENTRY="App.tsx"
+          npx react-native -v || true
+          npx react-native bundle \
+            --platform android \
+            --dev false \
+            --entry-file "$ENTRY" \
+            --bundle-output android/app/src/main/assets/index.android.bundle \
+            --assets-dest android/app/src/main/res
+          test -f android/app/src/main/assets/index.android.bundle || (echo "::error::Bundle not created"; exit 1)
+          echo "Bundled JS from $ENTRY"
 
-      # Make sure google-services.json is copied into android/app
+      # Ensure google-services.json exists under android/app
       - name: Ensure google-services.json copied to android/app
         working-directory: driver-app
         run: |
@@ -125,13 +126,6 @@ jobs:
           else
             echo "google-services.json already in android/app/"
           fi
-
-      - name: Show generated Android identifiers
-        working-directory: driver-app
-        run: |
-          echo "== AndroidManifest package ==" && (grep -m1 'package=' android/app/src/main/AndroidManifest.xml || true)
-          echo "== app/build.gradle applicationId ==" && (grep -m1 'applicationId' android/app/build.gradle || true)
-          echo "== google-services.json in android/app ==" && (ls -l android/app/google-services.json || true)
 
       - name: Ensure gradlew exists
         id: gradle_check
