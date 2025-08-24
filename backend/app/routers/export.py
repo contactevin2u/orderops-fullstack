@@ -8,9 +8,14 @@ import uuid
 from pydantic import BaseModel
 
 from ..db import get_session
-from ..models import Payment, Order, Customer
+from ..models import Payment, Order, Customer, Role
+from ..auth.deps import require_roles
 
-router = APIRouter(prefix="/export", tags=["export"])
+router = APIRouter(
+    prefix="/export",
+    tags=["export"],
+    dependencies=[Depends(require_roles(Role.ADMIN))],
+)
 
 @router.get("/cash.xlsx")
 def cash_export(start: str, end: str, mark: bool = False, db: Session = Depends(get_session)):

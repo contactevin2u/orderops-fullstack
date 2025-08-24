@@ -1,10 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from ..db import get_session
-from ..models import Order, Payment
+from ..models import Order, Payment, Role
 from ..services.documents import invoice_pdf, receipt_pdf, installment_agreement_pdf
+from ..auth.deps import require_roles
 
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["documents"],
+    dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
+)
 
 @router.get("/invoice/{order_id}.pdf")
 def invoice(order_id: int, db: Session = Depends(get_session)):

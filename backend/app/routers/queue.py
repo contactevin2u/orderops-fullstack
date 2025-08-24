@@ -2,9 +2,14 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..db import get_session
-from ..models import Job
+from ..models import Job, Role
+from ..auth.deps import require_roles
 
-router = APIRouter(prefix="/queue", tags=["queue"])
+router = APIRouter(
+    prefix="/queue",
+    tags=["queue"],
+    dependencies=[Depends(require_roles(Role.ADMIN))],
+)
 
 class EnqueueParseCreate(BaseModel):
     text: str

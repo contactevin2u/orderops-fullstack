@@ -8,12 +8,18 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import Payment, Order, Trip
+from ..models import Payment, Order, Trip, Role, User
 from ..services.commission import maybe_actualize_commission
 from ..utils.normalize import to_decimal
 from ..services.status_updates import recompute_financials
+from ..auth.deps import require_roles
+from ..utils.audit import log_action
 
-router = APIRouter(prefix="/payments", tags=["payments"])
+router = APIRouter(
+    prefix="/payments",
+    tags=["payments"],
+    dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
+)
 
 class PaymentIn(BaseModel):
     order_id: int
@@ -28,6 +34,7 @@ def add_payment(
     body: PaymentIn,
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
 ):
     order = db.get(Order, body.order_id)
     if not order:
@@ -58,6 +65,7 @@ def add_payment(
         trips = db.query(Trip).filter_by(order_id=order.id, status="DELIVERED").all()
         for t in trips:
             maybe_actualize_commission(db, t.id)
+    log_action(db, current_user, "payment.add", f"payment_id={p.id}")
     return {"payment_id": p.id, "order_balance": float(order.balance)}
 
 class VoidIn(BaseModel):
