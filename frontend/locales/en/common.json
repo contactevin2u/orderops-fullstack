@@ -6,7 +6,8 @@
     "reports": "Reports",
     "cashier": "Cashier",
     "adjustments": "Adjustments",
-    "menu": "Menu"
+    "menu": "Menu",
+    "admin": "Admin"
   },
   "intake": {
     "placeholder": "Paste a message here…",

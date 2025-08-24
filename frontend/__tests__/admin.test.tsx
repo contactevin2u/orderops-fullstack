@@ -12,8 +12,8 @@ describe('AdminPanel', () => {
   it('renders form fields', async () => {
     render(<AdminPanel />);
     await waitFor(() => {
-      expect(screen.getByText('Order')).toBeTruthy();
-      expect(screen.getByText('Driver')).toBeTruthy();
+      expect(screen.getByLabelText('Order')).toBeTruthy();
+      expect(screen.getByLabelText('Driver')).toBeTruthy();
     });
   });
 });
