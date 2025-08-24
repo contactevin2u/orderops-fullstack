@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from .core.config import settings, cors_origins_list
+from .routers import auth as auth_router
 from .routers import health, parse, orders, payments, export, documents, queue, reports, drivers
 
 app = FastAPI(title="OrderOps Fullstack v1", default_response_class=ORJSONResponse)
@@ -16,6 +17,7 @@ app.add_middleware(
 )
 
 app.include_router(health.router)
+app.include_router(auth_router.router)
 app.include_router(parse.router)
 app.include_router(orders.router)
 app.include_router(payments.router)

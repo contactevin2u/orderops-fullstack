@@ -1,5 +1,4 @@
 import React from 'react';
-import AppShell from '@/components/AppShell';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { useTranslation } from 'react-i18next';
@@ -54,29 +53,27 @@ export default function IntakePage() {
   const toPost = normalizeParsedForOrder(parsed);
 
   return (
-    <AppShell>
-      <div className="stack container" style={{ maxWidth: '48rem' }}>
+    <div className="stack container" style={{ maxWidth: '48rem' }}>
+      <Card>
+        <textarea
+          className="textarea"
+          rows={10}
+          placeholder={t('intake.placeholder')}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+        />
+        <div className="row" style={{ justifyContent: 'flex-end' }}>
+          <Button disabled={busy || !text} onClick={onParse}>{t('intake.parse')}</Button>
+          <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>{t('intake.create')}</Button>
+        </div>
+        {err && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
+        {msg && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}
+      </Card>
+      {toPost && (
         <Card>
-          <textarea
-            className="textarea"
-            rows={10}
-            placeholder={t('intake.placeholder')}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <div className="row" style={{ justifyContent: 'flex-end' }}>
-            <Button disabled={busy || !text} onClick={onParse}>{t('intake.parse')}</Button>
-            <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>{t('intake.create')}</Button>
-          </div>
-          {err && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
-          {msg && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}
+          <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>{JSON.stringify(toPost, null, 2)}</pre>
         </Card>
-        {toPost && (
-          <Card>
-            <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>{JSON.stringify(toPost, null, 2)}</pre>
-          </Card>
-        )}
-      </div>
-    </AppShell>
+      )}
+    </div>
   );
 }

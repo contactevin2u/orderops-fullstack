@@ -1,4 +1,5 @@
 import json
+import json
 import os
 from typing import Any, Dict
 
@@ -9,7 +10,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import Driver
+from ..models import Driver, User, Role
+from ..core.security import hash_password
 
 firebase_app = None
 security = HTTPBearer()
@@ -51,5 +53,19 @@ def driver_auth(
         db.add(driver)
         db.commit()
         db.refresh(driver)
+    try:
+        user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+        if not user:
+            user = User(
+                username=firebase_uid,
+                password_hash=hash_password(firebase_uid),
+                role=Role.DRIVER,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        request.state.user = user
+    except Exception:  # pragma: no cover - user table may not exist
+        request.state.user = None
     request.state.driver = driver
     return driver
