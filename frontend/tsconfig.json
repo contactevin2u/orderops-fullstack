@@ -23,7 +23,7 @@
         "*"
       ]
     },
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "next-auth"]
   },
   "include": [
     "next-env.d.ts",
