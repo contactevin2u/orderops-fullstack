@@ -103,6 +103,16 @@ class PlanOut(BaseModel):
         from_attributes = True
 
 
+class TripOut(BaseModel):
+    id: int
+    driver_id: int
+    status: str
+    driver_name: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
 class OrderOut(BaseModel):
     id: int
     code: str
@@ -122,6 +132,7 @@ class OrderOut(BaseModel):
     items: List[OrderItemOut] = Field(default_factory=list)
     payments: List[PaymentOut] = Field(default_factory=list)
     plan: Optional[PlanOut] = None
+    trip: Optional[TripOut] = None
 
     class Config:
         from_attributes = True
