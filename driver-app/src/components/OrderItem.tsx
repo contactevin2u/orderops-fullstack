@@ -11,6 +11,12 @@ interface Props {
 
 export default function OrderItem({ order, token, apiBase, refresh }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const statusColors: Record<string, string> = {
+    ASSIGNED: '#2563eb',
+    IN_TRANSIT: '#16a34a',
+    ON_HOLD: '#dc2626',
+    DELIVERED: '#6b7280',
+  };
   const update = async (status: string) => {
     try {
       await fetch(`${apiBase}/drivers/orders/${order.id}`, {
@@ -30,7 +36,9 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
       <Pressable onPress={() => setExpanded((e) => !e)}>
         <Text style={{ fontWeight: 'bold' }}>{order.description}</Text>
       </Pressable>
-      <Text>Status: {order.status}</Text>
+      <Text style={{ color: statusColors[order.status] || '#000' }}>
+        Status: {order.status}
+      </Text>
       {expanded &&
         order.items?.map((item) => (
           <Text key={item.id}>

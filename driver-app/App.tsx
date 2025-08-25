@@ -37,6 +37,8 @@ export default function App() {
   const [signingIn, setSigningIn] = useState(false);
   const orders = useOrderStore((s) => s.orders);
   const setOrders = useOrderStore((s) => s.setOrders);
+  const activeOrders = orders.filter((o) => o.status !== 'DELIVERED');
+  const completedOrders = orders.filter((o) => o.status === 'DELIVERED');
 
   const checkHealth = useCallback(async () => {
     async function ping(path: string) {
@@ -208,9 +210,21 @@ export default function App() {
       )}
       <Btn text="Sign Out" onPress={() => auth().signOut()} />
       <View style={{ height: 24 }} />
-      <Text style={styles.subtitle}>Assigned Orders</Text>
-      {orders.length === 0 && <Text>No orders assigned.</Text>}
-      {orders.map((o) => (
+      <Text style={styles.subtitle}>Active Orders ({activeOrders.length})</Text>
+      {activeOrders.length === 0 && <Text>No active orders.</Text>}
+      {activeOrders.map((o) => (
+        <OrderItem
+          key={o.id}
+          order={o}
+          token={idToken ?? ''}
+          apiBase={API_BASE}
+          refresh={() => fetchOrders(idToken ?? '')}
+        />
+      ))}
+      <View style={{ height: 24 }} />
+      <Text style={styles.subtitle}>Completed Orders ({completedOrders.length})</Text>
+      {completedOrders.length === 0 && <Text>No completed orders.</Text>}
+      {completedOrders.map((o) => (
         <OrderItem
           key={o.id}
           order={o}
