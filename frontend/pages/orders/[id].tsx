@@ -191,7 +191,7 @@ export default function OrderDetailPage(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const d = due || await orderDue(order.id);
-      if(!retCollect && d && Number(d?.outstanding || d?.balance || 0) > 0){
+      if((order.type === 'RENTAL' || !retCollect) && d && Number(d?.outstanding || d?.balance || 0) > 0){
         setErr("Outstanding must be cleared before return");
         setBusy(false);
         return;

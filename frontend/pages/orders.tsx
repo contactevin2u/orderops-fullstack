@@ -129,17 +129,17 @@ export default function OperatorOrdersPage() {
 
   async function markReturnOrCollect(order: any) {
     const collect = window.confirm("Collect item?");
-    if (!collect) {
-      try {
+    try {
+      if (order.type === 'RENTAL' || !collect) {
         const d = await orderDue(order.id);
         if (d && Number(d?.outstanding || d?.balance || 0) > 0) {
           alert("Outstanding must be cleared before return");
           return;
         }
-      } catch (e: any) {
-        alert(e?.message || "Failed");
-        return;
       }
+    } catch (e: any) {
+      alert(e?.message || "Failed");
+      return;
     }
     try {
       await markReturned(order.id, undefined, { collect });
