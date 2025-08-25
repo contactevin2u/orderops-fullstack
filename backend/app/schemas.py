@@ -200,6 +200,24 @@ class AssignDriverIn(BaseModel):
     driver_id: int
 
 
+class RouteCreateIn(BaseModel):
+    driver_id: int
+    route_date: str
+    name: str | None = None
+    notes: str | None = None
+
+
+class RouteOut(BaseModel):
+    id: int
+    driver_id: int
+    route_date: dt.date
+    name: str | None = None
+    notes: str | None = None
+
+    class Config:
+        from_attributes = True
+
+
 class DriverCreateIn(BaseModel):
     email: str
     password: str

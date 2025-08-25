@@ -7,6 +7,7 @@ from .payment import Payment
 from .job import Job
 from .idempotent_request import IdempotentRequest
 from .driver import Driver, DriverDevice
+from .driver_route import DriverRoute
 from .trip import Trip, TripEvent
 from .commission import Commission
 from .user import User, Role
@@ -23,6 +24,7 @@ __all__ = [
     "IdempotentRequest",
     "Driver",
     "DriverDevice",
+    "DriverRoute",
     "Trip",
     "TripEvent",
     "Commission",

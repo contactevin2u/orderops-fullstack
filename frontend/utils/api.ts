@@ -292,6 +292,19 @@ export function assignOrderToDriver(orderId: number | string, driverId: string) 
   return request(`/orders/${orderId}/assign`, { json: { driver_id: driverId } });
 }
 
+export function createRoute(body: { driver_id: number; route_date: string; name?: string; notes?: string }) {
+  return request<any>('/routes', { json: body });
+}
+
+export function listRoutes(date?: string) {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : '';
+  return request<any[]>(`/routes${qs}`);
+}
+
+export function addOrdersToRoute(routeId: number, orderIds: number[]) {
+  return request<any>(`/routes/${routeId}/orders`, { json: { order_ids: orderIds } });
+}
+
 export function createDriver(payload: {
   email: string;
   password: string;

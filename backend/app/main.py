@@ -1,9 +1,22 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+from fastapi.staticfiles import StaticFiles
+
 from .core.config import settings, cors_origins_list
 from .routers import auth as auth_router
-from .routers import health, parse, orders, payments, export, documents, queue, reports, drivers
+from .routers import (
+    health,
+    parse,
+    orders,
+    payments,
+    export,
+    documents,
+    queue,
+    reports,
+    drivers,
+    routes as routes_router,
+)
 
 app = FastAPI(title="OrderOps Fullstack v1", default_response_class=ORJSONResponse)
 
@@ -16,6 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.mount("/static/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 app.include_router(health.router)
 app.include_router(auth_router.router)
 app.include_router(parse.router)
@@ -26,3 +41,4 @@ app.include_router(documents.router)
 app.include_router(queue.router)
 app.include_router(reports.router)
 app.include_router(drivers.router)
+app.include_router(routes_router.router)

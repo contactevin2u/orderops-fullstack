@@ -20,6 +20,9 @@ class Trip(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), nullable=False)
     driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id"), nullable=False)
+    route_id: Mapped[int | None] = mapped_column(
+        ForeignKey("driver_routes.id"), nullable=True, index=True
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ASSIGNED")
     planned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -39,6 +42,7 @@ class Trip(Base):
 
     __table_args__ = (
         Index("ix_trips_driver_status_planned", "driver_id", "status", "planned_at"),
+        Index("ix_trips_route_status", "route_id", "status"),
     )
 
 
