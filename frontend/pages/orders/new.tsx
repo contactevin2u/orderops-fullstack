@@ -2,6 +2,8 @@ import Layout from "@/components/Layout";
 import React from "react";
 import { useRouter } from "next/router";
 import TermsModal from "@/components/ui/TermsModal";
+import Card from "@/components/Card";
+import PageHeader from "@/components/PageHeader";
 import { createManualOrder, parseMessage } from "@/utils/api";
 
 export default function NewOrderPage(){
@@ -146,9 +148,10 @@ export default function NewOrderPage(){
 
   return (
     <Layout>
-      <div className="card">
-        <h2 style={{marginTop:0}}>New Order</h2>
-        <div style={{marginBottom:12}}>
+      <div className="stack">
+        <PageHeader title="New Order" />
+        <Card className="stack">
+        <div className="stack">
           <label>Paste Message to Parse</label>
           <textarea
             className="textarea"
@@ -157,13 +160,13 @@ export default function NewOrderPage(){
             value={rawText}
             onChange={e=>setRawText(e.target.value)}
           />
-          <button className="btn secondary" onClick={onParse} disabled={busy || !rawText.trim()} style={{marginTop:8}}>Parse</button>
+          <button className="btn secondary" onClick={onParse} disabled={busy || !rawText.trim()}>Parse</button>
         </div>
         <div className="row">
           <div className="col"><label>Customer Name</label><input className="input" value={custName} onChange={e=>setCustName(e.target.value)} /></div>
           <div className="col"><label>Phone</label><input className="input" value={custPhone} onChange={e=>setCustPhone(e.target.value)} /></div>
         </div>
-        <div style={{marginTop:8}}><label>Address</label><textarea className="textarea" rows={2} value={custAddress} onChange={e=>setCustAddress(e.target.value)} /></div>
+        <div className="stack"><label>Address</label><textarea className="textarea" rows={2} value={custAddress} onChange={e=>setCustAddress(e.target.value)} /></div>
         <div className="row">
           <div className="col"><label>Type</label>
             <select className="select" value={type} onChange={e=>setType(e.target.value)}>
@@ -176,7 +179,7 @@ export default function NewOrderPage(){
           <div className="col"><label>Order Code</label><input className="input" value={orderCode} onChange={e=>setOrderCode(e.target.value)} /></div>
           <div className="col"><label>Delivery Date</label><input className="input" type="date" value={deliveryDate} onChange={e=>setDeliveryDate(e.target.value)} /></div>
         </div>
-        <div style={{marginTop:8}}><label>Notes</label><textarea className="textarea" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} /></div>
+        <div className="stack"><label>Notes</label><textarea className="textarea" rows={2} value={notes} onChange={e=>setNotes(e.target.value)} /></div>
 
         <div className="hr" />
         <h3>Items</h3>
@@ -224,8 +227,9 @@ export default function NewOrderPage(){
           <div className="col"><label>Monthly Amount</label><input className="input" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
         </div>
 
-        {err && <div style={{marginTop:8,color:'#ffb3b3'}}>{err}</div>}
-        <div style={{marginTop:8}}><button className="btn" onClick={onCreate} disabled={busy || !custName || items.length===0}>Create Order</button></div>
+        {err && <div style={{color:'#ffb3b3'}}>{err}</div>}
+        <div><button className="btn" onClick={onCreate} disabled={busy || !custName || items.length===0}>Create Order</button></div>
+        </Card>
       </div>
       <TermsModal
         open={termsOpen}

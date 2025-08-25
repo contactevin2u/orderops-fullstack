@@ -1,5 +1,5 @@
 import React from 'react';
-import Card from '@/components/ui/Card';
+import Card from '@/components/Card';
 import Button from '@/components/ui/Button';
 import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
@@ -64,9 +64,9 @@ export default function IntakePage() {
   const toPost = normalizeParsedForOrder(parsed);
 
   return (
-    <div className="stack container" style={{ maxWidth: '48rem' }}>
-      <Card>
-        <details style={{ marginBottom: 8 }}>
+    <div className="stack" style={{ maxWidth: '48rem', margin: '0 auto' }}>
+      <Card className="stack">
+        <details>
           <summary>{t('help.intake.title')}</summary>
           <p>{t('help.intake.body')}</p>
           <pre style={{ whiteSpace: 'pre-wrap' }}>{t('help.intake.sample')}</pre>
@@ -78,15 +78,15 @@ export default function IntakePage() {
           value={text}
           onChange={(e) => setText(e.target.value)}
         />
-        <div className="row" style={{ justifyContent: 'flex-end' }}>
+        <div className="cluster" style={{ justifyContent: 'flex-end' }}>
           <Button disabled={busy || !text} onClick={onParse}>{t('intake.parse')}</Button>
           <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>{t('intake.create')}</Button>
         </div>
-        {err && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
-        {msg && <p style={{ marginTop: 8, fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}
+        {err && <p style={{ fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
+        {msg && <p style={{ fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}
       </Card>
       {toPost && (
-        <Card>
+        <Card className="stack">
           <pre style={{ whiteSpace: 'pre-wrap', fontSize: '0.875rem' }}>{JSON.stringify(toPost, null, 2)}</pre>
         </Card>
       )}
