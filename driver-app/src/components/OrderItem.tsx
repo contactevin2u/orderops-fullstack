@@ -1,6 +1,8 @@
 // OrderItem.tsx
 import React, { useState } from 'react';
 import { View, Text, Button, Pressable, Linking } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { Order } from '../stores/orderStore';
 
 interface Props {
@@ -31,6 +33,25 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
       // swallow
     }
   };
+
+  async function completeWithPhoto() {
+    const res = await ImagePicker.launchCameraAsync({ allowsEditing: false, quality: 0.7 });
+    if (res.canceled) return;
+    const asset = res.assets[0];
+    const manip = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [{ resize: { width: 1280 } }],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+    );
+    const form = new FormData();
+    form.append('file', { uri: manip.uri, type: 'image/jpeg', name: 'pod.jpg' } as any);
+    await fetch(`${apiBase}/drivers/orders/${order.id}/pod-photo`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    await update('DELIVERED');
+  }
 
   const title = order.code || order.description || `Order #${order.id}`;
   const cust = order.customer || {};
@@ -96,7 +117,7 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
           )}
           {order.status === 'IN_TRANSIT' && (
             <>
-              <Button title="Complete" onPress={() => update('DELIVERED')} />
+              <Button title="Complete" onPress={completeWithPhoto} />
               <Button title="Hold" onPress={() => update('ON_HOLD')} />
             </>
           )}

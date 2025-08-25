@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 from decimal import Decimal
@@ -18,6 +18,7 @@ from ..schemas import (
     DriverCreateIn,
     CommissionMonthOut,
 )
+from ..utils.storage import save_pod_image
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -159,6 +160,31 @@ def get_assigned_order(order_id: int, driver=Depends(driver_auth), db: Session =
     return _order_to_driver_out(order, trip.status)
 
 
+@router.post("/orders/{order_id}/pod-photo", response_model=dict)
+def upload_pod_photo(
+    order_id: int,
+    file: UploadFile = File(...),
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    trip = (
+        db.query(Trip)
+        .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
+        .one_or_none()
+    )
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    data = file.file.read()
+    try:
+        url = save_pod_image(data)
+    except Exception as e:  # pragma: no cover - pillow errors
+        raise HTTPException(400, str(e)) from e
+    trip.pod_photo_url = url
+    db.commit()
+    db.refresh(trip)
+    return {"url": url}
+
+
 @router.patch("/orders/{order_id}", response_model=DriverOrderOut)
 def update_order_status(
     order_id: int,
@@ -181,6 +207,8 @@ def update_order_status(
         if not trip.started_at:
             trip.started_at = now
     elif payload.status == "DELIVERED":
+        if not trip.pod_photo_url:
+            raise HTTPException(400, "PoD photo required")
         trip.delivered_at = now
     elif payload.status == "ON_HOLD":
         pass
