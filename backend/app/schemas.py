@@ -103,11 +103,23 @@ class PlanOut(BaseModel):
         from_attributes = True
 
 
+class CommissionOut(BaseModel):
+    id: int
+    scheme: str
+    rate: Decimal
+    computed_amount: Decimal
+    actualized_at: dt.datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
 class TripOut(BaseModel):
     id: int
     driver_id: int
     status: str
     driver_name: str | None = None
+    commission: CommissionOut | None = None
 
     class Config:
         from_attributes = True

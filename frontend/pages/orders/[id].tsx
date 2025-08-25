@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
-import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue } from "@/utils/api";
+import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue, markSuccess, updateCommission } from "@/utils/api";
 
 export default function OrderDetailPage(){
   const router = useRouter();
@@ -49,6 +49,8 @@ export default function OrderDetailPage(){
   const [buybackMethod,setBuybackMethod] = React.useState<string>("");
   const [buybackRef,setBuybackRef] = React.useState<string>("");
 
+  const [commission,setCommission] = React.useState<string>("");
+
   const [due,setDue] = React.useState<any>(null);
   const [asOf,setAsOf] = React.useState<string>("");
 
@@ -81,6 +83,7 @@ export default function OrderDetailPage(){
       setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
       setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
       setItems(o?.items ? o.items.map((it:any)=>({ ...it, qty: String(it.qty), monthly_amount: it.monthly_amount ? String(it.monthly_amount) : "" })) : []);
+      setCommission(o?.trip?.commission?.computed_amount ? String(o.trip.commission.computed_amount) : "");
     }catch(e:any){ setError(e); }
   }, [id]);
 
@@ -197,6 +200,24 @@ export default function OrderDetailPage(){
       setOrder(out?.order || out);
       await loadDue(order.id, asOf);
       setMsg("Marked as returned");
+    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+  }
+
+  async function onSuccess(){
+    setBusy(true); setErr(""); setMsg("");
+    try{
+      await markSuccess(order.id);
+      setMsg("Marked success");
+      await load();
+    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+  }
+
+  async function saveCommission(){
+    setBusy(true); setErr(""); setMsg("");
+    try{
+      await updateCommission(order.id, Number(commission||0));
+      setMsg("Commission updated");
+      await load();
     }catch(e:any){ setError(e); } finally{ setBusy(false); }
   }
 
@@ -423,6 +444,19 @@ export default function OrderDetailPage(){
                 {(!order.payments || order.payments.length===0) && <tr><td colSpan={6} style={{opacity:.7}}>No payments</td></tr>}
               </tbody>
             </table>
+          </div>
+
+          <div className="card" style={{marginTop:16}}>
+            <h3 style={{marginTop:0}}>Delivery</h3>
+            {order.trip?.status === "DELIVERED" && (
+              <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
+            )}
+            {order.trip?.commission && (
+              <div style={{marginTop:8}}>
+                <input className="input" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
+                <button className="btn" style={{marginTop:4}} onClick={saveCommission} disabled={busy}>Save Commission</button>
+              </div>
+            )}
           </div>
 
           <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}}>{err || msg}</div>

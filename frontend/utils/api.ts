@@ -224,6 +224,14 @@ export function orderDue(id: number, asOf?: string) {
   return request<any>(`/orders/${id}/due${qs}`);
 }
 
+export function markSuccess(id: number) {
+  return request<any>(`/orders/${id}/success`, { method: "POST" });
+}
+
+export function updateCommission(id: number, amount: number) {
+  return request<any>(`/orders/${id}/commission`, { method: "PATCH", json: { amount } });
+}
+
 // -------- Payments
 export function addPayment(payload: {
   order_id: number;

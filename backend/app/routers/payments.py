@@ -8,8 +8,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..db import get_session
-from ..models import Payment, Order, Trip, Role, User
-from ..services.commission import maybe_actualize_commission
+from ..models import Payment, Order, Role, User
 from ..utils.normalize import to_decimal
 from ..services.status_updates import recompute_financials
 from ..auth.deps import require_roles
@@ -45,7 +44,6 @@ def add_payment(
             return {"payment_id": existing.id, "order_balance": float(order.balance)}
     pdate = date.fromisoformat(body.date) if body.date else date.today()
     amount = to_decimal(body.amount)
-    posted_before = db.query(Payment).filter_by(order_id=order.id, status="POSTED").count()
     p = Payment(
         order_id=order.id,
         amount=amount,
@@ -58,13 +56,8 @@ def add_payment(
     db.add(p)
     order.paid_amount = to_decimal(order.paid_amount) + amount
     recompute_financials(order)
-    first_payment = posted_before == 0
     db.commit()
     db.refresh(order)
-    if first_payment:
-        trips = db.query(Trip).filter_by(order_id=order.id, status="DELIVERED").all()
-        for t in trips:
-            maybe_actualize_commission(db, t.id)
     log_action(db, current_user, "payment.add", f"payment_id={p.id}")
     return {"payment_id": p.id, "order_balance": float(order.balance)}
 

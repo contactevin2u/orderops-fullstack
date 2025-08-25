@@ -16,6 +16,7 @@ from ..models import (
     User,
     Driver,
     Trip,
+    Commission,
 )
 from ..auth.deps import require_roles
 from ..utils.audit import log_action
@@ -30,6 +31,7 @@ from ..services.status_updates import (
     recompute_financials,
 )
 from ..utils.responses import envelope
+from ..utils.normalize import to_decimal
 
 router = APIRouter(
     prefix="/orders",
@@ -322,6 +324,79 @@ def assign_order(
     db.refresh(trip)
     log_action(db, current_user, "order.assign_driver", f"order_id={order.id},driver_id={driver.id}")
     return envelope({"order_id": order.id, "driver_id": driver.id, "trip_id": trip.id})
+
+
+class CommissionUpdateIn(BaseModel):
+    amount: Decimal
+
+
+@router.post("/{order_id}/success", response_model=dict)
+def mark_success(
+    order_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
+):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
+    if not trip or trip.status != "DELIVERED":
+        raise HTTPException(400, "Trip not delivered")
+    total = to_decimal(order.total or 0)
+    if total < 500:
+        rate = Decimal("20")
+    elif total < 5000:
+        rate = Decimal("30")
+    else:
+        rate = Decimal("50")
+    commission = db.query(Commission).filter_by(trip_id=trip.id).one_or_none()
+    now = datetime.utcnow()
+    if commission:
+        commission.rate = rate
+        commission.computed_amount = rate
+        commission.actualized_at = now
+        commission.actualization_reason = "manual_success"
+    else:
+        commission = Commission(
+            driver_id=trip.driver_id,
+            trip_id=trip.id,
+            scheme="FLAT",
+            rate=rate,
+            computed_amount=rate,
+            actualized_at=now,
+            actualization_reason="manual_success",
+        )
+        db.add(commission)
+    trip.status = "SUCCESS"
+    db.commit()
+    db.refresh(commission)
+    log_action(db, current_user, "order.success", f"order_id={order.id}")
+    return envelope({"commission_id": commission.id, "amount": float(commission.computed_amount)})
+
+
+@router.patch("/{order_id}/commission", response_model=dict)
+def update_commission(
+    order_id: int,
+    body: CommissionUpdateIn,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
+):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    commission = db.query(Commission).filter_by(trip_id=trip.id).one_or_none()
+    if not commission:
+        raise HTTPException(404, "Commission not found")
+    amt = to_decimal(body.amount)
+    commission.rate = amt
+    commission.computed_amount = amt
+    db.commit()
+    db.refresh(commission)
+    log_action(db, current_user, "commission.update", f"commission_id={commission.id}")
+    return envelope({"commission_id": commission.id, "amount": float(commission.computed_amount)})
 
 
 @router.post("/{order_id}/void", response_model=dict)
