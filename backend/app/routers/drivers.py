@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
+from decimal import Decimal
+import datetime as dt
 
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
@@ -18,6 +20,66 @@ from ..schemas import (
 )
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
+
+
+def _order_to_driver_out(order: Order, status: str) -> dict:
+    # delivery_date may be datetime or date
+    dd = None
+    if getattr(order, "delivery_date", None):
+        dd = (
+            order.delivery_date.date()
+            if hasattr(order.delivery_date, "date")
+            else order.delivery_date
+        )
+
+    items = []
+    try:
+        for it in getattr(order, "items", []) or []:
+            items.append(
+                {
+                    "id": it.id,
+                    "name": it.name,
+                    "qty": it.qty,
+                    "unit_price": getattr(it, "unit_price", None),
+                    "line_total": getattr(it, "line_total", None),
+                    "item_type": getattr(it, "item_type", None),
+                }
+            )
+    except Exception:
+        items = []
+
+    try:
+        cust = getattr(order, "customer", None)
+    except Exception:
+        cust = None
+    customer = None
+    if cust:
+        customer = {
+            "id": cust.id,
+            "name": getattr(cust, "name", None),
+            "phone": getattr(cust, "phone", None),
+            "address": getattr(cust, "address", None),
+            "map_url": getattr(cust, "map_url", None),
+        }
+
+    return {
+        "id": order.id,
+        "description": getattr(order, "code", None),
+        "code": getattr(order, "code", None),
+        "status": status,
+        "delivery_date": dd,
+        "notes": getattr(order, "notes", None),
+        "subtotal": getattr(order, "subtotal", Decimal("0")) or Decimal("0"),
+        "discount": getattr(order, "discount", Decimal("0")) or Decimal("0"),
+        "delivery_fee": getattr(order, "delivery_fee", Decimal("0")) or Decimal("0"),
+        "return_delivery_fee": getattr(order, "return_delivery_fee", Decimal("0")) or Decimal("0"),
+        "penalty_fee": getattr(order, "penalty_fee", Decimal("0")) or Decimal("0"),
+        "total": getattr(order, "total", Decimal("0")) or Decimal("0"),
+        "paid_amount": getattr(order, "paid_amount", Decimal("0")) or Decimal("0"),
+        "balance": getattr(order, "balance", Decimal("0")) or Decimal("0"),
+        "customer": customer,
+        "items": items,
+    }
 
 
 @router.get("", response_model=list[DriverOut])
@@ -72,41 +134,29 @@ def register_device(
 
 
 @router.get("/orders", response_model=list[DriverOrderOut])
-def list_assigned_orders(
-    driver=Depends(driver_auth),
-    db: Session = Depends(get_session),
-):
-    stmt = (
-        select(Trip, Order)
-        .join(Order, Trip.order_id == Order.id)
-        .where(Trip.driver_id == driver.id)
-    )
-    rows = db.execute(stmt).all()
-    results = []
+def list_assigned_orders(driver=Depends(driver_auth), db: Session = Depends(get_session)):
+    rows = db.execute(
+        select(Trip, Order).join(Order, Trip.order_id == Order.id).where(Trip.driver_id == driver.id)
+    ).all()
+    out = []
     for trip, order in rows:
-        try:
-            items = [
-                {
-                    "id": item.id,
-                    "name": item.name,
-                    "item_type": item.item_type,
-                    "qty": item.qty,
-                    "unit_price": item.unit_price,
-                    "line_total": item.line_total,
-                }
-                for item in order.items
-            ]
-        except Exception:
-            items = []
-        results.append(
-            {
-                "id": order.id,
-                "description": order.code,
-                "status": trip.status,
-                "items": items,
-            }
-        )
-    return results
+        out.append(_order_to_driver_out(order, trip.status))
+    return out
+
+
+@router.get("/orders/{order_id}", response_model=DriverOrderOut)
+def get_assigned_order(order_id: int, driver=Depends(driver_auth), db: Session = Depends(get_session)):
+    trip = (
+        db.query(Trip)
+        .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
+        .one_or_none()
+    )
+    if not trip:
+        raise HTTPException(status_code=404, detail="Trip not found")
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return _order_to_driver_out(order, trip.status)
 
 
 @router.patch("/orders/{order_id}", response_model=DriverOrderOut)
@@ -137,26 +187,7 @@ def update_order_status(
     db.add(TripEvent(trip_id=trip.id, status=payload.status))
     order = db.get(Order, order_id)
     db.commit()
-    try:
-        items = [
-            {
-                "id": item.id,
-                "name": item.name,
-                "item_type": item.item_type,
-                "qty": item.qty,
-                "unit_price": item.unit_price,
-                "line_total": item.line_total,
-            }
-            for item in order.items
-        ]
-    except Exception:
-        items = []
-    return {
-        "id": order.id,
-        "description": order.code,
-        "status": trip.status,
-        "items": items,
-    }
+    return _order_to_driver_out(order, trip.status)
 
 
 @router.get("/commissions", response_model=list[CommissionMonthOut])

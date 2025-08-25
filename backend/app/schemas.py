@@ -171,8 +171,24 @@ class DriverOut(BaseModel):
 
 class DriverOrderOut(BaseModel):
     id: int
-    description: str
+    description: Optional[str] = None     # keep for backward-compat (usually order.code)
     status: str
+    code: Optional[str] = None
+    delivery_date: Optional[dt.date] = None
+    notes: Optional[str] = None
+
+    # Money/totals (Decimal to keep precision)
+    subtotal: Decimal = Decimal("0")
+    discount: Decimal = Decimal("0")
+    delivery_fee: Decimal = Decimal("0")
+    return_delivery_fee: Decimal = Decimal("0")
+    penalty_fee: Decimal = Decimal("0")
+    total: Decimal = Decimal("0")
+    paid_amount: Decimal = Decimal("0")
+    balance: Decimal = Decimal("0")
+
+    # Relations
+    customer: Optional[CustomerOut] = None
     items: List[OrderItemOut] = Field(default_factory=list)
 
 
