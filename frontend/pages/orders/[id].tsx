@@ -193,7 +193,6 @@ export default function OrderDetailPage(){
     try{
       const d = due || await orderDue(order.id);
       if(!retCollect && d && Number(d?.outstanding || d?.balance || 0) > 0){
-        alert("Outstanding must be cleared before return");
         setErr("Outstanding must be cleared before return");
         setBusy(false);
         return;
