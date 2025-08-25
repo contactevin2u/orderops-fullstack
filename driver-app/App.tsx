@@ -1,8 +1,15 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, View, Text, Platform, Pressable } from 'react-native';
+import {
+  ScrollView,
+  View,
+  Text,
+  Platform,
+  Pressable,
+  TextInput,
+} from 'react-native';
 import Constants from 'expo-constants';
 import messaging from '@react-native-firebase/messaging';
-import auth from '@react-native-firebase/auth';
+import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
 import OrderItem from './src/components/OrderItem';
 import { useOrderStore } from './src/stores/orderStore';
 
@@ -19,6 +26,10 @@ export default function App() {
   const [fcm, setFcm] = useState<Status>(null);
   const [registerStatus, setRegisterStatus] = useState<Status>(null);
   const [error, setError] = useState<Status>(null);
+  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState<Status>(null);
   const orders = useOrderStore((s) => s.orders);
   const setOrders = useOrderStore((s) => s.setOrders);
 
@@ -55,24 +66,25 @@ export default function App() {
 
   const bootstrap = useCallback(async () => {
     setError(null);
+    const current = auth().currentUser;
+    if (!current) return;
     try {
-      // 1) Firebase auth (anonymous = no SHA fingerprints required)
-      if (!auth().currentUser) await auth().signInAnonymously();
-      const user = auth().currentUser!;
-      setUid(user.uid);
+      setUid(current.uid);
 
-      // 2) Notifications permission (Android 13+ / iOS)
-      try { await messaging().requestPermission(); } catch {}
+      // 1) Notifications permission (Android 13+ / iOS)
+      try {
+        await messaging().requestPermission();
+      } catch {}
 
-      // 3) Get FCM token
+      // 2) Get FCM token
       const token = await messaging().getToken();
       setFcm(token);
 
-      // 4) Get ID token to authenticate with your backend
-      const idt = await user.getIdToken(true);
+      // 3) Get ID token to authenticate with your backend
+      const idt = await current.getIdToken(true);
       setIdToken(idt);
 
-      // 5) Register device with backend
+      // 4) Register device with backend
       setRegisterStatus('registering…');
       const res = await fetch(`${API_BASE}/drivers/devices/register`, {
         method: 'POST',
@@ -84,12 +96,26 @@ export default function App() {
       });
       setRegisterStatus(res.ok ? 'OK' : `Failed: ${res.status}`);
 
-      // 6) Fetch assigned orders
+      // 5) Fetch assigned orders
       if (res.ok) await fetchOrders(idt);
     } catch (e: any) {
       setError(e?.message ?? String(e));
     }
   }, [fetchOrders]);
+
+  const login = useCallback(async () => {
+    setLoginError(null);
+    try {
+      await auth().signInWithEmailAndPassword(email.trim(), password);
+    } catch (e: any) {
+      setLoginError(e?.message ?? String(e));
+    }
+  }, [email, password]);
+
+  useEffect(() => {
+    const sub = auth().onAuthStateChanged(setUser);
+    return sub;
+  }, []);
 
   useEffect(() => {
     // optional foreground handler
@@ -97,7 +123,36 @@ export default function App() {
     return sub;
   }, []);
 
-  useEffect(() => { checkHealth(); bootstrap(); }, [checkHealth, bootstrap]);
+  useEffect(() => {
+    if (user) {
+      checkHealth();
+      bootstrap();
+    }
+  }, [user, checkHealth, bootstrap]);
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Driver Login</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          autoCapitalize="none"
+          keyboardType="email-address"
+          value={email}
+          onChangeText={setEmail}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+        {loginError && <Text style={styles.error}>Error: {loginError}</Text>}
+        <Btn text="Sign In" onPress={login} />
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -115,6 +170,8 @@ export default function App() {
       <Btn text="Retry Health" onPress={checkHealth} />
       <View style={{ height: 8 }} />
       <Btn text="Re-run Auth + Register" onPress={bootstrap} />
+      <View style={{ height: 8 }} />
+      <Btn text="Sign Out" onPress={() => auth().signOut()} />
       <View style={{ height: 24 }} />
       <Text style={styles.subtitle}>Assigned Orders</Text>
       {orders.length === 0 && <Text>No orders assigned.</Text>}
@@ -156,6 +213,13 @@ const styles = {
   label: { fontSize: 12, color: '#555', marginBottom: 2 },
   value: { fontSize: 14 },
   error: { marginTop: 12, color: '#b00020' },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 12,
+  },
   button: { backgroundColor: '#111827', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center' as const },
   buttonText: { color: '#fff', fontWeight: '600' as const },
 };
