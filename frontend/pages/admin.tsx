@@ -8,6 +8,9 @@ import {
   assignOrderToDriver,
   createDriver,
   listDriverCommissions,
+  createRoute,
+  listRoutes,
+  addOrdersToRoute,
 } from '@/utils/api';
 
 export default function AdminPanel() {
@@ -21,7 +24,12 @@ export default function AdminPanel() {
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const [err, setErr] = React.useState('');
-  const [orderTab, setOrderTab] = React.useState<'unassigned' | 'assigned'>('unassigned');
+  const [routes, setRoutes] = React.useState<any[]>([]);
+  const [routeDate, setRouteDate] = React.useState<string>(
+    new Date().toISOString().slice(0, 10)
+  );
+  const [routeDriverId, setRouteDriverId] = React.useState<string>('');
+  const [selected, setSelected] = React.useState<Set<number>>(new Set());
 
   const [email, setEmail] = React.useState('');
   const [password, setPassword] = React.useState('');
@@ -54,25 +62,60 @@ export default function AdminPanel() {
       .catch(() => {});
   }, []);
 
+  React.useEffect(() => {
+    listRoutes(routeDate).then(setRoutes).catch(() => {});
+  }, [routeDate]);
+
   async function onAssign() {
     if (!orderId || !driverId) return;
     setBusy(true);
     setErr('');
     setMsg('');
     try {
+      const order = orders.find((o: any) => String(o.id) === String(orderId));
+      const driver = drivers.find(
+        (d: any) => String(d.id || d.uid) === String(driverId)
+      );
+      const currentDriverName =
+        order?.trip?.driver_name ||
+        (order?.trip?.driver_id ? `ID ${order.trip.driver_id}` : null);
+      const newDriverName = driver?.name || driverId;
+      if (order?.trip?.driver_id) {
+        const ok = window.confirm(
+          `This order is currently assigned to ${currentDriverName}. Reassign to ${newDriverName}?`
+        );
+        if (!ok) {
+          setBusy(false);
+          return;
+        }
+      }
       await assignOrderToDriver(orderId, driverId);
       setMsg('Order assigned');
-      setOrderId('');
-      setDriverId('');
-      try {
-        const res = await listOrders(undefined, undefined, undefined, 50);
-        setOrders(res.items);
-      } catch {}
+      const res = await listOrders(undefined, undefined, undefined, 50);
+      setOrders(res.items);
     } catch (e: any) {
       setErr(e?.message || 'Assignment failed');
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onCreateRoute() {
+    if (!routeDriverId) return;
+    await createRoute({
+      driver_id: Number(routeDriverId),
+      route_date: routeDate,
+    });
+    setRoutes(await listRoutes(routeDate));
+  }
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const copy = new Set(prev);
+      if (copy.has(id)) copy.delete(id);
+      else copy.add(id);
+      return copy;
+    });
   }
 
   async function onCreateDriver() {
@@ -95,9 +138,12 @@ export default function AdminPanel() {
     }
   }
 
-  const unassigned = orders.filter((o: any) => !(o.trip && o.trip.driver_id));
-  const assigned = orders.filter((o: any) => o.trip && o.trip.driver_id);
-  const current = orderTab === 'unassigned' ? unassigned : assigned;
+  const unassigned = orders.filter(
+    (o: any) => !(o.trip && o.trip.driver_id)
+  );
+  const onHold = orders.filter(
+    (o: any) => o.trip?.status === 'ON_HOLD'
+  );
 
   return (
     <div className="stack container" style={{ maxWidth: '48rem' }}>
@@ -118,6 +164,38 @@ export default function AdminPanel() {
 
       {section === 'orders' && (
         <>
+          {/* Routes Section */}
+          <Card>
+            <div className="cluster">
+              <input type="date" value={routeDate} onChange={e => setRouteDate(e.target.value)} />
+              <select value={routeDriverId} onChange={e => setRouteDriverId(e.target.value)}>
+                <option value="">Driver</option>
+                {drivers.map((d:any)=><option key={d.id} value={d.id}>{d.name||d.id}</option>)}
+              </select>
+              <Button onClick={onCreateRoute} disabled={!routeDriverId}>Create Route</Button>
+            </div>
+          </Card>
+
+          {routes.map(r => (
+            <Card key={r.id}>
+              <div className="cluster" style={{justifyContent:"space-between"}}>
+                <div>Route #{r.id} • {r.route_date} • Driver {r.driver_id}</div>
+                <Button
+                  onClick={async () => {
+                    await addOrdersToRoute(r.id, Array.from(selected));
+                    setSelected(new Set());
+                    const res = await listOrders(undefined, undefined, undefined, 50);
+                    setOrders(res.items);
+                  }}
+                  disabled={selected.size===0}
+                >
+                  Add Selected Orders
+                </Button>
+              </div>
+            </Card>
+          ))}
+
+          {/* Assign Panel */}
           <Card>
             <div className="stack">
               <label>
@@ -150,45 +228,36 @@ export default function AdminPanel() {
             </div>
           </Card>
 
+          {/* Orders lists */}
           <div className="stack" style={{ marginTop: '1rem' }}>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                className={`btn ${orderTab === 'unassigned' ? '' : 'secondary'}`}
-                onClick={() => setOrderTab('unassigned')}
-              >
-                Unassigned Orders
-              </button>
-              <button
-                className={`btn ${orderTab === 'assigned' ? '' : 'secondary'}`}
-                onClick={() => setOrderTab('assigned')}
-              >
-                Assigned Orders
-              </button>
-            </div>
             <Card>
               <table className="table">
                 <thead>
                   <tr>
+                    <th></th>
                     <th>Order</th>
                     <th>Status</th>
-                    {orderTab === 'assigned' && <th>Driver</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {current.map((o: any) => (
+                  {unassigned.map((o: any) => (
                     <tr key={o.id}>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={selected.has(o.id)}
+                          onChange={() => toggleSelected(o.id)}
+                        />
+                      </td>
                       <td>{o.code || `Order ${o.id}`}</td>
                       <td>
                         <StatusBadge value={(o.trip && o.trip.status) || o.status} />
                       </td>
-                      {orderTab === 'assigned' && (
-                        <td>{o.trip?.driver_name || o.driver?.name || o.driver_id || '-'}</td>
-                      )}
                     </tr>
                   ))}
-                  {current.length === 0 && (
+                  {unassigned.length === 0 && (
                     <tr>
-                      <td colSpan={orderTab === 'assigned' ? 3 : 2} style={{ opacity: 0.7 }}>
+                      <td colSpan={3} style={{ opacity: 0.7 }}>
                         No orders
                       </td>
                     </tr>
@@ -196,6 +265,36 @@ export default function AdminPanel() {
                 </tbody>
               </table>
             </Card>
+
+            {onHold.length > 0 && (
+              <Card>
+                <div style={{ fontWeight: 'bold', marginBottom: 4 }}>
+                  On Hold ({onHold.length})
+                </div>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>Order</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {onHold.map((o: any) => (
+                      <tr key={o.id}>
+                        <td>
+                          <input
+                            type="checkbox"
+                            checked={selected.has(o.id)}
+                            onChange={() => toggleSelected(o.id)}
+                          />
+                        </td>
+                        <td>{o.code || `Order ${o.id}`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Card>
+            )}
           </div>
         </>
       )}

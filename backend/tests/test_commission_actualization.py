@@ -17,6 +17,7 @@ from app.models import (
     Order,
     Driver,
     Trip,
+    DriverRoute,
     Commission,
 )  # noqa: E402
 
@@ -37,6 +38,9 @@ def _setup_db():
     Trip.__table__.c.id.type = Integer()
     Trip.__table__.c.order_id.type = Integer()
     Trip.__table__.c.driver_id.type = Integer()
+    DriverRoute.__table__.c.id.type = Integer()
+    DriverRoute.__table__.c.driver_id.type = Integer()
+    Trip.__table__.c.route_id.type = Integer()
     Commission.__table__.c.id.type = Integer()
     Commission.__table__.c.driver_id.type = Integer()
     Commission.__table__.c.trip_id.type = Integer()
@@ -46,6 +50,7 @@ def _setup_db():
             Customer.__table__,
             Order.__table__,
             Driver.__table__,
+            DriverRoute.__table__,
             Trip.__table__,
             Commission.__table__,
         ],
