@@ -9,7 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
@@ -32,3 +32,5 @@ class Commission(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+    trip = relationship("Trip", back_populates="commission")

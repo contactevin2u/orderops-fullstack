@@ -15,10 +15,8 @@ from app.models import (
     Base,
     Customer,
     Order,
-    Payment,
     Driver,
     Trip,
-    OrderItem,
     Commission,
 )  # noqa: E402
 
@@ -35,14 +33,10 @@ def _setup_db():
     Customer.__table__.c.id.type = Integer()
     Order.__table__.c.id.type = Integer()
     Order.__table__.c.customer_id.type = Integer()
-    Payment.__table__.c.id.type = Integer()
-    Payment.__table__.c.order_id.type = Integer()
     Driver.__table__.c.id.type = Integer()
     Trip.__table__.c.id.type = Integer()
     Trip.__table__.c.order_id.type = Integer()
     Trip.__table__.c.driver_id.type = Integer()
-    OrderItem.__table__.c.id.type = Integer()
-    OrderItem.__table__.c.order_id.type = Integer()
     Commission.__table__.c.id.type = Integer()
     Commission.__table__.c.driver_id.type = Integer()
     Commission.__table__.c.trip_id.type = Integer()
@@ -51,17 +45,15 @@ def _setup_db():
         tables=[
             Customer.__table__,
             Order.__table__,
-            Payment.__table__,
             Driver.__table__,
             Trip.__table__,
-            OrderItem.__table__,
             Commission.__table__,
         ],
     )
     return sessionmaker(bind=engine, expire_on_commit=False)
 
 
-def test_actualize_after_first_payment(monkeypatch):
+def test_commission_on_success(monkeypatch):
     SessionLocal = _setup_db()
 
     def override_get_session():
@@ -78,7 +70,7 @@ def test_actualize_after_first_payment(monkeypatch):
         db.commit()
         db.refresh(cust)
 
-        order = Order(code="O1", type="OUTRIGHT", customer_id=cust.id, total=Decimal("100"))
+        order = Order(code="O1", type="OUTRIGHT", customer_id=cust.id, total=Decimal("600"))
         db.add(order)
         db.commit()
         db.refresh(order)
@@ -93,25 +85,22 @@ def test_actualize_after_first_payment(monkeypatch):
         db.commit()
         db.refresh(trip)
 
-        commission = Commission(
-            driver_id=driver.id,
-            trip_id=trip.id,
-            scheme="FLAT",
-            rate=Decimal("10.00"),
-            computed_amount=Decimal("10.00"),
-        )
-        db.add(commission)
-        db.commit()
-
-    resp = client.post(
-        "/payments",
-        json={"order_id": order.id, "amount": 50, "method": "cash"},
-    )
-    assert resp.status_code == 201
+    resp = client.post(f"/orders/{order.id}/success")
+    assert resp.status_code == 200
 
     with SessionLocal() as db:
         commission = db.query(Commission).first()
         assert commission.actualized_at is not None
-        assert commission.actualization_reason == "delivered+first_payment"
+        assert commission.computed_amount == Decimal("30.00")
+        assert commission.actualization_reason == "manual_success"
+
+    resp = client.patch(
+        f"/orders/{order.id}/commission", json={"amount": 40}
+    )
+    assert resp.status_code == 200
+
+    with SessionLocal() as db:
+        commission = db.query(Commission).first()
+        assert commission.computed_amount == Decimal("40.00")
 
     app.dependency_overrides.clear()

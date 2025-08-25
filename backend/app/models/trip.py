@@ -9,7 +9,7 @@ from sqlalchemy import (
     Numeric,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
 
@@ -34,6 +34,8 @@ class Trip(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
+
+    commission = relationship("Commission", uselist=False, back_populates="trip")
 
     __table_args__ = (
         Index("ix_trips_driver_status_planned", "driver_id", "status", "planned_at"),
