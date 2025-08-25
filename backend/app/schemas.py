@@ -114,6 +114,11 @@ class CommissionOut(BaseModel):
         from_attributes = True
 
 
+class CommissionMonthOut(BaseModel):
+    month: str
+    total: float
+
+
 class TripOut(BaseModel):
     id: int
     driver_id: int

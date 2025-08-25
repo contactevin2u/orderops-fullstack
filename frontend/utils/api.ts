@@ -300,3 +300,7 @@ export function createDriver(payload: {
 }) {
   return request<any>("/drivers", { json: payload });
 }
+
+export function listDriverCommissions(driverId: number) {
+  return request<any[]>(`/drivers/${driverId}/commissions`);
+}

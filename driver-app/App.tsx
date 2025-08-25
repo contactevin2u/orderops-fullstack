@@ -40,6 +40,7 @@ export default function App() {
   const activeOrders = orders.filter((o) => o.status !== 'DELIVERED');
   const completedOrders = orders.filter((o) => o.status === 'DELIVERED');
   const [tab, setTab] = useState<'active' | 'completed'>('active');
+  const [monthlyCommission, setMonthlyCommission] = useState(0);
 
   const checkHealth = useCallback(async () => {
     async function ping(path: string) {
@@ -70,6 +71,26 @@ export default function App() {
       }
     },
     [setOrders]
+  );
+
+  const fetchCommission = useCallback(
+    async (token: string) => {
+      try {
+        const r = await fetch(`${API_BASE}/drivers/commissions`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (r.ok) {
+          const data = await r.json();
+          const month = new Date().toISOString().slice(0, 7);
+          const entry = data.find((it: any) => it.month === month);
+          setMonthlyCommission(entry ? entry.total : 0);
+        }
+      } catch (e) {
+        /* ignore */
+      }
+    },
+    []
   );
 
   const handleOrderAssigned = useCallback(
@@ -117,11 +138,14 @@ export default function App() {
       setRegisterStatus(res.ok ? 'OK' : `Failed: ${res.status}`);
 
       // 5) Fetch assigned orders
-      if (res.ok) await fetchOrders(idt);
+      if (res.ok) {
+        await fetchOrders(idt);
+        await fetchCommission(idt);
+      }
     } catch (e: any) {
       setError(e?.message ?? String(e));
     }
-  }, [fetchOrders]);
+  }, [fetchOrders, fetchCommission]);
 
   const login = useCallback(async () => {
     if (signingIn) return;
@@ -194,6 +218,9 @@ export default function App() {
       <Pressable style={styles.signOut} onPress={() => auth().signOut()}>
         <Text style={styles.signOutText}>Sign Out</Text>
       </Pressable>
+      <Text style={{ marginBottom: 8 }}>
+        Commission this month: {monthlyCommission.toFixed(2)}
+      </Text>
       {DEBUG && (
         <>
           <Row label="API Base" value={API_BASE} />

@@ -7,12 +7,14 @@ import {
   listDrivers,
   assignOrderToDriver,
   createDriver,
+  listDriverCommissions,
 } from '@/utils/api';
 
 export default function AdminPanel() {
   const [section, setSection] = React.useState<'orders' | 'drivers'>('orders');
   const [orders, setOrders] = React.useState<any[]>([]);
   const [drivers, setDrivers] = React.useState<any[]>([]);
+  const [commissions, setCommissions] = React.useState<Record<number, number>>({});
 
   const [orderId, setOrderId] = React.useState('');
   const [driverId, setDriverId] = React.useState('');
@@ -32,7 +34,24 @@ export default function AdminPanel() {
     listOrders(undefined, undefined, undefined, 50)
       .then((res) => setOrders(res.items))
       .catch(() => {});
-    listDrivers().then(setDrivers).catch(() => {});
+    listDrivers()
+      .then((ds) => {
+        setDrivers(ds);
+        const month = new Date().toISOString().slice(0, 7);
+        Promise.all(
+          ds.map((d: any) =>
+            listDriverCommissions(d.id)
+              .then((arr) => {
+                const entry = arr.find((it: any) => it.month === month);
+                return [d.id, entry ? entry.total : 0];
+              })
+              .catch(() => [d.id, 0])
+          )
+        ).then((pairs) => {
+          setCommissions(Object.fromEntries(pairs as any));
+        });
+      })
+      .catch(() => {});
   }, []);
 
   async function onAssign() {
@@ -220,6 +239,7 @@ export default function AdminPanel() {
                   <tr>
                     <th>Name</th>
                     <th>ID</th>
+                    <th>Commission (month)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -227,11 +247,12 @@ export default function AdminPanel() {
                     <tr key={d.id}>
                       <td>{d.name || '-'}</td>
                       <td>{d.id}</td>
+                      <td>{(commissions[d.id] ?? 0).toFixed(2)}</td>
                     </tr>
                   ))}
                   {drivers.length === 0 && (
                     <tr>
-                      <td colSpan={2} style={{ opacity: 0.7 }}>
+                      <td colSpan={3} style={{ opacity: 0.7 }}>
                         No drivers
                       </td>
                     </tr>

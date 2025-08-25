@@ -1,19 +1,20 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
     DriverOrderOut,
     DriverOrderUpdateIn,
     DriverCreateIn,
+    CommissionMonthOut,
 )
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
@@ -156,3 +157,50 @@ def update_order_status(
         "status": trip.status,
         "items": items,
     }
+
+
+@router.get("/commissions", response_model=list[CommissionMonthOut])
+def my_commissions(
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    month_expr = (
+        func.strftime("%Y-%m", Commission.created_at)
+        if db.bind.dialect.name == "sqlite"
+        else func.to_char(Commission.created_at, "YYYY-MM")
+    )
+    stmt = (
+        select(month_expr.label("month"), func.sum(Commission.computed_amount).label("total"))
+        .where(Commission.driver_id == driver.id)
+        .group_by("month")
+        .order_by("month")
+    )
+    rows = db.execute(stmt).all()
+    return [
+        {"month": row.month, "total": float(row.total or 0)}
+        for row in rows
+    ]
+
+
+@router.get(
+    "/{driver_id}/commissions",
+    response_model=list[CommissionMonthOut],
+    dependencies=[Depends(require_roles(Role.ADMIN))],
+)
+def driver_commissions(driver_id: int, db: Session = Depends(get_session)):
+    month_expr = (
+        func.strftime("%Y-%m", Commission.created_at)
+        if db.bind.dialect.name == "sqlite"
+        else func.to_char(Commission.created_at, "YYYY-MM")
+    )
+    stmt = (
+        select(month_expr.label("month"), func.sum(Commission.computed_amount).label("total"))
+        .where(Commission.driver_id == driver_id)
+        .group_by("month")
+        .order_by("month")
+    )
+    rows = db.execute(stmt).all()
+    return [
+        {"month": row.month, "total": float(row.total or 0)}
+        for row in rows
+    ]
