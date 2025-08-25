@@ -16,7 +16,6 @@
     "i18next": "^25.4.0",
     "lucide-react": "^0.541.0",
     "next": "14.2.5",
-    "next-auth": "^4.24.11",
     "react": "18.2.0",
     "react-dom": "18.2.0",
     "react-i18next": "^15.7.1",

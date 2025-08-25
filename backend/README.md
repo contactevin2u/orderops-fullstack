@@ -15,6 +15,30 @@ uvicorn app.main:app --reload
 alembic upgrade head
 ```
 
+### First Login
+
+Run the migrations to create the `users` table and seed the default admin:
+
+```bash
+alembic upgrade head
+```
+
+The `0008_add_user_and_audit` migration inserts an initial `admin` user with a
+bcrypt password hash. To change the password, generate a new hash with
+`passlib` and update the row:
+
+```bash
+python - <<'PY'
+from passlib.hash import bcrypt
+print(bcrypt.hash("new-password"))
+PY
+# UPDATE users SET password_hash = '<hash>' WHERE username = 'admin';
+```
+
+The backend also exposes `/auth/register` which allows creating an initial
+`ADMIN` account when there are no users. Disable or guard this endpoint in
+production.
+
 ## Environment variables
 
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON string for Firebase service account used to verify driver ID tokens.
