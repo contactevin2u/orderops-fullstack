@@ -156,6 +156,7 @@ class DriverOrderOut(BaseModel):
     id: int
     description: str
     status: str
+    items: List[OrderItemOut] = Field(default_factory=list)
 
 
 class DriverOrderUpdateIn(BaseModel):

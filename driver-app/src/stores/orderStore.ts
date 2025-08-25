@@ -1,9 +1,16 @@
 import create from 'zustand';
 
+export interface OrderItem {
+  id: number;
+  name: string;
+  qty: number;
+}
+
 export interface Order {
   id: number;
   description: string;
   status: string;
+  items?: OrderItem[];
 }
 
 interface OrderState {

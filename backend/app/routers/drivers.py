@@ -57,10 +57,24 @@ def list_assigned_orders(
         .where(Trip.status == "ASSIGNED")
     )
     rows = db.execute(stmt).all()
-    return [
-        {"id": order.id, "description": order.code, "status": trip.status}
-        for trip, order in rows
-    ]
+    results = []
+    for trip, order in rows:
+        try:
+            items = [
+                {"id": item.id, "name": item.name, "qty": item.qty}
+                for item in order.items
+            ]
+        except Exception:
+            items = []
+        results.append(
+            {
+                "id": order.id,
+                "description": order.code,
+                "status": trip.status,
+                "items": items,
+            }
+        )
+    return results
 
 
 @router.patch("/orders/{order_id}", response_model=DriverOrderOut)
@@ -88,4 +102,16 @@ def update_order_status(
     db.add(TripEvent(trip_id=trip.id, status=payload.status))
     order = db.get(Order, order_id)
     db.commit()
-    return {"id": order.id, "description": order.code, "status": trip.status}
+    try:
+        items = [
+            {"id": item.id, "name": item.name, "qty": item.qty}
+            for item in order.items
+        ]
+    except Exception:
+        items = []
+    return {
+        "id": order.id,
+        "description": order.code,
+        "status": trip.status,
+        "items": items,
+    }

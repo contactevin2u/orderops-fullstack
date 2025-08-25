@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, Button } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Button, Pressable } from 'react-native';
 import { Order } from '../stores/orderStore';
 
 interface Props {
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default function OrderItem({ order, token, apiBase, refresh }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const update = async (status: string) => {
     try {
       await fetch(`${apiBase}/drivers/orders/${order.id}`, {
@@ -26,8 +27,16 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
 
   return (
     <View style={{ padding: 12, borderBottomWidth: 1, borderColor: '#ccc' }}>
-      <Text style={{ fontWeight: 'bold' }}>{order.description}</Text>
+      <Pressable onPress={() => setExpanded((e) => !e)}>
+        <Text style={{ fontWeight: 'bold' }}>{order.description}</Text>
+      </Pressable>
       <Text>Status: {order.status}</Text>
+      {expanded &&
+        order.items?.map((item) => (
+          <Text key={item.id}>
+            • {item.qty} x {item.name}
+          </Text>
+        ))}
       {order.status === 'ASSIGNED' && (
         <Button title="Start" onPress={() => update('IN_TRANSIT')} />
       )}
