@@ -55,6 +55,11 @@ async function request<T = any>(
   return unwrapped as T;
 }
 
+// -------- Auth
+export function getMe() {
+  return request<any>('/auth/me');
+}
+
 // -------- Health
 export function ping() {
   return request<{ ok: boolean } | string>("/healthz");
