@@ -12,6 +12,7 @@ import {
   Menu,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export type NavItem = { href: string; label: string; Icon: any };
 export const navItems: NavItem[] = [
@@ -28,6 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
+  const { data: session } = useSession();
   const pathname = router.asPath;
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
   React.useEffect(() => {
@@ -84,6 +86,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
             <LanguageSwitcher />
+            {session ? (
+              <button className="nav-link" onClick={() => signOut()}>
+                {t('nav.signout', { defaultValue: 'Sign out' })}
+              </button>
+            ) : (
+              <button className="nav-link" onClick={() => signIn('github')}>
+                {t('nav.signin', { defaultValue: 'Sign in' })}
+              </button>
+            )}
           </nav>
         </div>
       </header>
