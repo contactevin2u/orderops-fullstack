@@ -4,7 +4,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "DriverApp",
   slug: "driver-app",
-  version: "1.0.0",
+  version: "1.1.0",
   orientation: "portrait",
   assetBundlePatterns: ["**/*"],
 
@@ -13,6 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.yourco.driverAA",
     googleServicesFile: "./google-services.json",
     permissions: ["POST_NOTIFICATIONS"],
+    versionCode: 2,
   },
 
   // plugins we rely on

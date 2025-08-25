@@ -6,6 +6,7 @@ import {
   Platform,
   Pressable,
   TextInput,
+  Alert,
 } from 'react-native';
 import Constants from 'expo-constants';
 import messaging from '@react-native-firebase/messaging';
@@ -63,6 +64,18 @@ export default function App() {
       }
     },
     [setOrders]
+  );
+
+  const handleOrderAssigned = useCallback(
+    async (msg: any) => {
+      if (msg?.data?.type === 'order_assigned') {
+        await fetchOrders(idToken ?? '');
+        try {
+          Alert.alert('New order assigned');
+        } catch {}
+      }
+    },
+    [fetchOrders, idToken]
   );
 
   const bootstrap = useCallback(async () => {
@@ -123,10 +136,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    // optional foreground handler
-    const sub = messaging().onMessage(async () => {});
+    const sub = messaging().onMessage(handleOrderAssigned);
     return sub;
-  }, []);
+  }, [handleOrderAssigned]);
+
+  useEffect(() => {
+    const sub = messaging().onNotificationOpenedApp(handleOrderAssigned);
+    messaging()
+      .getInitialNotification()
+      .then((msg) => {
+        if (msg) handleOrderAssigned(msg);
+      });
+    return sub;
+  }, [handleOrderAssigned]);
 
   useEffect(() => {
     if (user) {
