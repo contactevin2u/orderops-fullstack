@@ -3,6 +3,8 @@ import useSWR from "swr";
 import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StatusBadge from "@/components/StatusBadge";
+import PageHeader from "@/components/PageHeader";
+import Card from "@/components/Card";
 import {
   listOrders,
   addPayment,
@@ -246,15 +248,16 @@ export default function OperatorOrdersPage() {
 
   return (
     <Layout>
-      <div className="card stack">
-        <h2 style={{ marginTop: 0 }}>Orders</h2>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input
-            className="input"
-            placeholder="Search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+      <div className="stack">
+        <PageHeader title="Orders" />
+        <Card className="stack">
+          <div className="cluster">
+            <input
+              className="input"
+              placeholder="Search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
           <select className="select" value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All Status</option>
             <option>NEW</option>
@@ -280,7 +283,7 @@ export default function OperatorOrdersPage() {
         </div>
 
         {selected.size>0 && (
-          <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+          <div className="cluster">
             <button className="btn secondary" onClick={batchRecordPayment}>Record Payment</button>
             <button className="btn secondary" onClick={batchExport}>Export</button>
             <button className="btn secondary" onClick={batchAssignDriver}>Assign Driver</button>
@@ -309,12 +312,13 @@ export default function OperatorOrdersPage() {
           )}
         </ErrorBoundary>
         {totalPages>1 && (
-          <div style={{display:'flex',gap:4,justifyContent:'center',marginTop:8}}>
+          <div className="cluster" style={{justifyContent:'center'}}>
             <button className="btn secondary" disabled={page===0} onClick={()=>setPage(p=>p-1)}>Prev</button>
             <span style={{alignSelf:'center'}}>{page+1}/{totalPages}</span>
             <button className="btn secondary" disabled={page>=totalPages-1} onClick={()=>setPage(p=>p+1)}>Next</button>
           </div>
         )}
+        </Card>
       </div>
     </Layout>
   );

@@ -1,6 +1,8 @@
 import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
+import Card from "@/components/Card";
 import {
   listOrders,
   markReturned,
@@ -98,15 +100,16 @@ export default function AdjustmentsPage() {
 
   return (
     <Layout>
-      <div className="card" style={{ maxWidth: 600, margin: '0 auto' }}>
-        <h2 style={{ marginTop: 0 }}>Adjustments</h2>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      <div className="stack" style={{ maxWidth: 600, margin: '0 auto' }}>
+        <PageHeader title="Adjustments" />
+        <Card className="stack">
+        <div className="cluster">
           <button className={`btn ${tab==='return'?'':'secondary'}`} onClick={()=>setTab('return')}>Return</button>
           <button className={`btn ${tab==='cancel'?'':'secondary'}`} onClick={()=>setTab('cancel')}>Cancel Installment</button>
           <button className={`btn ${tab==='buyback'?'':'secondary'}`} onClick={()=>setTab('buyback')}>Buyback</button>
         </div>
         {!order && (
-          <div className="stack" style={{marginBottom:16}}>
+          <div className="stack">
             <input className="input" placeholder="Search order" value={q} onChange={e=>setQ(e.target.value)} />
             {results.length>0 && (
               <ul className="stack" style={{maxHeight:200,overflowY:'auto'}}>
@@ -123,9 +126,9 @@ export default function AdjustmentsPage() {
         )}
         {order && (
           <div className="stack">
-            <div>
+            <div className="cluster">
               <b>{order.code || order.id}</b> - {order.customer_name}
-              <button className="btn secondary" style={{marginLeft:8}} onClick={()=>setOrder(null)}>Change</button>
+              <button className="btn secondary" onClick={()=>setOrder(null)}>Change</button>
             </div>
             {beforeDue && (
               <div>
@@ -156,7 +159,7 @@ export default function AdjustmentsPage() {
             {tab === 'buyback' && (
               <>
                 <input className="input" placeholder="Amount" value={amount} onChange={e=>setAmount(e.target.value)} />
-                <div style={{display:'flex',gap:4}}>
+                <div className="cluster">
                   <select className="select" value={dtype} onChange={e=>setDtype(e.target.value)}>
                     <option value="">No Discount</option>
                     <option value="percent">% Off</option>
@@ -172,14 +175,15 @@ export default function AdjustmentsPage() {
               Submit
             </button>
             {msg && order && (
-              <div>
+              <div className="cluster">
                 {msg}
-                <Link href={`/orders/${order.id}`} style={{marginLeft:4}}>View order</Link>
+                <Link href={`/orders/${order.id}`}>View order</Link>
               </div>
             )}
             {err && <div style={{color:'#ffb3b3'}}>{err}</div>}
           </div>
         )}
+        </Card>
       </div>
     </Layout>
   );
