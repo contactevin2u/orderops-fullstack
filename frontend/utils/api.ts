@@ -295,3 +295,37 @@ export function createDriver(payload: {
 }) {
   return request<any>("/drivers", { json: payload });
 }
+
+// -------- Driver assignments
+export function fetchDriverAssignments(date?: string) {
+  const sp = new URLSearchParams();
+  if (date) sp.set("date", date);
+  const qs = sp.toString();
+  return request<any[]>(`/drivers/me/assignments${qs ? `?${qs}` : ""}`);
+}
+
+export function fetchAssignmentDetail(id: number | string) {
+  return request<any>(`/drivers/me/assignments/${id}`);
+}
+
+export function updateAssignmentStatus(
+  id: number | string,
+  status: string,
+  reason?: string
+) {
+  return request<any>(`/drivers/me/assignments/${id}/status`, {
+    json: { status, reason },
+  });
+}
+
+// -------- Push notifications
+export function getVapidPublicKey() {
+  return request<{ key: string }>("/drivers/me/push/vapidPublicKey");
+}
+
+export function savePushSubscription(sub: {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}) {
+  return request(`/drivers/me/push/subscriptions`, { json: sub });
+}

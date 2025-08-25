@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
+import os
 
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
@@ -156,3 +158,30 @@ def update_order_status(
         "status": trip.status,
         "items": items,
     }
+
+
+class PushSubKeys(BaseModel):
+    p256dh: str
+    auth: str
+
+
+class PushSubscriptionIn(BaseModel):
+    endpoint: str
+    keys: PushSubKeys
+
+
+_subscriptions: dict[int, list[PushSubscriptionIn]] = {}
+
+
+@router.get("/me/push/vapidPublicKey")
+def get_vapid_public_key():
+    return {"key": os.getenv("VAPID_PUBLIC_KEY", "")}
+
+
+@router.post("/me/push/subscriptions")
+def save_push_subscription(
+    payload: PushSubscriptionIn, driver=Depends(driver_auth)
+):
+    subs = _subscriptions.setdefault(driver.id, [])
+    subs.append(payload)
+    return {"status": "ok"}

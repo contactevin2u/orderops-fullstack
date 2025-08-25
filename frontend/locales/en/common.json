@@ -65,4 +65,24 @@
     "download": "Download Terms (PDF)",
     "disclaimer": "This template is provided for operational convenience and is not legal advice. Please have your counsel review for your specific use."
   }
+  ,
+  "driver": {
+    "assignments": {
+      "title": "Assignments",
+      "today": "Today",
+      "tomorrow": "Tomorrow",
+      "all": "All",
+      "none": "No assignments"
+    },
+    "call": "Call",
+    "whatsapp": "WhatsApp",
+    "map": "Map",
+    "details": "Details",
+    "copied": "Copied!",
+    "enableNotifications": "Enable Notifications",
+    "newAssignment": "New assignment",
+    "start": "Start",
+    "delivered": "Delivered",
+    "failed": "Failed"
+  }
 }
