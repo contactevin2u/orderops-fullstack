@@ -32,16 +32,35 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
   };
 
   return (
-    <View style={{ padding: 12, borderBottomWidth: 1, borderColor: '#ccc' }}>
+    <View
+      style={{
+        padding: 12,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        backgroundColor: '#fff',
+        borderRadius: 8,
+        marginBottom: 12,
+      }}
+    >
       <Pressable onPress={() => setExpanded((e) => !e)}>
-        <Text style={{ fontWeight: 'bold' }}>
+        <Text style={{ fontWeight: 'bold', color: '#0f172a' }}>
           {order.address || order.description}
         </Text>
       </Pressable>
       {expanded && (
         <>
-          <Text style={{ color: statusColors[order.status] || '#000' }}>
-            Status: {order.status}
+          <Text
+            style={{
+              color: '#fff',
+              backgroundColor: statusColors[order.status] || '#6b7280',
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 4,
+              alignSelf: 'flex-start',
+              marginVertical: 4,
+            }}
+          >
+            {order.status}
           </Text>
           {order.phone && <Text>Phone: {order.phone}</Text>}
           {order.total !== undefined && <Text>Total: {order.total}</Text>}
