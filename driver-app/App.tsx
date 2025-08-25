@@ -20,6 +20,9 @@ const API_BASE =
   (Constants?.expoConfig?.extra as any)?.apiBase ||
   'https://orderops-api-v1.onrender.com';
 
+// Only show debug diagnostics in development builds
+const DEBUG = __DEV__;
+
 export default function App() {
   const [health, setHealth] = useState<Status>(null);
   const [uid, setUid] = useState<Status>(null);
@@ -186,20 +189,23 @@ export default function App() {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Driver App</Text>
+      {DEBUG && (
+        <>
+          <Row label="API Base" value={API_BASE} />
+          <Row label="Health" value={health ?? '…'} />
+          <Row label="Firebase UID" value={uid ?? '…'} />
+          <Row label="ID Token (tail)" value={idToken ? tail(idToken) : '…'} />
+          <Row label="FCM Token (tail)" value={fcm ? tail(fcm) : '…'} />
+          <Row label="Register" value={registerStatus ?? '…'} />
+          {error && <Text style={styles.error}>Error: {error}</Text>}
 
-      <Row label="API Base" value={API_BASE} />
-      <Row label="Health" value={health ?? '…'} />
-      <Row label="Firebase UID" value={uid ?? '…'} />
-      <Row label="ID Token (tail)" value={idToken ? tail(idToken) : '…'} />
-      <Row label="FCM Token (tail)" value={fcm ? tail(fcm) : '…'} />
-      <Row label="Register" value={registerStatus ?? '…'} />
-      {error && <Text style={styles.error}>Error: {error}</Text>}
-
-      <View style={{ height: 12 }} />
-      <Btn text="Retry Health" onPress={checkHealth} />
-      <View style={{ height: 8 }} />
-      <Btn text="Re-run Auth + Register" onPress={bootstrap} />
-      <View style={{ height: 8 }} />
+          <View style={{ height: 12 }} />
+          <Btn text="Retry Health" onPress={checkHealth} />
+          <View style={{ height: 8 }} />
+          <Btn text="Re-run Auth + Register" onPress={bootstrap} />
+          <View style={{ height: 8 }} />
+        </>
+      )}
       <Btn text="Sign Out" onPress={() => auth().signOut()} />
       <View style={{ height: 24 }} />
       <Text style={styles.subtitle}>Assigned Orders</Text>
