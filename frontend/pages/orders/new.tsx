@@ -1,4 +1,3 @@
-import Layout from "@/components/Layout";
 import React from "react";
 import { useRouter } from "next/router";
 import TermsModal from "@/components/ui/TermsModal";
@@ -147,7 +146,7 @@ export default function NewOrderPage(){
   }
 
   return (
-    <Layout>
+    <>
       <div className="stack">
         <PageHeader title="New Order" />
         <Card className="stack">
@@ -236,6 +235,6 @@ export default function NewOrderPage(){
         onClose={()=>setTermsOpen(false)}
         onAccept={()=>{ setAccepted(true); setTermsOpen(false); createOrder(); }}
       />
-    </Layout>
+    </>
   );
 }

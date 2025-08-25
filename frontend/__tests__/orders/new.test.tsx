@@ -4,7 +4,6 @@ import { vi } from 'vitest';
 import NewOrderPage from '@/pages/orders/new';
 
 vi.mock('next/router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('@/components/Layout', () => ({ default: ({ children }: any) => <div>{children}</div> }));
 
 describe('NewOrderPage', () => {
   it('renders charges and plan fields', () => {

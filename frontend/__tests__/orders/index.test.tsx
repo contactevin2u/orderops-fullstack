@@ -5,7 +5,6 @@ import { vi } from 'vitest';
 import OrdersPage from '@/pages/orders';
 
 vi.mock('next/link', () => ({ default: ({ children, ...props }: any) => <a {...props}>{children}</a> }));
-vi.mock('@/components/Layout', () => ({ default: ({ children }: any) => <div>{children}</div> }));
 vi.mock('swr');
 
 const mockedUseSWR: any = useSWR;

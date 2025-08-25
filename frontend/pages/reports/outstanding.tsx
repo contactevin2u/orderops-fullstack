@@ -1,4 +1,3 @@
-import Layout from "@/components/Layout";
 import Card from "@/components/Card";
 import Button from "@/components/ui/Button";
 import React from "react";
@@ -30,7 +29,6 @@ export default function OutstandingPage() {
   }, [load]);
 
   return (
-    <Layout>
       <div className="container stack" style={{ maxWidth: '64rem' }}>
         <Card>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>Outstanding</h2>
@@ -164,7 +162,6 @@ export default function OutstandingPage() {
           </div>
         </Card>
       </div>
-    </Layout>
   );
 }
 

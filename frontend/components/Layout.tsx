@@ -13,19 +13,23 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 
+export type NavItem = { href: string; label: string; Icon: any };
+export const navItems: NavItem[] = [
+  { href: '/', label: 'nav.intake', Icon: Inbox },
+  { href: '/orders', label: 'nav.orders', Icon: ClipboardList },
+  { href: '/export', label: 'nav.export', Icon: FileDown },
+  { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
+  { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
+  { href: '/adjustments', label: 'nav.adjustments', Icon: Wrench },
+];
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLDivElement>(null);
-  const nav = [
-    { href: '/', label: t('nav.intake'), Icon: Inbox },
-    { href: '/orders', label: t('nav.orders'), Icon: ClipboardList },
-    { href: '/export', label: t('nav.export'), Icon: FileDown },
-    { href: '/reports/outstanding', label: t('nav.reports'), Icon: BarChart2 },
-    { href: '/cashier', label: t('nav.cashier'), Icon: CircleDollarSign },
-    { href: '/adjustments', label: t('nav.adjustments'), Icon: Wrench },
-  ];
+  const pathname = router.asPath;
+  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
   React.useEffect(() => {
     if (mobileOpen) {
       const first = menuRef.current?.querySelector<HTMLElement>('a,button');
@@ -68,15 +72,15 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <span className="sr-only">{t('nav.menu')}</span>
           </button>
           <nav id="primary-nav" ref={menuRef} className={`nav ${mobileOpen ? 'open' : ''}`}>
-            {nav.map(({ href, label, Icon }) => (
+            {navItems.map(({ href, label, Icon }) => (
               <Link
                 key={href}
                 href={href}
-                className={`nav-link ${router.asPath.startsWith(href) ? 'active' : ''}`}
+                className={`nav-link ${isActive(href) ? 'active' : ''}`}
                 onClick={() => setMobileOpen(false)}
               >
                 <Icon style={{ width: 20, height: 20 }} />
-                <span>{label}</span>
+                <span>{t(label)}</span>
               </Link>
             ))}
             <LanguageSwitcher />
