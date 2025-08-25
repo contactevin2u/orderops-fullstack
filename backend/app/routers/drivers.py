@@ -85,7 +85,14 @@ def list_assigned_orders(
     for trip, order in rows:
         try:
             items = [
-                {"id": item.id, "name": item.name, "qty": item.qty}
+                {
+                    "id": item.id,
+                    "name": item.name,
+                    "item_type": item.item_type,
+                    "qty": item.qty,
+                    "unit_price": item.unit_price,
+                    "line_total": item.line_total,
+                }
                 for item in order.items
             ]
         except Exception:
@@ -131,7 +138,14 @@ def update_order_status(
     db.commit()
     try:
         items = [
-            {"id": item.id, "name": item.name, "qty": item.qty}
+            {
+                "id": item.id,
+                "name": item.name,
+                "item_type": item.item_type,
+                "qty": item.qty,
+                "unit_price": item.unit_price,
+                "line_total": item.line_total,
+            }
             for item in order.items
         ]
     except Exception:
