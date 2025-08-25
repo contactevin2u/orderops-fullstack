@@ -30,6 +30,7 @@ export default function App() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState<Status>(null);
+  const [signingIn, setSigningIn] = useState(false);
   const orders = useOrderStore((s) => s.orders);
   const setOrders = useOrderStore((s) => s.setOrders);
 
@@ -104,13 +105,17 @@ export default function App() {
   }, [fetchOrders]);
 
   const login = useCallback(async () => {
+    if (signingIn) return;
     setLoginError(null);
+    setSigningIn(true);
     try {
       await auth().signInWithEmailAndPassword(email.trim(), password);
     } catch (e: any) {
       setLoginError(e?.message ?? String(e));
+    } finally {
+      setSigningIn(false);
     }
-  }, [email, password]);
+  }, [email, password, signingIn]);
 
   useEffect(() => {
     const sub = auth().onAuthStateChanged(setUser);
@@ -147,9 +152,11 @@ export default function App() {
           secureTextEntry
           value={password}
           onChangeText={setPassword}
+          returnKeyType="done"
+          onSubmitEditing={login}
         />
         {loginError && <Text style={styles.error}>Error: {loginError}</Text>}
-        <Btn text="Sign In" onPress={login} />
+        <Btn text={signingIn ? 'Signing In…' : 'Sign In'} onPress={login} disabled={signingIn} />
       </View>
     );
   }
@@ -198,9 +205,9 @@ function Row({ label, value }: { label: string; value: string }) {
     </View>
   );
 }
-function Btn({ text, onPress }: { text: string; onPress: () => void }) {
+function Btn({ text, onPress, disabled }: { text: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable onPress={onPress} style={styles.button}>
+    <Pressable onPress={onPress} disabled={disabled} style={[styles.button, disabled && { opacity: 0.5 }]}> 
       <Text style={styles.buttonText}>{text}</Text>
     </Pressable>
   );
