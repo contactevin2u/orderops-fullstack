@@ -53,6 +53,7 @@ export default function AdjustmentsPage() {
     try {
       if (tab === 'return') {
         if (beforeDue && Number(beforeDue.balance || 0) > 0 && !collect) {
+
           setErr('Outstanding must be cleared before return');
           return;
         }
