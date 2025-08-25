@@ -1,4 +1,3 @@
-import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
 import {
@@ -128,7 +127,6 @@ export default function CashierPage() {
   };
 
   return (
-    <Layout>
       <div style={{ display: "flex", gap: 16 }}>
         <div className="card" style={{ flex: 1 }}>
           <h2 style={{ marginTop: 0 }}>Find Order</h2>
@@ -263,7 +261,6 @@ export default function CashierPage() {
           </div>
         </div>
       </div>
-    </Layout>
   );
 }
 

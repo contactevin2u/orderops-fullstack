@@ -1,6 +1,5 @@
 import React from "react";
 import useSWR from "swr";
-import Layout from "@/components/Layout";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StatusBadge from "@/components/StatusBadge";
 import PageHeader from "@/components/PageHeader";
@@ -247,7 +246,6 @@ export default function OperatorOrdersPage() {
   }
 
   return (
-    <Layout>
       <div className="stack">
         <PageHeader title="Orders" />
         <Card className="stack">
@@ -320,7 +318,6 @@ export default function OperatorOrdersPage() {
         )}
         </Card>
       </div>
-    </Layout>
   );
 }
 

@@ -1,4 +1,3 @@
-import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
@@ -99,7 +98,6 @@ export default function AdjustmentsPage() {
   );
 
   return (
-    <Layout>
       <div className="stack" style={{ maxWidth: 600, margin: '0 auto' }}>
         <PageHeader title="Adjustments" />
         <Card className="stack">
@@ -185,7 +183,6 @@ export default function AdjustmentsPage() {
         )}
         </Card>
       </div>
-    </Layout>
   );
 }
 

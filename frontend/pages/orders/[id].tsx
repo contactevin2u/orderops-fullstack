@@ -1,4 +1,3 @@
-import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -91,7 +90,7 @@ export default function OrderDetailPage(){
 
   React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[order, asOf, loadDue]);
 
-  if(!order) return <Layout><div className="card">Loading...</div></Layout>;
+  if(!order) return <div className="card">Loading...</div>;
   const profile = order.company_profile || {};
   const invoiceUrl = invoicePdfUrl(order.id);
   function copyInvoice(){ navigator.clipboard.writeText(invoiceUrl); alert(t('documents.copied')); }
@@ -247,7 +246,6 @@ export default function OrderDetailPage(){
   }
 
   return (
-    <Layout>
       <div className="row">
         <div className="col">
           <div className="card">
@@ -468,6 +466,5 @@ export default function OrderDetailPage(){
           <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}}>{err || msg}</div>
         </div>
       </div>
-    </Layout>
   );
 }

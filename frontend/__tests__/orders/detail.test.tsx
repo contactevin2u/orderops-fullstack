@@ -4,7 +4,6 @@ import { vi } from 'vitest';
 import OrderDetailPage from '@/pages/orders/[id]';
 
 vi.mock('next/router', () => ({ useRouter: () => ({ query: { id: '1' } }) }));
-vi.mock('@/components/Layout', () => ({ default: ({ children }: any) => <div>{children}</div> }));
 
 const mockGetOrder = vi.fn();
 const mockUpdateOrder = vi.fn();

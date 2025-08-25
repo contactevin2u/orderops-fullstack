@@ -1,4 +1,3 @@
-import Layout from "@/components/Layout";
 import Card from "@/components/Card";
 import Button from "@/components/ui/Button";
 import React from "react";
@@ -20,7 +19,6 @@ export default function ExportPage() {
   }
 
   return (
-    <Layout>
       <div className="small-container stack">
         <Card>
           <h2 style={{ marginTop: 0, marginBottom: 16 }}>Export Payments</h2>
@@ -70,7 +68,6 @@ export default function ExportPage() {
           </div>
         </Card>
       </div>
-    </Layout>
   );
 }
 

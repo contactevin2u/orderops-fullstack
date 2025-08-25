@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import '@/i18n';
 import { useRouter } from 'next/router';
-import AppShell from '@/components/AppShell';
+import Layout from '@/components/Layout';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -14,7 +14,7 @@ export default function App({ Component, pageProps }: AppProps) {
   const content = <Component {...pageProps} />;
   return (
     <div className={inter.className}>
-      {noLayout.includes(router.pathname) ? content : <AppShell>{content}</AppShell>}
+      {noLayout.includes(router.pathname) ? content : <Layout>{content}</Layout>}
     </div>
   );
 }
