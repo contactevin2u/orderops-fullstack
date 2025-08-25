@@ -176,7 +176,7 @@ jobs:
         if: steps.gradle_check.outputs.found == 'true'
         run: |
           firebase appdistribution:distribute driver-app/android/app/build/outputs/bundle/release/app-release.aab \
-            --app "$FIREBASE_APP_ID" \
+            --app "${{ secrets.FIREBASE_ANDROID_APP_ID }}" \
             --groups "$FIREBASE_GROUPS"
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ github.workspace }}/firebase-service-account.json
