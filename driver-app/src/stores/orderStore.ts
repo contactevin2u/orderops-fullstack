@@ -11,6 +11,9 @@ export interface Order {
   description: string;
   status: string;
   items?: OrderItem[];
+  address?: string;
+  phone?: string;
+  total?: number;
 }
 
 interface OrderState {

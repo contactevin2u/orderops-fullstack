@@ -34,31 +34,38 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
   return (
     <View style={{ padding: 12, borderBottomWidth: 1, borderColor: '#ccc' }}>
       <Pressable onPress={() => setExpanded((e) => !e)}>
-        <Text style={{ fontWeight: 'bold' }}>{order.description}</Text>
+        <Text style={{ fontWeight: 'bold' }}>
+          {order.address || order.description}
+        </Text>
       </Pressable>
-      <Text style={{ color: statusColors[order.status] || '#000' }}>
-        Status: {order.status}
-      </Text>
-      {expanded &&
-        order.items?.map((item) => (
-          <Text key={item.id}>
-            • {item.qty} x {item.name}
+      {expanded && (
+        <>
+          <Text style={{ color: statusColors[order.status] || '#000' }}>
+            Status: {order.status}
           </Text>
-        ))}
-      {order.status === 'ASSIGNED' && (
-        <>
-          <Button title="Start" onPress={() => update('IN_TRANSIT')} />
-          <Button title="Hold" onPress={() => update('ON_HOLD')} />
+          {order.phone && <Text>Phone: {order.phone}</Text>}
+          {order.total !== undefined && <Text>Total: {order.total}</Text>}
+          {order.items?.map((item) => (
+            <Text key={item.id}>
+              • {item.qty} x {item.name}
+            </Text>
+          ))}
+          {order.status === 'ASSIGNED' && (
+            <>
+              <Button title="Start" onPress={() => update('IN_TRANSIT')} />
+              <Button title="Hold" onPress={() => update('ON_HOLD')} />
+            </>
+          )}
+          {order.status === 'IN_TRANSIT' && (
+            <>
+              <Button title="Complete" onPress={() => update('DELIVERED')} />
+              <Button title="Hold" onPress={() => update('ON_HOLD')} />
+            </>
+          )}
+          {order.status === 'ON_HOLD' && (
+            <Button title="Resume" onPress={() => update('IN_TRANSIT')} />
+          )}
         </>
-      )}
-      {order.status === 'IN_TRANSIT' && (
-        <>
-          <Button title="Complete" onPress={() => update('DELIVERED')} />
-          <Button title="Hold" onPress={() => update('ON_HOLD')} />
-        </>
-      )}
-      {order.status === 'ON_HOLD' && (
-        <Button title="Resume" onPress={() => update('IN_TRANSIT')} />
       )}
     </View>
   );
