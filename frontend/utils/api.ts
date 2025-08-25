@@ -249,10 +249,18 @@ export function voidPayment(paymentId: number, reason?: string) {
   return request<any>(`/payments/${paymentId}/void`, { json: { reason } });
 }
 
-export function exportPayments(start: string, end: string, opts?: { mark?: boolean }) {
+export async function exportPayments(
+  start: string,
+  end: string,
+  opts?: { mark?: boolean }
+) {
   const sp = new URLSearchParams({ start, end });
   if (opts?.mark) sp.set("mark", "true");
-  return request<Blob>(`/export/cash.xlsx?${sp.toString()}`);
+  const res = await fetch(pathJoin(`/export/cash.xlsx?${sp.toString()}`), {
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
+  return res.blob();
 }
 
 // -------- Reports
