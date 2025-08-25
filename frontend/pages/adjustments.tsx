@@ -1,7 +1,13 @@
 import Layout from "@/components/Layout";
 import React from "react";
 import Link from "next/link";
-import { listOrders, markReturned, cancelInstallment, markBuyback } from "@/utils/api";
+import {
+  listOrders,
+  markReturned,
+  cancelInstallment,
+  markBuyback,
+  orderDue,
+} from "@/utils/api";
 
 type Tab = 'return' | 'cancel' | 'buyback';
 
@@ -12,6 +18,8 @@ export default function AdjustmentsPage() {
   const [order, setOrder] = React.useState<any>(null);
   const [msg, setMsg] = React.useState("");
   const [err, setErr] = React.useState("");
+  const [beforeDue, setBeforeDue] = React.useState<any>(null);
+  const [afterDue, setAfterDue] = React.useState<any>(null);
 
   React.useEffect(() => {
     if (!q) { setResults([]); return; }
@@ -26,10 +34,17 @@ export default function AdjustmentsPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const selectOrder = (o: any) => {
+  const selectOrder = async (o: any) => {
     setOrder(o);
     setResults([]);
     setQ("");
+    try {
+      const d = await orderDue(o.id);
+      setBeforeDue(d);
+      setAfterDue(d);
+    } catch (e: any) {
+      setErr(e?.message || "Failed to load due");
+    }
   };
 
   const submit = async () => {
@@ -37,7 +52,12 @@ export default function AdjustmentsPage() {
     setErr(""); setMsg("");
     try {
       if (tab === 'return') {
-        await markReturned(order.id, undefined, {
+        if (beforeDue && Number(beforeDue.balance || 0) > 0 && !collect) {
+          alert('Outstanding must be cleared before return');
+          setErr('Outstanding must be cleared before return');
+          return;
+        }
+        await markReturned(order.id, retDate || undefined, {
           collect: collect,
           return_delivery_fee: rfee ? Number(rfee) : undefined,
           method,
@@ -56,6 +76,8 @@ export default function AdjustmentsPage() {
         if (dtype && dval) opts.discount = { type: dtype, value: Number(dval) };
         await markBuyback(order.id, Number(amount || 0), opts);
       }
+      const d = await orderDue(order.id);
+      setAfterDue(d);
       setMsg(`Done. View order `);
     } catch (e: any) {
       setErr(e?.message || "Failed");
@@ -70,6 +92,9 @@ export default function AdjustmentsPage() {
   const [dval, setDval] = React.useState("");
   const [method, setMethod] = React.useState("");
   const [reference, setReference] = React.useState("");
+  const [retDate, setRetDate] = React.useState(() =>
+    new Date().toISOString().slice(0, 10)
+  );
 
   return (
     <Layout>
@@ -102,8 +127,25 @@ export default function AdjustmentsPage() {
               <b>{order.code || order.id}</b> - {order.customer_name}
               <button className="btn secondary" style={{marginLeft:8}} onClick={()=>setOrder(null)}>Change</button>
             </div>
+            {beforeDue && (
+              <div>
+                Outstanding: RM {Number(beforeDue?.balance || 0).toFixed(2)}
+                {afterDue && (
+                  <>
+                    {" -> "}
+                    {Number(afterDue?.balance || 0).toFixed(2)}
+                    {" (Δ "}
+                    {Number((afterDue?.balance || 0) - (beforeDue?.balance || 0)).toFixed(2)}
+                    {")"}
+                  </>
+                )}
+              </div>
+            )}
             {tab !== 'buyback' && (
               <label><input type="checkbox" checked={collect} onChange={e=>setCollect(e.target.checked)} /> Collect</label>
+            )}
+            {tab === 'return' && (
+              <input className="input" type="date" value={retDate} onChange={e=>setRetDate(e.target.value)} />
             )}
             {tab === 'cancel' && (
               <input className="input" placeholder="Penalty" value={penalty} onChange={e=>setPenalty(e.target.value)} />
