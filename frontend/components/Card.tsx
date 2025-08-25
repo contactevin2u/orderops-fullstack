@@ -1,6 +1,14 @@
 import React from 'react';
 import clsx from 'clsx';
 
-export default function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={clsx('card', className)}>{children}</div>;
+type Props = React.HTMLAttributes<HTMLDivElement> & {
+  children: React.ReactNode;
+};
+
+export default function Card({ children, className, ...rest }: Props) {
+  return (
+    <div className={clsx('card', className)} {...rest}>
+      {children}
+    </div>
+  );
 }
