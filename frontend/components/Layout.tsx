@@ -10,12 +10,19 @@ import {
   CircleDollarSign,
   Wrench,
   Menu,
+  Shield,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
 import { getMe } from '@/utils/api';
 
-export type NavItem = { href: string; label: string; Icon: any };
+export type NavItem = {
+  href: string;
+  label: string;
+  Icon: any;
+  requiresAuth?: boolean;
+};
+
 export const navItems: NavItem[] = [
   { href: '/', label: 'nav.intake', Icon: Inbox },
   { href: '/orders', label: 'nav.orders', Icon: ClipboardList },
@@ -23,18 +30,34 @@ export const navItems: NavItem[] = [
   { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
   { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
   { href: '/adjustments', label: 'nav.adjustments', Icon: Wrench },
+  { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
 ];
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = React.useState(false);
-  const menuRef = React.useRef<HTMLDivElement>(null);
+  const menuRef = React.useRef<HTMLElement>(null);
   const { data: user, error: userErr } = useSWR('me', getMe, {
     shouldRetryOnError: false,
   });
-  const pathname = router.asPath;
-  const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href));
+
+  const pathname = React.useMemo(
+    () => router.asPath.split('?')[0],
+    [router.asPath]
+  );
+
+  const isActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const uniqueByHref = (items: NavItem[]) =>
+    Array.from(new Map(items.map((i) => [i.href, i])).values());
+
+  const items = uniqueByHref(navItems).filter(
+    (i) => !i.requiresAuth || !!user
+  );
   React.useEffect(() => {
     if (mobileOpen) {
       const first = menuRef.current?.querySelector<HTMLElement>('a,button');
@@ -68,6 +91,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <div className="header-inner">
           <h1>OrderOps</h1>
           <button
+            type="button"
             className="nav-link nav-toggle"
             aria-expanded={mobileOpen}
             aria-controls="primary-nav"
@@ -76,8 +100,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <Menu style={{ width: 20, height: 20 }} />
             <span className="sr-only">{t('nav.menu')}</span>
           </button>
-          <nav id="primary-nav" ref={menuRef} className={`nav ${mobileOpen ? 'open' : ''}`}>
-            {navItems.map(({ href, label, Icon }) => (
+          <nav
+            id="primary-nav"
+            ref={menuRef}
+            className={`nav ${mobileOpen ? 'open' : ''}`}
+            aria-label="Primary"
+          >
+            {items.map(({ href, label, Icon }) => (
               <Link
                 key={href}
                 href={href}
