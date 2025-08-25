@@ -1,4 +1,10 @@
-import { listOrders, getOrder, listDrivers, assignOrderToDriver } from '@/utils/api';
+import {
+  listOrders,
+  getOrder,
+  listDrivers,
+  assignOrderToDriver,
+  listDriverCommissions,
+} from '@/utils/api';
 
 // Use Vitest's vi to mock fetch
 
@@ -57,6 +63,22 @@ describe('api request unwrapping', () => {
         method: 'POST',
         body: JSON.stringify({ driver_id: 'd1' }),
       }),
+    );
+  });
+
+  it('fetches driver commissions', async () => {
+    const data = [{ month: '2024-01', total: 10 }];
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify(data),
+      headers: { get: () => 'application/json' },
+    });
+
+    const result = await listDriverCommissions(1);
+    expect(result).toEqual(data);
+    expect((global as any).fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/drivers/1/commissions'),
+      expect.any(Object)
     );
   });
 });
