@@ -13,6 +13,7 @@ import {
   assignOrderToDriver,
   listDrivers,
   invoicePdfUrl,
+  orderDue,
 } from "@/utils/api";
 import Link from "next/link";
 
@@ -127,6 +128,18 @@ export default function OperatorOrdersPage() {
 
   async function markReturnOrCollect(order: any) {
     const collect = window.confirm("Collect item?");
+    if (!collect) {
+      try {
+        const d = await orderDue(order.id);
+        if (d && Number(d?.outstanding || d?.balance || 0) > 0) {
+          alert("Outstanding must be cleared before return");
+          return;
+        }
+      } catch (e: any) {
+        alert(e?.message || "Failed");
+        return;
+      }
+    }
     try {
       await markReturned(order.id, undefined, { collect });
       mutate();
