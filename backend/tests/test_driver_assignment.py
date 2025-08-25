@@ -104,13 +104,16 @@ def test_driver_order_listing(monkeypatch):
         db.add_all([driver, customer])
         db.flush()
         order = Order(code="O1", type="OUTRIGHT", customer_id=customer.id)
-        db.add(order)
+        order2 = Order(code="O2", type="OUTRIGHT", customer_id=customer.id)
+        db.add_all([order, order2])
         db.flush()
         trip = Trip(order_id=order.id, driver_id=driver.id, status="ASSIGNED")
-        db.add(trip)
+        trip2 = Trip(order_id=order2.id, driver_id=driver.id, status="DELIVERED")
+        db.add_all([trip, trip2])
         db.commit()
         driver_id = driver.id
         order_id = order.id
+        order2_id = order2.id
 
     app.dependency_overrides[auth_firebase.driver_auth] = lambda: driver
 
@@ -119,8 +122,8 @@ def test_driver_order_listing(monkeypatch):
     assert resp.status_code == 200
     data = resp.json()
     assert any(o["id"] == order_id for o in data)
-    assert data[0]["description"] == "O1"
-    assert data[0]["status"] == "ASSIGNED"
+    assert any(o["id"] == order2_id and o["status"] == "DELIVERED" for o in data)
+    assert any(o["description"] == "O1" for o in data)
 
     app.dependency_overrides.clear()
 
@@ -158,6 +161,20 @@ def test_driver_can_update_order_status(monkeypatch):
             trip = db.query(Trip).filter_by(order_id=order_id).one()
             assert trip.status == "IN_TRANSIT"
             assert trip.started_at is not None
+
+        resp = client.patch(f"/drivers/orders/{order_id}", json={"status": "ON_HOLD"})
+        assert resp.status_code == 200
+
+        with SessionLocal() as db:
+            trip = db.query(Trip).filter_by(order_id=order_id).one()
+            assert trip.status == "ON_HOLD"
+
+        resp = client.patch(f"/drivers/orders/{order_id}", json={"status": "IN_TRANSIT"})
+        assert resp.status_code == 200
+
+        with SessionLocal() as db:
+            trip = db.query(Trip).filter_by(order_id=order_id).one()
+            assert trip.status == "IN_TRANSIT"
 
         resp = client.patch(f"/drivers/orders/{order_id}", json={"status": "DELIVERED"})
         assert resp.status_code == 200

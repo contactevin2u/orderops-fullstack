@@ -4,10 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..auth.firebase import driver_auth
+from ..auth.firebase import driver_auth, firebase_auth, _get_app
+from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent
-from ..schemas import DeviceRegisterIn, DriverOut, DriverOrderOut, DriverOrderUpdateIn
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role
+from ..schemas import (
+    DeviceRegisterIn,
+    DriverOut,
+    DriverOrderOut,
+    DriverOrderUpdateIn,
+    DriverCreateIn,
+)
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -15,6 +22,24 @@ router = APIRouter(prefix="/drivers", tags=["drivers"])
 @router.get("", response_model=list[DriverOut])
 def list_drivers(db: Session = Depends(get_session)):
     return db.query(Driver).filter(Driver.is_active == True).all()
+
+
+@router.post("", response_model=DriverOut, dependencies=[Depends(require_roles(Role.ADMIN))])
+def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
+    try:
+        fb_user = firebase_auth.create_user(
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.name,
+            app=_get_app(),
+        )
+    except Exception as exc:  # pragma: no cover - network/cred failures
+        raise HTTPException(400, "Failed to create driver") from exc
+    driver = Driver(firebase_uid=fb_user.uid, name=payload.name, phone=payload.phone)
+    db.add(driver)
+    db.commit()
+    db.refresh(driver)
+    return driver
 
 
 @router.post("/devices/register")
@@ -54,7 +79,6 @@ def list_assigned_orders(
         select(Trip, Order)
         .join(Order, Trip.order_id == Order.id)
         .where(Trip.driver_id == driver.id)
-        .where(Trip.status == "ASSIGNED")
     )
     rows = db.execute(stmt).all()
     results = []
@@ -91,14 +115,17 @@ def update_order_status(
     )
     if not trip:
         raise HTTPException(404, "Trip not found")
-    if payload.status not in {"IN_TRANSIT", "DELIVERED"}:
+    if payload.status not in {"IN_TRANSIT", "DELIVERED", "ON_HOLD"}:
         raise HTTPException(400, "Invalid status")
     trip.status = payload.status
     now = datetime.now(timezone.utc)
     if payload.status == "IN_TRANSIT":
-        trip.started_at = now
+        if not trip.started_at:
+            trip.started_at = now
     elif payload.status == "DELIVERED":
         trip.delivered_at = now
+    elif payload.status == "ON_HOLD":
+        pass
     db.add(TripEvent(trip_id=trip.id, status=payload.status))
     order = db.get(Order, order_id)
     db.commit()

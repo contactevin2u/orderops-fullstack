@@ -38,10 +38,19 @@ export default function OrderItem({ order, token, apiBase, refresh }: Props) {
           </Text>
         ))}
       {order.status === 'ASSIGNED' && (
-        <Button title="Start" onPress={() => update('IN_TRANSIT')} />
+        <>
+          <Button title="Start" onPress={() => update('IN_TRANSIT')} />
+          <Button title="Hold" onPress={() => update('ON_HOLD')} />
+        </>
       )}
       {order.status === 'IN_TRANSIT' && (
-        <Button title="Complete" onPress={() => update('DELIVERED')} />
+        <>
+          <Button title="Complete" onPress={() => update('DELIVERED')} />
+          <Button title="Hold" onPress={() => update('ON_HOLD')} />
+        </>
+      )}
+      {order.status === 'ON_HOLD' && (
+        <Button title="Resume" onPress={() => update('IN_TRANSIT')} />
       )}
     </View>
   );

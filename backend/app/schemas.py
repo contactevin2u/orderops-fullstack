@@ -160,8 +160,15 @@ class DriverOrderOut(BaseModel):
 
 
 class DriverOrderUpdateIn(BaseModel):
-    status: str  # IN_TRANSIT|DELIVERED
+    status: str  # IN_TRANSIT|DELIVERED|ON_HOLD
 
 
 class AssignDriverIn(BaseModel):
     driver_id: int
+
+
+class DriverCreateIn(BaseModel):
+    email: str
+    password: str
+    name: str | None = None
+    phone: str | None = None

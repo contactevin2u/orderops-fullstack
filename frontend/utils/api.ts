@@ -270,3 +270,12 @@ export function listDrivers() {
 export function assignOrderToDriver(orderId: number | string, driverId: string) {
   return request(`/orders/${orderId}/assign`, { json: { driver_id: driverId } });
 }
+
+export function createDriver(payload: {
+  email: string;
+  password: string;
+  name?: string;
+  phone?: string;
+}) {
+  return request<any>("/drivers", { json: payload });
+}
