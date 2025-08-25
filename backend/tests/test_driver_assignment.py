@@ -11,7 +11,7 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.main import app  # noqa: E402
 from app.db import get_session  # noqa: E402
-from app.models import Base, Driver, Customer, Order, Trip, Role  # noqa: E402
+from app.models import Base, Driver, Customer, Order, Trip, TripEvent, Role  # noqa: E402
 from app.routers import orders as orders_router  # noqa: E402
 from app.auth import firebase as auth_firebase  # noqa: E402
 
@@ -30,9 +30,17 @@ def _setup_db():
     Trip.__table__.c.id.type = Integer()
     Trip.__table__.c.order_id.type = Integer()
     Trip.__table__.c.driver_id.type = Integer()
+    TripEvent.__table__.c.id.type = Integer()
+    TripEvent.__table__.c.trip_id.type = Integer()
     Base.metadata.create_all(
         engine,
-        tables=[Driver.__table__, Customer.__table__, Order.__table__, Trip.__table__],
+        tables=[
+            Driver.__table__,
+            Customer.__table__,
+            Order.__table__,
+            Trip.__table__,
+            TripEvent.__table__,
+        ],
     )
     return sessionmaker(bind=engine, expire_on_commit=False)
 
@@ -115,3 +123,48 @@ def test_driver_order_listing(monkeypatch):
     assert data[0]["status"] == "ASSIGNED"
 
     app.dependency_overrides.clear()
+
+
+def test_driver_can_update_order_status(monkeypatch):
+    SessionLocal = _setup_db()
+
+    def override_get_session():
+        with SessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    with SessionLocal() as db:
+        driver = Driver(firebase_uid="u1", name="D1")
+        customer = Customer(name="C1")
+        db.add_all([driver, customer])
+        db.flush()
+        order = Order(code="O1", type="OUTRIGHT", customer_id=customer.id)
+        db.add(order)
+        db.flush()
+        trip = Trip(order_id=order.id, driver_id=driver.id, status="ASSIGNED")
+        db.add(trip)
+        db.commit()
+        order_id = order.id
+
+    app.dependency_overrides[auth_firebase.driver_auth] = lambda: driver
+
+    client = TestClient(app)
+    try:
+        resp = client.patch(f"/drivers/orders/{order_id}", json={"status": "IN_TRANSIT"})
+        assert resp.status_code == 200
+
+        with SessionLocal() as db:
+            trip = db.query(Trip).filter_by(order_id=order_id).one()
+            assert trip.status == "IN_TRANSIT"
+            assert trip.started_at is not None
+
+        resp = client.patch(f"/drivers/orders/{order_id}", json={"status": "DELIVERED"})
+        assert resp.status_code == 200
+
+        with SessionLocal() as db:
+            trip = db.query(Trip).filter_by(order_id=order_id).one()
+            assert trip.status == "DELIVERED"
+            assert trip.delivered_at is not None
+    finally:
+        app.dependency_overrides.clear()

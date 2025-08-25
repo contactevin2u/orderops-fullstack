@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth.firebase import driver_auth
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order
-from ..schemas import DeviceRegisterIn, DriverOut, DriverOrderOut
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent
+from ..schemas import DeviceRegisterIn, DriverOut, DriverOrderOut, DriverOrderUpdateIn
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -61,3 +61,31 @@ def list_assigned_orders(
         {"id": order.id, "description": order.code, "status": trip.status}
         for trip, order in rows
     ]
+
+
+@router.patch("/orders/{order_id}", response_model=DriverOrderOut)
+def update_order_status(
+    order_id: int,
+    payload: DriverOrderUpdateIn,
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    trip = (
+        db.query(Trip)
+        .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
+        .one_or_none()
+    )
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    if payload.status not in {"IN_TRANSIT", "DELIVERED"}:
+        raise HTTPException(400, "Invalid status")
+    trip.status = payload.status
+    now = datetime.now(timezone.utc)
+    if payload.status == "IN_TRANSIT":
+        trip.started_at = now
+    elif payload.status == "DELIVERED":
+        trip.delivered_at = now
+    db.add(TripEvent(trip_id=trip.id, status=payload.status))
+    order = db.get(Order, order_id)
+    db.commit()
+    return {"id": order.id, "description": order.code, "status": trip.status}

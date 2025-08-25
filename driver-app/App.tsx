@@ -119,7 +119,13 @@ export default function App() {
       <Text style={styles.subtitle}>Assigned Orders</Text>
       {orders.length === 0 && <Text>No orders assigned.</Text>}
       {orders.map((o) => (
-        <OrderItem key={o.id} order={o} />
+        <OrderItem
+          key={o.id}
+          order={o}
+          token={idToken ?? ''}
+          apiBase={API_BASE}
+          refresh={() => fetchOrders(idToken ?? '')}
+        />
       ))}
     </ScrollView>
   );
