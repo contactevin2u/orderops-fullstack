@@ -158,5 +158,9 @@ class DriverOrderOut(BaseModel):
     status: str
 
 
+class DriverOrderUpdateIn(BaseModel):
+    status: str  # IN_TRANSIT|DELIVERED
+
+
 class AssignDriverIn(BaseModel):
     driver_id: int
