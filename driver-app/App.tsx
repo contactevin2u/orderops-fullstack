@@ -39,6 +39,7 @@ export default function App() {
   const setOrders = useOrderStore((s) => s.setOrders);
   const activeOrders = orders.filter((o) => o.status !== 'DELIVERED');
   const completedOrders = orders.filter((o) => o.status === 'DELIVERED');
+  const [tab, setTab] = useState<'active' | 'completed'>('active');
 
   const checkHealth = useCallback(async () => {
     async function ping(path: string) {
@@ -163,7 +164,7 @@ export default function App() {
   }, [user, checkHealth, bootstrap]);
   if (!user) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loginContainer}>
         <Text style={styles.title}>Driver Login</Text>
         <TextInput
           style={styles.input}
@@ -190,7 +191,9 @@ export default function App() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Driver App</Text>
+      <Pressable style={styles.signOut} onPress={() => auth().signOut()}>
+        <Text style={styles.signOutText}>Sign Out</Text>
+      </Pressable>
       {DEBUG && (
         <>
           <Row label="API Base" value={API_BASE} />
@@ -208,31 +211,51 @@ export default function App() {
           <View style={{ height: 8 }} />
         </>
       )}
-      <Btn text="Sign Out" onPress={() => auth().signOut()} />
-      <View style={{ height: 24 }} />
-      <Text style={styles.subtitle}>Active Orders ({activeOrders.length})</Text>
-      {activeOrders.length === 0 && <Text>No active orders.</Text>}
-      {activeOrders.map((o) => (
-        <OrderItem
-          key={o.id}
-          order={o}
-          token={idToken ?? ''}
-          apiBase={API_BASE}
-          refresh={() => fetchOrders(idToken ?? '')}
-        />
-      ))}
-      <View style={{ height: 24 }} />
-      <Text style={styles.subtitle}>Completed Orders ({completedOrders.length})</Text>
-      {completedOrders.length === 0 && <Text>No completed orders.</Text>}
-      {completedOrders.map((o) => (
-        <OrderItem
-          key={o.id}
-          order={o}
-          token={idToken ?? ''}
-          apiBase={API_BASE}
-          refresh={() => fetchOrders(idToken ?? '')}
-        />
-      ))}
+      <View style={styles.tabs}>
+        <Pressable
+          style={[styles.tab, tab === 'active' && styles.tabActive]}
+          onPress={() => setTab('active')}
+        >
+          <Text style={[styles.tabText, tab === 'active' && styles.tabTextActive]}>
+            Active ({activeOrders.length})
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, tab === 'completed' && styles.tabActive]}
+          onPress={() => setTab('completed')}
+        >
+          <Text style={[styles.tabText, tab === 'completed' && styles.tabTextActive]}>
+            Completed ({completedOrders.length})
+          </Text>
+        </Pressable>
+      </View>
+      {tab === 'active' ? (
+        activeOrders.length === 0 ? (
+          <Text>No active orders.</Text>
+        ) : (
+          activeOrders.map((o) => (
+            <OrderItem
+              key={o.id}
+              order={o}
+              token={idToken ?? ''}
+              apiBase={API_BASE}
+              refresh={() => fetchOrders(idToken ?? '')}
+            />
+          ))
+        )
+      ) : completedOrders.length === 0 ? (
+        <Text>No completed orders.</Text>
+      ) : (
+        completedOrders.map((o) => (
+          <OrderItem
+            key={o.id}
+            order={o}
+            token={idToken ?? ''}
+            apiBase={API_BASE}
+            refresh={() => fetchOrders(idToken ?? '')}
+          />
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -255,9 +278,9 @@ function Btn({ text, onPress, disabled }: { text: string; onPress: () => void; d
   );
 }
 const styles = {
-  container: { flexGrow: 1 as const, padding: 16, justifyContent: 'center' as const, backgroundColor: '#fff' },
+  container: { flexGrow: 1 as const, padding: 16, backgroundColor: '#fff' },
+  loginContainer: { flexGrow: 1 as const, padding: 16, justifyContent: 'center' as const, backgroundColor: '#fff' },
   title: { fontSize: 22, fontWeight: '700', textAlign: 'center' as const, marginBottom: 16 },
-  subtitle: { fontSize: 18, fontWeight: '600', marginBottom: 8 },
   row: { marginVertical: 6 },
   label: { fontSize: 12, color: '#555', marginBottom: 2 },
   value: { fontSize: 14 },
@@ -271,4 +294,17 @@ const styles = {
   },
   button: { backgroundColor: '#111827', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 8, alignItems: 'center' as const },
   buttonText: { color: '#fff', fontWeight: '600' as const },
+  signOut: { alignSelf: 'flex-end' as const, padding: 4, marginBottom: 8 },
+  signOutText: { color: '#2563eb', fontSize: 12, textDecorationLine: 'underline' as const },
+  tabs: { flexDirection: 'row' as const, marginBottom: 16 },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderColor: '#ccc',
+    alignItems: 'center' as const,
+  },
+  tabActive: { borderColor: '#111827' },
+  tabText: { color: '#555' },
+  tabTextActive: { color: '#111827', fontWeight: '600' as const },
 };
