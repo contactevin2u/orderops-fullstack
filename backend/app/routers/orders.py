@@ -315,6 +315,8 @@ def assign_order(
         raise HTTPException(404, "Driver not found")
     trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
     if trip:
+        if trip.status in {"DELIVERED", "SUCCESS"}:
+            raise HTTPException(400, "Delivered orders cannot be reassigned")
         trip.driver_id = driver.id
         trip.status = "ASSIGNED"
     else:

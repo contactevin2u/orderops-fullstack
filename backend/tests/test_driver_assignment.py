@@ -89,6 +89,45 @@ def test_assign_order_to_driver(monkeypatch):
     app.dependency_overrides.clear()
 
 
+def test_cannot_reassign_delivered_order(monkeypatch):
+    SessionLocal = _setup_db()
+
+    def override_get_session():
+        with SessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[get_session] = override_get_session
+
+    class DummyUser:
+        id = 1
+        role = Role.ADMIN
+
+    dep = orders_router.router.dependencies[0].dependency
+    app.dependency_overrides[dep] = lambda: DummyUser()
+
+    client = TestClient(app)
+
+    with SessionLocal() as db:
+        driver1 = Driver(firebase_uid="u1", name="D1")
+        driver2 = Driver(firebase_uid="u2", name="D2")
+        customer = Customer(name="C1")
+        db.add_all([driver1, driver2, customer])
+        db.flush()
+        order = Order(code="O1", type="OUTRIGHT", customer_id=customer.id)
+        db.add(order)
+        db.flush()
+        trip = Trip(order_id=order.id, driver_id=driver1.id, status="DELIVERED")
+        db.add(trip)
+        db.commit()
+        order_id = order.id
+        driver2_id = driver2.id
+
+    resp = client.post(f"/orders/{order_id}/assign", json={"driver_id": driver2_id})
+    assert resp.status_code == 400
+
+    app.dependency_overrides.clear()
+
+
 def test_driver_order_listing(monkeypatch):
     SessionLocal = _setup_db()
 
