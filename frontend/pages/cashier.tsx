@@ -1,18 +1,33 @@
 import Layout from "@/components/Layout";
 import React from "react";
-import { listOrders, orderDue, addPayment } from "@/utils/api";
+import Link from "next/link";
+import {
+  listOrders,
+  orderDue,
+  addPayment,
+  voidPayment,
+  exportPayments,
+} from "@/utils/api";
 
 export default function CashierPage() {
   const [q, setQ] = React.useState("");
   const [results, setResults] = React.useState<any[]>([]);
-  const [selected, setSelected] = React.useState<any>(null);
+  const [order, setOrder] = React.useState<any>(null);
+  const [due, setDue] = React.useState<any>(null);
+
   const [amount, setAmount] = React.useState("");
+  const [method, setMethod] = React.useState("");
   const [date, setDate] = React.useState(() =>
     new Date().toISOString().slice(0, 10)
   );
-  const [due, setDue] = React.useState<any>(null);
+  const [reference, setReference] = React.useState("");
+  const [category, setCategory] = React.useState("");
+
   const [msg, setMsg] = React.useState("");
   const [err, setErr] = React.useState("");
+
+  const amountRef = React.useRef<HTMLInputElement>(null);
+  const lastPaymentId = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (!q) {
@@ -30,90 +45,222 @@ export default function CashierPage() {
     return () => clearTimeout(t);
   }, [q]);
 
-  const selectOrder = async (o: any) => {
-    setSelected(o);
+  const refreshDue = React.useCallback(async (id: number) => {
     try {
-      const d = await orderDue(o.id, date);
+      const d = await orderDue(id, date);
       setDue(d);
     } catch (e: any) {
       setErr(e?.message || "Failed to load due");
     }
+  }, [date]);
+
+  const selectOrder = async (o: any) => {
+    setOrder(o);
+    setResults([]);
+    setQ("");
+    await refreshDue(o.id);
+    setAmount("");
+    amountRef.current?.focus();
   };
 
-  const postPayment = async () => {
-    if (!selected) return;
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!order) return;
     setErr("");
     setMsg("");
     try {
-      await addPayment({
-        order_id: selected.id,
+      const p = await addPayment({
+        order_id: order.id,
         amount: Number(amount || 0),
         date,
+        method,
+        reference,
+        category,
         idempotencyKey: crypto.randomUUID(),
       });
-      const d = await orderDue(selected.id, date);
-      setDue(d);
+      lastPaymentId.current = p?.id;
+      await refreshDue(order.id);
       setAmount("");
-      setMsg("Payment recorded");
+      setMsg("Recorded");
+      amountRef.current?.focus();
     } catch (e: any) {
       setErr(e?.message || "Failed to post");
     }
   };
 
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        if (lastPaymentId.current) {
+          voidPayment(lastPaymentId.current)
+            .then(async () => {
+              setMsg("Last payment voided");
+              await refreshDue(order.id);
+              lastPaymentId.current = null;
+            })
+            .catch((er: any) => setErr(er?.message || "Undo failed"));
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [order, refreshDue]);
+
+  const [start, setStart] = React.useState("");
+  const [end, setEnd] = React.useState("");
+  const [mark, setMark] = React.useState(false);
+
+  const doExport = async () => {
+    if (!start || !end) return;
+    setErr("");
+    try {
+      const blob = await exportPayments(start, end, { mark });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `cash-${start}-to-${end}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e: any) {
+      setErr(e?.message || "Export failed");
+    }
+  };
+
   return (
     <Layout>
-      <div className="card" style={{ maxWidth: 500, margin: '0 auto' }}>
-        <h2 style={{ marginTop: 0 }}>Cashier</h2>
-        <input
-          className="input"
-          placeholder="Search order..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        {results.length > 0 && (
-          <ul className="stack" style={{ maxHeight: 200, overflowY: 'auto' }}>
-            {results.map((r) => (
-              <li key={r.id}>
-                <button
-                  className="btn secondary"
-                  style={{ width: '100%' }}
-                  onClick={() => selectOrder(r)}
-                >
-                  {r.code || r.id} - {r.customer_name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {selected && (
-          <div className="stack" style={{ marginTop: 16 }}>
-            <div>
-              <b>{selected.code || selected.id}</b> - {selected.customer_name}
+      <div style={{ display: "flex", gap: 16 }}>
+        <div className="card" style={{ flex: 1 }}>
+          <h2 style={{ marginTop: 0 }}>Find Order</h2>
+          <input
+            className="input"
+            placeholder="Search order..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          {results.length > 0 && (
+            <ul className="stack" style={{ maxHeight: 200, overflowY: "auto" }}>
+              {results.map((r) => (
+                <li key={r.id}>
+                  <button
+                    className="btn secondary"
+                    style={{ width: "100%" }}
+                    onClick={() => selectOrder(r)}
+                  >
+                    {r.code || r.id} - {r.customer_name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {order && (
+            <div style={{ marginTop: 16 }}>
+              <div>
+                <b>{order.code || order.id}</b> - {order.customer_name}
+              </div>
+              <div>Outstanding: RM {Number(due?.balance || 0).toFixed(2)}</div>
             </div>
-            <div>Due: RM {Number(due?.balance || 0).toFixed(2)}</div>
-            <input
-              className="input"
-              style={{ fontSize: 24 }}
-              placeholder="Amount"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <div style={{ display: 'flex', gap: 8 }}>
+          )}
+        </div>
+
+        <div className="card" style={{ flex: 1 }}>
+          <h2 style={{ marginTop: 0 }}>Payment</h2>
+          {order ? (
+            <form className="stack" onSubmit={submit}>
+              <input
+                ref={amountRef}
+                className="input"
+                style={{ fontSize: 24 }}
+                placeholder="Amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
               <input
                 className="input"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
+                placeholder="Method"
+                value={method}
+                onChange={(e) => setMethod(e.target.value)}
               />
-              <button className="btn secondary" onClick={() => setDate(new Date().toISOString().slice(0,10))}>Today</button>
-            </div>
-            <button className="btn" onClick={postPayment} disabled={!amount}>
-              Add Payment
-            </button>
+              <input
+                className="input"
+                placeholder="Reference"
+                value={reference}
+                onChange={(e) => setReference(e.target.value)}
+              />
+              <input
+                className="input"
+                placeholder="Category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  className="input"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="btn secondary"
+                  onClick={() =>
+                    setDate(new Date().toISOString().slice(0, 10))
+                  }
+                >
+                  Today
+                </button>
+              </div>
+              <button className="btn" type="submit" disabled={!amount}>
+                Submit
+              </button>
+            </form>
+          ) : (
+            <div>Select an order to record payment.</div>
+          )}
+          <div style={{ marginTop: 8, color: err ? "#ffb3b3" : "#9fffba" }}>
+            {err || msg}
           </div>
-        )}
-        <div style={{ marginTop: 8, color: err ? '#ffb3b3' : '#9fffba' }}>
-          {err || msg}
+        </div>
+
+        <div className="card" style={{ width: 260 }}>
+          <h3 style={{ marginTop: 0 }}>Export</h3>
+          <div className="stack" style={{ gap: 8 }}>
+            <input
+              className="input"
+              type="date"
+              value={start}
+              onChange={(e) => setStart(e.target.value)}
+            />
+            <input
+              className="input"
+              type="date"
+              value={end}
+              onChange={(e) => setEnd(e.target.value)}
+            />
+            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <input
+                type="checkbox"
+                checked={mark}
+                onChange={(e) => setMark(e.target.checked)}
+              />
+              Mark exported
+            </label>
+            <button
+              type="button"
+              className="btn"
+              onClick={doExport}
+              disabled={!start || !end}
+            >
+              Export
+            </button>
+            <Link
+              href="/export"
+              className="btn secondary"
+              style={{ textAlign: "center" }}
+            >
+              View Export Runs
+            </Link>
+          </div>
         </div>
       </div>
     </Layout>

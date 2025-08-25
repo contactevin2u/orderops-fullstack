@@ -191,6 +191,12 @@ export default function OrderDetailPage(){
   async function onReturned(){
     setBusy(true); setErr(""); setMsg("");
     try{
+      const d = due || await orderDue(order.id);
+      if(!retCollect && d && Number(d?.outstanding || d?.balance || 0) > 0){
+        setErr("Outstanding must be cleared before return");
+        setBusy(false);
+        return;
+      }
       const out = await markReturned(order.id, undefined, {
         collect: retCollect,
         return_delivery_fee: retDelFee ? Number(retDelFee) : undefined,
