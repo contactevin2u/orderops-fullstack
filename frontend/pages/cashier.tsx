@@ -1,5 +1,6 @@
 import React from "react";
 import Link from "next/link";
+import Card from "@/components/Card";
 import {
   listOrders,
   orderDue,
@@ -127,9 +128,10 @@ export default function CashierPage() {
   };
 
   return (
-      <div style={{ display: "flex", gap: 16 }}>
-        <div className="card" style={{ flex: 1 }}>
-          <h2 style={{ marginTop: 0 }}>Find Order</h2>
+    <div className="stack">
+      <div className="grid" style={{ gridTemplateColumns: "1fr 1fr 260px" }}>
+        <Card className="stack" style={{ flex: 1 }}>
+          <h2>Find Order</h2>
           <input
             className="input"
             placeholder="Search order..."
@@ -152,17 +154,17 @@ export default function CashierPage() {
             </ul>
           )}
           {order && (
-            <div style={{ marginTop: 16 }}>
+            <div className="stack">
               <div>
                 <b>{order.code || order.id}</b> - {order.customer_name}
               </div>
               <div>Outstanding: RM {Number(due?.balance || 0).toFixed(2)}</div>
             </div>
           )}
-        </div>
+        </Card>
 
-        <div className="card" style={{ flex: 1 }}>
-          <h2 style={{ marginTop: 0 }}>Payment</h2>
+        <Card className="stack" style={{ flex: 1 }}>
+          <h2>Payment</h2>
           {order ? (
             <form className="stack" onSubmit={submit}>
               <input
@@ -191,7 +193,7 @@ export default function CashierPage() {
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
               />
-              <div style={{ display: "flex", gap: 8 }}>
+              <div className="cluster">
                 <input
                   className="input"
                   type="date"
@@ -215,14 +217,12 @@ export default function CashierPage() {
           ) : (
             <div>Select an order to record payment.</div>
           )}
-          <div style={{ marginTop: 8, color: err ? "#ffb3b3" : "#9fffba" }}>
-            {err || msg}
-          </div>
-        </div>
+          <div style={{ color: err ? "#ffb3b3" : "#9fffba" }}>{err || msg}</div>
+        </Card>
 
-        <div className="card" style={{ width: 260 }}>
-          <h3 style={{ marginTop: 0 }}>Export</h3>
-          <div className="stack" style={{ gap: 8 }}>
+        <Card className="stack" style={{ width: 260 }}>
+          <h3>Export</h3>
+          <div className="stack">
             <input
               className="input"
               type="date"
@@ -235,7 +235,7 @@ export default function CashierPage() {
               value={end}
               onChange={(e) => setEnd(e.target.value)}
             />
-            <label style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <label className="cluster">
               <input
                 type="checkbox"
                 checked={mark}
@@ -259,8 +259,9 @@ export default function CashierPage() {
               View Export Runs
             </Link>
           </div>
-        </div>
+        </Card>
       </div>
+    </div>
   );
 }
 
