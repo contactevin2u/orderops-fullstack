@@ -304,8 +304,8 @@ export default function OrderDetailPage(){
               <div>Paid</div><div>RM {Number(order.paid_amount||0).toFixed(2)}</div>
               <div>Balance</div><div><b>RM {Number(order.balance||0).toFixed(2)}</b></div>
               {due && (<>
-                <div>Accrued</div><div>RM {Number(due.accrued||0).toFixed(2)}</div>
-                <div>Outstanding</div><div><b>RM {Number(due.outstanding||0).toFixed(2)}</b></div>
+                <div>Should Have Paid</div><div>RM {Number(due.accrued||0).toFixed(2)}</div>
+                <div>Still Owed</div><div><b>RM {Number(due.outstanding||0).toFixed(2)}</b></div>
               </>)}
             </div>
 

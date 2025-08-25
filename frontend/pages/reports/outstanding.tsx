@@ -33,7 +33,7 @@ export default function OutstandingPage() {
     <Layout>
       <div className="container stack" style={{ maxWidth: '64rem' }}>
         <Card>
-          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Outstanding</h2>
+          <h2 style={{ marginTop: 0, marginBottom: 16 }}>Still Owed</h2>
           <div
             style={{
               display: 'flex',
@@ -74,16 +74,25 @@ export default function OutstandingPage() {
             <table className="table">
               <thead>
                 <tr>
-                  {['code','customer','type','status','expected','paid','fees','balance'].map((k) => (
+                  {[
+                    { key: 'code', label: 'Code' },
+                    { key: 'customer', label: 'Customer' },
+                    { key: 'type', label: 'Type' },
+                    { key: 'status', label: 'Status' },
+                    { key: 'expected', label: 'Should Have Paid' },
+                    { key: 'paid', label: 'Paid' },
+                    { key: 'fees', label: 'Fees' },
+                    { key: 'balance', label: 'Still Owed' },
+                  ].map(({ key, label }) => (
                     <th
-                      key={k}
+                      key={key}
                       onClick={() =>
-                        setSort((s) => ({ key: k, asc: s.key === k ? !s.asc : true }))
+                        setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))
                       }
                       style={{ cursor: 'pointer' }}
                     >
-                      {k.charAt(0).toUpperCase() + k.slice(1)}
-                      {sort.key === k ? (sort.asc ? ' ▲' : ' ▼') : ''}
+                      {label}
+                      {sort.key === key ? (sort.asc ? ' ▲' : ' ▼') : ''}
                     </th>
                   ))}
                 </tr>
@@ -136,7 +145,7 @@ export default function OutstandingPage() {
             <Button
               variant="secondary"
               onClick={() => {
-                const header = ['Code','Customer','Type','Status','Expected','Paid','Fees','Balance'];
+                const header = ['Code','Customer','Type','Status','Should Have Paid','Paid','Fees','Still Owed'];
                 const csv = [header.join(',')]
                   .concat(
                     rows.map((r:any)=>([
@@ -154,7 +163,7 @@ export default function OutstandingPage() {
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `outstanding_${asOf}.csv`;
+                a.download = `still_owed_${asOf}.csv`;
                 a.click();
                 URL.revokeObjectURL(url);
               }}

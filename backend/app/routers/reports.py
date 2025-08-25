@@ -27,7 +27,7 @@ def outstanding(
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_session),
 ):
-    """Return outstanding balances for orders as of ``as_of`` date."""
+    """Return amount still owed for orders as of ``as_of`` date."""
 
     as_of = as_of or date.today()
     end_dt = datetime.combine(as_of, datetime.min.time())

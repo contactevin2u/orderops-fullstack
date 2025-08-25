@@ -27,7 +27,7 @@ def months_elapsed(
 
 
 def calculate_plan_due(plan: Plan | None, as_of: date) -> Decimal:
-    """Return amount expected to be paid for ``plan`` as of ``as_of`` date."""
+    """Return planned payment amount for ``plan`` as of ``as_of`` date."""
     if not plan or not getattr(plan, "order", None):
         return Decimal("0.00")
 
