@@ -48,8 +48,16 @@ def list_orders(
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_session),
 ):
-    stmt = select(Order, Customer.name.label("customer_name")).join(
-        Customer, Customer.id == Order.customer_id
+    stmt = (
+        select(
+            Order,
+            Customer.name.label("customer_name"),
+            Trip,
+            Driver.name.label("driver_name"),
+        )
+        .join(Customer, Customer.id == Order.customer_id)
+        .join(Trip, Trip.order_id == Order.id, isouter=True)
+        .join(Driver, Driver.id == Trip.driver_id, isouter=True)
     )
     if q:
         like = f"%{q}%"
@@ -63,9 +71,16 @@ def list_orders(
     stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
-    for (order, customer_name) in rows:
+    for (order, customer_name, trip, driver_name) in rows:
         dto = OrderOut.model_validate(order).model_dump()
         dto["customer_name"] = customer_name
+        if trip:
+            dto["trip"] = {
+                "id": trip.id,
+                "driver_id": trip.driver_id,
+                "status": trip.status,
+                "driver_name": driver_name,
+            }
         out.append(OrderListOut.model_validate(dto))
     return envelope(out)
 
