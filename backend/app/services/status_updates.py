@@ -9,6 +9,7 @@ from datetime import date
 from ..models import Order, Payment
 from ..utils.normalize import to_decimal
 from .ordersvc import create_adjustment_order
+from .plan_math import calculate_plan_due
 
 
 DEC0 = Decimal("0.00")
@@ -63,6 +64,25 @@ def mark_returned(
     payment_date: date | None = None,
 ) -> Order:
     """Mark an order as returned and handle optional return delivery fee."""
+    if order.type == "RENTAL":
+        as_of = (return_date.date() if return_date else date.today())
+        paid = sum(
+            (
+                p.amount
+                for p in getattr(order, "payments", [])
+                if p.status == "POSTED" and p.date <= as_of
+            ),
+            DEC0,
+        )
+        fees = (
+            (order.delivery_fee or DEC0)
+            + (order.return_delivery_fee or DEC0)
+            + (order.penalty_fee or DEC0)
+        )
+        expected = calculate_plan_due(getattr(order, "plan", None), as_of) + fees
+        balance = (expected - paid).quantize(Decimal("0.01"))
+        if balance > DEC0:
+            raise ValueError("Outstanding must be cleared before return")
     order.returned_at = return_date or datetime.utcnow()
     order.status = "RETURNED"
     if return_delivery_fee is not None:

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
@@ -239,3 +239,12 @@ def test_rental_return_cancels_plan():
     assert any(
         getattr(o, "code", "").endswith("-R") for o in db.added if isinstance(o, Order)
     )
+
+
+def test_mark_returned_rejects_rental_with_outstanding():
+    db = DummySession()
+    order = _rental_order()
+    order.plan.start_date = date.today() - timedelta(days=31)
+    order.plan.order = order
+    with pytest.raises(ValueError):
+        mark_returned(db, order)

@@ -53,8 +53,7 @@ export default function AdjustmentsPage() {
     setErr(""); setMsg("");
     try {
       if (tab === 'return') {
-        if (beforeDue && Number(beforeDue.balance || 0) > 0 && !collect) {
-
+        if (beforeDue && Number(beforeDue.balance || 0) > 0 && (order.type === 'RENTAL' || !collect)) {
           setErr('Outstanding must be cleared before return');
           return;
         }
