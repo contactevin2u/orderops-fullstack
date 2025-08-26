@@ -1,5 +1,5 @@
 import Card from "@/components/Card";
-import Button from "@/components/ui/Button";
+import Button from "@/components/ui/button";
 import React from "react";
 import { outstanding } from "@/utils/api";
 import Link from "next/link";
