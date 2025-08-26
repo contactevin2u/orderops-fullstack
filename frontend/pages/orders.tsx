@@ -13,7 +13,7 @@ import {
   markSuccess,
   assignOrderToDriver,
   listDrivers,
-  invoicePdfUrl,
+  invoicePrintUrl,
   orderDue,
 } from "@/utils/api";
 import Link from "next/link";
@@ -193,8 +193,7 @@ export default function OperatorOrdersPage() {
   }
 
   function openInvoice(order: any) {
-    const url = invoicePdfUrl(order.id);
-    window.open(url, "_blank");
+    window.open(invoicePrintUrl(order.id), "_blank", "noopener,noreferrer");
   }
 
   async function batchRecordPayment() {

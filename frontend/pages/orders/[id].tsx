@@ -3,7 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
-import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePdfUrl, orderDue, markSuccess, updateCommission } from "@/utils/api";
+import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePrintUrl, orderDue, markSuccess, updateCommission } from "@/utils/api";
 
 export default function OrderDetailPage(){
   const router = useRouter();
@@ -92,7 +92,7 @@ export default function OrderDetailPage(){
 
   if(!order) return <div className="card">Loading...</div>;
   const profile = order.company_profile || {};
-  const invoiceUrl = invoicePdfUrl(order.id);
+  const invoiceUrl = invoicePrintUrl(order.id);
   function copyInvoice(){ navigator.clipboard.writeText(invoiceUrl); alert(t('documents.copied')); }
 
   function updateItem(idx:number, field:string, value:any){
@@ -254,7 +254,7 @@ export default function OrderDetailPage(){
             <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <h2 style={{marginTop:0}}>{order.code || order.id} <span className="badge">{order.status}</span></h2>
-              <a className="btn secondary" href={invoicePdfUrl(order.id)} target="_blank" rel="noreferrer">
+              <a className="btn secondary" href={invoicePrintUrl(order.id)} target="_blank" rel="noreferrer">
                 Invoice PDF
               </a>
             </div>

@@ -283,6 +283,10 @@ export function invoicePdfUrl(orderId: number) {
   return `${base}/documents/invoice/${orderId}.pdf`;
 }
 
+export function invoicePrintUrl(orderId: number | string) {
+  return `/invoice/${orderId}/print`;
+}
+
 // -------- Drivers
 export function listDrivers() {
   return request<any[]>("/drivers");

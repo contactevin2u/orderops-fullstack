@@ -61,7 +61,7 @@ export interface InvoiceData {
     accountNo: string;
     swift?: string;
     note?: string;
-    qrUrl?: string;
+    qrDataUrl?: string;
   };
   footer: {
     terms: string[];
@@ -91,8 +91,8 @@ function shadeColor(color: string, percent: number) {
 const BRAND_LOGO_URL =
   'https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png';
 
-export default function InvoiceFortune500({ data }: { data: InvoiceData }) {
-  const { brand, meta, billTo, shipTo, items, summary, payment, footer } = data;
+export default function InvoiceFortune500({ invoice }: { invoice: InvoiceData }) {
+  const { brand, meta, billTo, shipTo, items, summary, payment, footer } = invoice;
   const logoUrl = brand.logoUrl || BRAND_LOGO_URL;
   const formatter = new Intl.NumberFormat('en-MY', {
     style: 'currency',
@@ -386,11 +386,20 @@ export default function InvoiceFortune500({ data }: { data: InvoiceData }) {
             </>
           )}
         </p>
-        {payment.qrUrl && (
+        {payment.qrDataUrl ? (
           <img
-            src={payment.qrUrl}
+            src={payment.qrDataUrl}
             alt="Payment QR code"
             style={{ marginTop: '1rem', height: '120px' }}
+          />
+        ) : (
+          <div
+            style={{
+              marginTop: '1rem',
+              height: '120px',
+              width: '120px',
+              border: '2px dashed #ddd',
+            }}
           />
         )}
       </div>
@@ -415,89 +424,4 @@ export default function InvoiceFortune500({ data }: { data: InvoiceData }) {
     </div>
   );
 }
-
-export const sampleInvoice: InvoiceData = {
-  brand: {
-    logoUrl: 'https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png',
-    name: 'AA ALIVE SDN BHD',
-    regNo: 'MDA-Registered | 1234567-X',
-    address:
-      '10 Jalan Perusahaan Amari, Batu Caves, 68100 Kuala Lumpur, Malaysia',
-    phone: '+60 11-2868 6592',
-    email: 'contact@evin2u.com',
-    website: 'https://katil-hospital.my',
-    brandColor: '#0F766E',
-  },
-  meta: {
-    title: 'TAX INVOICE / INVOIS CUKAI',
-    number: 'INV-2025-000123',
-    issueDate: '2025-08-26',
-    dueDate: '2025-09-09',
-    currency: 'MYR',
-    taxLabel: 'SST',
-    taxId: 'SST ID: B1234567890',
-    poNumber: 'PO-778899',
-    reference: 'Order Intake Cloud',
-  },
-  billTo: {
-    label: 'Bill To / Dibayar Kepada',
-    name: 'Assunta Hospital Malaysia',
-    attn: 'Procurement Department',
-    address: 'Jalan Templer, 46990 Petaling Jaya, Selangor',
-    email: 'procurement@assunta.com',
-  },
-  shipTo: {
-    label: 'Ship To / Dihantar Ke',
-    name: 'Assunta Hospital – Receiving Bay',
-    address: 'Jalan Templer, 46990 Petaling Jaya, Selangor',
-  },
-  items: [
-    {
-      sku: 'SKB-E300',
-      name: 'Electric Hospital Bed – Hi-Lo (3-function)',
-      note: 'With side rails, ABS head/foot board',
-      qty: 8,
-      unit: 'unit',
-      unitPrice: 4200,
-      discount: 0,
-      taxRate: 0.06,
-    },
-    {
-      sku: 'MAT-PRO90',
-      name: 'Pressure-relief Mattress 90mm',
-      qty: 8,
-      unit: 'unit',
-      unitPrice: 380,
-      discount: 0.05,
-      taxRate: 0.06,
-    },
-    {
-      sku: 'SRV-INST',
-      name: 'On-site Installation & Training',
-      qty: 1,
-      unit: 'lot',
-      unitPrice: 600,
-      discount: 0,
-      taxRate: 0,
-    },
-  ],
-  summary: { shipping: 0, other: 0, rounding: 0, depositPaid: 0 },
-  payment: {
-    bankName: 'CIMB',
-    accountName: 'AA ALIVE SDN BHD',
-    accountNo: '8011366127',
-    swift: 'CIBBMYKLXXX',
-    note: 'Please pay within 14 days. Late payment may incur charges.',
-    qrUrl:
-      'https://static.wixstatic.com/media/20c5f7_98a9fa77aba04052833d15b05fadbe30~mv2.png',
-  },
-  footer: {
-    terms: [
-      'Goods remain the property of AA ALIVE SDN BHD until full payment is received.',
-      'Warranty: 12 months against manufacturing defects unless stated otherwise.',
-      'Return policy per contract. / Polisi pemulangan mengikut kontrak.',
-    ],
-    note: 'Thank you for your business! / Terima kasih atas sokongan anda!',
-  },
-};
 

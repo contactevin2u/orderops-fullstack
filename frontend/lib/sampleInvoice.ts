@@ -64,6 +64,7 @@ export const sampleInvoice: InvoiceData = {
     accountNo: '512345678901',
     swift: 'MBBEMYKL',
     note: 'Payment due within 14 days.',
+    qrDataUrl: 'https://static.wixstatic.com/media/20c5f7_98a9fa77aba04052833d15b05fadbe30~mv2.png',
   },
   footer: {
     terms: [
