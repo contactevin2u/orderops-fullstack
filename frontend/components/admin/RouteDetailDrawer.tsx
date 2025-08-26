@@ -16,10 +16,11 @@ interface Props {
 
 export default function RouteDetailDrawer({ route, onClose }: Props) {
   const qc = useQueryClient();
-  const { data: unassigned } = useQuery({
+  const unassignedQuery = useQuery({
     queryKey: ['unassigned', route.date],
     queryFn: () => fetchUnassigned(route.date),
   });
+  const unassigned = unassignedQuery.data || [];
 
   const assignedQuery = useQuery({
     queryKey: ['route-orders', route.id, route.date],
@@ -28,7 +29,37 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
 
   const assignMutation = useMutation({
     mutationFn: (orderId: string) => assignOrdersToRoute(route.id, [orderId]),
-    onSuccess: () => {
+    onMutate: async (orderId: string) => {
+      await qc.cancelQueries({ queryKey: ['unassigned', route.date] });
+      await qc.cancelQueries({ queryKey: ['route-orders', route.id, route.date] });
+      const prevUnassigned =
+        qc.getQueryData<Order[]>(['unassigned', route.date]) || [];
+      const prevAssigned =
+        qc.getQueryData<Order[]>(['route-orders', route.id, route.date]) || [];
+      const order = prevUnassigned.find((o) => o.id === orderId);
+      qc.setQueryData<Order[]>(
+        ['unassigned', route.date],
+        prevUnassigned.filter((o) => o.id !== orderId),
+      );
+      if (order) {
+        qc.setQueryData<Order[]>(
+          ['route-orders', route.id, route.date],
+          [...prevAssigned, order],
+        );
+      }
+      return { prevUnassigned, prevAssigned };
+    },
+    onError: (_err, _orderId, ctx) => {
+      if (ctx) {
+        qc.setQueryData(['unassigned', route.date], ctx.prevUnassigned);
+        qc.setQueryData([
+          'route-orders',
+          route.id,
+          route.date,
+        ], ctx.prevAssigned);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['routes', route.date] });
       qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
       qc.invalidateQueries({ queryKey: ['route-orders', route.id, route.date] });
@@ -37,7 +68,37 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
 
   const removeMutation = useMutation({
     mutationFn: (orderId: string) => removeOrdersFromRoute(route.id, [orderId]),
-    onSuccess: () => {
+    onMutate: async (orderId: string) => {
+      await qc.cancelQueries({ queryKey: ['unassigned', route.date] });
+      await qc.cancelQueries({ queryKey: ['route-orders', route.id, route.date] });
+      const prevUnassigned =
+        qc.getQueryData<Order[]>(['unassigned', route.date]) || [];
+      const prevAssigned =
+        qc.getQueryData<Order[]>(['route-orders', route.id, route.date]) || [];
+      const order = prevAssigned.find((o) => o.id === orderId);
+      qc.setQueryData<Order[]>(
+        ['route-orders', route.id, route.date],
+        prevAssigned.filter((o) => o.id !== orderId),
+      );
+      if (order) {
+        qc.setQueryData<Order[]>(
+          ['unassigned', route.date],
+          [...prevUnassigned, order],
+        );
+      }
+      return { prevUnassigned, prevAssigned };
+    },
+    onError: (_err, _orderId, ctx) => {
+      if (ctx) {
+        qc.setQueryData(['unassigned', route.date], ctx.prevUnassigned);
+        qc.setQueryData([
+          'route-orders',
+          route.id,
+          route.date,
+        ], ctx.prevAssigned);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['routes', route.date] });
       qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
       qc.invalidateQueries({ queryKey: ['route-orders', route.id, route.date] });
