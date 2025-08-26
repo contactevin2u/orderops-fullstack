@@ -124,6 +124,7 @@ class TripOut(BaseModel):
     driver_id: int
     status: str
     driver_name: str | None = None
+    route_id: int | None = None
     commission: CommissionOut | None = None
 
     class Config:

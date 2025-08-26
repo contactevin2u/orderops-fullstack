@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchRoutes, fetchUnassigned, fetchOnHold } from '../utils/apiAdapter';
+import { fetchRoutes, fetchUnassigned, fetchOnHold, fetchRouteOrders } from '../utils/apiAdapter';
 
 import * as api from '../utils/api';
 
@@ -54,5 +54,20 @@ describe('apiAdapter', () => {
     });
     expect(orders).toHaveLength(1);
     expect(orders[0].status).toBe('ON_HOLD');
+  });
+
+  it('fetchRouteOrders filters orders by route id', async () => {
+    (api.listOrders as any).mockResolvedValue({
+      items: [
+        { ...sampleOrder, trip: { route_id: 1 } },
+        { ...sampleOrder, id: 11, trip: { route_id: 2 } },
+      ],
+    });
+    const orders = await fetchRouteOrders('1', '2024-05-25');
+    expect(api.listOrders).toHaveBeenCalledWith(undefined, undefined, undefined, 500, {
+      date: '2024-05-25',
+    });
+    expect(orders).toHaveLength(1);
+    expect(orders[0].routeId).toBe('1');
   });
 });
