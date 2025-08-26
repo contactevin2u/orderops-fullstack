@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRoutes, fetchUnassigned, fetchOnHold, Route } from '@/utils/apiAdapter';
+import AdminLayout from '@/components/admin/AdminLayout';
 
 const RouteDetailDrawer = dynamic(() => import('@/components/admin/RouteDetailDrawer'));
 
@@ -64,3 +65,5 @@ export default function AdminRoutesPage() {
     </div>
   );
 }
+
+(AdminRoutesPage as any).getLayout = (page: any) => <AdminLayout>{page}</AdminLayout>;
