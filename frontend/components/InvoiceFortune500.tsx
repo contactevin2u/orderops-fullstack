@@ -13,15 +13,15 @@ export interface InvoiceItem {
 }
 
 export interface InvoiceData {
-  brand: {
+  brand?: {
     logoUrl?: string;
-    name: string;
+    name?: string;
     regNo?: string;
     address?: string;
     phone?: string;
     email?: string;
     website?: string;
-    brandColor: string;
+    brandColor?: string;
   };
   meta: {
     title: string;
@@ -92,7 +92,13 @@ const BRAND_LOGO_URL =
   'https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png';
 
 export default function InvoiceFortune500({ invoice }: { invoice: InvoiceData }) {
-  const { brand, meta, billTo, shipTo, items, summary, payment, footer } = invoice;
+  const { meta, billTo, shipTo, items, summary, payment, footer } = invoice;
+  const brand = {
+    logoUrl: BRAND_LOGO_URL,
+    name: '',
+    brandColor: '#000',
+    ...(invoice.brand ?? {}),
+  };
   const logoUrl = brand.logoUrl || BRAND_LOGO_URL;
   const formatter = new Intl.NumberFormat('en-MY', {
     style: 'currency',
@@ -115,7 +121,7 @@ export default function InvoiceFortune500({ invoice }: { invoice: InvoiceData })
     (summary.rounding || 0) -
     (summary.depositPaid || 0);
 
-  const gradientTo = shadeColor(brand.brandColor, 40);
+  const gradientTo = shadeColor(brand.brandColor || '#000', 40);
 
   return (
     <div className="invoice-f500">
