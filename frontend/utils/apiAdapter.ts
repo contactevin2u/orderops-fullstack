@@ -105,7 +105,7 @@ export async function fetchOnHold(date: string): Promise<Order[]> {
     .filter(
       (o) =>
         o.deliveryDate === date &&
-        o.trip?.status === 'ON_HOLD' &&
+        (o.status === 'ON_HOLD' || o.trip?.status === 'ON_HOLD') &&
         o.status !== 'SUCCESS' &&
         o.status !== 'DELIVERED'
     );
