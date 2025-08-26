@@ -18,7 +18,10 @@ export default function AdminAssignPage() {
     }
   }, [dateParam, date, router]);
 
-  const { data: orders } = useQuery(['unassigned', date], () => fetchUnassigned(date));
+  const { data: orders } = useQuery({
+    queryKey: ['unassigned', date],
+    queryFn: () => fetchUnassigned(date),
+  });
 
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = React.useState(false);

@@ -10,17 +10,23 @@ interface Props {
 
 export default function RouteDetailDrawer({ route, onClose }: Props) {
   const qc = useQueryClient();
-  const { data: unassigned } = useQuery(['unassigned', route.date], () => fetchUnassigned(route.date));
+  const { data: unassigned } = useQuery({
+    queryKey: ['unassigned', route.date],
+    queryFn: () => fetchUnassigned(route.date),
+  });
 
-  const assignMutation = useMutation((orderId: string) => assignOrdersToRoute(route.id, [orderId]), {
+  const assignMutation = useMutation({
+    mutationFn: (orderId: string) => assignOrdersToRoute(route.id, [orderId]),
     onSuccess: () => {
-      qc.invalidateQueries(['routes', route.date]);
-      qc.invalidateQueries(['unassigned', route.date]);
+      qc.invalidateQueries({ queryKey: ['routes', route.date] });
+      qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
     },
   });
 
-  const removeMutation = useMutation((orderId: string) => removeOrdersFromRoute(route.id, [orderId]), {
-    onSuccess: () => qc.invalidateQueries(['routes', route.date]),
+  const removeMutation = useMutation({
+    mutationFn: (orderId: string) => removeOrdersFromRoute(route.id, [orderId]),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['routes', route.date] }),
   });
 
   return (

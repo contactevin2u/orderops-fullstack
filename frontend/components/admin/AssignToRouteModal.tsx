@@ -9,14 +9,18 @@ interface Props {
 }
 
 export default function AssignToRouteModal({ orderIds, date, onClose }: Props) {
-  const { data: routes } = useQuery(['routes', date], () => fetchRoutes(date));
+  const { data: routes } = useQuery({
+    queryKey: ['routes', date],
+    queryFn: () => fetchRoutes(date),
+  });
   const qc = useQueryClient();
   const [routeId, setRouteId] = useState('');
 
-  const mutation = useMutation(() => assignOrdersToRoute(routeId, orderIds), {
+  const mutation = useMutation({
+    mutationFn: () => assignOrdersToRoute(routeId, orderIds),
     onSuccess: () => {
-      qc.invalidateQueries(['routes', date]);
-      qc.invalidateQueries(['unassigned', date]);
+      qc.invalidateQueries({ queryKey: ['routes', date] });
+      qc.invalidateQueries({ queryKey: ['unassigned', date] });
       onClose();
     },
   });

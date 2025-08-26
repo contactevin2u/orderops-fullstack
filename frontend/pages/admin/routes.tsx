@@ -18,9 +18,18 @@ export default function AdminRoutesPage() {
     }
   }, [dateParam, date, router]);
 
-  const { data: routes } = useQuery(['routes', date], () => fetchRoutes(date));
-  const { data: unassigned } = useQuery(['unassigned', date], () => fetchUnassigned(date));
-  const { data: onHold } = useQuery(['onHold', date], () => fetchOnHold(date));
+  const { data: routes } = useQuery({
+    queryKey: ['routes', date],
+    queryFn: () => fetchRoutes(date),
+  });
+  const { data: unassigned } = useQuery({
+    queryKey: ['unassigned', date],
+    queryFn: () => fetchUnassigned(date),
+  });
+  const { data: onHold } = useQuery({
+    queryKey: ['onHold', date],
+    queryFn: () => fetchOnHold(date),
+  });
 
   const [selectedRoute, setSelectedRoute] = React.useState<Route | null>(null);
 
