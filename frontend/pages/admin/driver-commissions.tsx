@@ -10,27 +10,37 @@ export default function DriverCommissionsPage(){
   const [driverId, setDriverId] = React.useState<string>('');
   const [month, setMonth] = React.useState<string>(new Date().toISOString().slice(0,7)); // yyyy-mm
 
-  const { data: drivers } = useQuery(['drivers'], listDrivers);
-  const { data: rows } = useQuery(
-    ['commissions', driverId, month],
-    () => driverId ? listDriverCommissions(Number(driverId)) : Promise.resolve([]),
-    { enabled: !!driverId }
-  );
+  const { data: drivers } = useQuery({
+    queryKey: ['drivers'],
+    queryFn: listDrivers,
+  });
+  const { data: rows } = useQuery({
+    queryKey: ['commissions', driverId, month],
+    queryFn: () => (driverId ? listDriverCommissions(Number(driverId)) : Promise.resolve([])),
+    enabled: !!driverId,
+  });
 
-  const payAndSuccess = useMutation(
-    async ({ orderId, amount, method, reference }: any) => {
+  const payAndSuccess = useMutation({
+    mutationFn: async ({ orderId, amount, method, reference }: any) => {
       if (method && amount) {
-        await addPayment({ order_id: orderId, amount: Number(amount), method, reference, category: 'INITIAL', idempotencyKey: crypto.randomUUID() });
+        await addPayment({
+          order_id: orderId,
+          amount: Number(amount),
+          method,
+          reference,
+          category: 'INITIAL',
+          idempotencyKey: crypto.randomUUID(),
+        });
       }
       await markSuccess(orderId);
     },
-    { onSuccess: () => qc.invalidateQueries(['commissions', driverId, month]) }
-  );
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['commissions', driverId, month] }),
+  });
 
-  const saveCommission = useMutation(
-    async ({ orderId, amount }: any) => updateCommission(orderId, Number(amount)),
-    { onSuccess: () => qc.invalidateQueries(['commissions', driverId, month]) }
-  );
+  const saveCommission = useMutation({
+    mutationFn: async ({ orderId, amount }: any) => updateCommission(orderId, Number(amount)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['commissions', driverId, month] }),
+  });
 
   return (
     <div>
