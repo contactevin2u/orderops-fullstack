@@ -109,8 +109,13 @@ function mapOrderToInvoice(order: any): InvoiceData {
 }
 
 export default async function Page({ params }: { params: { id: string } }) {
-  const order = await getOrder(params.id);
-  const invoice = mapOrderToInvoice(order);
-  return <InvoiceFortune500 invoice={invoice} />;
+  try {
+    const order = await getOrder(params.id);
+    const invoice = mapOrderToInvoice(order);
+    return <InvoiceFortune500 invoice={invoice} />;
+  } catch (err) {
+    console.error("Failed to load invoice", err);
+    return <div>Failed to load invoice.</div>;
+  }
 }
 
