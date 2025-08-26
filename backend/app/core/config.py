@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pydantic import Field
 
 class Settings(BaseSettings):
     APP_VERSION: str = "local"
@@ -22,9 +23,9 @@ class Settings(BaseSettings):
     WORKER_MAX_ATTEMPTS: int = 5
 
     # Auth
-    JWT_SECRET: str = "change-me"
+    JWT_SECRET: str = Field("change-me", env="JWT_SECRET")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    COOKIE_SECURE: bool = False
+    COOKIE_SECURE: bool = True
 
     class Config:
         env_file = ".env"

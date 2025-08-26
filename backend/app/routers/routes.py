@@ -31,7 +31,11 @@ def create_route(payload: RouteCreateIn, db: Session = Depends(get_session)):
 def list_routes(date: str | None = None, db: Session = Depends(get_session)):
     q = db.query(DriverRoute)
     if date:
-        q = q.filter(DriverRoute.route_date == date)
+        try:
+            d = dt_date.fromisoformat(date)
+        except ValueError:
+            raise HTTPException(400, "Invalid date format")
+        q = q.filter(DriverRoute.route_date == d)
     return q.order_by(DriverRoute.route_date.desc(), DriverRoute.id.desc()).all()
 
 

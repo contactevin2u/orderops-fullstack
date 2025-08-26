@@ -11,7 +11,17 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.main import app  # noqa: E402
 from app.db import get_session  # noqa: E402
-from app.models import Base, Driver, Customer, Order, Trip, TripEvent, DriverRoute, Role  # noqa: E402
+from app.models import (
+    Base,
+    Driver,
+    Customer,
+    Order,
+    Trip,
+    TripEvent,
+    DriverRoute,
+    Role,
+    DriverDevice,
+)  # noqa: E402
 from app.routers import orders as orders_router, routes as routes_router  # noqa: E402
 from app.auth import firebase as auth_firebase  # noqa: E402
 
@@ -29,6 +39,8 @@ def _setup_db():
     Order.__table__.c.customer_id.type = Integer()
     DriverRoute.__table__.c.id.type = Integer()
     DriverRoute.__table__.c.driver_id.type = Integer()
+    DriverDevice.__table__.c.id.type = Integer()
+    DriverDevice.__table__.c.driver_id.type = Integer()
     Trip.__table__.c.id.type = Integer()
     Trip.__table__.c.order_id.type = Integer()
     Trip.__table__.c.driver_id.type = Integer()
@@ -42,6 +54,7 @@ def _setup_db():
             Customer.__table__,
             Order.__table__,
             DriverRoute.__table__,
+            DriverDevice.__table__,
             Trip.__table__,
             TripEvent.__table__,
         ],
