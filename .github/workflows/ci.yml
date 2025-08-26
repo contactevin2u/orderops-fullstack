@@ -33,6 +33,9 @@ jobs:
           pip install -r requirements.txt
           pip install black flake8 mypy pytest pytest-cov
 
+      - name: Check Alembic revision lengths
+        run: python ../scripts/check_alembic_revision_lengths.py
+
       - name: Lint
         run: |
           black --check .

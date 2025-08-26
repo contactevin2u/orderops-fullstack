@@ -1,7 +1,7 @@
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0009_add_driver_routes_and_trip_route_id'
+revision = '0009_add_driver_routes'
 down_revision = '0008_add_user_and_audit'
 branch_labels = None
 depends_on = None
