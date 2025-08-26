@@ -49,7 +49,10 @@ function mapOrder(o: any): Order {
     size: o.size,
     weightKg: o.weight_kg ?? o.weightKg,
     priority: o.priority,
-    routeId: o.route_id ?? o.routeId ?? o.trip?.route_id ?? null,
+    routeId:
+      o.route_id?.toString() ??
+      o.routeId?.toString() ??
+      (o.trip?.route_id != null ? String(o.trip.route_id) : null),
     notes: o.notes || '',
     trip: o.trip,
   };
@@ -96,6 +99,13 @@ export async function fetchUnassigned(date: string): Promise<Order[]> {
 export async function fetchOnHold(date: string): Promise<Order[]> {
   const { items } = await listOrders(undefined, 'ON_HOLD', undefined, 500, { date });
   return (items || []).map(mapOrder);
+}
+
+export async function fetchRouteOrders(routeId: string, date: string): Promise<Order[]> {
+  const { items } = await listOrders(undefined, undefined, undefined, 500, { date });
+  return (items || [])
+    .filter((o: any) => o.trip?.route_id === Number(routeId))
+    .map(mapOrder);
 }
 
 export async function createRoute(payload: {

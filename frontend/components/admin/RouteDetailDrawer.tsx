@@ -1,7 +1,12 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Route, Order } from '@/utils/apiAdapter';
-import { fetchUnassigned, assignOrdersToRoute, removeOrdersFromRoute } from '@/utils/apiAdapter';
+import {
+  fetchUnassigned,
+  assignOrdersToRoute,
+  removeOrdersFromRoute,
+  fetchRouteOrders,
+} from '@/utils/apiAdapter';
 
 interface Props {
   route: Route;
@@ -13,6 +18,11 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
   const { data: unassigned } = useQuery({
     queryKey: ['unassigned', route.date],
     queryFn: () => fetchUnassigned(route.date),
+  });
+
+  const assignedQuery = useQuery({
+    queryKey: ['route-orders', route.id, route.date],
+    queryFn: () => fetchRouteOrders(route.id, route.date),
   });
 
   const assignMutation = useMutation({
@@ -86,16 +96,29 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
           <tr><th>Seq</th><th>Order</th><th></th></tr>
         </thead>
         <tbody>
-          {route.stops.map((s) => (
-            <tr key={s.orderId}>
-              <td>{s.seq}</td>
-              <td>{s.orderId}</td>
-              <td>
-                <button onClick={() => removeMutation.mutate(s.orderId)}>Remove</button>
-              </td>
+          {assignedQuery.isLoading && (
+            <tr>
+              <td colSpan={3} role="status">Loading...</td>
             </tr>
-          ))}
-          {route.stops.length === 0 && <tr><td colSpan={3} style={{ opacity: 0.6 }}>No stops</td></tr>}
+          )}
+          {assignedQuery.isError && (
+            <tr>
+              <td colSpan={3} role="alert">Failed to load</td>
+            </tr>
+          )}
+          {!assignedQuery.isLoading &&
+            (assignedQuery.data || []).map((o: Order, idx: number) => (
+              <tr key={o.id}>
+                <td>{idx + 1}</td>
+                <td>{o.orderNo}</td>
+                <td>
+                  <button onClick={() => removeMutation.mutate(o.id)}>Remove</button>
+                </td>
+              </tr>
+            ))}
+          {!assignedQuery.isLoading && (assignedQuery.data?.length || 0) === 0 && (
+            <tr><td colSpan={3} style={{ opacity: 0.6 }}>No stops</td></tr>
+          )}
         </tbody>
       </table>
       {unassigned && unassigned.length > 0 && (

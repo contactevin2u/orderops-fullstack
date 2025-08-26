@@ -98,6 +98,7 @@ def list_orders(
                 "driver_id": trip.driver_id,
                 "status": trip.status,
                 "driver_name": driver_name,
+                "route_id": trip.route_id,
             }
         out.append(OrderListOut.model_validate(dto))
     return envelope(out)
