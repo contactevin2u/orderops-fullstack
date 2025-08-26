@@ -21,14 +21,18 @@ from ..models import (
 from ..auth.deps import require_roles
 from ..utils.audit import log_action
 from ..schemas import OrderOut, AssignDriverIn
-from ..services.ordersvc import create_order_from_parsed
+from ..services.ordersvc import (
+    create_order_from_parsed,
+    recompute_financials,
+    _sum_posted_payments,
+    q2,
+)
 from ..services.plan_math import calculate_plan_due
 from ..services.status_updates import (
     apply_buyback,
     cancel_installment,
     mark_cancelled,
     mark_returned,
-    recompute_financials,
 )
 from ..utils.responses import envelope
 from ..utils.normalize import to_decimal
@@ -165,48 +169,48 @@ def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depend
 
     as_of = as_of or date.today()
 
-    def _sum_payments(o: Order) -> Decimal:
-        return sum(
-            (
-                p.amount
-                for p in getattr(o, "payments", [])
-                if p.status == "POSTED" and p.date <= as_of
-            ),
-            Decimal("0.00"),
-        )
-
-    paid = _sum_payments(order)
-
-    fees = (
-        (order.delivery_fee or Decimal("0.00"))
-        + (order.return_delivery_fee or Decimal("0.00"))
-        + (order.penalty_fee or Decimal("0.00"))
+    paid_parent = _sum_posted_payments(order)
+    paid_children = sum(
+        (_sum_posted_payments(ch) for ch in getattr(order, "adjustments", []) or []),
+        Decimal("0"),
     )
 
-    child_total = Decimal("0.00")
     if order.status in {"CANCELLED", "RETURNED"}:
-        child_total = sum(
-            (adj.total or Decimal("0.00")) for adj in getattr(order, "adjustments", [])
+        expected = q2(
+            sum(
+                (Decimal(getattr(ch, "total", 0) or 0) for ch in getattr(order, "adjustments", []) or []),
+                Decimal("0"),
+            )
         )
-        for adj in getattr(order, "adjustments", []):
-            paid += _sum_payments(adj)
-
-    if order.status in {"CANCELLED", "RETURNED"}:
-        expected = fees + child_total
-    elif order.plan and order.plan.status != "ACTIVE":
-        expected = fees
-    elif order.type in ("INSTALLMENT", "RENTAL") and order.plan:
-        expected = calculate_plan_due(order.plan, as_of) + fees
+        paid = q2(paid_parent + paid_children)
+        plan_due = Decimal("0")
     else:
-        expected = order.total or Decimal("0.00")
+        fees = q2(
+            (order.delivery_fee or Decimal("0"))
+            + (order.return_delivery_fee or Decimal("0"))
+            + (order.penalty_fee or Decimal("0"))
+        )
+        plan_due = calculate_plan_due(getattr(order, "plan", None), as_of)
+        if plan_due > 0:
+            expected = q2(plan_due + fees)
+            paid = q2(paid_parent)
+        else:
+            expected = q2(order.total or Decimal("0"))
+            paid = q2(paid_parent)
 
-    balance = (expected - paid).quantize(Decimal("0.01"))
+    balance = q2(expected - paid)
+    to_collect = q2(balance if balance > 0 else Decimal("0"))
+    to_refund = q2(-balance if balance < 0 else Decimal("0"))
+    accrued = plan_due if plan_due > 0 else Decimal("0")
 
     return envelope(
         {
             "expected": float(expected),
             "paid": float(paid),
             "balance": float(balance),
+            "to_collect": float(to_collect),
+            "to_refund": float(to_refund),
+            "accrued": float(accrued),
         }
     )
 
@@ -278,9 +282,14 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
                 category = ip.get("category")
                 qty = int(ip.get("qty") or 0)
                 unit_price = Decimal(str(ip.get("unit_price") or 0))
-                line_total = Decimal(
-                    str(ip.get("line_total") or (unit_price * qty))
-                )
+                lt_input = ip.get("line_total")
+                line_total = Decimal(str(lt_input)) if lt_input is not None else unit_price * qty
+                if item_type in {"RENTAL", "INSTALLMENT"}:
+                    if lt_input is not None and Decimal(str(lt_input)) > 0:
+                        raise HTTPException(400, "Plan items cannot have positive totals")
+                    if line_total >= 0:
+                        unit_price = Decimal("0")
+                        line_total = Decimal("0")
                 order.items.append(
                     OrderItem(
                         name=name,

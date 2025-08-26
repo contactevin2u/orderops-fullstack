@@ -8,33 +8,17 @@ from datetime import date
 
 from ..models import Order, Payment
 from ..utils.normalize import to_decimal
-from .ordersvc import create_adjustment_order
+from .ordersvc import (
+    create_adjustment_order,
+    recompute_financials,
+    CONST_CANCEL_SUFFIX,
+    CONST_RETURN_SUFFIX,
+    CONST_BUYBACK_SUFFIX,
+)
 from .plan_math import calculate_plan_due
 
 
 DEC0 = Decimal("0.00")
-
-
-def recompute_financials(order: Order) -> None:
-    """Recalculate subtotal, total and balance for ``order`` based on items and charges."""
-    subtotal = sum(
-        (
-            it.line_total if it.line_total is not None else (it.unit_price * it.qty)
-            for it in order.items
-        ),
-        DEC0,
-    ).quantize(Decimal("0.01"))
-    order.subtotal = subtotal
-    order.total = (
-        subtotal
-        - (order.discount or DEC0)
-        + (order.delivery_fee or DEC0)
-        + (order.return_delivery_fee or DEC0)
-        + (order.penalty_fee or DEC0)
-    ).quantize(Decimal("0.01"))
-    order.balance = (order.total - (order.paid_amount or DEC0)).quantize(
-        Decimal("0.01")
-    )
 
 
 def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Order:
@@ -49,7 +33,7 @@ def mark_cancelled(db: Session, order: Order, reason: str | None = None) -> Orde
         for k in ["penalty_fee", "delivery_fee", "return_delivery_fee"]
         if getattr(order, k)
     }
-    create_adjustment_order(db, order, "-I", [], charges)
+    create_adjustment_order(db, order, CONST_CANCEL_SUFFIX, [], charges)
     return order
 
 
@@ -94,7 +78,7 @@ def mark_returned(
         for k in ["return_delivery_fee", "penalty_fee"]
         if getattr(order, k)
     }
-    adj = create_adjustment_order(db, order, "-R", [], charges)
+    adj = create_adjustment_order(db, order, CONST_RETURN_SUFFIX, [], charges)
     rdf = to_decimal(order.return_delivery_fee or DEC0)
     if collect and rdf > DEC0:
         p = Payment(
@@ -104,6 +88,7 @@ def mark_returned(
             category="DELIVERY",
             method=method,
             reference=reference,
+            status="POSTED",
         )
         db.add(p)
         adj.paid_amount = to_decimal(adj.paid_amount) + rdf
@@ -142,42 +127,50 @@ def cancel_installment(
     if return_fee is not None:
         order.return_delivery_fee = to_decimal(return_fee)
 
-    charges_total = (order.penalty_fee or DEC0) + (order.return_delivery_fee or DEC0)
     charges = {
         k: getattr(order, k)
         for k in ["return_delivery_fee", "penalty_fee"]
         if getattr(order, k)
     }
-    create_adjustment_order(db, order, "-I", [], charges)
+    child = create_adjustment_order(db, order, CONST_CANCEL_SUFFIX, [], charges)
 
+    orig_penalty = order.penalty_fee or DEC0
+    orig_return = order.return_delivery_fee or DEC0
     original_paid = to_decimal(order.paid_amount or DEC0)
+
     payments: list[Payment] = []
     if collect:
-        if order.penalty_fee and order.penalty_fee > DEC0:
+        if orig_penalty > DEC0:
             payments.append(
                 Payment(
-                    order_id=order.id,
-                    amount=to_decimal(order.penalty_fee),
+                    order_id=child.id,
+                    amount=to_decimal(orig_penalty),
                     date=payment_date or date.today(),
                     category="PENALTY",
                     method=method,
                     reference=reference,
+                    status="POSTED",
                 )
             )
-        if order.return_delivery_fee and order.return_delivery_fee > DEC0:
+        if orig_return > DEC0:
             payments.append(
                 Payment(
-                    order_id=order.id,
-                    amount=to_decimal(order.return_delivery_fee),
+                    order_id=child.id,
+                    amount=to_decimal(orig_return),
                     date=payment_date or date.today(),
                     category="DELIVERY",
                     method=method,
                     reference=reference,
+                    status="POSTED",
                 )
             )
     for p in payments:
         db.add(p)
         order.paid_amount = to_decimal(order.paid_amount) + to_decimal(p.amount)
+
+    # Move fees to child to avoid double counting
+    order.return_delivery_fee = DEC0
+    order.penalty_fee = DEC0
 
     principal_paid = original_paid
     remaining = principal_paid
@@ -253,7 +246,7 @@ def apply_buyback(
             "line_total": -line_amt,
         }
     ]
-    create_adjustment_order(db, order, "-I", lines, {})
+    create_adjustment_order(db, order, CONST_BUYBACK_SUFFIX, lines, {})
 
     # Record refund as negative payment
     p = Payment(
@@ -263,6 +256,7 @@ def apply_buyback(
         category="BUYBACK",
         method=method,
         reference=reference,
+        status="POSTED",
     )
     db.add(p)
     order.paid_amount = to_decimal(order.paid_amount) - line_amt

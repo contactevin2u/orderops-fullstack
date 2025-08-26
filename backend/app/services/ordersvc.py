@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, date
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import secrets
 from typing import Any, Dict, Optional, Tuple
 
@@ -18,7 +18,16 @@ from ..utils.normalize import to_decimal
 # Helpers
 # -------------------------------
 
+CENT = Decimal("0.01")
 DEC0 = Decimal("0.00")
+
+
+def q2(value: Decimal) -> Decimal:
+    return (value or Decimal("0")).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+PLAN_ITEM_TYPES = {"RENTAL", "INSTALLMENT"}
+FEE_ITEM_TYPES = {"FEE"}
 
 
 
@@ -92,22 +101,39 @@ def _get_or_create_customer(db: Session, data: Dict[str, Any]) -> Customer:
     return cust
 
 
-def _compute_subtotal_from_items(items: list[dict]) -> Decimal:
-    subtotal = DEC0
-    for it in items:
-        lt = to_decimal(it.get("line_total"))
-        up = to_decimal(it.get("unit_price"))
-        qty = to_decimal(it.get("qty") or 1)
-        monthly = to_decimal(it.get("monthly_amount"))
-        # For RENTAL/INSTALLMENT items, monthly amounts should not inflate outright subtotal
-        # Only include explicit unit/line totals (including negatives for adjustments)
-        if lt != 0:
+def _compute_subtotal_from_items(items) -> Decimal:
+    """Compute subtotal from ``items`` respecting plan/fee rules."""
+    subtotal = Decimal("0")
+    for it in items or []:
+        if isinstance(it, dict):
+            item_type = (it.get("item_type") or "").upper()
+            lt = it.get("line_total")
+            up = it.get("unit_price")
+            qty = it.get("qty")
+        else:
+            item_type = getattr(it, "item_type", "").upper()
+            lt = getattr(it, "line_total", None)
+            up = getattr(it, "unit_price", None)
+            qty = getattr(it, "qty", None)
+        if lt is None:
+            lt = (up or Decimal("0")) * (qty or 0)
+        lt = Decimal(str(lt or 0))
+        if item_type in PLAN_ITEM_TYPES:
+            if item_type in FEE_ITEM_TYPES or lt < 0:
+                subtotal += lt
+            else:
+                continue
+        else:
             subtotal += lt
-        elif up != 0:
-            subtotal += (up * qty)
-        # else: keep as 0.00
-        # monthly is handled by Plan, not subtotal
-    return subtotal
+    return q2(subtotal)
+
+
+def _sum_posted_payments(order) -> Decimal:
+    total = Decimal("0")
+    for p in getattr(order, "payments", []) or []:
+        if getattr(p, "status", None) == "POSTED":
+            total += Decimal(str(p.amount))
+    return q2(total)
 
 
 def _apply_charges_and_totals(
@@ -135,7 +161,20 @@ def _apply_charges_and_totals(
     total = total_from_payload if total_from_payload > 0 else computed_total
 
     paid = to_decimal(totals.get("paid"))
-    return (subtotal, discount, delivery_fee, return_delivery_fee, penalty_fee, total, paid)
+    return (
+        q2(subtotal),
+        q2(discount),
+        q2(delivery_fee),
+        q2(return_delivery_fee),
+        q2(penalty_fee),
+        q2(total),
+        q2(paid),
+    )
+
+
+CONST_CANCEL_SUFFIX = "-C"
+CONST_RETURN_SUFFIX = "-R"
+CONST_BUYBACK_SUFFIX = "-B"
 
 
 # -------------------------------
@@ -145,14 +184,15 @@ def _apply_charges_and_totals(
 def create_adjustment_order(
     db: Session,
     parent: Order,
-    code_suffix: str,
+    suffix: str,
     lines: list[dict],
     charges: dict,
 ) -> Order:
     """Create a child adjustment order linked to ``parent``."""
-    code = f"{parent.code}{code_suffix}"
+    raw_code = f"{parent.code}{suffix}"
+    code = _ensure_unique_code(db, raw_code)
     subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(lines, charges, None)
-    balance = (total - paid).quantize(Decimal("0.01"))
+    balance = q2(total - paid)
 
     adj = Order(
         code=code,
@@ -180,7 +220,7 @@ def create_adjustment_order(
         qty = to_decimal(it.get("qty") or 1)
         unit_price = to_decimal(it.get("unit_price"))
         line_total = to_decimal(it.get("line_total"))
-        if item_type in ("RENTAL", "INSTALLMENT"):
+        if item_type in PLAN_ITEM_TYPES:
             if unit_price <= 0 and line_total <= 0:
                 unit_price = DEC0
                 line_total = DEC0
@@ -199,6 +239,34 @@ def create_adjustment_order(
         )
 
     return adj
+
+
+def recompute_financials(order: Order) -> None:
+    """Recompute derived money fields from authoritative sources."""
+    items = [
+        {
+            "item_type": getattr(it, "item_type", None),
+            "unit_price": getattr(it, "unit_price", None),
+            "line_total": getattr(it, "line_total", None),
+            "qty": getattr(it, "qty", None),
+        }
+        for it in getattr(order, "items", [])
+    ]
+    charges = {
+        "discount": getattr(order, "discount", DEC0),
+        "delivery_fee": getattr(order, "delivery_fee", DEC0),
+        "return_delivery_fee": getattr(order, "return_delivery_fee", DEC0),
+        "penalty_fee": getattr(order, "penalty_fee", DEC0),
+    }
+    subtotal, discount, delivery, return_delivery, penalty, total, _ = _apply_charges_and_totals(
+        items, charges, None
+    )
+    paid = _sum_posted_payments(order)
+
+    order.subtotal = subtotal
+    order.total = q2(subtotal - discount + delivery + return_delivery + penalty)
+    order.paid_amount = paid
+    order.balance = q2(order.total - paid)
 
 def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: str | None = None) -> Order:
     """
@@ -244,7 +312,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
     totals = order_data.get("totals") or {}
 
     subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(items, charges, totals)
-    balance = (total - paid).quantize(Decimal("0.01"))
+    balance = q2(total - paid)
 
     order = Order(
         code=code,
