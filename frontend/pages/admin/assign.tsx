@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { fetchUnassigned, Order } from '@/utils/apiAdapter';
+import { getOrderBadges } from '@/utils/orderBadges';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 const AssignToRouteModal = dynamic(() => import('@/components/admin/AssignToRouteModal'));
@@ -24,6 +25,17 @@ export default function AdminAssignPage() {
     queryFn: () => fetchUnassigned(date),
   });
   const orders = ordersQuery.data || [];
+
+  const counts = React.useMemo(() => {
+    let noDate = 0;
+    let overdue = 0;
+    orders.forEach((o) => {
+      const badges = getOrderBadges(o, date);
+      if (badges.includes('No date')) noDate += 1;
+      if (badges.some((b) => b.startsWith('Overdue'))) overdue += 1;
+    });
+    return { noDate, overdue };
+  }, [orders, date]);
 
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [showCompleted, setShowCompleted] = React.useState(false);
@@ -80,6 +92,9 @@ export default function AdminAssignPage() {
           />{' '}
           Show completed
         </label>
+        <span aria-live="polite">
+          Unassigned: {orders.length} (No date: {counts.noDate} Overdue: {counts.overdue})
+        </span>
         <span aria-live="polite">Selected: {selected.size}</span>
       </header>
       <table className="table" style={{ marginTop: 16 }}>
@@ -127,7 +142,14 @@ export default function AdminAssignPage() {
                   />
                 </td>
                 <td>{o.orderNo}</td>
-                <td>{o.deliveryDate}</td>
+                <td>
+                  {o.deliveryDate}{' '}
+                  {getOrderBadges(o, date).map((b) => (
+                    <span key={b} style={{ marginLeft: 4, fontSize: '0.8em', color: '#c00' }}>
+                      {b}
+                    </span>
+                  ))}
+                </td>
                 <td>{o.status}</td>
               </tr>
             ))}

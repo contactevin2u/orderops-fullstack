@@ -7,6 +7,7 @@ import {
   removeOrdersFromRoute,
   fetchRouteOrders,
 } from '@/utils/apiAdapter';
+import { getOrderBadges } from '@/utils/orderBadges';
 
 interface Props {
   route: Route;
@@ -30,13 +31,17 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['routes', route.date] });
       qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
+      qc.invalidateQueries({ queryKey: ['route-orders', route.id, route.date] });
     },
   });
 
   const removeMutation = useMutation({
     mutationFn: (orderId: string) => removeOrdersFromRoute(route.id, [orderId]),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ['routes', route.date] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['routes', route.date] });
+      qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
+      qc.invalidateQueries({ queryKey: ['route-orders', route.id, route.date] });
+    },
   });
 
   const dialogRef = React.useRef<HTMLDivElement>(null);
@@ -128,6 +133,11 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
             {unassigned.map((o: Order) => (
               <li key={o.id} style={{ marginBottom: 4 }}>
                 {o.orderNo}{' '}
+                {getOrderBadges(o, route.date).map((b) => (
+                  <span key={b} style={{ marginLeft: 4, fontSize: '0.8em', color: '#c00' }}>
+                    {b}
+                  </span>
+                ))}{' '}
                 <button onClick={() => assignMutation.mutate(o.id)}>Add</button>
               </li>
             ))}
