@@ -248,12 +248,12 @@ export default function OrderDetailPage(){
 
   return (
         <>
-        <Link href="/orders" className="btn secondary" style={{marginBottom:8}}>&larr; Back to Orders</Link>
-        <div className="row">
+        <Link href="/orders" className="btn secondary back-link">&larr; Back to Orders</Link>
+        <div className="row page-grid">
           <div className="col">
             <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <h2 style={{marginTop:0}}>{order.code || order.id} <span className="badge">{order.status}</span></h2>
+              <h2>{order.code || order.id} <span className="badge">{order.status}</span></h2>
               <a className="btn secondary" href={invoicePrintUrl(order.id)} target="_blank" rel="noreferrer">
                 Invoice PDF
               </a>
@@ -342,10 +342,6 @@ export default function OrderDetailPage(){
                   value={buybackAmt}
                   onChange={e=>setBuybackAmt(e.target.value)}
                 />
-
-
-                <input className="input" type="number" placeholder="Buyback amount" value={buybackAmt} onChange={e=>setBuybackAmt(e.target.value)} />
-
                 <div style={{display:"flex",gap:4}}>
                   <select
                     className="select"
@@ -365,10 +361,6 @@ export default function OrderDetailPage(){
                     onChange={e=>setBuybackDiscVal(e.target.value)}
                     style={{flex:1,width:"auto"}}
                   />
-
-
-                  <input className="input" type="number" placeholder="Value" value={buybackDiscVal} onChange={e=>setBuybackDiscVal(e.target.value)} />
-
                 </div>
                 <input className="input" placeholder="Method" value={buybackMethod} onChange={e=>setBuybackMethod(e.target.value)} />
                 <input className="input" placeholder="Reference" value={buybackRef} onChange={e=>setBuybackRef(e.target.value)} />
@@ -378,9 +370,9 @@ export default function OrderDetailPage(){
 
           </div>
         </div>
-        <div className="col">
+        <div className="col sidebar-sticky">
           <div className="card">
-            <h3 style={{marginTop:0}}>Edit Order</h3>
+            <h3>Edit Order</h3>
             <div className="row">
               <div className="col"><label>Order Code</label><input className="input" value={orderCode} onChange={e=>setOrderCode(e.target.value)} /></div>
               <div className="col"><label>Type</label>
@@ -428,8 +420,8 @@ export default function OrderDetailPage(){
             <div style={{marginTop:8}}><button className="btn" onClick={saveDetails} disabled={busy}>Save</button></div>
           </div>
 
-          <div className="card" style={{marginTop:16}}>
-            <h3 style={{marginTop:0}}>{t('documents.title')}</h3>
+          <div className="card">
+            <h3>{t('documents.title')}</h3>
             <div className="row" style={{marginBottom:8}}>
               <a className="btn" href={invoiceUrl} target="_blank" rel="noopener noreferrer">{t('documents.view')}</a>
               <a className="btn secondary" href={invoiceUrl} download>{t('documents.download')}</a>
@@ -454,8 +446,8 @@ export default function OrderDetailPage(){
             </div>
           </div>
 
-          <div className="card" style={{marginTop:16}}>
-            <h3 style={{marginTop:0}}>Payments</h3>
+          <div className="card">
+            <h3>Payments</h3>
             <div className="row">
               <div className="col"><input className="input" type="number" placeholder="Amount" value={payAmt} onChange={e=>setPayAmt(e.target.value)} /></div>
               <div className="col"><input className="input" type="date" placeholder="Date" value={payDate} onChange={e=>setPayDate(e.target.value)} /></div>
@@ -485,8 +477,8 @@ export default function OrderDetailPage(){
             </table>
           </div>
 
-            <div className="card" style={{marginTop:16}}>
-              <h3 style={{marginTop:0}}>Delivery</h3>
+            <div className="card">
+              <h3>Delivery</h3>
               {order.trip?.status === "DELIVERED" && (
                 <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
               )}
@@ -501,6 +493,34 @@ export default function OrderDetailPage(){
             <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}} aria-live="polite">{err || msg}</div>
           </div>
         </div>
+        <style jsx>{`
+          .page-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+            gap: 16px;
+            align-items: start;
+          }
+          @media (max-width: 1024px) {
+            .page-grid {
+              grid-template-columns: 1fr;
+            }
+          }
+          .sidebar-sticky {
+            position: sticky;
+            top: 8px;
+          }
+          .card h2,
+          .card h3 {
+            margin: 0;
+          }
+          .sidebar-sticky .card + .card {
+            margin-top: 16px;
+          }
+          .back-link {
+            margin-bottom: 8px;
+            display: inline-block;
+          }
+        `}</style>
         </>
     );
   }
