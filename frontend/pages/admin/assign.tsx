@@ -10,7 +10,7 @@ const AssignToRouteModal = dynamic(() => import('@/components/admin/AssignToRout
 export default function AdminAssignPage() {
   const router = useRouter();
   const dateParam = typeof router.query.date === 'string' ? router.query.date : '';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Date().toLocaleDateString('en-CA');
   const date = dateParam || today;
 
   React.useEffect(() => {
