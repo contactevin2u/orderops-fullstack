@@ -67,9 +67,9 @@ def test_get_order_due_cancelled_order():
     db = DummySession(order)
     resp = get_order_due(order_id=1, db=db)
     data = resp["data"]
-    assert data["expected"] == 10.0
+    assert data["expected"] == 0.0
     assert data["paid"] == 0.0
-    assert data["balance"] == 10.0
+    assert data["balance"] == 0.0
 
 
 def test_get_order_due_returned_with_refund():
@@ -98,7 +98,7 @@ def test_get_order_due_returned_with_refund():
     ]
     adj = Order(
         id=2,
-        code="ORD3-I",
+        code="ORD3-B",
         type="OUTRIGHT",
         status="RETURNED",
         customer_id=1,

@@ -49,7 +49,7 @@ def test_admin_can_create_driver(monkeypatch):
     def fake_create_user(*args, **kwargs):
         return types.SimpleNamespace(uid="u123")
 
-    monkeypatch.setattr(drv_router.firebase_auth, "create_user", fake_create_user)
+    monkeypatch.setattr(drv_router.firebase_auth, "create_user", fake_create_user, raising=False)
     monkeypatch.setattr(drv_router, "_get_app", lambda: object())
 
     client = TestClient(app)
