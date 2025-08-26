@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, Depends, HTTPException, Query, Header, Response
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, cast, Date, and_
 from pydantic import BaseModel
@@ -34,6 +34,7 @@ from ..services.status_updates import (
     mark_cancelled,
     mark_returned,
 )
+from ..services.documents import invoice_pdf
 from ..utils.responses import envelope
 from ..utils.normalize import to_decimal
 from .drivers import notify_assignment
@@ -171,6 +172,19 @@ def get_order(order_id: int, db: Session = Depends(get_session)):
     if not order:
         raise HTTPException(404, "Order not found")
     return envelope(OrderOut.model_validate(order))
+
+
+@router.get("/{order_id}/invoice.pdf")
+def get_invoice_pdf(order_id: int, db: Session = Depends(get_session)):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    pdf = invoice_pdf(order)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="invoice_{order.code}.pdf"'},
+    )
 
 
 @router.get("/{order_id}/due", response_model=dict)
