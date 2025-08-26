@@ -3,6 +3,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
+import Card from "@/components/Card";
 import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePrintUrl, orderDue, markSuccess, updateCommission } from "@/utils/api";
 
 export default function OrderDetailPage(){
@@ -90,7 +91,7 @@ export default function OrderDetailPage(){
 
   React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[order, asOf, loadDue]);
 
-  if(!order) return <div className="card">Loading...</div>;
+  if(!order) return <Card>Loading...</Card>;
   const profile = order.company_profile || {};
   const invoiceUrl = invoicePrintUrl(order.id);
   function copyInvoice(){ navigator.clipboard.writeText(invoiceUrl); alert(t('documents.copied')); }
@@ -248,12 +249,12 @@ export default function OrderDetailPage(){
 
   return (
         <>
-        <Link href="/orders" className="btn secondary back-link">&larr; Back to Orders</Link>
-        <div className="row page-grid">
-          <div className="col">
-            <div className="card">
+        <Link href="/orders" className="btn secondary mb-2 inline-block">&larr; Back to Orders</Link>
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
+          <div>
+            <Card>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <h2>{order.code || order.id} <span className="badge">{order.status}</span></h2>
+              <h2 className="m-0">{order.code || order.id} <span className="badge">{order.status}</span></h2>
               <a className="btn secondary" href={invoicePrintUrl(order.id)} target="_blank" rel="noreferrer">
                 Invoice PDF
               </a>
@@ -266,7 +267,7 @@ export default function OrderDetailPage(){
             </div>
 
             <div className="hr" />
-              <h3>Items</h3>
+              <h3 className="m-0">Items</h3>
               <div style={{overflowX:"auto"}}>
                 <table className="table">
                   <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Monthly</th><th>Line Total</th><th></th></tr></thead>
@@ -367,12 +368,11 @@ export default function OrderDetailPage(){
                 <button className="btn secondary" onClick={onBuyback} disabled={busy || !buybackAmt}>Record Buyback</button>
               </div>
             </div>
-
-          </div>
+          </Card>
         </div>
-        <div className="col sidebar-sticky">
-          <div className="card">
-            <h3>Edit Order</h3>
+        <div className="sticky top-2 space-y-4">
+          <Card>
+            <h3 className="m-0">Edit Order</h3>
             <div className="row">
               <div className="col"><label>Order Code</label><input className="input" value={orderCode} onChange={e=>setOrderCode(e.target.value)} /></div>
               <div className="col"><label>Type</label>
@@ -418,16 +418,16 @@ export default function OrderDetailPage(){
               <textarea className="textarea" rows={4} value={notes} onChange={e=>setNotes(e.target.value)} />
             </div>
             <div style={{marginTop:8}}><button className="btn" onClick={saveDetails} disabled={busy}>Save</button></div>
-          </div>
+          </Card>
 
-          <div className="card">
-            <h3>{t('documents.title')}</h3>
+          <Card>
+            <h3 className="m-0">{t('documents.title')}</h3>
             <div className="row" style={{marginBottom:8}}>
               <a className="btn" href={invoiceUrl} target="_blank" rel="noopener noreferrer">{t('documents.view')}</a>
               <a className="btn secondary" href={invoiceUrl} download>{t('documents.download')}</a>
               <button className="btn secondary" onClick={copyInvoice}>{t('documents.share')}</button>
             </div>
-            <div className="card" style={{marginTop:8}}>
+            <Card style={{marginTop:8}}>
               {profile.logo_url ? (
                 <Image
                   src={profile.logo_url}
@@ -443,11 +443,11 @@ export default function OrderDetailPage(){
               <p>{profile.tax_label ? `${profile.tax_label} ${profile.tax_percent || ''}%` : t('documents.noTax')}</p>
               <p>{profile.bank_account || t('documents.noBank')}</p>
               <p>{profile.footer_note || t('documents.noFooter')}</p>
-            </div>
-          </div>
+            </Card>
+          </Card>
 
-          <div className="card">
-            <h3>Payments</h3>
+          <Card>
+            <h3 className="m-0">Payments</h3>
             <div className="row">
               <div className="col"><input className="input" type="number" placeholder="Amount" value={payAmt} onChange={e=>setPayAmt(e.target.value)} /></div>
               <div className="col"><input className="input" type="date" placeholder="Date" value={payDate} onChange={e=>setPayDate(e.target.value)} /></div>
@@ -475,10 +475,10 @@ export default function OrderDetailPage(){
                 {(!order.payments || order.payments.length===0) && <tr><td colSpan={6} style={{opacity:.7}}>No payments</td></tr>}
               </tbody>
             </table>
-          </div>
+          </Card>
 
-            <div className="card">
-              <h3>Delivery</h3>
+            <Card>
+              <h3 className="m-0">Delivery</h3>
               {order.trip?.status === "DELIVERED" && (
                 <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
               )}
@@ -488,39 +488,11 @@ export default function OrderDetailPage(){
                   <button className="btn" style={{marginTop:4}} onClick={saveCommission} disabled={busy}>Save Commission</button>
                 </div>
               )}
-            </div>
+            </Card>
 
-            <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}} aria-live="polite">{err || msg}</div>
-          </div>
+          <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}} aria-live="polite">{err || msg}</div>
         </div>
-        <style jsx>{`
-          .page-grid {
-            display: grid;
-            grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
-            gap: 16px;
-            align-items: start;
-          }
-          @media (max-width: 1024px) {
-            .page-grid {
-              grid-template-columns: 1fr;
-            }
-          }
-          .sidebar-sticky {
-            position: sticky;
-            top: 8px;
-          }
-          .card h2,
-          .card h3 {
-            margin: 0;
-          }
-          .sidebar-sticky .card + .card {
-            margin-top: 16px;
-          }
-          .back-link {
-            margin-bottom: 8px;
-            display: inline-block;
-          }
-        `}</style>
+        </div>
         </>
     );
   }
