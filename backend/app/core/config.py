@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     WORKER_MAX_ATTEMPTS: int = 5
 
     # Auth
-    JWT_SECRET: str = Field("change-me", env="JWT_SECRET")
+    JWT_SECRET: str = Field(env="JWT_SECRET")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     COOKIE_SECURE: bool = True
 
