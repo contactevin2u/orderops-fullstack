@@ -19,13 +19,21 @@ async function request<T = any>(
   init?: RequestInit & { json?: any; idempotencyKey?: string }
 ): Promise<T> {
   const { json, headers, idempotencyKey, ...rest } = init || {};
+  let hdrs = headers || {};
+  if (typeof window === 'undefined') {
+    try {
+      const { cookies } = await import('next/headers');
+      const cookie = cookies().toString();
+      if (cookie) hdrs = { ...hdrs, Cookie: cookie };
+    } catch {}
+  }
   const res = await fetch(pathJoin(path), {
     method: json ? "POST" : (rest.method || "GET"),
     headers: {
       Accept: "application/json",
       ...(json ? { "Content-Type": "application/json" } : {}),
       ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      ...(headers || {}),
+      ...hdrs,
     },
     body: json ? JSON.stringify(json) : rest.body,
     credentials: 'include',

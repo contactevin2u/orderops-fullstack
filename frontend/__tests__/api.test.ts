@@ -8,6 +8,12 @@ import {
 
 // Use Vitest's vi to mock fetch
 
+vi.mock('next/headers', () => ({
+  cookies: () => ({
+    toString: () => 'sid=abc',
+  }),
+}));
+
 describe('api request unwrapping', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -35,6 +41,28 @@ describe('api request unwrapping', () => {
 
     const result = await getOrder(123);
     expect(result).toEqual(order);
+  });
+
+  it('forwards cookies on server requests', async () => {
+    (global as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      text: async () => JSON.stringify({}),
+      headers: { get: () => 'application/json' },
+    });
+
+    const savedWindow = (global as any).window;
+    (global as any).window = undefined;
+
+    await getOrder(1);
+
+    expect((global as any).fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/orders/1'),
+      expect.objectContaining({
+        headers: expect.objectContaining({ Cookie: 'sid=abc' }),
+      }),
+    );
+
+    (global as any).window = savedWindow;
   });
 
   it('lists drivers', async () => {
