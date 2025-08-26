@@ -29,10 +29,57 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
       qc.invalidateQueries({ queryKey: ['routes', route.date] }),
   });
 
+  const dialogRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const el = dialogRef.current;
+    const prev = document.activeElement as HTMLElement | null;
+    el?.focus();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+      if (e.key === 'Tab' && el) {
+        const focusable = Array.from(
+          el.querySelectorAll<HTMLElement>(
+            'a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])'
+          )
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
+    };
+    el?.addEventListener('keydown', handleKeyDown);
+    return () => {
+      el?.removeEventListener('keydown', handleKeyDown);
+      prev?.focus();
+    };
+  }, [onClose]);
+
   return (
-    <div style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 360, background: '#fff', boxShadow: '-2px 0 8px rgba(0,0,0,0.2)', padding: 16, overflowY: 'auto' }}>
-      <button onClick={onClose} style={{ float: 'right' }}>✕</button>
-      <h2>{route.name}</h2>
+    <div
+      ref={dialogRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="route-title"
+      tabIndex={-1}
+      style={{ position: 'fixed', top: 0, right: 0, bottom: 0, width: 360, background: '#fff', boxShadow: '-2px 0 8px rgba(0,0,0,0.2)', padding: 16, overflowY: 'auto' }}
+    >
+      <button onClick={onClose} aria-label="Close" style={{ float: 'right' }}>✕</button>
+      <h2 id="route-title">{route.name}</h2>
       <h3>Stops</h3>
       <table className="table">
         <thead>

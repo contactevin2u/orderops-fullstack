@@ -251,6 +251,16 @@ h6 {
   border: 0;
 }
 
+.not-sr-only:where(:focus, :focus-visible) {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
