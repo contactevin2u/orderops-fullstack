@@ -47,6 +47,31 @@ npx tsc --noEmit
 npm run build
 ```
 
+## Invoice Rendering
+
+The frontend was bootstrapped with Next.js and uses Tailwind CSS for styling.
+Install the dependencies and start the development server:
+
+```bash
+cd frontend
+npm install tailwindcss puppeteer
+npm run dev
+```
+
+To produce a printable PDF for an invoice, run the render script in another
+terminal. The invoice ID defaults to the first CLI argument but can be
+overridden with the `INVOICE_ID` environment variable:
+
+```bash
+cd frontend
+INVOICE_ID=123 npx tsx ../scripts/render-invoice.ts
+```
+
+The script opens `http://localhost:3000/invoice/<ID>/print` in a headless
+browser and writes `invoice-<ID>.pdf` with A4 margins and backgrounds
+included. Invoice templates can embed QR codes by using `payment.qrDataUrl`
+as the image source.
+
 ## Export Runs
 
 The backend supports marking cash payment exports so they are not exported twice.
