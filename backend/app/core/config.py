@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # Auth
     JWT_SECRET: str = "change-me"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    COOKIE_SECURE: bool = False
 
     class Config:
         env_file = ".env"

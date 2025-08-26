@@ -25,7 +25,7 @@ alembic upgrade head
 
 The `0008_add_user_and_audit` migration inserts an initial `admin` user with a
 bcrypt password hash. To change the password, generate a new hash with
-`passlib` and update the row:
+`libpass` (a drop-in fork of `passlib`) and update the row:
 
 ```bash
 python - <<'PY'
@@ -42,6 +42,7 @@ production.
 ## Environment variables
 
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON string for Firebase service account used to verify driver ID tokens.
+- `COOKIE_SECURE`: set to `true` to send the auth cookie only over HTTPS (defaults to `false` for local development).
 
 ## Worker configuration
 

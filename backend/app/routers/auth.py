@@ -6,15 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..models import User, Role, AuditLog
-
 from ..core.security import verify_password, create_access_token, hash_password
-
-
-from ..core.security import verify_password, create_access_token, hash_password
-
-from ..core.security import verify_password, create_access_token
-
-
 from ..auth.deps import get_current_user
 from ..core.config import settings
 
@@ -48,7 +40,7 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
         "token",
         token,
         httponly=True,
-        secure=True,
+        secure=settings.COOKIE_SECURE,
         samesite="lax",
         max_age=max_age,
     )
@@ -97,7 +89,12 @@ def logout(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_session),
 ):
-    response.delete_cookie("token")
+    response.delete_cookie(
+        "token",
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+    )
     db.add(AuditLog(user_id=current_user.id, action="logout"))
     db.commit()
     return {"ok": True}
