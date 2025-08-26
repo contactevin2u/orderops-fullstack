@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy.orm import Session
 from ..db import get_session
 from ..models import Order, Payment, Role
-from ..services.documents import invoice_pdf, receipt_pdf, installment_agreement_pdf
+from ..services.documents import receipt_pdf, installment_agreement_pdf
 from ..auth.deps import require_roles
 
 router = APIRouter(
@@ -10,13 +10,6 @@ router = APIRouter(
     tags=["documents"],
     dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
 )
-
-@router.get("/invoice/{order_id}.pdf")
-def invoice(order_id: int, db: Session = Depends(get_session)):
-    o = db.get(Order, order_id)
-    if not o: raise HTTPException(404, "Not found")
-    pdf = invoice_pdf(o)
-    return Response(content=pdf, media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="invoice_{o.code}.pdf"'} )
 
 @router.get("/receipt/{payment_id}.pdf")
 def receipt(payment_id: int, db: Session = Depends(get_session)):

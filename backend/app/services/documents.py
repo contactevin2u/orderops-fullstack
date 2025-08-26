@@ -6,7 +6,6 @@ clear error if ReportLab is missing so callers can respond with a helpful
 message instead of the application failing to start.
 """
 
-from textwrap import wrap
 from io import BytesIO
 from datetime import date
 
@@ -16,114 +15,115 @@ from ..models.payment import Payment
 from ..models.plan import Plan
 
 
-def _draw_lines(c, x, y, lines, max_width_mm=180, leading=14):
-    from reportlab.lib.units import mm  # local import
-
-    width = max_width_mm * mm
-    for line in lines:
-        for seg in wrap(line, 100):
-            c.drawString(x * mm, y * mm, seg)
-            y -= leading / 3.0
-            y -= leading / 3.0
-    return y
-
-
 def invoice_pdf(order: Order) -> bytes:
+    """Render an invoice using a Fortune 500 style template."""
     try:  # pragma: no cover - exercised indirectly in tests
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            Table,
+            TableStyle,
+        )
+        from reportlab.pdfgen.canvas import Canvas
     except ImportError as exc:  # pragma: no cover - tested by import
         raise RuntimeError(
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'."
         ) from exc
 
     buf = BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
-    c.setPageCompression(0)
-    x, y = 20, 280
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
+    styles = getSampleStyleSheet()
+    elems: list = []
 
-    c.setFont("Helvetica-Bold", 14)
     title = "CREDIT NOTE" if float(getattr(order, "total", 0)) < 0 else "INVOICE"
-    c.drawString(x * mm, y * mm, f"{title} {order.code}")
-    y -= 5
-    c.setFont("Helvetica", 10)
     inv_date = getattr(order, "created_at", date.today())
-    c.drawString(x * mm, y * mm, f"Invoice Date: {inv_date:%Y-%m-%d}")
-    y -= 5
 
-    company = [
-        settings.COMPANY_NAME,
-        settings.COMPANY_ADDRESS,
-        f"Phone: {settings.COMPANY_PHONE}",
-        f"Email: {settings.COMPANY_EMAIL}",
-    ]
-    y = _draw_lines(c, x, y, company)
-    y -= 5
+    elems.append(Paragraph(settings.COMPANY_NAME, styles["Title"]))
+    elems.append(Paragraph(settings.COMPANY_ADDRESS, styles["Normal"]))
+    elems.append(Spacer(1, 12))
+    elems.append(Paragraph(f"{title} {order.code}", styles["Heading2"]))
+    elems.append(Paragraph(f"Invoice Date: {inv_date:%Y-%m-%d}", styles["Normal"]))
+    elems.append(Spacer(1, 12))
 
-    cust = [
-        f"Bill To: {order.customer.name}",
-        f"Phone: {order.customer.phone or '-'}",
-        f"Address: {order.customer.address or '-'}",
-    ]
-    y = _draw_lines(c, x, y, cust)
-    y -= 5
+    elems.append(Paragraph(f"Bill To: {order.customer.name}", styles["Normal"]))
+    if order.customer.phone:
+        elems.append(Paragraph(f"Phone: {order.customer.phone}", styles["Normal"]))
+    if order.customer.address:
+        elems.append(Paragraph(order.customer.address, styles["Normal"]))
+    elems.append(Spacer(1, 12))
 
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x * mm, y * mm, "Items:")
-    y -= 6
-    c.setFont("Helvetica", 10)
+    item_data = [["Item", "Qty", "Unit Price", "Total"]]
     for it in order.items:
-        line = f"- {it.name} x{int(it.qty)}  @ RM{float(it.unit_price):.2f}  = RM{float(it.line_total):.2f}"
-        c.drawString(x * mm, y * mm, line)
-        y -= 5
+        item_data.append(
+            [
+                it.name,
+                str(int(it.qty)),
+                f"RM{float(it.unit_price):.2f}",
+                f"RM{float(it.line_total):.2f}",
+            ]
+        )
+    item_table = Table(item_data, colWidths=[80 * mm, 20 * mm, 30 * mm, 30 * mm])
+    item_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
+                ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ]
+        )
+    )
+    elems.append(item_table)
+    elems.append(Spacer(1, 12))
 
-    y -= 3
     totals = [
-        f"Subtotal: RM{float(order.subtotal):.2f}",
-        f"Discount: RM{float(order.discount):.2f}",
-        f"Delivery Fee: RM{float(order.delivery_fee):.2f}",
-        f"Return Delivery Fee: RM{float(order.return_delivery_fee):.2f}",
-        f"Penalty Fee: RM{float(order.penalty_fee):.2f}",
-        f"TOTAL: RM{float(order.total):.2f}",
-        f"Paid: RM{float(order.paid_amount):.2f}",
-        f"Balance: RM{float(order.balance):.2f}",
+        ("Subtotal", getattr(order, "subtotal", 0)),
+        ("Discount", getattr(order, "discount", 0)),
+        ("Delivery Fee", getattr(order, "delivery_fee", 0)),
+        ("Return Delivery Fee", getattr(order, "return_delivery_fee", 0)),
+        ("Penalty Fee", getattr(order, "penalty_fee", 0)),
+        ("TOTAL", getattr(order, "total", 0)),
+        ("Paid", getattr(order, "paid_amount", 0)),
+        ("Balance", getattr(order, "balance", 0)),
     ]
-    for t in totals:
-        c.drawString(x * mm, y * mm, t)
-        y -= 5
+    total_data = [[k, f"RM{float(v):.2f}"] for k, v in totals if float(v or 0)]
+    if total_data:
+        total_table = Table(total_data, colWidths=[110 * mm, 40 * mm])
+        total_table.setStyle(
+            TableStyle(
+                [
+                    ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+                    ("LINEABOVE", (0, -1), (-1, -1), 0.5, colors.black),
+                ]
+            )
+        )
+        elems.append(total_table)
+        elems.append(Spacer(1, 12))
 
-    y -= 10
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x * mm, y * mm, "Payment Information:")
-    y -= 6
-    c.setFont("Helvetica", 10)
-    c.drawString(x * mm, y * mm, f"{settings.COMPANY_NAME} - {settings.COMPANY_BANK}")
-    y -= 5
-    c.drawString(x * mm, y * mm, f"Customer Service: {settings.COMPANY_PHONE}")
+    elems.append(
+        Paragraph(
+            f"Payment to {settings.COMPANY_BANK}. Customer Service: {settings.COMPANY_PHONE}",
+            styles["Normal"],
+        )
+    )
+    elems.append(Paragraph(f"{settings.TAX_LABEL}: {settings.TAX_PERCENT}%", styles["Normal"]))
 
-    # Footer with tax information
-    c.setFont("Helvetica", 8)
-    c.drawString(x * mm, 10 * mm, f"{settings.TAX_LABEL}: {settings.TAX_PERCENT}%")
+    def _canvasmaker(*args, **kwargs):
+        kwargs["pageCompression"] = 0
+        return Canvas(*args, **kwargs)
 
-    c.showPage()
-
-    y = 280
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(x * mm, y * mm, "Terms & Conditions")
-    y -= 10
-    c.setFont("Helvetica", 10)
-    terms = [
-        "Rentals: Payment is due on the first of each month. Late fees apply after a 7-day grace period.",
-        "Installments: Installment plans must be approved prior to delivery. Failure to remit payment by the due date may result in service interruption.",
-        "Warranty Coverage: Products include a one-year limited warranty against manufacturing defects. This warranty does not cover damage from misuse or unauthorized modifications.",
-        "Returns & Exchanges: Goods must be returned within 14 days in original packaging. Certain items may be non-refundable based on their condition or usage.",
-        f"Customer Service: For support, call {settings.COMPANY_PHONE}.",
-    ]
-    y = _draw_lines(c, x, y, terms, leading=12)
-
-    c.showPage()
-    c.save()
+    doc.build(elems, canvasmaker=_canvasmaker)
     pdf = buf.getvalue()
     buf.close()
     return pdf
