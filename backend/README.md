@@ -42,6 +42,7 @@ production.
 ## Environment variables
 
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON string for Firebase service account used to verify driver ID tokens.
+- `COOKIE_SECURE`: set to `true` to send the auth cookie only over HTTPS (defaults to `false` for local development).
 
 ## Worker configuration
 
