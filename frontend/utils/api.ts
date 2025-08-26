@@ -85,13 +85,16 @@ export async function listOrders(
   q?: string,
   status?: string,
   type?: string,
-  limit?: number
+  limit?: number,
+  opts?: { date?: string; unassigned?: boolean }
 ): Promise<OrdersList> {
   const sp = new URLSearchParams();
   if (q) sp.set("q", q);
   if (status) sp.set("status", status);
   if (type) sp.set("type", type);
   if (limit) sp.set("limit", String(limit));
+  if (opts?.date) sp.set("date", opts.date);
+  if (opts?.unassigned) sp.set("unassigned", "true");
   const qs = sp.toString();
 
   const data = await request<any>(`/orders${qs ? `?${qs}` : ""}`);

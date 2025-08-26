@@ -35,16 +35,23 @@ describe('apiAdapter', () => {
     });
   });
 
-  it('filters unassigned orders by date and status', async () => {
-    (api.listOrders as any).mockResolvedValue({ items: [sampleOrder, { ...sampleOrder, id: 11, status: 'SUCCESS' }] });
+  it('fetchUnassigned passes server-side filters', async () => {
+    (api.listOrders as any).mockResolvedValue({ items: [sampleOrder] });
     const orders = await fetchUnassigned('2024-05-25');
+    expect(api.listOrders).toHaveBeenCalledWith(undefined, undefined, undefined, 500, {
+      date: '2024-05-25',
+      unassigned: true,
+    });
     expect(orders).toHaveLength(1);
     expect(orders[0].id).toBe('10');
   });
 
-  it('fetchOnHold filters status', async () => {
-    (api.listOrders as any).mockResolvedValue({ items: [{ ...sampleOrder, status: 'ON_HOLD' }, { ...sampleOrder, id: 12, status: 'DELIVERED' }] });
+  it('fetchOnHold forwards date and status filters', async () => {
+    (api.listOrders as any).mockResolvedValue({ items: [{ ...sampleOrder, status: 'ON_HOLD' }] });
     const orders = await fetchOnHold('2024-05-25');
+    expect(api.listOrders).toHaveBeenCalledWith(undefined, 'ON_HOLD', undefined, 500, {
+      date: '2024-05-25',
+    });
     expect(orders).toHaveLength(1);
     expect(orders[0].status).toBe('ON_HOLD');
   });

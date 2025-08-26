@@ -86,29 +86,16 @@ export async function fetchRoutes(date: string): Promise<Route[]> {
 }
 
 export async function fetchUnassigned(date: string): Promise<Order[]> {
-  const { items } = await listOrders(undefined, undefined, undefined, 500);
-  return items
-    .map(mapOrder)
-    .filter(
-      (o) =>
-        o.deliveryDate === date &&
-        !o.trip &&
-        o.status !== 'SUCCESS' &&
-        o.status !== 'DELIVERED'
-    );
+  const { items } = await listOrders(undefined, undefined, undefined, 500, {
+    date,
+    unassigned: true,
+  });
+  return (items || []).map(mapOrder);
 }
 
 export async function fetchOnHold(date: string): Promise<Order[]> {
-  const { items } = await listOrders(undefined, undefined, undefined, 500);
-  return items
-    .map(mapOrder)
-    .filter(
-      (o) =>
-        o.deliveryDate === date &&
-        (o.status === 'ON_HOLD' || o.trip?.status === 'ON_HOLD') &&
-        o.status !== 'SUCCESS' &&
-        o.status !== 'DELIVERED'
-    );
+  const { items } = await listOrders(undefined, 'ON_HOLD', undefined, 500, { date });
+  return (items || []).map(mapOrder);
 }
 
 export async function createRoute(payload: {

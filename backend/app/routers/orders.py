@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, cast, Date, and_
 from pydantic import BaseModel
 from decimal import Decimal
 from datetime import datetime, date
@@ -52,6 +52,8 @@ def list_orders(
     q: str | None = None,
     status: str | None = None,
     type: str | None = None,
+    date: str | None = None,
+    unassigned: bool = False,
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_session),
 ):
@@ -75,6 +77,15 @@ def list_orders(
         stmt = stmt.where(Order.status == status)
     if type:
         stmt = stmt.where(Order.type == type)
+    if date:
+        try:
+            d = datetime.fromisoformat(date).date()
+        except Exception:
+            raise HTTPException(400, "Invalid date format")
+        stmt = stmt.where(cast(Order.delivery_date, Date) == d)
+    if unassigned:
+        # No trip or trip has no route yet (still not assigned to a route)
+        stmt = stmt.where(and_(or_(Trip.id.is_(None), Trip.route_id.is_(None))))
     stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
