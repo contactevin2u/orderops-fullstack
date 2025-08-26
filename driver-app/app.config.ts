@@ -21,6 +21,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ["expo-splash-screen", { backgroundColor: "#FFFFFF", resizeMode: "contain" }],
     "@react-native-firebase/app",
     "@react-native-firebase/messaging",
+    "@notifee/react-native",
   ],
 
   // optional mirror (plugin reads it too)

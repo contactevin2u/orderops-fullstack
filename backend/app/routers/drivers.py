@@ -23,6 +23,25 @@ from ..utils.storage import save_pod_image
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
 
+def notify_assignment(fcm_tokens: list[str], order_id: int) -> None:
+    """Send an FCM notification to driver devices about a new assignment."""
+    if not fcm_tokens:
+        return
+    try:
+        from firebase_admin import messaging
+
+        payload = messaging.MulticastMessage(
+            tokens=fcm_tokens,
+            notification=messaging.Notification(
+                title="New order assigned", body="Open to view."
+            ),
+            data={"type": "order_assigned", "order_id": str(order_id)},
+        )
+        messaging.send_multicast(payload, app=_get_app())
+    except Exception:
+        # Silently ignore notification errors
+        pass
+
 def _order_to_driver_out(order: Order, status: str) -> dict:
     # delivery_date may be datetime or date
     dd = None

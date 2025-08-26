@@ -6,11 +6,13 @@ import {
   Platform,
   Pressable,
   TextInput,
-  Alert,
+  AppState,
 } from 'react-native';
 import Constants from 'expo-constants';
 import messaging from '@react-native-firebase/messaging';
 import auth, { FirebaseAuthTypes } from '@react-native-firebase/auth';
+import notifee, { AndroidImportance } from '@notifee/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import OrderItem from './src/components/OrderItem';
 import { useOrderStore } from './src/stores/orderStore';
 
@@ -42,6 +44,18 @@ export default function App() {
   const [tab, setTab] = useState<'active' | 'completed'>('active');
   const [monthlyCommission, setMonthlyCommission] = useState(0);
 
+  useEffect(() => {
+    (async () => {
+      const stash = await AsyncStorage.getItem('pendingOrders');
+      if (stash) {
+        try {
+          setOrders(JSON.parse(stash));
+        } catch {}
+        await AsyncStorage.removeItem('pendingOrders');
+      }
+    })();
+  }, [setOrders]);
+
   const checkHealth = useCallback(async () => {
     async function ping(path: string) {
       const r = await fetch(`${API_BASE}${path}`, { method: 'GET' });
@@ -65,6 +79,8 @@ export default function App() {
         if (r.ok) {
           const data = await r.json();
           setOrders(data?.data ?? data);
+          // make UI fast after background fetch stashes
+          await AsyncStorage.removeItem('pendingOrders');
         }
       } catch (e) {
         // ignore fetch errors for now
@@ -93,17 +109,52 @@ export default function App() {
     []
   );
 
+  // Ensure a high-importance channel for Android banners
+  useEffect(() => {
+    (async () => {
+      await notifee.createChannel({
+        id: 'orders',
+        name: 'Order Assignments',
+        importance: AndroidImportance.HIGH,
+      });
+    })();
+  }, []);
+
   const handleOrderAssigned = useCallback(
     async (msg: any) => {
-      if (msg?.data?.type === 'order_assigned') {
+      const t = msg?.data?.type;
+      if (t === 'order_assigned' || t === 'trip_assignment') {
         await fetchOrders(idToken ?? '');
         try {
-          Alert.alert('New order assigned');
+          // show a small local banner in foreground
+          await notifee.displayNotification({
+            title: 'New order assigned',
+            body: 'You have a new delivery task.',
+            android: { channelId: 'orders' },
+          });
         } catch {}
       }
     },
     [fetchOrders, idToken]
   );
+
+  // Token lifecycle: keep backend registration fresh
+  useEffect(() => {
+    const sub = messaging().onTokenRefresh(async (newToken) => {
+      const current = auth().currentUser;
+      if (!current) return;
+      const idt = await current.getIdToken(true);
+      await fetch(`${API_BASE}/drivers/devices/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${idt}`,
+        },
+        body: JSON.stringify({ fcm_token: newToken, platform: Platform.OS }),
+      });
+    });
+    return sub;
+  }, []);
 
   const bootstrap = useCallback(async () => {
     setError(null);
@@ -124,6 +175,7 @@ export default function App() {
       // 3) Get ID token to authenticate with your backend
       const idt = await current.getIdToken(true);
       setIdToken(idt);
+      await AsyncStorage.setItem('idToken', idt); // for headless background fetch
 
       // 4) Register device with backend
       setRegisterStatus('registering…');
@@ -186,6 +238,39 @@ export default function App() {
       bootstrap();
     }
   }, [user, checkHealth, bootstrap]);
+
+  // 5-minute polling only while active
+  useEffect(() => {
+    let interval: any;
+    const start = () => {
+      if (!interval) {
+        interval = setInterval(() => {
+          if (AppState.currentState === 'active' && idToken) {
+            fetchOrders(idToken);
+          }
+        }, 5 * 60 * 1000);
+      }
+    };
+    const stop = () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+    };
+    start();
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') {
+        fetchOrders(idToken ?? '');
+        start();
+      } else {
+        stop();
+      }
+    });
+    return () => {
+      stop();
+      sub.remove();
+    };
+  }, [idToken, fetchOrders]);
   if (!user) {
     return (
       <View style={styles.loginContainer}>

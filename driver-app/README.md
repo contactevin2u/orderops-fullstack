@@ -15,3 +15,22 @@ and upload them as artifacts:
 Run either workflow from the Actions tab in GitHub and download the generated
 APK from the workflow artifacts section.
 
+## QA Checklist
+
+Before testing builds, verify the following on the Android test device:
+
+- Notifications are allowed for the app (Android 13+ requires explicit permission).
+- Battery optimizations are disabled so background handlers can run.
+- The Firebase SHA-1/256 keys are registered and a matching `google-services.json`
+  with the same `package_name` is bundled with the app.
+
+Test scenarios:
+
+1. **App killed** – assign an order; a system notification appears within a few
+   seconds. Tapping it opens the app with the orders list refreshed.
+2. **Missed push while active** – block FCM or disable network; while the app is
+   in the foreground, orders refresh within five minutes via polling.
+
+Reinstalling or updating the app should continue to receive push notifications
+thanks to automatic token refresh and re-registration.
+
