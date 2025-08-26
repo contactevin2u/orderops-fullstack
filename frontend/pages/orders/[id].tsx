@@ -298,8 +298,14 @@ export default function OrderDetailPage(){
 
             <div className="hr" />
             <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-              <label>As of</label>
-              <input className="input" type="date" value={asOf} onChange={e=>setAsOf(e.target.value)} />
+              <label style={{flexShrink:0}}>As of</label>
+              <input
+                className="input"
+                type="date"
+                value={asOf}
+                onChange={e=>setAsOf(e.target.value)}
+                style={{flex:1,width:"auto"}}
+              />
             </div>
             <div className="kv">
               <div>Subtotal</div><div>RM {Number(order.subtotal||0).toFixed(2)}</div>
@@ -329,13 +335,33 @@ export default function OrderDetailPage(){
                 <button className="btn secondary" onClick={onReturned} disabled={busy}>Mark Returned (Rental)</button>
               </div>
               <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
+                <input
+                  className="input"
+                  type="number"
+                  placeholder="Buyback amount"
+                  value={buybackAmt}
+                  onChange={e=>setBuybackAmt(e.target.value)}
+                />
                 <input className="input" type="number" placeholder="Buyback amount" value={buybackAmt} onChange={e=>setBuybackAmt(e.target.value)} />
                 <div style={{display:"flex",gap:4}}>
-                  <select className="select" value={buybackDiscType} onChange={e=>setBuybackDiscType(e.target.value)}>
+                  <select
+                    className="select"
+                    value={buybackDiscType}
+                    onChange={e=>setBuybackDiscType(e.target.value)}
+                    style={{flex:1,width:"auto"}}
+                  >
                     <option value="">No Discount</option>
                     <option value="percent">% Off</option>
                     <option value="fixed">Fixed</option>
                   </select>
+                  <input
+                    className="input"
+                    type="number"
+                    placeholder="Value"
+                    value={buybackDiscVal}
+                    onChange={e=>setBuybackDiscVal(e.target.value)}
+                    style={{flex:1,width:"auto"}}
+                  />
                   <input className="input" type="number" placeholder="Value" value={buybackDiscVal} onChange={e=>setBuybackDiscVal(e.target.value)} />
                 </div>
                 <input className="input" placeholder="Method" value={buybackMethod} onChange={e=>setBuybackMethod(e.target.value)} />
