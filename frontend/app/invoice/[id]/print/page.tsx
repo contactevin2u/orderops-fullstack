@@ -4,19 +4,16 @@ import { getOrder } from "@/utils/api";
 export const dynamic = "force-dynamic";
 
 function isoDate(d?: string | number | Date) {
-  if (!d) return new Date().toISOString().slice(0, 10);
-  const dt = new Date(d);
+  const dt = new Date(d ?? Date.now());
   return isNaN(dt.getTime()) ? new Date().toISOString().slice(0, 10) : dt.toISOString().slice(0, 10);
 }
 
 function parseBankLine(bank?: string) {
   if (!bank) return { bankName: "", accountNo: "" };
-  const m = bank.match(/^([\w\s\-\.&]+?)[:\s-]*([0-9\- ]{6,})/i);
+  const m = bank.match(/^([\w\s\-.&]+?)[:\s-]*([0-9\- ]{6,})/i);
   return m ? { bankName: m[1].trim(), accountNo: m[2].replace(/\s+/g, "") } : { bankName: bank, accountNo: "" };
 }
 
-// Map your repo's Order shape -> InvoiceFortune500 schema.
-// Adapt field names if your order object differs.
 function mapOrderToInvoice(order: any): InvoiceData {
   const profile = order?.company_profile ?? order?.company ?? {};
   const customer = order?.customer ?? order?.bill_to ?? {};
@@ -25,16 +22,21 @@ function mapOrderToInvoice(order: any): InvoiceData {
   const taxLabel: string = profile.tax_label || "SST";
   const taxPercent: number = typeof profile.tax_percent === "number" ? profile.tax_percent : 0;
 
-  const items = itemsSrc.map((it: any) => ({
-    sku: it?.sku || it?.code || "",
-    name: it?.name || it?.title || "",
-    note: it?.note || undefined,
-    qty: Number(it?.qty ?? it?.quantity ?? 0),
-    unit: (it?.unit as string) || "unit",
-    unitPrice: Number(it?.unit_price ?? it?.price ?? 0),
-    discount: Number(it?.discount ?? 0) > 1 ? Number(it.discount) / 100 : Number(it?.discount ?? 0), // allow 0..1 or %
-    taxRate: taxPercent ? taxPercent / 100 : 0,
-  }));
+  const items = itemsSrc.map((it: any) => {
+    const unitPrice = Number(it?.unit_price ?? it?.price ?? 0);
+    const qty = Number(it?.qty ?? it?.quantity ?? 0);
+    const discount = Number(it?.discount ?? 0);
+    return {
+      sku: it?.sku || it?.code || "",
+      name: it?.name || it?.title || "",
+      note: it?.note || undefined,
+      qty,
+      unit: (it?.unit as string) || "unit",
+      unitPrice,
+      discount: discount > 1 ? discount / 100 : discount,
+      taxRate: taxPercent ? taxPercent / 100 : 0,
+    };
+  });
 
   const shipping = Number(order?.delivery_fee ?? 0);
   const other =

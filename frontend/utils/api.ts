@@ -278,11 +278,6 @@ export function outstanding(type?: string, asOf?: string) {
 }
 
 // -------- Documents
-export function invoicePdfUrl(orderId: number) {
-  const base = API_BASE;
-  return `${base}/documents/invoice/${orderId}.pdf`;
-}
-
 export function invoicePrintUrl(orderId: number | string) {
   return `/invoice/${orderId}/print`;
 }
