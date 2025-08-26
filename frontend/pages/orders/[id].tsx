@@ -175,6 +175,7 @@ export default function OrderDetailPage(){
   }
 
   async function onVoidPayment(pid:number){
+    if(!confirm("Void this payment?")) return;
     setBusy(true); setErr(""); setMsg("");
     try{ await voidPayment(pid, "Voided from UI"); setMsg("Payment voided"); await load(); }
     catch(e:any){ setError(e); } finally{ setBusy(false); }
@@ -246,9 +247,11 @@ export default function OrderDetailPage(){
   }
 
   return (
-      <div className="row">
-        <div className="col">
-          <div className="card">
+        <>
+        <Link href="/orders" className="btn secondary" style={{marginBottom:8}}>&larr; Back to Orders</Link>
+        <div className="row">
+          <div className="col">
+            <div className="card">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <h2 style={{marginTop:0}}>{order.code || order.id} <span className="badge">{order.status}</span></h2>
               <a className="btn secondary" href={invoicePdfUrl(order.id)} target="_blank" rel="noreferrer">
@@ -279,9 +282,9 @@ export default function OrderDetailPage(){
                             <option>FEE</option>
                           </select>
                         </td>
-                        <td><input className="input" value={it.qty} onChange={e=>updateItem(idx,'qty',e.target.value)} /></td>
-                        <td><input className="input" value={it.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} /></td>
-                        <td><input className="input" value={it.monthly_amount} onChange={e=>updateItem(idx,'monthly_amount',e.target.value)} /></td>
+                        <td><input className="input" type="number" value={it.qty} onChange={e=>updateItem(idx,'qty',e.target.value)} /></td>
+                        <td><input className="input" type="number" value={it.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} /></td>
+                        <td><input className="input" type="number" value={it.monthly_amount} onChange={e=>updateItem(idx,'monthly_amount',e.target.value)} /></td>
                         <td>RM {(Number(it.unit_price||0)*Number(it.qty||0)).toFixed(2)}</td>
                         <td><button className="btn secondary" onClick={()=>removeItem(idx)}>Remove</button></td>
                       </tr>
@@ -320,20 +323,20 @@ export default function OrderDetailPage(){
               </div>
               <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
                 <label><input type="checkbox" checked={retCollect} onChange={e=>setRetCollect(e.target.checked)} /> Collect</label>
-                <input className="input" placeholder="Return fee" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} />
+                <input className="input" type="number" placeholder="Return fee" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} />
                 <input className="input" placeholder="Method" value={retMethod} onChange={e=>setRetMethod(e.target.value)} />
                 <input className="input" placeholder="Reference" value={retRef} onChange={e=>setRetRef(e.target.value)} />
                 <button className="btn secondary" onClick={onReturned} disabled={busy}>Mark Returned (Rental)</button>
               </div>
               <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
-                <input className="input" placeholder="Buyback amount" value={buybackAmt} onChange={e=>setBuybackAmt(e.target.value)} />
+                <input className="input" type="number" placeholder="Buyback amount" value={buybackAmt} onChange={e=>setBuybackAmt(e.target.value)} />
                 <div style={{display:"flex",gap:4}}>
                   <select className="select" value={buybackDiscType} onChange={e=>setBuybackDiscType(e.target.value)}>
                     <option value="">No Discount</option>
                     <option value="percent">% Off</option>
                     <option value="fixed">Fixed</option>
                   </select>
-                  <input className="input" placeholder="Value" value={buybackDiscVal} onChange={e=>setBuybackDiscVal(e.target.value)} />
+                  <input className="input" type="number" placeholder="Value" value={buybackDiscVal} onChange={e=>setBuybackDiscVal(e.target.value)} />
                 </div>
                 <input className="input" placeholder="Method" value={buybackMethod} onChange={e=>setBuybackMethod(e.target.value)} />
                 <input className="input" placeholder="Reference" value={buybackRef} onChange={e=>setBuybackRef(e.target.value)} />
@@ -367,12 +370,12 @@ export default function OrderDetailPage(){
                 <label>Delivery Date</label>
                 <input className="input" type="date" value={deliveryDate} onChange={e=>setDeliveryDate(e.target.value)} />
               </div>
-              <div className="col"><label>Penalty Fee</label><input className="input" value={penalty} onChange={e=>setPenalty(e.target.value)} /></div>
-              <div className="col"><label>Discount</label><input className="input" value={disc} onChange={e=>setDisc(e.target.value)} /></div>
+              <div className="col"><label>Penalty Fee</label><input className="input" type="number" value={penalty} onChange={e=>setPenalty(e.target.value)} /></div>
+              <div className="col"><label>Discount</label><input className="input" type="number" value={disc} onChange={e=>setDisc(e.target.value)} /></div>
             </div>
             <div className="row">
-              <div className="col"><label>Delivery Fee</label><input className="input" value={delFee} onChange={e=>setDelFee(e.target.value)} /></div>
-              <div className="col"><label>Return Delivery Fee</label><input className="input" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} /></div>
+              <div className="col"><label>Delivery Fee</label><input className="input" type="number" value={delFee} onChange={e=>setDelFee(e.target.value)} /></div>
+              <div className="col"><label>Return Delivery Fee</label><input className="input" type="number" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} /></div>
             </div>
             <div className="row">
               <div className="col">
@@ -384,7 +387,7 @@ export default function OrderDetailPage(){
                 </select>
               </div>
               <div className="col"><label>Months</label><input className="input" type="number" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
-              <div className="col"><label>Monthly Amount</label><input className="input" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
+              <div className="col"><label>Monthly Amount</label><input className="input" type="number" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
             </div>
             <div style={{marginTop:8}}>
               <label>Notes</label>
@@ -422,7 +425,7 @@ export default function OrderDetailPage(){
           <div className="card" style={{marginTop:16}}>
             <h3 style={{marginTop:0}}>Payments</h3>
             <div className="row">
-              <div className="col"><input className="input" placeholder="Amount" value={payAmt} onChange={e=>setPayAmt(e.target.value)} /></div>
+              <div className="col"><input className="input" type="number" placeholder="Amount" value={payAmt} onChange={e=>setPayAmt(e.target.value)} /></div>
               <div className="col"><input className="input" type="date" placeholder="Date" value={payDate} onChange={e=>setPayDate(e.target.value)} /></div>
             </div>
             <div className="row">
@@ -450,21 +453,22 @@ export default function OrderDetailPage(){
             </table>
           </div>
 
-          <div className="card" style={{marginTop:16}}>
-            <h3 style={{marginTop:0}}>Delivery</h3>
-            {order.trip?.status === "DELIVERED" && (
-              <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
-            )}
-            {order.trip?.commission && (
-              <div style={{marginTop:8}}>
-                <input className="input" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
-                <button className="btn" style={{marginTop:4}} onClick={saveCommission} disabled={busy}>Save Commission</button>
-              </div>
-            )}
-          </div>
+            <div className="card" style={{marginTop:16}}>
+              <h3 style={{marginTop:0}}>Delivery</h3>
+              {order.trip?.status === "DELIVERED" && (
+                <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
+              )}
+              {order.trip?.commission && (
+                <div style={{marginTop:8}}>
+                  <input className="input" type="number" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
+                  <button className="btn" style={{marginTop:4}} onClick={saveCommission} disabled={busy}>Save Commission</button>
+                </div>
+              )}
+            </div>
 
-          <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}}>{err || msg}</div>
+            <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}} aria-live="polite">{err || msg}</div>
+          </div>
         </div>
-      </div>
-  );
-}
+        </>
+    );
+  }

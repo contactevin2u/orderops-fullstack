@@ -105,10 +105,11 @@ describe('OrderDetailPage', () => {
     fireEvent.click(addBtn);
 
     const table = screen.getAllByRole('table')[0];
-    const inputs = within(table).getAllByRole('textbox');
-    fireEvent.change(inputs[0], { target: { value: 'NewItem' } });
-    fireEvent.change(inputs[1], { target: { value: '3' } });
-    fireEvent.change(inputs[2], { target: { value: '5' } });
+    const nameInput = within(table).getByRole('textbox');
+    const numberInputs = within(table).getAllByRole('spinbutton');
+    fireEvent.change(nameInput, { target: { value: 'NewItem' } });
+    fireEvent.change(numberInputs[0], { target: { value: '3' } });
+    fireEvent.change(numberInputs[1], { target: { value: '5' } });
 
     fireEvent.click(screen.getByText('Save Items'));
 
