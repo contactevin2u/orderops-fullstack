@@ -7,7 +7,11 @@ from ..models import DriverRoute, Trip, Order, Driver, Role
 from ..schemas import RouteCreateIn, RouteOut
 from ..auth.deps import require_roles
 
-router = APIRouter(prefix="/routes", tags=["routes"], dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))])
+router = APIRouter(
+    prefix="/routes",
+    tags=["routes"],
+    dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
+)
 
 
 @router.post("", response_model=RouteOut)
@@ -72,3 +76,24 @@ def add_orders_to_route(route_id: int, body: dict, db: Session = Depends(get_ses
             assigned.append(oid)
     db.commit()
     return {"assigned": assigned, "skipped": skipped}
+
+
+@router.delete("/{route_id}/orders", response_model=dict)
+def remove_orders_from_route(
+    route_id: int, body: dict, db: Session = Depends(get_session)
+):
+    order_ids: list[int] = body.get("order_ids") or []
+    route = db.get(DriverRoute, route_id)
+    if not route:
+        raise HTTPException(404, "Route not found")
+
+    removed, skipped = [], []
+    for oid in order_ids:
+        trip = db.query(Trip).filter_by(order_id=oid, route_id=route.id).one_or_none()
+        if not trip:
+            skipped.append((oid, "not_on_route"))
+            continue
+        trip.route_id = None
+        removed.append(oid)
+    db.commit()
+    return {"removed": removed, "skipped": skipped}

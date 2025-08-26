@@ -15,6 +15,7 @@ export type Order = {
   priority?: number;
   routeId?: string | null;
   notes?: string;
+  trip?: any;
 };
 
 export type Route = {
@@ -48,8 +49,9 @@ function mapOrder(o: any): Order {
     size: o.size,
     weightKg: o.weight_kg ?? o.weightKg,
     priority: o.priority,
-    routeId: o.route_id ?? o.routeId ?? null,
+    routeId: o.route_id ?? o.routeId ?? o.trip?.route_id ?? null,
     notes: o.notes || '',
+    trip: o.trip,
   };
 }
 
@@ -84,24 +86,26 @@ export async function fetchRoutes(date: string): Promise<Route[]> {
 }
 
 export async function fetchUnassigned(date: string): Promise<Order[]> {
-  const { items } = await listOrders(undefined, 'UNASSIGNED');
+  const { items } = await listOrders(undefined, undefined, undefined, 500);
   return items
     .map(mapOrder)
     .filter(
       (o) =>
         o.deliveryDate === date &&
+        !o.trip &&
         o.status !== 'SUCCESS' &&
         o.status !== 'DELIVERED'
     );
 }
 
 export async function fetchOnHold(date: string): Promise<Order[]> {
-  const { items } = await listOrders(undefined, 'ON_HOLD');
+  const { items } = await listOrders(undefined, undefined, undefined, 500);
   return items
     .map(mapOrder)
     .filter(
       (o) =>
         o.deliveryDate === date &&
+        o.trip?.status === 'ON_HOLD' &&
         o.status !== 'SUCCESS' &&
         o.status !== 'DELIVERED'
     );
