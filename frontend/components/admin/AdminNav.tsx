@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 export default function AdminNav() {
   const { pathname } = useRouter();
   const items = [
+    { href: '/admin', label: 'Home' },
     { href: '/admin/routes', label: 'Routes' },
     { href: '/admin/assign', label: 'Assign' },
     { href: '/admin/driver-commissions', label: 'Driver Commissions' },
