@@ -97,7 +97,7 @@ export default function DriverCommissionsPage() {
             {rowsQuery.isError && (
               <tr>
                 <td colSpan={6} role="alert">
-                  Failed to load
+                  {(rowsQuery.error as any)?.message || 'Failed to load'}
                 </td>
               </tr>
             )}

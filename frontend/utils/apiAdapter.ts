@@ -1,4 +1,10 @@
-import { listRoutes, listOrders, addOrdersToRoute, createRoute as apiCreateRoute } from './api';
+import {
+  listRoutes,
+  listOrders,
+  addOrdersToRoute,
+  createRoute as apiCreateRoute,
+  request,
+} from './api';
 
 export type Order = {
   id: string;
@@ -125,22 +131,12 @@ export async function assignOrdersToRoute(
   await addOrdersToRoute(Number(routeId), orderIds.map((o) => Number(o)));
 }
 
-function apiBase() {
-  const envBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
-  return envBase || '/_api';
-}
-
 export async function removeOrdersFromRoute(
   routeId: string,
   orderIds: string[],
 ): Promise<void> {
-  const res = await fetch(`${apiBase()}/routes/${routeId}/orders`, {
+  await request(`/routes/${routeId}/orders`, {
     method: 'DELETE',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ order_ids: orderIds.map((o) => Number(o)) }),
+    json: { order_ids: orderIds.map((o) => Number(o)) },
   });
-  if (!res.ok) {
-    throw new Error(`Failed to remove orders: ${res.status}`);
-  }
 }

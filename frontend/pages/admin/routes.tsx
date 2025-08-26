@@ -75,7 +75,11 @@ export default function AdminRoutesPage() {
       </header>
       <div style={{ marginTop: 16 }}>
         {routesQuery.isLoading && <p role="status">Loading...</p>}
-        {routesQuery.isError && <p role="alert">Failed to load</p>}
+        {routesQuery.isError && (
+          <p role="alert">
+            {(routesQuery.error as any)?.message || 'Failed to load'}
+          </p>
+        )}
         {!routesQuery.isLoading && routes.length === 0 && <p style={{ opacity: 0.6 }}>No routes</p>}
         {!routesQuery.isLoading && routes.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>

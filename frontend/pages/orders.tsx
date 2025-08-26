@@ -15,6 +15,7 @@ import {
   listDrivers,
   invoicePrintUrl,
   orderDue,
+  apiBase,
 } from "@/utils/api";
 import Link from "next/link";
 
@@ -218,7 +219,7 @@ export default function OperatorOrdersPage() {
   }
 
   function batchExport() {
-    const base = process.env.NEXT_PUBLIC_API_URL || "/_api";
+    const base = apiBase();
     const ids = Array.from(selected).join(",");
     const url = `${base}/orders/export.xlsx?ids=${ids}`;
     if (typeof window !== "undefined") window.open(url, "_blank");

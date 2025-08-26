@@ -7,28 +7,47 @@ function normalizeBase(s?: string) {
 }
 
 const ENV_BASE = normalizeBase(process.env.NEXT_PUBLIC_API_URL);
-// When next.config.js rewrites are active, API_BASE can be "/_api"
-const API_BASE = ENV_BASE || "/_api";
 
-function pathJoin(p: string) {
-  return `${API_BASE}${p.startsWith("/") ? p : `/${p}`}`;
+export function getApiBase() {
+  // Server-side: trust env if present
+  if (typeof window === "undefined") return ENV_BASE || "/_api";
+  // Client-side: prefer same-origin proxy unless env matches origin
+  if (!ENV_BASE) return "/_api";
+  try {
+    const url = new URL(ENV_BASE, window.location.href);
+    return url.origin === window.location.origin
+      ? normalizeBase(url.toString())
+      : "/_api";
+  } catch {
+    return "/_api";
+  }
 }
 
-async function request<T = any>(
+export function apiBase() {
+  return getApiBase();
+}
+
+function pathJoin(p: string) {
+  const base = apiBase();
+  return `${base}${p.startsWith("/") ? p : `/${p}`}`;
+}
+
+export async function request<T = any>(
   path: string,
   init?: RequestInit & { json?: any; idempotencyKey?: string }
 ): Promise<T> {
-  const { json, headers, idempotencyKey, ...rest } = init || {};
+  const { json, headers, idempotencyKey, method, body, credentials, ...rest } =
+    init || {};
   const res = await fetch(pathJoin(path), {
-    method: json ? "POST" : (rest.method || "GET"),
+    method: method || (json ? "POST" : "GET"),
     headers: {
       Accept: "application/json",
       ...(json ? { "Content-Type": "application/json" } : {}),
       ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
       ...(headers || {}),
     },
-    body: json ? JSON.stringify(json) : rest.body,
-    credentials: 'include',
+    body: json ? JSON.stringify(json) : body,
+    credentials: "include",
     ...rest,
   }).catch((e: any) => {
     throw new Error(`Network error calling ${path}: ${e?.message || "failed to fetch"}`);

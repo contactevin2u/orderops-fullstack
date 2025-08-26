@@ -111,7 +111,7 @@ export default function AdminAssignPage() {
           {ordersQuery.isError && (
             <tr>
               <td colSpan={4} role="alert">
-                Failed to load
+                {(ordersQuery.error as any)?.message || 'Failed to load'}
               </td>
             </tr>
           )}

@@ -1,12 +1,13 @@
 import Card from "@/components/Card";
 import Button from "@/components/ui/button";
 import React from "react";
+import { apiBase } from "@/utils/api";
 
 export default function ExportPage() {
   const [start, setStart] = React.useState("");
   const [end, setEnd] = React.useState("");
   const [mark, setMark] = React.useState(false);
-  const base = process.env.NEXT_PUBLIC_API_URL || "/_api";
+  const base = apiBase();
 
   function download(kind: "cash" | "payments_received") {
     if (!start || !end) return;
