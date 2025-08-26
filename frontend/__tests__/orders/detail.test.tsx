@@ -17,7 +17,7 @@ vi.mock('@/utils/api', () => ({
   voidOrder: vi.fn(),
   markReturned: vi.fn(),
   markBuyback: vi.fn(),
-  invoicePdfUrl: vi.fn(),
+  invoicePrintUrl: vi.fn(),
   orderDue: (...args: any[]) => mockOrderDue(...args),
 }));
 
