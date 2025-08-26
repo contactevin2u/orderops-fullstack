@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Header, Response
 from sqlalchemy.orm import Session
-from sqlalchemy import select, func, or_, cast, Date, and_
+from sqlalchemy import select, and_, or_
 from pydantic import BaseModel
 from decimal import Decimal
-from datetime import datetime, date
+from datetime import datetime, date as date_cls, time, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from ..db import get_session
 from ..models import (
@@ -38,6 +39,17 @@ from ..services.documents import invoice_pdf
 from ..utils.responses import envelope
 from ..utils.normalize import to_decimal
 from .drivers import notify_assignment
+
+APP_TZ = ZoneInfo("Asia/Kuala_Lumpur")
+
+
+def kl_day_bounds(d: datetime | date_cls):
+    """Return (start_utc, end_utc) for KL local day covering date d."""
+    if isinstance(d, datetime):
+        d = d.date()
+    start_local = datetime.combine(d, time.min, tzinfo=APP_TZ)
+    end_local = start_local + timedelta(days=1)
+    return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
 
 router = APIRouter(
     prefix="/orders",
@@ -78,12 +90,33 @@ def list_orders(
         stmt = stmt.where(Order.status == status)
     if type:
         stmt = stmt.where(Order.type == type)
+
+    # --- Date filtering (backlog semantics) ---
     if date:
         try:
             d = datetime.fromisoformat(date).date()
         except Exception:
-            raise HTTPException(400, "Invalid date format")
-        stmt = stmt.where(cast(Order.delivery_date, Date) == d)
+            raise HTTPException(status_code=400, detail="Invalid date format (expected YYYY-MM-DD)")
+
+        start_utc, end_utc = kl_day_bounds(d)
+
+        backlog_mode = (unassigned is True) or (status == "ON_HOLD")
+
+        if backlog_mode:
+            stmt = stmt.where(
+                or_(
+                    Order.delivery_date.is_(None),
+                    Order.delivery_date < end_utc,
+                )
+            )
+        else:
+            stmt = stmt.where(
+                and_(
+                    Order.delivery_date >= start_utc,
+                    Order.delivery_date < end_utc,
+                )
+            )
+
     if unassigned:
         # No trip or trip has no route yet (still not assigned to a route)
         stmt = stmt.where(and_(or_(Trip.id.is_(None), Trip.route_id.is_(None))))
@@ -188,12 +221,12 @@ def get_invoice_pdf(order_id: int, db: Session = Depends(get_session)):
 
 
 @router.get("/{order_id}/due", response_model=dict)
-def get_order_due(order_id: int, as_of: date | None = None, db: Session = Depends(get_session)):
+def get_order_due(order_id: int, as_of: date_cls | None = None, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
 
-    as_of = as_of or date.today()
+    as_of = as_of or date_cls.today()
 
     paid_parent = _sum_posted_payments(order)
     paid_children = sum(
@@ -504,7 +537,7 @@ def return_order(
             bool(body.collect) if body else False,
             body.method if body else None,
             body.reference if body else None,
-            date.fromisoformat(body.date) if body and body.date else None,
+            date_cls.fromisoformat(body.date) if body and body.date else None,
         )
         db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="return"))
         db.commit()
