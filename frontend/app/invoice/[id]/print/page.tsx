@@ -55,8 +55,7 @@ export default function InvoicePrintPage() {
 
   return (
     <div className="p-4">
-      {/* @ts-expect-error Invoice component expects different props */}
-      <InvoiceFortune500 order={order} printMode />
+      <InvoiceFortune500 invoice={order} />
     </div>
   );
 }
