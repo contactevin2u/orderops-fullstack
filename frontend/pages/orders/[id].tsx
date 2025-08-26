@@ -342,6 +342,7 @@ export default function OrderDetailPage(){
                   value={buybackAmt}
                   onChange={e=>setBuybackAmt(e.target.value)}
                 />
+                <input className="input" type="number" placeholder="Buyback amount" value={buybackAmt} onChange={e=>setBuybackAmt(e.target.value)} />
                 <div style={{display:"flex",gap:4}}>
                   <select
                     className="select"
@@ -361,6 +362,7 @@ export default function OrderDetailPage(){
                     onChange={e=>setBuybackDiscVal(e.target.value)}
                     style={{flex:1,width:"auto"}}
                   />
+                  <input className="input" type="number" placeholder="Value" value={buybackDiscVal} onChange={e=>setBuybackDiscVal(e.target.value)} />
                 </div>
                 <input className="input" placeholder="Method" value={buybackMethod} onChange={e=>setBuybackMethod(e.target.value)} />
                 <input className="input" placeholder="Reference" value={buybackRef} onChange={e=>setBuybackRef(e.target.value)} />
