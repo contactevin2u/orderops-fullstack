@@ -25,7 +25,7 @@ alembic upgrade head
 
 The `0008_add_user_and_audit` migration inserts an initial `admin` user with a
 bcrypt password hash. To change the password, generate a new hash with
-`passlib` and update the row:
+`libpass` (a drop-in fork of `passlib`) and update the row:
 
 ```bash
 python - <<'PY'

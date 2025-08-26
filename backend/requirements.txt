@@ -20,9 +20,9 @@ jsonschema>=4.21
 json-repair>=0.2
 rapidfuzz>=3.6
 firebase-admin>=6.5.0
-# Ensure passlib/bcrypt versions are compatible (fixes "module 'bcrypt' has no attribute '__about__'")
-passlib[bcrypt]>=1.7.4
-bcrypt>=4.0.1
+# Use libpass (drop-in fork of passlib) to support bcrypt >=4.1 on Python 3.13
+libpass>=1.9
+bcrypt>=4.2
 PyJWT>=2.8
 Pillow>=10.0
 python-multipart>=0.0.6
