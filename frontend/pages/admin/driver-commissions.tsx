@@ -102,14 +102,14 @@ export default function DriverCommissionsPage() {
               </tr>
             )}
             {!rowsQuery.isLoading &&
-              rows.map((o: any) => (
-                <OrderRow
-                  key={o.id}
-                  o={o}
-                  onPaySuccess={payAndSuccess.mutate}
-                  onSaveCommission={saveCommission.mutate}
-                />
-              ))}
+                rows.map((o: any) => (
+                  <OrderRow
+                    key={o.id}
+                    o={o}
+                    onPaySuccess={payAndSuccess.mutateAsync}
+                    onSaveCommission={saveCommission.mutateAsync}
+                  />
+                ))}
             {!rowsQuery.isLoading && rows.length === 0 && (
               <tr>
                 <td colSpan={6} style={{ opacity: 0.7 }}>
@@ -127,21 +127,45 @@ export default function DriverCommissionsPage() {
   );
 }
 
-function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPaySuccess: any; onSaveCommission: any }) {
+export function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPaySuccess: any; onSaveCommission: any }) {
   const [method, setMethod] = React.useState('');
   const [amount, setAmount] = React.useState('');
   const [reference, setReference] = React.useState('');
   const [commission, setCommission] = React.useState(
     String(o?.trip?.commission?.computed_amount ?? o?.commission ?? '')
   );
+  const [msg, setMsg] = React.useState('');
 
   const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
   let pod = o?.trip?.pod_photo_url || o?.pod_photo_url;
   if (pod && !pod.startsWith('http')) pod = `${apiBase}${pod}`;
+  const isPdf = pod ? /\.pdf($|\?)/i.test(pod) : false;
+  const podHref = pod ? `/pod-viewer?url=${encodeURIComponent(pod)}` : '';
   const canSuccess =
     o.status === 'DELIVERED' &&
     !!pod &&
     ((method === '' && amount === '') || (!!method && !!amount));
+
+  const handleSave = async () => {
+    try {
+      await onSaveCommission({ orderId: o.id, amount: commission });
+      setMsg('Saved');
+    } catch (e: any) {
+      setMsg(e?.message || 'Error');
+    }
+  };
+
+  const handleSuccess = async () => {
+    try {
+      await onPaySuccess({ orderId: o.id, amount, method, reference });
+      setMsg('Marked as SUCCESS');
+      setMethod('');
+      setAmount('');
+      setReference('');
+    } catch (e: any) {
+      setMsg(e?.message || 'Error');
+    }
+  };
 
   return (
     <tr>
@@ -149,8 +173,23 @@ function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPaySuccess:
       <td><StatusBadge value={o.status} /></td>
       <td>
         {pod ? (
-          <a href={pod} target="_blank" rel="noreferrer">
-            <Image src={pod} alt="POD" width={64} height={64} />
+          <a href={podHref} target="_blank" rel="noreferrer">
+            {isPdf ? (
+              <span
+                style={{
+                  display: 'inline-block',
+                  width: 64,
+                  height: 64,
+                  lineHeight: '64px',
+                  textAlign: 'center',
+                  background: '#eee',
+                }}
+              >
+                PDF
+              </span>
+            ) : (
+              <Image src={pod} alt="POD" width={64} height={64} unoptimized />
+            )}
           </a>
         ) : (
           <span style={{ opacity: 0.6 }}>No POD</span>
@@ -205,10 +244,7 @@ function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPaySuccess:
             value={commission}
             onChange={(e) => setCommission(e.target.value)}
           />
-          <button
-            className="btn secondary"
-            onClick={() => onSaveCommission({ orderId: o.id, amount: commission })}
-          >
+          <button className="btn secondary" onClick={handleSave}>
             Save
           </button>
         </div>
@@ -218,10 +254,13 @@ function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPaySuccess:
           className="btn"
           disabled={!canSuccess}
           title={!canSuccess ? 'Requires POD and valid payment (if provided)' : undefined}
-          onClick={() => onPaySuccess({ orderId: o.id, amount, method, reference })}
+          onClick={handleSuccess}
         >
           Mark Success
         </button>
+        <span role="status" style={{ marginLeft: 8, fontSize: '0.875rem', opacity: 0.7 }}>
+          {msg}
+        </span>
       </td>
     </tr>
   );
