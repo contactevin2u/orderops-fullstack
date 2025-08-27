@@ -9,7 +9,7 @@ export default function InvoicePreviewPage() {
 
   return (
     <iframe
-      src={`/api/invoices/${id}/pdf`}
+      src={`/_api/orders/${id}/invoice.pdf`}
       className="fixed inset-0 w-screen h-screen border-0"
     />
   );

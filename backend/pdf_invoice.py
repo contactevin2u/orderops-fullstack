@@ -64,7 +64,7 @@ async def build_invoice_pdf(inv: dict) -> bytes:
     story: list = []
 
     # Header with logo and company details
-    logo_img = Image(await _fetch_image(LOGO_URL), width=60 * mm, preserveAspectRatio=True)
+    logo_img = Image(await _fetch_image(LOGO_URL), width=60 * mm)
     company_lines = [
         Paragraph("AA Alive Sdn Bhd", right),
         Paragraph("10 Jalan Perusahaan Amari,", right),
