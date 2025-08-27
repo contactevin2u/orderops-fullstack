@@ -15,6 +15,9 @@ module.exports = {
   },
   async rewrites() {
     // Proxy path you can use for local dev if you prefer: /_api/* -> API_BASE/*
-    return [{ source: "/_api/:path*", destination: `${API_BASE}/:path*` }];
+    return [
+      { source: "/_api/:path*", destination: `${API_BASE}/:path*` },
+      { source: "/static/uploads/:path*", destination: `${API_BASE}/static/uploads/:path*` },
+    ];
   },
 };

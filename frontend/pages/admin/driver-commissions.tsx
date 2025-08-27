@@ -4,6 +4,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listDrivers, listDriverOrders, addPayment, markSuccess, updateCommission } from '@/utils/api';
 import StatusBadge from '@/components/StatusBadge';
+import { resolvePodUrl } from '@/utils/pod';
 
 export default function DriverCommissionsPage() {
   const qc = useQueryClient();
@@ -136,9 +137,7 @@ export function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPayS
   );
   const [msg, setMsg] = React.useState('');
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
-  let pod = o?.trip?.pod_photo_url || o?.pod_photo_url;
-  if (pod && !pod.startsWith('http')) pod = `${apiBase}${pod}`;
+  let pod = resolvePodUrl(o?.trip?.pod_photo_url || o?.pod_photo_url);
   const isPdf = pod ? /\.pdf($|\?)/i.test(pod) : false;
   const podHref = pod ? `/pod-viewer?url=${encodeURIComponent(pod)}` : '';
   const canSuccess =

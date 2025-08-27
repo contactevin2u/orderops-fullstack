@@ -40,4 +40,17 @@ describe('OrderRow', () => {
     expect(save).toHaveBeenCalled();
     expect(screen.getByText(/saved/i)).toBeInTheDocument();
   });
+
+  it('prefixes relative POD url with API base', () => {
+    process.env.NEXT_PUBLIC_API_URL = 'https://api.example.com';
+    const order = { ...baseOrder, trip: { pod_photo_url: '/static/uploads/x.jpg', commission: { computed_amount: 0 } } };
+    render(
+      <table>
+        <tbody>
+          <OrderRow o={order} onPaySuccess={async () => {}} onSaveCommission={async () => {}} />
+        </tbody>
+      </table>
+    );
+    expect(screen.getByRole('img', { name: /pod/i })).toHaveAttribute('src', 'https://api.example.com/static/uploads/x.jpg');
+  });
 });
