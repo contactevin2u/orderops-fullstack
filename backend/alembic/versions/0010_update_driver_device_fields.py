@@ -8,12 +8,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add token column as nullable first so existing rows can be populated
-    op.add_column("driver_devices", sa.Column("token", sa.String(length=255), nullable=True))
-    # Populate existing rows with unique placeholder tokens
-    op.execute("UPDATE driver_devices SET token = 'migrated-' || id")
-    # Enforce NOT NULL after backfilling
-    op.alter_column("driver_devices", "token", nullable=False)
+
     op.add_column("driver_devices", sa.Column("app_version", sa.String(length=20), nullable=True))
     op.add_column("driver_devices", sa.Column("model", sa.String(length=100), nullable=True))
     op.add_column(
