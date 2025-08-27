@@ -157,6 +157,7 @@ def list_orders(
                 "status": trip.status,
                 "driver_name": driver_name,
                 "route_id": trip.route_id,
+                "pod_photo_url": trip.pod_photo_url,
             }
             if commission:
                 trip_dto["commission"] = {
@@ -494,11 +495,19 @@ def update_commission(
     if not trip:
         raise HTTPException(404, "Trip not found")
     commission = db.query(Commission).filter_by(trip_id=trip.id).one_or_none()
-    if not commission:
-        raise HTTPException(404, "Commission not found")
     amt = to_decimal(body.amount)
-    commission.rate = amt
-    commission.computed_amount = amt
+    if commission:
+        commission.rate = amt
+        commission.computed_amount = amt
+    else:
+        commission = Commission(
+            driver_id=trip.driver_id,
+            trip_id=trip.id,
+            scheme="FLAT",
+            rate=amt,
+            computed_amount=amt,
+        )
+        db.add(commission)
     db.commit()
     db.refresh(commission)
     log_action(db, current_user, "commission.update", f"commission_id={commission.id}")
