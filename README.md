@@ -90,3 +90,12 @@ runs via `GET /export/runs`, inspect their payments with
 
 The frontend now includes a **Cashier** page for quick payment entry and an
 **Adjustments** wizard for returns, buybacks and installment cancellations.
+
+## Offline Outbox & API Client
+
+The Expo-based driver app routes all HTTP calls through a centralized client
+that injects the Firebase ID token and normalizes JSON or text responses. Any
+mutating request made while offline is stored in an AsyncStorage-backed outbox
+and retried with exponential backoff when connectivity is restored or the app
+foregrounds. A lightweight toast system surfaces errors and queued actions to
+the driver.

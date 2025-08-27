@@ -6,7 +6,8 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "ios": "expo run:ios"
+    "ios": "expo run:ios",
+    "test": "tsc src/lib/api.ts src/offline/outbox.ts src/offline/types.ts src/config/env.ts --outDir build --module commonjs --target ES2019 --esModuleInterop --skipLibCheck && node --test tests/api.test.js tests/outbox.test.js"
   },
   "dependencies": {
     "@react-native-firebase/app": "^21.4.0",
@@ -23,5 +24,9 @@
     "react": "18.2.0",
     "react-native": "0.74.0",
     "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
   }
 }

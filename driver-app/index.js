@@ -17,12 +17,9 @@ messaging().setBackgroundMessageHandler(async (msg) => {
     });
     // 2) OPTIONAL: headless fetch to stash new orders for instant UI
     try {
-      const idt = await AsyncStorage.getItem('idToken');
-      if (idt) {
-        const r = await api.get('/drivers/orders', idt);
-        if (r.ok) {
-          await AsyncStorage.setItem('pendingOrders', JSON.stringify(r.data?.data ?? r.data));
-        }
+      const r = await api.get('/drivers/orders');
+      if (r.ok) {
+        await AsyncStorage.setItem('pendingOrders', JSON.stringify(r.data?.data ?? r.data));
       }
     } catch {}
   }
