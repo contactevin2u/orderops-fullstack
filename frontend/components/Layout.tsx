@@ -8,6 +8,7 @@ import {
   FileDown,
   BarChart2,
   CircleDollarSign,
+  FilePlus,
   Wrench,
   Menu,
   Shield,
@@ -26,6 +27,7 @@ export type NavItem = {
 export const navItems: NavItem[] = [
   { href: '/', label: 'nav.intake', Icon: Inbox },
   { href: '/orders', label: 'nav.orders', Icon: ClipboardList },
+  { href: '/orders/new', label: 'orders.create', Icon: FilePlus },
   { href: '/export', label: 'nav.export', Icon: FileDown },
   { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
   { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
