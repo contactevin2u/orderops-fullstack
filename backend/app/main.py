@@ -17,6 +17,7 @@ from .routers import (
     drivers,
     routes as routes_router,
 )
+from .audit import router as audit_router
 
 app = FastAPI(title="OrderOps Fullstack v1", default_response_class=ORJSONResponse)
 
@@ -42,3 +43,4 @@ app.include_router(queue.router)
 app.include_router(reports.router)
 app.include_router(drivers.router)
 app.include_router(routes_router.router)
+app.include_router(audit_router)

@@ -1,5 +1,6 @@
 import json
 import os
+import logging
 from typing import Any, Dict
 
 import httpx
@@ -32,11 +33,14 @@ def _get_access_token() -> tuple[str, str]:
     return token.token, _project_id
 
 
-def send_to_token(token: str, title: str, body: str, data: Dict[str, Any]) -> None:
-    try:
-        access_token, project_id = _get_access_token()
-    except Exception:
-        return
+def send_to_token(
+    token: str,
+    title: str,
+    body: str,
+    data: Dict[str, Any],
+    channel_id: str | None = None,
+) -> tuple[int, str]:
+    access_token, project_id = _get_access_token()
     url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
     message = {
         "message": {
@@ -45,20 +49,26 @@ def send_to_token(token: str, title: str, body: str, data: Dict[str, Any]) -> No
             "data": data,
             "android": {
                 "priority": "HIGH",
-                "notification": {"channel_id": PUSH_ANDROID_CHANNEL_ID},
+                "notification": {
+                    "channel_id": channel_id or PUSH_ANDROID_CHANNEL_ID
+                },
             },
         }
     }
+    hdrs = {"Authorization": f"Bearer {access_token}"}
+    resp = httpx.post(url, headers=hdrs, json=message, timeout=10)
     try:
-        httpx.post(
-            url,
-            headers={"Authorization": f"Bearer {access_token}"},
-            json=message,
-            timeout=10,
-        ).raise_for_status()
+        resp.raise_for_status()
     except Exception:
-        # Silently ignore notification errors
-        pass
+        logging.exception(
+            "FCM send failed",
+            extra={
+                "status": getattr(resp, "status_code", None),
+                "body": getattr(resp, "text", None),
+            },
+        )
+        raise
+    return resp.status_code, resp.text
 
 
 def notify_order_assigned(db: Session, driver_id: int, order: Order) -> None:
@@ -76,4 +86,10 @@ def notify_order_assigned(db: Session, driver_id: int, order: Order) -> None:
         "delivery_window": getattr(order, "delivery_window", ""),
     }
     for device in driver.devices:
-        send_to_token(device.token, title, body, data)
+        try:
+            send_to_token(device.token, title, body, data)
+        except Exception:
+            logging.exception(
+                "notify_order_assigned push failed",
+                extra={"driver_id": driver_id, "token": device.token},
+            )
