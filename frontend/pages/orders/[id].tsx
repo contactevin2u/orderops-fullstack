@@ -277,7 +277,7 @@ export default function OrderDetailPage(){
 
             <div className="hr" />
               <h3 className="m-0">Items</h3>
-              <div style={{overflowX:"auto"}}>
+              <div className="overflow-x-auto">
                 <table className="table">
                   <thead><tr><th>Name</th><th>Type</th><th>Qty</th><th>Unit</th><th>Monthly</th><th>Line Total</th><th></th></tr></thead>
                   <tbody>
@@ -299,22 +299,21 @@ export default function OrderDetailPage(){
                         <td><button className="btn secondary" onClick={()=>removeItem(idx)}>Remove</button></td>
                       </tr>
                     ))}
-                    {items.length===0 && <tr><td colSpan={7} style={{opacity:.7}}>No items</td></tr>}
+                    {items.length===0 && <tr><td colSpan={7} className="opacity-70">No items</td></tr>}
                     <tr><td colSpan={7}><button className="btn secondary" onClick={addItem}>Add Item</button></td></tr>
                   </tbody>
                 </table>
               </div>
-              <div style={{marginTop:8}}><button className="btn" onClick={saveItems} disabled={busy}>Save Items</button></div>
+              <div className="mt-2"><button className="btn" onClick={saveItems} disabled={busy}>Save Items</button></div>
 
             <div className="hr" />
-            <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-              <label style={{flexShrink:0}}>As of</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="flex-shrink-0">As of</label>
               <input
-                className="input"
+                className="input flex-1 w-auto"
                 type="date"
                 value={asOf}
                 onChange={e=>setAsOf(e.target.value)}
-                style={{flex:1,width:"auto"}}
               />
             </div>
             <div className="kv">
@@ -337,14 +336,14 @@ export default function OrderDetailPage(){
               <div className="col">
                 <button className="btn secondary" onClick={onCancelOrder} disabled={busy}>Void/Cancel Order</button>
               </div>
-              <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div className="col flex flex-col gap-1">
                 <label><input type="checkbox" checked={retCollect} onChange={e=>setRetCollect(e.target.checked)} /> Collect</label>
                 <input className="input" type="number" min="0" step="0.01" placeholder="Return fee" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} />
                 <input className="input" placeholder="Method" value={retMethod} onChange={e=>setRetMethod(e.target.value)} />
                 <input className="input" placeholder="Reference" value={retRef} onChange={e=>setRetRef(e.target.value)} />
                 <button className="btn secondary" onClick={onReturned} disabled={busy}>Mark Returned (Rental)</button>
               </div>
-              <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
+              <div className="col flex flex-col gap-1">
                 <input
                   className="input"
                   type="number"
@@ -354,26 +353,24 @@ export default function OrderDetailPage(){
                   value={buybackAmt}
                   onChange={e=>setBuybackAmt(e.target.value)}
                 />
-                <div style={{display:"flex",gap:4}}>
+                <div className="flex gap-1">
                   <select
-                    className="select"
+                    className="select flex-1 w-auto"
                     value={buybackDiscType}
                     onChange={e=>setBuybackDiscType(e.target.value)}
-                    style={{flex:1,width:"auto"}}
                   >
                     <option value="">No Discount</option>
                     <option value="percent">% Off</option>
                     <option value="fixed">Fixed</option>
                   </select>
                   <input
-                    className="input"
+                    className="input flex-1 w-auto"
                     type="number"
                     min="0"
                     step="0.01"
                     placeholder="Value"
                     value={buybackDiscVal}
                     onChange={e=>setBuybackDiscVal(e.target.value)}
-                    style={{flex:1,width:"auto"}}
                   />
                 </div>
                 <input className="input" placeholder="Method" value={buybackMethod} onChange={e=>setBuybackMethod(e.target.value)} />
@@ -401,7 +398,7 @@ export default function OrderDetailPage(){
               <div className="col"><label>Customer Name</label><input className="input" value={custName} onChange={e=>setCustName(e.target.value)} /></div>
               <div className="col"><label>Phone</label><input className="input" value={custPhone} onChange={e=>setCustPhone(e.target.value)} /></div>
             </div>
-            <div style={{marginTop:8}}><label>Address</label><textarea className="textarea" rows={2} value={custAddress} onChange={e=>setCustAddress(e.target.value)} /></div>
+            <div className="mt-2"><label>Address</label><textarea className="textarea" rows={2} value={custAddress} onChange={e=>setCustAddress(e.target.value)} /></div>
             <div className="row">
               <div className="col">
                 <label>Delivery Date</label>
@@ -426,28 +423,28 @@ export default function OrderDetailPage(){
               <div className="col"><label>Months</label><input className="input" type="number" min="1" step="1" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
               <div className="col"><label>Monthly Amount</label><input className="input" type="number" min="0" step="0.01" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
             </div>
-            <div style={{marginTop:8}}>
+            <div className="mt-2">
               <label>Notes</label>
               <textarea className="textarea" rows={4} value={notes} onChange={e=>setNotes(e.target.value)} />
             </div>
-            <div style={{marginTop:8}}><button className="btn" onClick={saveDetails} disabled={busy}>Save</button></div>
+            <div className="mt-2"><button className="btn" onClick={saveDetails} disabled={busy}>Save</button></div>
           </Card>
 
           <Card>
             <h3 className="m-0">{t('documents.title')}</h3>
-            <div className="row" style={{marginBottom:8}}>
+            <div className="row mb-2">
               <a className="btn" href={invoiceUrl} target="_blank" rel="noopener noreferrer">{t('documents.view')}</a>
               <a className="btn secondary" href={invoiceUrl} download>{t('documents.download')}</a>
               <button className="btn secondary" onClick={copyInvoice}>{t('documents.share')}</button>
             </div>
-            <Card style={{marginTop:8}}>
+            <Card className="mt-2">
               {profile.logo_url ? (
                 <Image
                   src={profile.logo_url}
                   alt="logo"
                   width={160}
                   height={40}
-                  style={{ maxHeight: 40, width: 'auto' }}
+                  className="max-h-10 w-auto"
                 />
               ) : (
                 <div>{t('documents.noLogo')}</div>
@@ -469,7 +466,7 @@ export default function OrderDetailPage(){
               <div className="col"><input className="input" placeholder="Method" value={payMethod} onChange={e=>setPayMethod(e.target.value)} /></div>
               <div className="col"><input className="input" placeholder="Reference" value={payRef} onChange={e=>setPayRef(e.target.value)} /></div>
             </div>
-            <div style={{marginTop:8}}><button className="btn" onClick={postPayment} disabled={busy || !payAmt}>Add Payment</button></div>
+            <div className="mt-2"><button className="btn" onClick={postPayment} disabled={busy || !payAmt}>Add Payment</button></div>
 
             <div className="hr" />
             <table className="table">
@@ -485,7 +482,7 @@ export default function OrderDetailPage(){
                     <td>{p.status!=="VOIDED" && <button className="btn secondary" onClick={()=>onVoidPayment(p.id)} disabled={busy}>Void</button>}</td>
                   </tr>
                 ))}
-                {(!order.payments || order.payments.length===0) && <tr><td colSpan={6} style={{opacity:.7}}>No payments</td></tr>}
+                {(!order.payments || order.payments.length===0) && <tr><td colSpan={6} className="opacity-70">No payments</td></tr>}
               </tbody>
             </table>
           </Card>
@@ -496,14 +493,14 @@ export default function OrderDetailPage(){
                 <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
               )}
               {order.trip?.commission && (
-                <div style={{marginTop:8}}>
+                <div className="mt-2">
                   <input className="input" type="number" min="0" step="0.01" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
-                  <button className="btn" style={{marginTop:4}} onClick={saveCommission} disabled={busy}>Save Commission</button>
+                  <button className="btn mt-1" onClick={saveCommission} disabled={busy}>Save Commission</button>
                 </div>
               )}
             </Card>
 
-          <div style={{marginTop:8,color: err? "#ffb3b3" : "#9fffba"}} aria-live="polite">{err || msg}</div>
+          <div className={`mt-2 ${err ? 'text-red-300' : 'text-green-300'}`} aria-live="polite">{err || msg}</div>
         </div>
         </div>
         </>
