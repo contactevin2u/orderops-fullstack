@@ -7,6 +7,7 @@ export default function AdminIndexPage() {
     { href: '/admin/routes', label: 'Routes' },
     { href: '/admin/assign', label: 'Assign' },
     { href: '/admin/driver-commissions', label: 'Driver Commissions' },
+    { href: '/admin/users', label: 'Users' },
   ];
   return (
     <div>

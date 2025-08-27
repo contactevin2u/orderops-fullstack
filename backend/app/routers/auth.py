@@ -20,12 +20,10 @@ class LoginIn(BaseModel):
     remember: bool | None = False
 
 
-
 class RegisterIn(BaseModel):
     username: str
     password: str
     role: Role | None = None
-
 
 
 @router.post("/login")
@@ -33,9 +31,16 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
     user = db.query(User).filter(User.username == payload.username).one_or_none()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(401, "Invalid credentials")
-    expire = timedelta(days=7) if payload.remember else timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    if payload.remember:
+        expire = timedelta(days=7)
+        max_age = int(expire.total_seconds())
+    elif user.role == Role.ADMIN:
+        expire = timedelta(hours=24)
+        max_age = int(expire.total_seconds())
+    else:
+        expire = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        max_age = None
     token = create_access_token({"sub": str(user.id), "role": user.role.value}, expire)
-    max_age = int(expire.total_seconds()) if payload.remember else None
     response.set_cookie(
         "token",
         token,
@@ -47,7 +52,6 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
     db.add(AuditLog(user_id=user.id, action="login"))
     db.commit()
     return {"id": user.id, "username": user.username, "role": user.role.value}
-
 
 
 @router.post("/register")
@@ -82,7 +86,6 @@ def register(
     return {"id": user.id, "username": user.username, "role": user.role.value}
 
 
-
 @router.post("/logout")
 def logout(
     response: Response,
@@ -102,5 +105,8 @@ def logout(
 
 @router.get("/me")
 def get_me(current_user: User = Depends(get_current_user)):
-    return {"id": current_user.id, "username": current_user.username, "role": current_user.role.value}
-
+    return {
+        "id": current_user.id,
+        "username": current_user.username,
+        "role": current_user.role.value,
+    }
