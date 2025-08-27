@@ -10,7 +10,7 @@ export default function InvoicePrintPage() {
   return (
     <iframe
       src={`/_api/orders/${id}/invoice.pdf`}
-      className="w-full h-screen"
+      className="fixed inset-0 w-screen h-screen border-0"
     />
   );
 }
