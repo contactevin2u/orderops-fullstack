@@ -3,6 +3,7 @@ import App from './App';
 import messaging from '@react-native-firebase/messaging';
 import notifee from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from './src/lib/api';
 
 // background handler (required for notifications when app is quit)
 messaging().setBackgroundMessageHandler(async (msg) => {
@@ -17,15 +18,10 @@ messaging().setBackgroundMessageHandler(async (msg) => {
     // 2) OPTIONAL: headless fetch to stash new orders for instant UI
     try {
       const idt = await AsyncStorage.getItem('idToken');
-      const apiBase = 'https://orderops-api-v1.onrender.com';
       if (idt) {
-        const r = await fetch(`${apiBase}/drivers/orders`, {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${idt}` },
-        });
+        const r = await api.get('/drivers/orders', idt);
         if (r.ok) {
-          const data = await r.json();
-          await AsyncStorage.setItem('pendingOrders', JSON.stringify(data?.data ?? data));
+          await AsyncStorage.setItem('pendingOrders', JSON.stringify(r.data?.data ?? r.data));
         }
       }
     } catch {}
