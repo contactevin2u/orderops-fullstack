@@ -6,11 +6,11 @@ Renders:
 - Receipt
 - Installment Agreement
 
-No HTML/Jinja/WeasyPrint paths for simplicity and reliability.
+No HTML/Jinja/WeasyPrint paths. No remote image URLs (use local files only).
 """
 
 from io import BytesIO
-import urllib.request
+import os
 
 # Project settings and models
 from ..core.config import settings
@@ -24,46 +24,37 @@ from ..models.plan import Plan
 # ---------------------------------------------------------------------------
 
 def invoice_pdf(order: Order) -> bytes:
-    """
-    Render an invoice (or credit note when total < 0) as a PDF using ReportLab.
-    """
+    """Render an invoice (or credit note when total < 0) as a PDF using ReportLab."""
     return legacy_reportlab_invoice_pdf(order)
 
 
 # ---------------------------------------------------------------------------
-# Internal utilities (images & constants)
+# Constants (banking)
 # ---------------------------------------------------------------------------
-
-DEFAULT_LOGO_URL = (
-    "https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png"
-)
-DEFAULT_QR_URL = (
-    "https://static.wixstatic.com/media/20c5f7_98a9fa77aba04052833d15b05fadbe30~mv2.png"
-)
 
 BENEFICIARY_NAME = "AA Alive Sdn. Bhd."
 BANK_NAME = "CIMB Bank"
 BANK_ACCOUNT_NO = "8011366127"
 
 
-def _fetch_image_bytes(url: str, timeout: float = 6.0) -> BytesIO | None:
-    """Fetch an image from a remote URL into memory (safe fallback to None)."""
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = resp.read()
-        return BytesIO(data)
-    except Exception:
-        return None
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-
-def _fit_colwidths(widths, frame_width_pts: float):
-    """Scale a list of widths (already in points) to fit the available frame width."""
-    total = sum(widths)
-    if total <= frame_width_pts:
-        return widths
+def _fit_colwidths(widths_pts, frame_width_pts: float):
+    """Scale a list of widths (points) to fit the available frame width."""
+    total = sum(widths_pts)
+    if total <= frame_width_pts or total <= 0:
+        return widths_pts
     scale = frame_width_pts / float(total)
-    return [w * scale for w in widths]
+    return [w * scale for w in widths_pts]
+
+
+def _file_exists(path: str | None) -> bool:
+    try:
+        return bool(path) and os.path.isfile(path) and os.path.getsize(path) > 0
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +62,7 @@ def _fit_colwidths(widths, frame_width_pts: float):
 # ---------------------------------------------------------------------------
 
 def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
-    """Render an invoice using a polished ReportLab template (styling + images)."""
+    """Render an invoice using a polished ReportLab template (styling + optional local images)."""
     try:  # pragma: no cover - exercised indirectly in tests
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
@@ -91,7 +82,6 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.lib.colors import HexColor
-        from reportlab.lib.utils import ImageReader
     except ImportError as exc:  # pragma: no cover - tested by import
         raise RuntimeError(
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
@@ -123,16 +113,14 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         except Exception:
             return str(q or 0)
 
-    # Pre-fetch remote images (logo for header; QR fallback for payment box)
-    logo_reader = None
-    try:
-        _logo_bytes = _fetch_image_bytes(DEFAULT_LOGO_URL)
-        if _logo_bytes:
-            logo_reader = ImageReader(_logo_bytes)
-    except Exception:
-        logo_reader = None
-
-    qr_fallback_bytes = _fetch_image_bytes(DEFAULT_QR_URL)
+    # Optional local images (no remote URLs)
+    LOGO_PATH = getattr(settings, "COMPANY_LOGO_PATH", None)
+    QR_IMAGE_PATH = (
+        getattr(settings, "PAYMENT_QR_IMAGE_PATH", None)
+        or getattr(settings, "COMPANY_QR_IMAGE_PATH", None)
+    )
+    has_logo = _file_exists(LOGO_PATH)
+    has_qr = _file_exists(QR_IMAGE_PATH)
 
     # --- styles --------------------------------------------------------------
     styles = getSampleStyleSheet()
@@ -145,7 +133,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=14, leading=16))
     styles.add(ParagraphStyle(name="MetaKey", parent=styles["Small"], textColor="#6B7280"))
     styles.add(ParagraphStyle(name="MetaVal", parent=styles["Small"], alignment=TA_RIGHT))
-    # Wrap-friendly paragraph for long descriptions (prevents infinite height)
+    # Wrap-friendly paragraph for long descriptions
     styles.add(ParagraphStyle(name="Wrap", parent=styles["Normal"], wordWrap="CJK"))
 
     # --- doc & canvas deco ---------------------------------------------------
@@ -175,11 +163,11 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
             fill=1,
             stroke=0,
         )
-        # Remote logo (if available)
-        if logo_reader:
+        # Local logo (if available)
+        if has_logo:
             try:
                 c.drawImage(
-                    logo_reader,
+                    LOGO_PATH,
                     d.leftMargin,
                     d.height + d.topMargin + d.bottomMargin - BAR_H + 2,
                     height=BAR_H - 4,
@@ -226,7 +214,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
 
     # Fit header table to frame width
     header_cols = _fit_colwidths([100 * mm, 70 * mm], FRAME_W)
-    ht = Table([[left, right]], colWidths=header_cols)
+    ht = Table([[left, right]], colWidths=header_cols, repeatRows=0)
     ht.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     elems += [ht, Spacer(1, 8)]
 
@@ -245,7 +233,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
 
     if meta_rows:
         mt_cols = _fit_colwidths([35 * mm, 55 * mm], FRAME_W)
-        mt = Table(meta_rows, colWidths=mt_cols, hAlign="RIGHT")
+        mt = Table(meta_rows, colWidths=mt_cols, hAlign="RIGHT", repeatRows=0)
         mt.setStyle(TableStyle([
             ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -299,7 +287,6 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         discounted = unit_price * (1 - (disc or 0))
         amount = discounted * float(qty or 0)
         desc = name + (f"<br/><font color='#6B7280' size='9'>{note}</font>" if note else "")
-        # Use wrap-friendly style for long descriptions
         data.append([
             sku,
             Paragraph(desc, styles["Wrap"]),
@@ -311,20 +298,18 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
             money(amount),
         ])
 
-    # Fit columns to frame width (sum must be <= FRAME_W)
-    # Target distribution totalling 170mm: 18, 58, 12, 12, 22, 12, 12, 24
-    raw_cols = [18, 58, 12, 12, 22, 12, 12, 24]
-    itab_cols_pts = [v * mm for v in raw_cols]
+    # Fit columns to frame width (totals ~170mm pre-scale)
+    from reportlab.lib.units import mm as _mm  # ensure unit in scope
+    raw_cols_mm = [18, 58, 12, 12, 22, 12, 12, 24]
+    itab_cols_pts = [v * _mm for v in raw_cols_mm]
     itab_cols = _fit_colwidths(itab_cols_pts, FRAME_W)
 
     itab = Table(data, colWidths=itab_cols, repeatRows=1)
     itab.setStyle(TableStyle([
-        # header
         ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND_COLOR)),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
         ("FONTSIZE", (0, 0), (-1, 0), 10),
-        # body
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.white]),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E5E7EB")),
         ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
@@ -385,7 +370,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         ]))
         elems.append(KeepTogether([trow, Spacer(1, 10)]))
 
-    # --- payment box (with QR image) ----------------------------------------
+    # --- payment box (no remote QR; only local file or base64 from order) ---
     bank_lines = [
         f"Beneficiary: {BENEFICIARY_NAME}",
         f"Bank: {BANK_NAME}",
@@ -394,37 +379,27 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     p = [Paragraph("<br/>".join(bank_lines), styles["Normal"])]
 
     qr = getattr(getattr(order, "payment", None), "qrDataUrl", None)
+    qr_img_flow = None
+
     if qr:
         try:
             import base64
             img_data = qr.split(",", 1)[-1]
-            qr_img = Image(BytesIO(base64.b64decode(img_data)), width=40 * mm, height=40 * mm)
-            pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
-            ptab = Table([[p[0], qr_img]], colWidths=pay_cols)
+            qr_img_flow = Image(BytesIO(base64.b64decode(img_data)), width=40 * mm, height=40 * mm)
         except Exception:
-            if qr_fallback_bytes:
-                try:
-                    qr_img = Image(qr_fallback_bytes, width=40 * mm, height=40 * mm)
-                    pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
-                    ptab = Table([[p[0], qr_img]], colWidths=pay_cols)
-                except Exception:
-                    pay_cols = _fit_colwidths([100 * mm], FRAME_W)
-                    ptab = Table([[p[0]]], colWidths=pay_cols)
-            else:
-                pay_cols = _fit_colwidths([100 * mm], FRAME_W)
-                ptab = Table([[p[0]]], colWidths=pay_cols)
+            qr_img_flow = None
+    elif has_qr:
+        try:
+            qr_img_flow = Image(QR_IMAGE_PATH, width=40 * mm, height=40 * mm)
+        except Exception:
+            qr_img_flow = None
+
+    if qr_img_flow:
+        pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
+        ptab = Table([[p[0], qr_img_flow]], colWidths=pay_cols)
     else:
-        if qr_fallback_bytes:
-            try:
-                qr_img = Image(qr_fallback_bytes, width=40 * mm, height=40 * mm)
-                pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
-                ptab = Table([[p[0], qr_img]], colWidths=pay_cols)
-            except Exception:
-                pay_cols = _fit_colwidths([100 * mm], FRAME_W)
-                ptab = Table([[p[0]]], colWidths=pay_cols)
-        else:
-            pay_cols = _fit_colwidths([100 * mm], FRAME_W)
-            ptab = Table([[p[0]]], colWidths=pay_cols)
+        pay_cols = _fit_colwidths([100 * mm], FRAME_W)
+        ptab = Table([[p[0]]], colWidths=pay_cols)
 
     ptab.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#E5E7EB")),
@@ -450,7 +425,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     elems.append(Spacer(1, 6))
     elems.append(Paragraph("<br/>".join(f"• {t}" for t in terms), styles["Small"]))
 
-    # Optional bilingual page
+    # Optional bilingual page (unchanged content)
     elems.append(PageBreak())
     elems.append(Paragraph("Terms & Conditions", styles["H2"]))
     elems.append(Spacer(1, 6))
