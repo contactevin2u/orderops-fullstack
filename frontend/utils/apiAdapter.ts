@@ -122,8 +122,11 @@ export async function fetchOnHold(date: string): Promise<Order[]> {
   return (items || []).map(mapOrder);
 }
 
-export async function fetchRouteOrders(routeId: string, date: string): Promise<Order[]> {
-  const { items } = await listOrders(undefined, undefined, undefined, 500, { date });
+export async function fetchRouteOrders(
+  routeId: string,
+  _date: string,
+): Promise<Order[]> {
+  const { items } = await listOrders(undefined, undefined, undefined, 500);
   return (items || [])
     .filter((o: any) => o.trip?.route_id === Number(routeId))
     .map(mapOrder);

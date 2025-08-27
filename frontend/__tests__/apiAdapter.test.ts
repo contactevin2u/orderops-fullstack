@@ -64,9 +64,12 @@ describe('apiAdapter', () => {
       ],
     });
     const orders = await fetchRouteOrders('1', '2024-05-25');
-    expect(api.listOrders).toHaveBeenCalledWith(undefined, undefined, undefined, 500, {
-      date: '2024-05-25',
-    });
+    expect(api.listOrders).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      undefined,
+      500,
+    );
     expect(orders).toHaveLength(1);
     expect(orders[0].routeId).toBe('1');
   });
