@@ -172,17 +172,17 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
       <h3>Stops</h3>
       <table className="table">
         <thead>
-          <tr><th>Seq</th><th>Order</th><th></th></tr>
+          <tr><th>Seq</th><th>Order</th><th>Status</th><th></th></tr>
         </thead>
         <tbody>
           {assignedQuery.isLoading && (
             <tr>
-              <td colSpan={3} role="status">Loading...</td>
+              <td colSpan={4} role="status">Loading...</td>
             </tr>
           )}
           {assignedQuery.isError && (
             <tr>
-              <td colSpan={3} role="alert">Failed to load</td>
+              <td colSpan={4} role="alert">Failed to load</td>
             </tr>
           )}
           {!assignedQuery.isLoading &&
@@ -190,13 +190,14 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
               <tr key={o.id}>
                 <td>{idx + 1}</td>
                 <td>{o.orderNo}</td>
+                <td>{o.status}</td>
                 <td>
                   <button onClick={() => removeMutation.mutate(o.id)}>Remove</button>
                 </td>
               </tr>
             ))}
           {!assignedQuery.isLoading && (assignedQuery.data?.length || 0) === 0 && (
-            <tr><td colSpan={3} style={{ opacity: 0.6 }}>No stops</td></tr>
+            <tr><td colSpan={4} style={{ opacity: 0.6 }}>No stops</td></tr>
           )}
         </tbody>
       </table>
