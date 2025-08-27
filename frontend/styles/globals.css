@@ -397,6 +397,51 @@ form .error {
   font-size: 0.875rem;
 }
 
+/* Login Page */
+.login-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 24rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-4);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  padding: var(--space-8);
+  color: #fff;
+}
+
+.login-card input[type='text'],
+.login-card input[type='password'] {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.login-card input::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.login-card button.primary {
+  width: 100%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-primary-hover));
+}
+
+.login-title {
+  text-align: center;
+  background: linear-gradient(90deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: #1f2937;

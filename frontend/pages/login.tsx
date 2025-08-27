@@ -30,9 +30,9 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="container small-container" style={{ marginTop: '4rem' }}>
-      <form className="stack" onSubmit={handleSubmit}>
-        <h1>Sign in</h1>
+    <div className="login-wrapper">
+      <form className="login-card stack" onSubmit={handleSubmit}>
+        <h1 className="login-title">Sign in</h1>
         <label>
           Username
           <input
