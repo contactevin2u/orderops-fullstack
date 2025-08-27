@@ -97,6 +97,7 @@ class PlanOut(BaseModel):
     start_date: Optional[dt.date] = None
     months: Optional[int] = None
     monthly_amount: Decimal = Decimal("0")
+    upfront_billed_amount: Decimal = Decimal("0")
     status: str
 
     class Config:

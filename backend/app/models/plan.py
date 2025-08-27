@@ -15,4 +15,5 @@ class Plan(Base):
     start_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     months: Mapped[int | None] = mapped_column(Numeric(12, 0), nullable=True)  # For installment
     monthly_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
+    upfront_billed_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     status: Mapped[str] = mapped_column(String(20), default="ACTIVE")  # ACTIVE|CANCELLED|COMPLETED

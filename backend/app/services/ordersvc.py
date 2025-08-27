@@ -136,6 +136,55 @@ def _sum_posted_payments(order) -> Decimal:
     return q2(total)
 
 
+def ensure_first_month_fee_line(
+    order_or_items, plan_type: str, monthly_amount: Decimal
+) -> tuple[list[dict], Decimal]:
+    """
+    Ensure there is exactly one FEE line representing the first cycle of the plan.
+    Returns (items_as_dicts, injected_amount). If already present, injected_amount = 0.
+    Detect existing line by item_type == 'FEE' and name starting with 'First Month '.
+    SKU hint: 'FIRST_MONTH'.
+    """
+    # Normalize to list of dicts
+    if isinstance(order_or_items, list):
+        items = [dict(it) for it in order_or_items]
+    else:
+        items = [
+            {
+                "name": getattr(it, "name", None),
+                "item_type": getattr(it, "item_type", None),
+                "sku": getattr(it, "sku", None),
+                "qty": getattr(it, "qty", None),
+                "unit_price": getattr(it, "unit_price", None),
+                "line_total": getattr(it, "line_total", None),
+            }
+            for it in getattr(order_or_items, "items", [])
+        ]
+
+    monthly_amount = q2(Decimal(str(monthly_amount or 0)))
+    if monthly_amount <= 0:
+        return items, Decimal("0")
+
+    for it in items:
+        if (it.get("item_type") or "").upper() == "FEE":
+            name = it.get("name") or ""
+            lt = Decimal(str(it.get("line_total") or 0))
+            if name.startswith("First Month ") and lt > 0:
+                return items, Decimal("0")
+
+    fee_name = f"First Month {'Rental' if plan_type == 'RENTAL' else 'Instalment'}"
+    fee_line = {
+        "name": fee_name,
+        "item_type": "FEE",
+        "sku": "FIRST_MONTH",
+        "qty": 1,
+        "unit_price": monthly_amount,
+        "line_total": monthly_amount,
+    }
+    items.append(fee_line)
+    return items, monthly_amount
+
+
 def _apply_charges_and_totals(
     items: list[dict],
     charges: dict | None,
@@ -268,6 +317,47 @@ def recompute_financials(order: Order) -> None:
     order.paid_amount = paid
     order.balance = q2(order.total - paid)
 
+
+def ensure_plan_first_month_fee(order: Order) -> None:
+    """Ensure the order has a first month fee line aligned with the plan."""
+    plan = getattr(order, "plan", None)
+    if not plan:
+        recompute_financials(order)
+        return
+    monthly_amount = q2(Decimal(str(getattr(plan, "monthly_amount", 0) or 0)))
+    plan_type = (getattr(plan, "plan_type", "RENTAL") or "RENTAL").upper()
+
+    fee_line = None
+    for it in list(getattr(order, "items", []) or []):
+        if (getattr(it, "item_type", "") or "").upper() == "FEE" and (getattr(it, "name", "") or "").startswith("First Month "):
+            fee_line = it
+            break
+
+    if monthly_amount <= 0:
+        if fee_line:
+            order.items.remove(fee_line)
+        plan.upfront_billed_amount = DEC0
+        recompute_financials(order)
+        return
+
+    if fee_line:
+        fee_line.unit_price = monthly_amount
+        fee_line.line_total = monthly_amount
+    else:
+        order.items.append(
+            OrderItem(
+                order_id=order.id,
+                name=f"First Month {'Rental' if plan_type == 'RENTAL' else 'Instalment'}",
+                sku="FIRST_MONTH",
+                item_type="FEE",
+                qty=1,
+                unit_price=monthly_amount,
+                line_total=monthly_amount,
+            )
+        )
+    plan.upfront_billed_amount = monthly_amount
+    recompute_financials(order)
+
 def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: str | None = None) -> Order:
     """
     Create an Order (plus items/plan) from a parsed payload like:
@@ -310,6 +400,48 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
     items = order_data.get("items") or []
     charges = order_data.get("charges") or {}
     totals = order_data.get("totals") or {}
+
+    plan_in = order_data.get("plan") or {}
+    has_plan_data = any(
+        k in plan_in for k in ("plan_type", "months", "monthly_amount", "start_date")
+    )
+    should_create_plan = (
+        otype in ("INSTALLMENT", "RENTAL")
+        or has_plan_data
+        or any((it.get("item_type") or "").strip().upper() in ("INSTALLMENT", "RENTAL") for it in items)
+    )
+
+    plan_type = (plan_in.get("plan_type") or otype).strip().upper()
+    if plan_type not in ("INSTALLMENT", "RENTAL"):
+        for it in items:
+            itype = (it.get("item_type") or "").strip().upper()
+            if itype in ("INSTALLMENT", "RENTAL"):
+                plan_type = itype
+                break
+        if plan_type not in ("INSTALLMENT", "RENTAL"):
+            plan_type = "RENTAL"
+    months_raw = plan_in.get("months")
+    months = (
+        int(months_raw)
+        if isinstance(months_raw, (int, float, str)) and str(months_raw).strip().isdigit()
+        else None
+    )
+
+    monthly_amount = to_decimal(plan_in.get("monthly_amount"))
+    if monthly_amount <= 0:
+        monthly_candidates = []
+        for it in items:
+            ma = to_decimal(it.get("monthly_amount"))
+            if ma > 0:
+                monthly_candidates.append(ma)
+        if monthly_candidates:
+            monthly_amount = sum(monthly_candidates, DEC0)
+
+    start_date = parse_relaxed_date(plan_in.get("start_date") or "") or delivery_date
+
+    injected_amount = Decimal("0")
+    if monthly_amount > 0:
+        items, injected_amount = ensure_first_month_fee_line(items, plan_type, monthly_amount)
 
     subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(items, charges, totals)
     balance = q2(total - paid)
@@ -365,44 +497,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
         )
 
     # plan (optional)
-    plan_in = order_data.get("plan") or {}
-    has_plan_data = any(k in plan_in for k in ("plan_type", "months", "monthly_amount", "start_date"))
-    should_create_plan = (
-        otype in ("INSTALLMENT", "RENTAL")
-        or has_plan_data
-        or any((it.get("item_type") or "").strip().upper() in ("INSTALLMENT", "RENTAL") for it in items)
-    )
-
     if should_create_plan:
-        plan_type = (plan_in.get("plan_type") or otype).strip().upper()
-        if plan_type not in ("INSTALLMENT", "RENTAL"):
-            for it in items:
-                itype = (it.get("item_type") or "").strip().upper()
-                if itype in ("INSTALLMENT", "RENTAL"):
-                    plan_type = itype
-                    break
-            if plan_type not in ("INSTALLMENT", "RENTAL"):
-                plan_type = "RENTAL"
-        months_raw = plan_in.get("months")
-        months = (
-            int(months_raw)
-            if isinstance(months_raw, (int, float, str)) and str(months_raw).strip().isdigit()
-            else None
-        )
-
-        monthly_amount = to_decimal(plan_in.get("monthly_amount"))
-        # As a fallback, if not present, aggregate positive monthly amounts from items
-        if monthly_amount <= 0:
-            monthly_candidates = []
-            for it in items:
-                ma = to_decimal(it.get("monthly_amount"))
-                if ma > 0:
-                    monthly_candidates.append(ma)
-            if monthly_candidates:
-                monthly_amount = sum(monthly_candidates, DEC0)
-
-        start_date = parse_relaxed_date(plan_in.get("start_date") or "") or delivery_date
-
         db.add(
             Plan(
                 order_id=order.id,
@@ -410,6 +505,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
                 start_date=start_date,
                 months=months,
                 monthly_amount=monthly_amount,
+                upfront_billed_amount=injected_amount,
                 status="ACTIVE",
             )
         )

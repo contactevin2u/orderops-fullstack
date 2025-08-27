@@ -57,4 +57,8 @@ def test_patch_plan_item_zero_pricing():
     item = order.items[0]
     assert item.unit_price == Decimal("0")
     assert item.line_total == Decimal("0")
-    assert order.subtotal == Decimal("0")
+    assert order.subtotal == Decimal("100.00")
+    fee_lines = [
+        it for it in order.items if it.item_type == "FEE" and it.name.startswith("First Month")
+    ]
+    assert len(fee_lines) == 1

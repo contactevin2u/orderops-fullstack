@@ -27,8 +27,9 @@ from ..services.ordersvc import (
     recompute_financials,
     _sum_posted_payments,
     q2,
+    ensure_plan_first_month_fee,
 )
-from ..services.plan_math import calculate_plan_due
+from ..reports.outstanding import compute_expected_for_order, calculate_plan_due
 from ..services.status_updates import (
     apply_buyback,
     cancel_installment,
@@ -262,39 +263,15 @@ def get_order_due(order_id: int, as_of: date_cls | None = None, db: Session = De
 
     as_of = as_of or date_cls.today()
 
-    paid_parent = _sum_posted_payments(order)
-    paid_children = sum(
+    expected = compute_expected_for_order(order, as_of)
+    paid = _sum_posted_payments(order) + sum(
         (_sum_posted_payments(ch) for ch in getattr(order, "adjustments", []) or []),
         Decimal("0"),
     )
-
-    if order.status in {"CANCELLED", "RETURNED"}:
-        expected = q2(
-            sum(
-                (Decimal(getattr(ch, "total", 0) or 0) for ch in getattr(order, "adjustments", []) or []),
-                Decimal("0"),
-            )
-        )
-        paid = q2(paid_parent + paid_children)
-        plan_due = Decimal("0")
-    else:
-        fees = q2(
-            (order.delivery_fee or Decimal("0"))
-            + (order.return_delivery_fee or Decimal("0"))
-            + (order.penalty_fee or Decimal("0"))
-        )
-        plan_due = calculate_plan_due(getattr(order, "plan", None), as_of)
-        if plan_due > 0:
-            expected = q2(plan_due + fees)
-            paid = q2(paid_parent)
-        else:
-            expected = q2(order.total or Decimal("0"))
-            paid = q2(paid_parent)
-
     balance = q2(expected - paid)
     to_collect = q2(balance if balance > 0 else Decimal("0"))
     to_refund = q2(-balance if balance < 0 else Decimal("0"))
-    accrued = plan_due if plan_due > 0 else Decimal("0")
+    accrued = calculate_plan_due(order.plan, as_of)
 
     return envelope(
         {
@@ -397,7 +374,10 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
 
 
     # Recompute monetary totals based on current state
-    recompute_financials(order)
+    if order.plan:
+        ensure_plan_first_month_fee(order)
+    else:
+        recompute_financials(order)
     db.commit()
     db.refresh(order)
     return envelope(OrderOut.model_validate(order))
