@@ -9,7 +9,8 @@
   --radius-2: 8px;
   --radius-3: 12px;
   --radius-4: 16px;
-  --container-max: 1200px;
+  --app-header-h: 64px;
+  --container-max: 1440px;
   --max-w-screen-2xl: 1536px;
   --gutter-x-sm: 1rem;
   --gutter-x-md: 1.5rem;
@@ -53,13 +54,13 @@ h6 {
 }
 
 .header-inner {
-  max-width: 80rem;
+  max-width: var(--container-max);
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-6);
 }
 
 .nav {
@@ -278,6 +279,36 @@ h6 {
   max-width: 32rem;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+@media (min-width: 1024px) {
+  .header-inner {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 16px;
+    justify-content: flex-start;
+  }
+  .nav {
+    display: flex;
+    position: static;
+    width: auto;
+    padding: 0;
+    gap: 24px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    margin-left: auto;
+    flex: 1;
+    min-width: 0;
+  }
+  .nav-toggle {
+    display: none;
+  }
+  .main > .container {
+    max-width: var(--container-max);
+    padding-left: var(--space-8);
+    padding-right: var(--space-8);
+  }
 }
 
 @media (max-width: 1024px) {

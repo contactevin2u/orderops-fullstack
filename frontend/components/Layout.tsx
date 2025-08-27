@@ -38,6 +38,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const menuRef = React.useRef<HTMLElement>(null);
+  const headerRef = React.useRef<HTMLElement>(null);
   const { data: user, error: userErr } = useSWR('me', getMe, {
     shouldRetryOnError: false,
   });
@@ -65,6 +66,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     }
   }, [mobileOpen]);
   React.useEffect(() => {
+    const el = headerRef.current;
+    if (!el) return;
+    const update = () =>
+      document.documentElement.style.setProperty(
+        '--app-header-h',
+        `${el.offsetHeight}px`
+      );
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  React.useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (!mobileOpen) return;
       if (e.key === 'Escape') setMobileOpen(false);
@@ -87,7 +101,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [mobileOpen]);
   return (
     <div className="layout">
-      <header className="header">
+      <header ref={headerRef} className="header">
         <div className="header-inner">
           <h1>OrderOps</h1>
           <button
