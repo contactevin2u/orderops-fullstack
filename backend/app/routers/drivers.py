@@ -113,7 +113,10 @@ def register_device(
 ):
     device = (
         db.query(DriverDevice)
-        .filter(DriverDevice.token == payload.token)
+        .filter(
+            DriverDevice.driver_id == driver.id,
+            DriverDevice.token == payload.token,
+        )
         .one_or_none()
     )
     if device:

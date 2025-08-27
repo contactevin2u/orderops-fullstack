@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, String, func, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
@@ -24,12 +24,15 @@ class Driver(Base):
 
 class DriverDevice(Base):
     __tablename__ = "driver_devices"
+    __table_args__ = (
+        UniqueConstraint("driver_id", "token", name="uq_driver_devices_driver_id_token"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     driver_id: Mapped[int] = mapped_column(
         ForeignKey("drivers.id"), index=True, nullable=False
     )
-    token: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    token: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     platform: Mapped[str] = mapped_column(String(20))
     app_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     model: Mapped[str | None] = mapped_column(String(100), nullable=True)
