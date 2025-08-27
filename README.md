@@ -8,8 +8,6 @@ All application pages require a logged-in user and unauthenticated visitors are 
 
 During the first run you can create an administrator account at `/register`. After running the migration that adds user support, a default admin user exists:
 
-- username: `admin`
-- password: `admin123`
 
 Administrators can sign in with these credentials and create additional users.
 
