@@ -7,7 +7,6 @@ from PIL import Image, ImageOps
 MAX_SIDE = 1280
 MAX_BYTES = 5 * 1024 * 1024
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
-PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").rstrip("/")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
@@ -23,7 +22,4 @@ def save_pod_image(file_bytes: bytes) -> str:
     path = os.path.join(UPLOAD_DIR, name)
     with open(path, "wb") as f:
         f.write(out.getvalue())
-    url = f"/static/uploads/{name}"
-    if PUBLIC_BASE_URL:
-        url = f"{PUBLIC_BASE_URL}{url}"
-    return url
+    return f"/static/uploads/{name}"

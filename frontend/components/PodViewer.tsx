@@ -10,17 +10,5 @@ export default function PodViewer({ url }: { url: string }) {
       </object>
     );
   }
-  return (
-    <div>
-      <img src={url} alt="POD" style={{ maxWidth: '100%', height: 'auto' }} data-testid="pod-image" />
-      <p>
-        <button
-          type="button"
-          onClick={() => window.open(url, '_blank', 'noopener,noreferrer')}
-        >
-          Open POD
-        </button>
-      </p>
-    </div>
-  );
+  return <img src={url} alt="POD" style={{ maxWidth: '100%', height: 'auto' }} data-testid="pod-image" />;
 }

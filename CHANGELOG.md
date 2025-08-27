@@ -5,4 +5,3 @@
 - ensure middleware excludes Next.js static/image routes
 - add POD viewer page that supports images and PDFs
 - improve driver commissions page with success messaging and tests
-- proxy /static/uploads to API and normalize POD URLs so proof-of-delivery files render
