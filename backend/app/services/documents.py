@@ -1,153 +1,68 @@
-"""PDF generation utilities.
+"""
+PDF generation utilities (ReportLab-only).
 
-Legacy implementations use ReportLab. A new HTML-to-PDF path powered by
-WeasyPrint can be enabled with ``USE_HTML_TEMPLATE_INVOICE=1``.
+This module renders:
+- Invoice / Credit Note (styled ReportLab template)
+- Receipt (simple)
+- Installment Agreement (simple)
+
+HTML/Jinja/WeasyPrint path removed for simplicity and reliability.
 """
 
-import os
-import logging
 from io import BytesIO
+import urllib.request
 
+# Project settings and models
 from ..core.config import settings
 from ..models.order import Order
 from ..models.payment import Payment
 from ..models.plan import Plan
 
 
-def build_invoice_context(order: Order) -> dict:
-    company = getattr(order, "company", None) or type("X", (), {})()
-    bank = getattr(company, "bank", None) or type("X", (), {})()
-    subtotal = float(getattr(order, "subtotal", 0) or 0)
-    discount = float(getattr(order, "discount", 0) or 0)
-    delivery_fee = float(getattr(order, "delivery_fee", 0) or 0)
-    penalty_amount = float(getattr(order, "penalty_fee", 0) or 0)
-    buyback_amount = float(getattr(order, "return_delivery_fee", 0) or 0)
-    tax_amount = float(getattr(order, "tax_total", 0) or 0)
-    total = (
-        subtotal
-        - discount
-        + delivery_fee
-        + penalty_amount
-        - buyback_amount
-        + tax_amount
-    )
-    doc_title = "CREDIT NOTE" if total < 0 else "INVOICE"
-    customer = getattr(order, "customer", None) or type("X", (), {})()
-    bill_to = {
-        "name": getattr(customer, "name", ""),
-        "address_lines": getattr(customer, "address_lines", None)
-        or (
-            [getattr(customer, "address", "")]
-            if getattr(customer, "address", "")
-            else []
-        ),
-        "phone": getattr(customer, "phone", ""),
-        "email": getattr(customer, "email", ""),
-    }
-    ship_obj = getattr(order, "shipping_to", None)
-    ship_to = None
-    if ship_obj:
-        ship_to = {
-            "name": getattr(ship_obj, "name", ""),
-            "address_lines": getattr(ship_obj, "address_lines", None)
-            or (
-                [getattr(ship_obj, "address", "")]
-                if getattr(ship_obj, "address", "")
-                else []
-            ),
-        }
-    items = []
-    for it in getattr(order, "items", []) or []:
-        items.append(
-            {
-                "description": getattr(it, "name", getattr(it, "description", ""))
-                or "",
-                "qty": float(getattr(it, "qty", 0) or 0),
-                "unit_price": float(getattr(it, "unit_price", 0) or 0),
-                "line_total": float(
-                    getattr(it, "line_total", getattr(it, "amount", 0)) or 0
-                ),
-            }
-        )
-    notes = getattr(getattr(order, "footer", None), "note", "") or ""
-    qr_url = getattr(getattr(order, "payment", None), "qrDataUrl", None)
-    context = {
-        "doc_title": doc_title,
-        "company": {
-            "name": getattr(company, "name", ""),
-            "logo_url": getattr(
-                company, "logo_url", getattr(settings, "COMPANY_LOGO_URL", "")
-            ),
-            "reg_no": getattr(company, "reg_no", ""),
-            "tax_label": getattr(company, "tax_label", "Tax"),
-            "tax_percent": getattr(company, "tax_percent", ""),
-            "address_lines": getattr(company, "address_lines", None)
-            or (
-                [getattr(settings, "COMPANY_ADDRESS", "")]
-                if getattr(settings, "COMPANY_ADDRESS", "")
-                else []
-            ),
-            "phone": getattr(company, "phone", getattr(settings, "COMPANY_PHONE", "")),
-            "email": getattr(company, "email", getattr(settings, "COMPANY_EMAIL", "")),
-            "bank": {
-                "name": getattr(bank, "name", ""),
-                "acct_no": getattr(bank, "acct_no", ""),
-                "beneficiary": getattr(bank, "beneficiary", ""),
-                "iban": getattr(bank, "iban", ""),
-                "swift": getattr(bank, "swift", ""),
-            },
-        },
-        "invoice": {
-            "number": getattr(order, "code", ""),
-            "date": getattr(order, "created_at", "") or "",
-            "due_date": getattr(order, "due_date", "") or "",
-        },
-        "bill_to": bill_to,
-        "ship_to": ship_to,
-        "items": items,
-        "summary": {
-            "subtotal": subtotal,
-            "discount": discount,
-            "delivery_fee": delivery_fee,
-            "penalty_amount": penalty_amount,
-            "buyback_amount": buyback_amount,
-            "tax_amount": tax_amount,
-            "total": total,
-        },
-        "notes": notes,
-        "qr_url": qr_url,
-        "rtl": getattr(order, "rtl", False),
-    }
-    return context
-
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
 def invoice_pdf(order: Order) -> bytes:
-    """Render an invoice as PDF, using WeasyPrint when enabled."""
-    use_html = os.getenv("USE_HTML_TEMPLATE_INVOICE") == "1"
-    if use_html:
-        try:
-            from jinja2 import Environment, FileSystemLoader, select_autoescape
-            from weasyprint import HTML, CSS
-
-            ctx = build_invoice_context(order)
-            env = Environment(
-                loader=FileSystemLoader("backend/templates"),
-                autoescape=select_autoescape(["html"]),
-            )
-            tmpl = env.get_template("invoice/invoice.html")
-            html = tmpl.render(**ctx)
-            return HTML(string=html, base_url="backend/").write_pdf(
-                stylesheets=[CSS("backend/static/invoice/invoice.css")]
-            )
-        except Exception:
-            logging.exception(
-                "HTML invoice generation failed; falling back to ReportLab"
-            )
+    """
+    Render an invoice (or credit note when total < 0) as a PDF using ReportLab.
+    """
     return legacy_reportlab_invoice_pdf(order)
 
 
+# ---------------------------------------------------------------------------
+# Internal utilities
+# ---------------------------------------------------------------------------
+
+DEFAULT_LOGO_URL = (
+    "https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png"
+)
+DEFAULT_QR_URL = (
+    "https://static.wixstatic.com/media/20c5f7_98a9fa77aba04052833d15b05fadbe30~mv2.png"
+)
+
+BENEFICIARY_NAME = "AA Alive Sdn. Bhd."
+BANK_NAME = "CIMB Bank"
+BANK_ACCOUNT_NO = "8011366127"
+
+
+def _fetch_image_bytes(url: str, timeout: float = 6.0) -> BytesIO | None:
+    """Fetch an image from a remote URL into memory (safe fallback to None)."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = resp.read()
+        return BytesIO(data)
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Polished ReportLab invoice template
+# ---------------------------------------------------------------------------
+
 def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
-    """Render an invoice using the original ReportLab template."""
+    """Render an invoice using a polished ReportLab template (styling + images)."""
     try:  # pragma: no cover - exercised indirectly in tests
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
@@ -166,33 +81,63 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         from reportlab.lib.enums import TA_RIGHT
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.lib.colors import HexColor
+        from reportlab.lib.utils import ImageReader
     except ImportError as exc:  # pragma: no cover - tested by import
         raise RuntimeError(
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
         ) from exc
 
+    # --- theme & helpers -----------------------------------------------------
     try:
         pdfmetrics.registerFont(TTFont("Inter", "/app/static/fonts/Inter-Regular.ttf"))
-        pdfmetrics.registerFont(
-            TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf")
-        )
-        BASE_FONT = "Inter"
-        BASE_BOLD = "Inter-Bold"
+        pdfmetrics.registerFont(TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf"))
+        BASE_FONT, BASE_BOLD = "Inter", "Inter-Bold"
     except Exception:
-        BASE_FONT = "Helvetica"
-        BASE_BOLD = "Helvetica-Bold"
+        BASE_FONT, BASE_BOLD = "Helvetica", "Helvetica-Bold"
 
+    BRAND_COLOR = getattr(getattr(order, "company", None), "brand_color", "#0F172A") or "#0F172A"
+    ACCENT_COLOR = getattr(getattr(order, "company", None), "accent_color", "#2563EB") or "#2563EB"
+    CURRENCY = getattr(settings, "CURRENCY_PREFIX", "RM") or "RM"
+
+    def money(x):
+        try:
+            return f"{CURRENCY}{float(x or 0):,.2f}"
+        except Exception:
+            return f"{CURRENCY}0.00"
+
+    def _fmt_qty(q):
+        try:
+            qf = float(q or 0)
+            s = f"{qf:.2f}".rstrip("0").rstrip(".")
+            return s if s else "0"
+        except Exception:
+            return str(q or 0)
+
+    # Pre-fetch remote images (logo for header; QR fallback for payment box)
+    logo_reader = None
+    try:
+        _logo_bytes = _fetch_image_bytes(DEFAULT_LOGO_URL)
+        if _logo_bytes:
+            logo_reader = ImageReader(_logo_bytes)
+    except Exception:
+        logo_reader = None
+
+    qr_fallback_bytes = _fetch_image_bytes(DEFAULT_QR_URL)
+
+    # --- styles --------------------------------------------------------------
     styles = getSampleStyleSheet()
     styles["Normal"].fontName = BASE_FONT
     styles["Title"].fontName = BASE_BOLD
-    styles.add(
-        ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11)
-    )
-    styles.add(
-        ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT)
-    )
-    styles.add(ParagraphStyle(name="Note", parent=styles["Small"], textColor="#555555"))
 
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11))
+    styles.add(ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="Muted", parent=styles["Small"], textColor="#555555"))
+    styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=14, leading=16))
+    styles.add(ParagraphStyle(name="MetaKey", parent=styles["Small"], textColor="#6B7280"))
+    styles.add(ParagraphStyle(name="MetaVal", parent=styles["Small"], alignment=TA_RIGHT))
+
+    # --- doc & canvas deco ---------------------------------------------------
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -202,19 +147,14 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         topMargin=20 * mm,
         bottomMargin=20 * mm,
     )
-    elems = []
 
-    brand_color = (
-        getattr(getattr(order, "company", None), "brand_color", None) or "#000000"
-    )
-    logo_path = getattr(settings, "COMPANY_LOGO_PATH", None)
-    from reportlab.lib.colors import HexColor
-
-    BAR_H = 18  # points
+    BAR_H = 18  # header band height (pt)
+    company_name = getattr(settings, "COMPANY_NAME", "")
 
     def _page_deco(c, d):
         c.saveState()
-        c.setFillColor(HexColor(brand_color))
+        # Top brand bar
+        c.setFillColor(HexColor(BRAND_COLOR))
         c.rect(
             0,
             d.height + d.topMargin + d.bottomMargin - BAR_H,
@@ -223,10 +163,11 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
             fill=1,
             stroke=0,
         )
-        if logo_path:
+        # Remote logo (if available)
+        if logo_reader:
             try:
                 c.drawImage(
-                    logo_path,
+                    logo_reader,
                     d.leftMargin,
                     d.height + d.topMargin + d.bottomMargin - BAR_H + 2,
                     height=BAR_H - 4,
@@ -235,315 +176,317 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
                 )
             except Exception:
                 pass
+        # Company name (top right)
+        c.setFillColor(colors.white)
         c.setFont(BASE_BOLD, 10)
-        c.setFillColorRGB(1, 1, 1)
         c.drawRightString(
             d.width + d.leftMargin,
             d.height + d.topMargin + d.bottomMargin - BAR_H + 5,
-            getattr(settings, "COMPANY_NAME", ""),
+            company_name,
         )
+        # Footer page number
         c.setFont(BASE_FONT, 9)
-        c.setFillColorRGB(0, 0, 0)
+        c.setFillColor(colors.black)
         c.drawRightString(d.width + d.leftMargin, 15, f"Page {d.page}")
         c.restoreState()
 
+    elems = []
+
+    # --- header block --------------------------------------------------------
     title = "CREDIT NOTE" if float(getattr(order, "total", 0) or 0) < 0 else "INVOICE"
     inv_date = getattr(order, "created_at", None)
-    elems += [
-        Paragraph(getattr(settings, "COMPANY_NAME", ""), styles["Title"]),
-        Paragraph(getattr(settings, "COMPANY_ADDRESS", ""), styles["Small"]),
-        Spacer(1, 6),
-        Paragraph(f"{title} {getattr(order,'code','')}", styles["Heading2"]),
+
+    # Company lines
+    company_lines = [
+        getattr(settings, "COMPANY_NAME", ""),
+        getattr(settings, "COMPANY_ADDRESS", ""),
+    ]
+    company_lines = [x for x in company_lines if x]
+
+    left = Paragraph("<br/>".join(company_lines), styles["Small"])
+    right = KeepTogether([
+        Paragraph(f"{title} <font color='{ACCENT_COLOR}'>{getattr(order,'code','')}</font>", styles["H2"]),
+        Spacer(1, 2),
         Paragraph(
-            f"Issue Date: {getattr(inv_date,'strftime',lambda *_: '')('%Y-%m-%d')}",
+            f"Issue Date: {getattr(inv_date, 'strftime', lambda *_:'' )('%Y-%m-%d')}",
             styles["Normal"],
         ),
-        Spacer(1, 8),
-    ]
+    ])
+    from reportlab.platypus import Table  # local import to keep lints happy
+    ht = Table([[left, right]], colWidths=[110 * mm, 70 * mm])
+    ht.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
+    elems += [ht, Spacer(1, 8)]
+
+    # --- meta table (clean, right-aligned values) ----------------------------
     meta_rows = []
-
-    def add(k, v):
+    def add_meta(k, v):
         if v:
-            meta_rows.append(
-                [Paragraph(k, styles["Small"]), Paragraph(str(v), styles["Right"])]
-            )
+            meta_rows.append([Paragraph(k, styles["MetaKey"]), Paragraph(str(v), styles["MetaVal"])])
 
-    add("Due Date", getattr(order, "due_date", None))
-    add("PO", getattr(order, "po_number", None))
-    add("Ref", getattr(order, "reference", None))
+    add_meta("Due Date", getattr(order, "due_date", None))
+    add_meta("PO", getattr(order, "po_number", None))
+    add_meta("Ref", getattr(order, "reference", None))
     tax_id = getattr(getattr(order, "company", None), "tax_id", None)
     if tax_id:
-        add("Tax ID", tax_id)
+        add_meta("Tax ID", tax_id)
+
     if meta_rows:
-        t = Table(meta_rows, colWidths=[40 * mm, 60 * mm])
-        t.setStyle(TableStyle([("ALIGN", (1, 0), (-1, -1), "RIGHT")]))
-        elems += [t, Spacer(1, 8)]
+        mt = Table(meta_rows, colWidths=[35 * mm, 55 * mm], hAlign="RIGHT")
+        mt.setStyle(TableStyle([
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elems += [mt, Spacer(1, 8)]
 
+    # --- bill/ship blocks in a soft box -------------------------------------
     def block(label, obj):
-        lines = [f"<b>{label}</b>", getattr(obj, "name", "") or ""]
-        attn = getattr(obj, "attn", None)
-        if attn:
-            lines.append(f"Attn: {attn}")
-        addr = getattr(obj, "address", None)
-        if addr:
-            lines.append(addr)
-        email = getattr(obj, "email", None)
-        if email:
-            lines.append(email)
-        return Paragraph("<br/>".join(lines), styles["Normal"])
+        obj = obj or type("X", (), {})()
+        bits = [f"<b>{label}</b>", getattr(obj, "name", "") or ""]
+        if getattr(obj, "attn", None):
+            bits.append(f"Attn: {obj.attn}")
+        if getattr(obj, "address", None):
+            bits.append(obj.address)
+        if getattr(obj, "email", None):
+            bits.append(obj.email)
+        return Paragraph("<br/>".join([b for b in bits if b]), styles["Normal"])
 
-    bill = block("Bill To", getattr(order, "customer", None) or type("X", (), {})())
+    bill = block("Bill To", getattr(order, "customer", None))
     ship_to = getattr(order, "shipping_to", None)
-    bill_ship = [[bill, block("Ship To", ship_to)]] if ship_to else [[bill]]
-    bt = Table(bill_ship, colWidths=[90 * mm, 90 * mm] if ship_to else [180 * mm])
-    bt.setStyle(
-        TableStyle(
-            [
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]
-        )
+    bt = Table(
+        [[bill, block("Ship To", ship_to)]] if ship_to else [[bill]],
+        colWidths=[90 * mm, 90 * mm] if ship_to else [180 * mm],
     )
-    elems += [bt, Spacer(1, 8)]
+    bt.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#E5E7EB")),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F9FAFB")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elems += [bt, Spacer(1, 10)]
 
-    header = [
-        "SKU",
-        "Description",
-        "Qty",
-        "Unit",
-        "Unit Price",
-        "Disc",
-        "Tax",
-        "Amount",
-    ]
+    # --- items table (zebra rows, right-aligned numbers) ---------------------
+    header = ["SKU", "Description", "Qty", "Unit", "Unit Price", "Disc", "Tax", "Amount"]
     data = [header]
     for it in getattr(order, "items", []) or []:
         sku = getattr(it, "sku", "") or ""
         name = getattr(it, "name", "") or ""
         note = getattr(it, "note", "") or ""
-        qty = int(getattr(it, "qty", 0) or 0)
+        qty = getattr(it, "qty", 0) or 0
         unit = getattr(it, "unit", "") or "-"
         unit_price = float(getattr(it, "unit_price", 0) or 0)
         disc = getattr(it, "discount_rate", None)
         taxr = getattr(it, "tax_rate", None)
+        # display amount; keep original calc style for consistency
         discounted = unit_price * (1 - (disc or 0))
-        amount = discounted * qty
-        data.append(
-            [
-                sku,
-                Paragraph(
-                    name
-                    + (
-                        f"<br/><font color='#555555' size='9'>{note}</font>"
-                        if note
-                        else ""
-                    ),
-                    styles["Normal"],
-                ),
-                f"{qty}",
-                unit,
-                f"RM{unit_price:,.2f}",
-                (f"{disc*100:.0f}%" if disc else "-"),
-                (f"{taxr*100:.0f}%" if taxr else "-"),
-                f"RM{amount:,.2f}",
-            ]
-        )
-    colw = [20 * mm, 70 * mm, 15 * mm, 15 * mm, 25 * mm, 15 * mm, 15 * mm, 25 * mm]
-    itab = Table(data, colWidths=colw, repeatRows=1)
-    itab.setStyle(
-        TableStyle(
-            [
-                ("BACKGROUND", (0, 0), (-1, 0), colors.whitesmoke),
-                ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
-                ("GRID", (0, 0), (-1, -1), 0.25, colors.grey),
-                ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-                ("LEFTPADDING", (0, 0), (-1, -1), 6),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 6),
-                ("TOPPADDING", (0, 0), (-1, -1), 4),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ]
-        )
-    )
-    elems += [itab, Spacer(1, 10)]
+        amount = discounted * float(qty or 0)
+        desc = name + (f"<br/><font color='#6B7280' size='9'>{note}</font>" if note else "")
+        data.append([
+            sku,
+            Paragraph(desc, styles["Normal"]),
+            _fmt_qty(qty),
+            unit,
+            money(unit_price),
+            (f"{disc * 100:.0f}%" if disc else "-"),
+            (f"{taxr * 100:.0f}%" if taxr else "-"),
+            money(amount),
+        ])
 
+    colw = [22 * mm, 66 * mm, 15 * mm, 15 * mm, 25 * mm, 15 * mm, 15 * mm, 27 * mm]
+    itab = Table(data, colWidths=colw, repeatRows=1)
+    itab.setStyle(TableStyle([
+        # header
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND_COLOR)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        # body
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.white]),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E5E7EB")),
+        ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elems += [itab, Spacer(1, 12)]
+
+    # --- summary (dynamic rows + bold total strip) --------------------------
     def row(k, v):
         return [Paragraph(k, styles["Normal"]), Paragraph(v, styles["Right"])]
 
-    def money(x):
-        return f"RM{float(x or 0):,.2f}"
-
+    # Common fields (show when present)
     subtotal = getattr(order, "subtotal", None)
+    discount = getattr(order, "discount", None)
     tax_total = getattr(order, "tax_total", None)
     shipping = getattr(order, "delivery_fee", None)
+    return_delivery = getattr(order, "return_delivery_fee", None)
+    penalty = getattr(order, "penalty_fee", None)
     other = getattr(order, "other_fee", None)
     rounding = getattr(order, "rounding", None)
     deposit = getattr(order, "deposit_paid", None)
+    buyback = getattr(order, "buyback_amount", None)
     total = getattr(order, "total", None)
+    tax_label = getattr(getattr(order, "company", None), "tax_label", "Tax") or "Tax"
+
     summary = []
     if subtotal is not None:
         summary.append(row("Subtotal", money(subtotal)))
-    if tax_total is not None:
-        summary.append(row("Tax", money(tax_total)))
+    if discount:
+        summary.append(row("Discount", "-" + money(discount)))
     if shipping:
-        summary.append(row("Shipping", money(shipping)))
+        summary.append(row("Delivery Fee", money(shipping)))
+    if return_delivery:
+        summary.append(row("Return Delivery", money(return_delivery)))
+    if penalty:
+        summary.append(row("Penalty", money(penalty)))
     if other:
         summary.append(row("Other", money(other)))
     if rounding:
         summary.append(row("Rounding", money(rounding)))
+    if buyback:
+        summary.append(row("Buyback", "-" + money(buyback)))
+    if tax_total is not None:
+        summary.append(row(tax_label, money(tax_total)))
     if deposit:
         summary.append(row("Deposit Paid", "-" + money(deposit)))
-    if total is not None:
-        summary.append(row("Total", money(total)))
-    if summary:
-        stab = Table(summary, colWidths=[45 * mm, 45 * mm], hAlign="RIGHT")
-        stab.setStyle(
-            TableStyle(
-                [
-                    ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
-                    ("LINEABOVE", (0, -1), (-1, -1), 0.5, colors.black),
-                ]
-            )
-        )
-        elems.append(KeepTogether([stab, Spacer(1, 8)]))
 
-    pay = getattr(order, "company", None) or type("X", (), {})()
-    lines = [
-        getattr(pay, "bank_name", "") or "",
-        getattr(pay, "bank_account_name", "") or "",
-        getattr(pay, "bank_account_no", "") or "",
+    if summary:
+        stab = Table(summary, colWidths=[50 * mm, 45 * mm], hAlign="RIGHT")
+        stab.setStyle(TableStyle([
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elems.append(KeepTogether([stab, Spacer(1, 6)]))
+
+    if total is not None:
+        trow = Table([row("Total", money(total))], colWidths=[50 * mm, 45 * mm], hAlign="RIGHT")
+        trow.setStyle(TableStyle([
+            ("LINEABOVE", (0, 0), (-1, 0), 1.2, HexColor(ACCENT_COLOR)),
+            ("FONTNAME", (0, 0), (-1, -1), BASE_BOLD),
+            ("ALIGN", (1, 0), (1, 0), "RIGHT"),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        elems.append(KeepTogether([trow, Spacer(1, 10)]))
+
+    # --- payment box (with QR image) ----------------------------------------
+    # Always show the requested bank details explicitly.
+    bank_lines = [
+        f"Beneficiary: {BENEFICIARY_NAME}",
+        f"Bank: {BANK_NAME}",
+        f"Account No.: {BANK_ACCOUNT_NO}",
     ]
-    p = [Paragraph("<br/>".join([x for x in lines if x]), styles["Normal"])]
+    p = [Paragraph("<br/>".join(bank_lines), styles["Normal"])]
+
+    # Prefer base64 QR if provided; otherwise load remote QR image
     qr = getattr(getattr(order, "payment", None), "qrDataUrl", None)
     if qr:
         try:
             import base64
-
             img_data = qr.split(",", 1)[-1]
-            qr_img = Image(
-                BytesIO(base64.b64decode(img_data)), width=40 * mm, height=40 * mm
-            )
-            ptab = Table([[p, qr_img]], colWidths=[90 * mm, 40 * mm])
+            qr_img = Image(BytesIO(base64.b64decode(img_data)), width=40 * mm, height=40 * mm)
+            ptab = Table([[p[0], qr_img]], colWidths=[100 * mm, 40 * mm])
         except Exception:
-            ptab = Table([[p]], colWidths=[90 * mm])
+            # fallback to remote QR
+            if qr_fallback_bytes:
+                try:
+                    qr_img = Image(qr_fallback_bytes, width=40 * mm, height=40 * mm)
+                    ptab = Table([[p[0], qr_img]], colWidths=[100 * mm, 40 * mm])
+                except Exception:
+                    ptab = Table([[p[0]]], colWidths=[100 * mm])
+            else:
+                ptab = Table([[p[0]]], colWidths=[100 * mm])
     else:
-        ptab = Table([[p]], colWidths=[90 * mm])
-    ptab.setStyle(
-        TableStyle(
-            [
-                ("BOX", (0, 0), (-1, -1), 0.5, colors.grey),
-                ("LEFTPADDING", (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-                ("TOPPADDING", (0, 0), (-1, -1), 8),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
-            ]
-        )
-    )
+        if qr_fallback_bytes:
+            try:
+                qr_img = Image(qr_fallback_bytes, width=40 * mm, height=40 * mm)
+                ptab = Table([[p[0], qr_img]], colWidths=[100 * mm, 40 * mm])
+            except Exception:
+                ptab = Table([[p[0]]], colWidths=[100 * mm])
+        else:
+            ptab = Table([[p[0]]], colWidths=[100 * mm])
+
+    ptab.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#E5E7EB")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
     elems += [ptab, Spacer(1, 12)]
 
+    # --- notes & T&C ---------------------------------------------------------
     terms = getattr(getattr(order, "footer", None), "terms", None) or [
         "Payment due upon receipt.",
         "Goods sold are not returnable except by prior arrangement.",
     ]
     note = getattr(getattr(order, "footer", None), "note", None)
-    elems.append(Paragraph("<br/>".join(f"• {t}" for t in terms), styles["Small"]))
+
     if note:
-        elems.append(Paragraph(note, styles["Small"]))
+        elems.append(Paragraph(note, styles["Muted"]))
+        elems.append(Spacer(1, 8))
+
+    elems.append(Paragraph("Terms & Conditions", styles["H2"]))
+    elems.append(Spacer(1, 6))
+    elems.append(Paragraph("<br/>".join(f"• {t}" for t in terms), styles["Small"]))
+
+    # Optional bilingual page (kept from your original)
     elems.append(PageBreak())
-    elems.append(Paragraph("Terms & Conditions", styles["Heading2"]))
-    elems.append(Spacer(1, 8))
+    elems.append(Paragraph("Terms & Conditions", styles["H2"]))
+    elems.append(Spacer(1, 6))
     elems.append(Paragraph("English – “Terms & Conditions”", styles["Normal"]))
     elems.append(Spacer(1, 4))
     english_terms = [
-        (
-            "Payment, Default & Remedies. All amounts are due on or before the due date. If you fail to pay any amount when due, we may, to the maximum extent permitted by law: (a) charge late fees and interest; (b) suspend delivery/service and accelerate all amounts outstanding; (c) report the default to credit reporting agencies, including CTOS Data Systems Sdn Bhd; and (d) assign or sell our receivables (including this invoice) to a third-party collector without further consent."
-        ),
-        (
-            "Data Processing & Privacy Consent. You consent to our collection, use and disclosure of your personal data for account management, payment recovery, fraud prevention and legal compliance, including disclosure to credit reporting agencies (such as CTOS) and appointed collection partners, until all sums are fully settled, subject to applicable law, including the Personal Data Protection Act 2010."
-        ),
-        (
-            "Ownership & Repossession (Instalment/Rental). Title to goods remains with the Company until full payment is received (for sales) and at all times during rental. Upon default or termination, we may, as permitted by law, enter the location of the goods with reasonable notice (or without notice if legally allowed) to remove and repossess our assets; you must grant access and cooperation. Associated removal, transport and restoration costs are chargeable to you."
-        ),
-        (
-            "Damage & Loss (Rental). You are responsible for any loss or damage beyond fair wear and tear. Repair, parts and replacement costs (including logistics and technician time) will be charged. If damage renders the equipment unusable, rental charges may continue during downtime caused by your act/omission."
-        ),
-        (
-            "Delivery, Risk & Insurance. Risk passes on delivery for sales; for rentals, risk of loss/damage remains with you while equipment is in your care. You agree to take reasonable care and, where applicable, maintain suitable insurance."
-        ),
-        (
-            "Assignment & Third-Party Collection. We may at any time assign, novate or sell any receivables or this agreement to financiers or collection agencies. Your obligations remain unchanged."
-        ),
-        (
-            "Limitation of Liability. To the maximum extent permitted by law, we are not liable for indirect, special or consequential losses. Our aggregate liability is capped at the price paid for the goods/services giving rise to the claim."
-        ),
-        (
-            "Governing Law & Jurisdiction. This agreement is governed by the laws of Malaysia. You submit to the exclusive jurisdiction of the courts of Kuala Lumpur."
-        ),
-        (
-            "Acceptance. By signing, placing the order, taking delivery, or making any payment, you accept these Terms & Conditions."
-        ),
+        ("Payment, Default & Remedies. All amounts are due on or before the due date. If you fail to pay any amount when due, we may, to the maximum extent permitted by law: (a) charge late fees and interest; (b) suspend delivery/service and accelerate all amounts outstanding; (c) report the default to credit reporting agencies, including CTOS Data Systems Sdn Bhd; and (d) assign or sell our receivables (including this invoice) to a third-party collector without further consent."),
+        ("Data Processing & Privacy Consent. You consent to our collection, use and disclosure of your personal data for account management, payment recovery, fraud prevention and legal compliance, including disclosure to credit reporting agencies (such as CTOS) and appointed collection partners, until all sums are fully settled, subject to applicable law, including the Personal Data Protection Act 2010."),
+        ("Ownership & Repossession (Instalment/Rental). Title to goods remains with the Company until full payment is received (for sales) and at all times during rental. Upon default or termination, we may, as permitted by law, enter the location of the goods with reasonable notice (or without notice if legally allowed) to remove and repossess our assets; you must grant access and cooperation. Associated removal, transport and restoration costs are chargeable to you."),
+        ("Damage & Loss (Rental). You are responsible for any loss or damage beyond fair wear and tear. Repair, parts and replacement costs (including logistics and technician time) will be charged. If damage renders the equipment unusable, rental charges may continue during downtime caused by your act/omission."),
+        ("Delivery, Risk & Insurance. Risk passes on delivery for sales; for rentals, risk of loss/damage remains with you while equipment is in your care. You agree to take reasonable care and, where applicable, maintain suitable insurance."),
+        ("Assignment & Third-Party Collection. We may at any time assign, novate or sell any receivables or this agreement to financiers or collection agencies. Your obligations remain unchanged."),
+        ("Limitation of Liability. To the maximum extent permitted by law, we are not liable for indirect, special or consequential losses. Our aggregate liability is capped at the price paid for the goods/services giving rise to the claim."),
+        ("Governing Law & Jurisdiction. This agreement is governed by the laws of Malaysia. You submit to the exclusive jurisdiction of the courts of Kuala Lumpur."),
+        ("Acceptance. By signing, placing the order, taking delivery, or making any payment, you accept these Terms & Conditions."),
     ]
     for para in english_terms:
         elems.append(Paragraph(para, styles["Small"]))
         elems.append(Spacer(1, 4))
 
-    elems.append(Spacer(1, 6))
+    elems.append(Spacer(1, 8))
     elems.append(Paragraph("Bahasa Melayu – “Terma & Syarat”", styles["Normal"]))
     elems.append(Spacer(1, 4))
     malay_terms = [
-        (
-            "Pembayaran, Kegagalan & Pemulihan. Semua amaun perlu dibayar pada atau sebelum tarikh akhir. Jika anda gagal membayar, kami boleh, setakat yang dibenarkan undang-undang: (a) mengenakan caj lewat dan faedah; (b) menggantung penghantaran/perkhidmatan dan mempercepatkan semua amaun tertunggak; (c) melaporkan kegagalan bayaran kepada agensi pelaporan kredit termasuk CTOS Data Systems Sdn Bhd; dan (d) menyerah hak atau menjual terimaan kami (termasuk invois ini) kepada pihak pengutip hutang tanpa keizinan lanjut."
-        ),
-        (
-            "Pemprosesan Data & Persetujuan Privasi. Anda bersetuju bahawa kami boleh mengumpul, menggunakan dan mendedahkan data peribadi anda bagi tujuan pengurusan akaun, pemulihan bayaran, pencegahan penipuan dan pematuhan undang-undang, termasuk pendedahan kepada agensi pelaporan kredit (seperti CTOS) dan rakan kutipan yang dilantik, sehingga semua amaun diselesaikan sepenuhnya, tertakluk kepada undang-undang yang berkenaan termasuk Akta Perlindungan Data Peribadi 2010."
-        ),
-        (
-            "Pemilikan & Pengambilan Semula (Ansuran/Sewaan). Hak milik kekal milik Syarikat sehingga bayaran penuh diterima (jualan) dan pada setiap masa sepanjang tempoh sewaan. Jika berlaku kegagalan atau penamatan, kami boleh, seperti yang dibenarkan undang-undang, memasuki lokasi barangan dengan notis munasabah (atau tanpa notis jika dibenarkan undang-undang) untuk mengalih keluar dan mengambil balik aset kami; anda hendaklah memberikan akses dan kerjasama. Kos pengalihan, pengangkutan dan pemulihan adalah ditanggung oleh anda."
-        ),
-        (
-            "Kerosakan & Kehilangan (Sewaan). Anda bertanggungjawab atas sebarang kerosakan atau kehilangan selain daripada haus dan lusuh biasa. Kos pembaikan, alat ganti dan penggantian (termasuk logistik dan masa juruteknik) akan dicajkan. Jika kerosakan menyebabkan peralatan tidak boleh digunakan, caj sewaan boleh diteruskan sepanjang tempoh henti yang berpunca daripada tindakan/kelalaian anda."
-        ),
-        (
-            "Penghantaran, Risiko & Insurans. Risiko berpindah semasa penghantaran bagi jualan; bagi sewaan, risiko kehilangan/kerosakan berada pada anda sementara peralatan berada dalam jagaan anda. Anda bersetuju menjaga peralatan dengan sewajarnya dan, jika berkenaan, mengekalkan insurans yang sesuai."
-        ),
-        (
-            "Penyerahan & Pengutipan Pihak Ketiga. Kami boleh pada bila-bila masa menyerah hak, menovat atau menjual mana-mana terimaan atau perjanjian ini kepada pembiaya atau agensi kutipan. Kewajipan anda tidak berubah."
-        ),
-        (
-            "Had Tanggungan. Setakat yang dibenarkan undang-undang, kami tidak bertanggungan atas kerugian tidak langsung, khas atau berbangkit. Jumlah tanggungan kami terhad kepada harga yang dibayar bagi barangan/perkhidmatan yang berkaitan."
-        ),
-        (
-            "Undang-undang Mentadbir & Bidang Kuasa. Terma ini ditadbir oleh undang-undang Malaysia. Anda bersetuju tertakluk kepada bidang kuasa eksklusif Mahkamah Kuala Lumpur."
-        ),
-        (
-            "Penerimaan. Dengan menandatangani, membuat pesanan, menerima penghantaran, atau membuat sebarang pembayaran, anda bersetuju dengan Terma & Syarat ini."
-        ),
+        ("Pembayaran, Kegagalan & Pemulihan. Semua amaun perlu dibayar pada atau sebelum tarikh akhir. Jika anda gagal membayar, kami boleh, setakat yang dibenarkan undang-undang: (a) mengenakan caj lewat dan faedah; (b) menggantung penghantaran/perkhidmatan dan mempercepatkan semua amaun tertunggak; (c) melaporkan kegagalan bayaran kepada agensi pelaporan kredit termasuk CTOS Data Systems Sdn Bhd; dan (d) menyerah hak atau menjual terimaan kami (termasuk invois ini) kepada pihak pengutip hutang tanpa keizinan lanjut."),
+        ("Pemprosesan Data & Persetujuan Privasi. Anda bersetuju bahawa kami boleh mengumpul, menggunakan dan mendedahkan data peribadi anda bagi tujuan pengurusan akaun, pemulihan bayaran, pencegahan penipuan dan pematuhan undang-undang, termasuk pendedahan kepada agensi pelaporan kredit (seperti CTOS) dan rakan kutipan yang dilantik, sehingga semua amaun diselesaikan sepenuhnya, tertakluk kepada undang-undang yang berkenaan termasuk Akta Perlindungan Data Peribadi 2010."),
+        ("Pemilikan & Pengambilan Semula (Ansuran/Sewaan). Hak milik kekal milik Syarikat sehingga bayaran penuh diterima (jualan) dan pada setiap masa sepanjang tempoh sewaan. Jika berlaku kegagalan atau penamatan, kami boleh, seperti yang dibenarkan undang-undang, memasuki lokasi barangan dengan notis munasabah (atau tanpa notis jika dibenarkan undang-undang) untuk mengalih keluar dan mengambil balik aset kami; anda hendaklah memberikan akses dan kerjasama. Kos pengalihan, pengangkutan dan pemulihan adalah ditanggung oleh anda."),
+        ("Kerosakan & Kehilangan (Sewaan). Anda bertanggungjawab atas sebarang kerosakan atau kehilangan selain daripada haus dan lusuh biasa. Kos pembaikan, alat ganti dan penggantian (termasuk logistik dan masa juruteknik) akan dicajkan. Jika kerosakan menyebabkan peralatan tidak boleh digunakan, caj sewaan boleh diteruskan sepanjang tempoh henti yang berpunca daripada tindakan/kelalaian anda."),
+        ("Penghantaran, Risiko & Insurans. Risiko berpindah semasa penghantaran bagi jualan; bagi sewaan, risiko kehilangan/kerosakan berada pada anda sementara peralatan berada dalam jagaan anda. Anda bersetuju menjaga peralatan dengan sewajarnya dan, jika berkenaan, mengekalkan insurans yang sesuai."),
+        ("Penyerahan & Pengutipan Pihak Ketiga. Kami boleh pada bila-bila masa menyerah hak, menovat atau menjual mana-mana terimaan atau perjanjian ini kepada pembiaya atau agensi kutipan. Kewajipan anda tidak berubah."),
+        ("Had Tanggungan. Setakat yang dibenarkan undang-undang, kami tidak bertanggungan atas kerugian tidak langsung, khas atau berbangkit. Jumlah tanggungan kami terhad kepada harga yang dibayar bagi barangan/perkhidmatan yang berkaitan."),
+        ("Undang-undang Mentadbir & Bidang Kuasa. Terma ini ditadbir oleh undang-undang Malaysia. Anda bersetuju tertakluk kepada bidang kuasa eksklusif Mahkamah Kuala Lumpur."),
+        ("Penerimaan. Dengan menandatangani, membuat pesanan, menerima penghantaran, atau membuat sebarang pembayaran, anda bersetuju dengan Terma & Syarat ini."),
     ]
     for para in malay_terms:
         elems.append(Paragraph(para, styles["Small"]))
         elems.append(Spacer(1, 4))
-    elems += [
-        Paragraph("Terms & Conditions", styles["Heading2"]),
-        Spacer(1, 8),
-        Paragraph("<br/>".join(f"• {t}" for t in terms), styles["Small"]),
-    ]
 
+    # build
     def _canvasmaker(*a, **k):
         from reportlab.pdfgen.canvas import Canvas
-
-        k["pageCompression"] = 0
+        k["pageCompression"] = 1  # smaller files than 0
         return Canvas(*a, **k)
 
-    doc.build(
-        elems, onFirstPage=_page_deco, onLaterPages=_page_deco, canvasmaker=_canvasmaker
-    )
+    doc.build(elems, onFirstPage=_page_deco, onLaterPages=_page_deco, canvasmaker=_canvasmaker)
     pdf = buf.getvalue()
     buf.close()
     return pdf
 
+
+# ---------------------------------------------------------------------------
+# Receipt
+# ---------------------------------------------------------------------------
 
 def receipt_pdf(order: Order, payment: Payment) -> bytes:
     try:  # pragma: no cover - exercised indirectly in tests
@@ -555,35 +498,58 @@ def receipt_pdf(order: Order, payment: Payment) -> bytes:
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
         ) from exc
 
+    CURRENCY = getattr(settings, "CURRENCY_PREFIX", "RM") or "RM"
+
+    def money(x):
+        try:
+            return f"{CURRENCY}{float(x or 0):,.2f}"
+        except Exception:
+            return f"{CURRENCY}0.00"
+
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     x, y = 20, 280
     c.setFont("Helvetica-Bold", 14)
-    c.drawString(x * mm, y * mm, f"RECEIPT for {order.code}")
+    c.drawString(x * mm, y * mm, f"RECEIPT for {getattr(order, 'code', '')}")
     y -= 10
     c.setFont("Helvetica", 10)
+
+    def _fmt_date(d):
+        try:
+            return getattr(d, "strftime")("%Y-%m-%d")
+        except Exception:
+            return str(d or "")
+
     lines = [
-        settings.COMPANY_NAME,
-        settings.COMPANY_ADDRESS,
-        f"Phone: {settings.COMPANY_PHONE}",
-        f"Email: {settings.COMPANY_EMAIL}",
-        f"Customer: {order.customer.name}",
-        f"Payment Date: {payment.date}",
-        f"Amount: RM{float(payment.amount):.2f}",
-        f"Method: {payment.method or '-'} Ref: {payment.reference or '-'}",
-        f"Status: {payment.status}",
-        f"Bank: {settings.COMPANY_BANK}",
-        f"Customer Service: {settings.COMPANY_PHONE}",
+        getattr(settings, "COMPANY_NAME", ""),
+        getattr(settings, "COMPANY_ADDRESS", ""),
+        f"Phone: {getattr(settings, 'COMPANY_PHONE', '')}",
+        f"Email: {getattr(settings, 'COMPANY_EMAIL', '')}",
+        f"Customer: {getattr(getattr(order, 'customer', None) or type('X',(),{})(), 'name', '-')}",
+        f"Payment Date: {_fmt_date(getattr(payment, 'date', None))}",
+        f"Amount: {money(getattr(payment, 'amount', 0))}",
+        f"Method: {getattr(payment, 'method', '-') or '-'}  Ref: {getattr(payment, 'reference', '-') or '-'}",
+        f"Status: {getattr(payment, 'status', '-')}",
+        # Hard-coded bank details as requested
+        f"Beneficiary: {BENEFICIARY_NAME}",
+        f"Bank: {BANK_NAME}",
+        f"Account No.: {BANK_ACCOUNT_NO}",
+        f"Customer Service: {getattr(settings, 'COMPANY_PHONE', '')}",
     ]
     for t in lines:
-        c.drawString(x * mm, y * mm, t)
-        y -= 6
+        if t:
+            c.drawString(x * mm, y * mm, t)
+            y -= 6
     c.showPage()
     c.save()
     pdf = buf.getvalue()
     buf.close()
     return pdf
 
+
+# ---------------------------------------------------------------------------
+# Installment Agreement
+# ---------------------------------------------------------------------------
 
 def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
     try:  # pragma: no cover - exercised indirectly in tests
@@ -600,21 +566,16 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
 
     try:
         pdfmetrics.registerFont(TTFont("Inter", "/app/static/fonts/Inter-Regular.ttf"))
-        pdfmetrics.registerFont(
-            TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf")
-        )
-        BASE_FONT = "Inter"
-        BASE_BOLD = "Inter-Bold"
+        pdfmetrics.registerFont(TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf"))
+        BASE_FONT, BASE_BOLD = "Inter", "Inter-Bold"
     except Exception:
-        BASE_FONT = "Helvetica"
-        BASE_BOLD = "Helvetica-Bold"
+        BASE_FONT, BASE_BOLD = "Helvetica", "Helvetica-Bold"
 
     styles = getSampleStyleSheet()
     styles["Normal"].fontName = BASE_FONT
     styles["Title"].fontName = BASE_BOLD
-    styles.add(
-        ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11)
-    )
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11))
+    styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=14, leading=16))
 
     buf = BytesIO()
     doc = SimpleDocTemplate(
@@ -627,9 +588,16 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
     )
     elems = []
 
+    def money(x):
+        try:
+            return f"RM{float(x or 0):,.2f}"
+        except Exception:
+            return "RM0.00"
+
     elems.append(
         Paragraph(
-            f"INSTALLMENT AGREEMENT ({getattr(order, 'code', '')})", styles["Title"]
+            f"INSTALLMENT AGREEMENT ({getattr(order, 'code', '')})",
+            styles["Title"],
         )
     )
     elems.append(Spacer(1, 8))
@@ -649,7 +617,7 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
         elems.append(Paragraph(f"Address: {addr}", styles["Normal"]))
     elems.append(
         Paragraph(
-            f"Plan: {getattr(plan, 'months', 0)} months at RM{float(getattr(plan, 'monthly_amount', 0)):,.2f}/month (no prorate)",
+            f"Plan: {getattr(plan, 'months', 0)} months at {money(getattr(plan, 'monthly_amount', 0))}/month (no prorate)",
             styles["Normal"],
         )
     )
@@ -659,44 +627,24 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
         "If cancel early, penalty equals remaining unpaid instalments plus return delivery fee.",
         "Title remains with company until fully paid.",
     ]
-    elems.append(Paragraph("Terms:", styles["Heading2"]))
-    elems.append(
-        Paragraph("<br/>".join(f"• {t}" for t in bullet_terms), styles["Normal"])
-    )
+    elems.append(Paragraph("Terms:", styles["H2"]))
+    elems.append(Paragraph("<br/>".join(f"• {t}" for t in bullet_terms), styles["Normal"]))
     elems.append(PageBreak())
 
-    elems.append(Paragraph("Terms & Conditions", styles["Heading2"]))
+    elems.append(Paragraph("Terms & Conditions", styles["H2"]))
     elems.append(Spacer(1, 8))
     elems.append(Paragraph("English – “Terms & Conditions”", styles["Normal"]))
     elems.append(Spacer(1, 4))
     english_terms = [
-        (
-            "Payment, Default & Remedies. All amounts are due on or before the due date. If you fail to pay any amount when due, we may, to the maximum extent permitted by law: (a) charge late fees and interest; (b) suspend delivery/service and accelerate all amounts outstanding; (c) report the default to credit reporting agencies, including CTOS Data Systems Sdn Bhd; and (d) assign or sell our receivables (including this invoice) to a third-party collector without further consent."
-        ),
-        (
-            "Data Processing & Privacy Consent. You consent to our collection, use and disclosure of your personal data for account management, payment recovery, fraud prevention and legal compliance, including disclosure to credit reporting agencies (such as CTOS) and appointed collection partners, until all sums are fully settled, subject to applicable law, including the Personal Data Protection Act 2010."
-        ),
-        (
-            "Ownership & Repossession (Instalment/Rental). Title to goods remains with the Company until full payment is received (for sales) and at all times during rental. Upon default or termination, we may, as permitted by law, enter the location of the goods with reasonable notice (or without notice if legally allowed) to remove and repossess our assets; you must grant access and cooperation. Associated removal, transport and restoration costs are chargeable to you."
-        ),
-        (
-            "Damage & Loss (Rental). You are responsible for any loss or damage beyond fair wear and tear. Repair, parts and replacement costs (including logistics and technician time) will be charged. If damage renders the equipment unusable, rental charges may continue during downtime caused by your act/omission."
-        ),
-        (
-            "Delivery, Risk & Insurance. Risk passes on delivery for sales; for rentals, risk of loss/damage remains with you while equipment is in your care. You agree to take reasonable care and, where applicable, maintain suitable insurance."
-        ),
-        (
-            "Assignment & Third-Party Collection. We may at any time assign, novate or sell any receivables or this agreement to financiers or collection agencies. Your obligations remain unchanged."
-        ),
-        (
-            "Limitation of Liability. To the maximum extent permitted by law, we are not liable for indirect, special or consequential losses. Our aggregate liability is capped at the price paid for the goods/services giving rise to the claim."
-        ),
-        (
-            "Governing Law & Jurisdiction. This agreement is governed by the laws of Malaysia. You submit to the exclusive jurisdiction of the courts of Kuala Lumpur."
-        ),
-        (
-            "Acceptance. By signing, placing the order, taking delivery, or making any payment, you accept these Terms & Conditions."
-        ),
+        ("Payment, Default & Remedies. All amounts are due on or before the due date. If you fail to pay any amount when due, we may, to the maximum extent permitted by law: (a) charge late fees and interest; (b) suspend delivery/service and accelerate all amounts outstanding; (c) report the default to credit reporting agencies, including CTOS Data Systems Sdn Bhd; and (d) assign or sell our receivables (including this invoice) to a third-party collector without further consent."),
+        ("Data Processing & Privacy Consent. You consent to our collection, use and disclosure of your personal data for account management, payment recovery, fraud prevention and legal compliance, including disclosure to credit reporting agencies (such as CTOS) and appointed collection partners, until all sums are fully settled, subject to applicable law, including the Personal Data Protection Act 2010."),
+        ("Ownership & Repossession (Instalment/Rental). Title to goods remains with the Company until full payment is received (for sales) and at all times during rental. Upon default or termination, we may, as permitted by law, enter the location of the goods with reasonable notice (or without notice if legally allowed) to remove and repossess our assets; you must grant access and cooperation. Associated removal, transport and restoration costs are chargeable to you."),
+        ("Damage & Loss (Rental). You are responsible for any loss or damage beyond fair wear and tear. Repair, parts and replacement costs (including logistics and technician time) will be charged. If damage renders the equipment unusable, rental charges may continue during downtime caused by your act/omission."),
+        ("Delivery, Risk & Insurance. Risk passes on delivery for sales; for rentals, risk of loss/damage remains with you while equipment is in your care. You agree to take reasonable care and, where applicable, maintain suitable insurance."),
+        ("Assignment & Third-Party Collection. We may at any time assign, novate or sell any receivables or this agreement to financiers or collection agencies. Your obligations remain unchanged."),
+        ("Limitation of Liability. To the maximum extent permitted by law, we are not liable for indirect, special or consequential losses. Our aggregate liability is capped at the price paid for the goods/services giving rise to the claim."),
+        ("Governing Law & Jurisdiction. This agreement is governed by the laws of Malaysia. You submit to the exclusive jurisdiction of the courts of Kuala Lumpur."),
+        ("Acceptance. By signing, placing the order, taking delivery, or making any payment, you accept these Terms & Conditions."),
     ]
     for para in english_terms:
         elems.append(Paragraph(para, styles["Small"]))
@@ -706,33 +654,15 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
     elems.append(Paragraph("Bahasa Melayu – “Terma & Syarat”", styles["Normal"]))
     elems.append(Spacer(1, 4))
     malay_terms = [
-        (
-            "Pembayaran, Kegagalan & Pemulihan. Semua amaun perlu dibayar pada atau sebelum tarikh akhir. Jika anda gagal membayar, kami boleh, setakat yang dibenarkan undang-undang: (a) mengenakan caj lewat dan faedah; (b) menggantung penghantaran/perkhidmatan dan mempercepatkan semua amaun tertunggak; (c) melaporkan kegagalan bayaran kepada agensi pelaporan kredit termasuk CTOS Data Systems Sdn Bhd; dan (d) menyerah hak atau menjual terimaan kami (termasuk invois ini) kepada pihak pengutip hutang tanpa keizinan lanjut."
-        ),
-        (
-            "Pemprosesan Data & Persetujuan Privasi. Anda bersetuju bahawa kami boleh mengumpul, menggunakan dan mendedahkan data peribadi anda bagi tujuan pengurusan akaun, pemulihan bayaran, pencegahan penipuan dan pematuhan undang-undang, termasuk pendedahan kepada agensi pelaporan kredit (seperti CTOS) dan rakan kutipan yang dilantik, sehingga semua amaun diselesaikan sepenuhnya, tertakluk kepada undang-undang yang berkenaan termasuk Akta Perlindungan Data Peribadi 2010."
-        ),
-        (
-            "Pemilikan & Pengambilan Semula (Ansuran/Sewaan). Hak milik kekal milik Syarikat sehingga bayaran penuh diterima (jualan) dan pada setiap masa sepanjang tempoh sewaan. Jika berlaku kegagalan atau penamatan, kami boleh, seperti yang dibenarkan undang-undang, memasuki lokasi barangan dengan notis munasabah (atau tanpa notis jika dibenarkan undang-undang) untuk mengalih keluar dan mengambil balik aset kami; anda hendaklah memberikan akses dan kerjasama. Kos pengalihan, pengangkutan dan pemulihan adalah ditanggung oleh anda."
-        ),
-        (
-            "Kerosakan & Kehilangan (Sewaan). Anda bertanggungjawab atas sebarang kerosakan atau kehilangan selain daripada haus dan lusuh biasa. Kos pembaikan, alat ganti dan penggantian (termasuk logistik dan masa juruteknik) akan dicajkan. Jika kerosakan menyebabkan peralatan tidak boleh digunakan, caj sewaan boleh diteruskan sepanjang tempoh henti yang berpunca daripada tindakan/kelalaian anda."
-        ),
-        (
-            "Penghantaran, Risiko & Insurans. Risiko berpindah semasa penghantaran bagi jualan; bagi sewaan, risiko kehilangan/kerosakan berada pada anda sementara peralatan berada dalam jagaan anda. Anda bersetuju menjaga peralatan dengan sewajarnya dan, jika berkenaan, mengekalkan insurans yang sesuai."
-        ),
-        (
-            "Penyerahan & Pengutipan Pihak Ketiga. Kami boleh pada bila-bila masa menyerah hak, menovat atau menjual mana-mana terimaan atau perjanjian ini kepada pembiaya atau agensi kutipan. Kewajipan anda tidak berubah."
-        ),
-        (
-            "Had Tanggungan. Setakat yang dibenarkan undang-undang, kami tidak bertanggungan atas kerugian tidak langsung, khas atau berbangkit. Jumlah tanggungan kami terhad kepada harga yang dibayar bagi barangan/perkhidmatan yang berkaitan."
-        ),
-        (
-            "Undang-undang Mentadbir & Bidang Kuasa. Terma ini ditadbir oleh undang-undang Malaysia. Anda bersetuju tertakluk kepada bidang kuasa eksklusif Mahkamah Kuala Lumpur."
-        ),
-        (
-            "Penerimaan. Dengan menandatangani, membuat pesanan, menerima penghantaran, atau membuat sebarang pembayaran, anda bersetuju dengan Terma & Syarat ini."
-        ),
+        ("Pembayaran, Kegagalan & Pemulihan. Semua amaun perlu dibayar pada atau sebelum tarikh akhir. Jika anda gagal membayar, kami boleh, setakat yang dibenarkan undang-undang: (a) mengenakan caj lewat dan faedah; (b) menggantung penghantaran/perkhidmatan dan mempercepatkan semua amaun tertunggak; (c) melaporkan kegagalan bayaran kepada agensi pelaporan kredit termasuk CTOS Data Systems Sdn Bhd; dan (d) menyerah hak atau menjual terimaan kami (termasuk invois ini) kepada pihak pengutip hutang tanpa keizinan lanjut."),
+        ("Pemprosesan Data & Persetujuan Privasi. Anda bersetuju bahawa kami boleh mengumpul, menggunakan dan mendedahkan data peribadi anda bagi tujuan pengurusan akaun, pemulihan bayaran, pencegahan penipuan dan pematuhan undang-undang, termasuk pendedahan kepada agensi pelaporan kredit (seperti CTOS) dan rakan kutipan yang dilantik, sehingga semua amaun diselesaikan sepenuhnya, tertakluk kepada undang-undang yang berkenaan termasuk Akta Perlindungan Data Peribadi 2010."),
+        ("Pemilikan & Pengambilan Semula (Ansuran/Sewaan). Hak milik kekal milik Syarikat sehingga bayaran penuh diterima (jualan) dan pada setiap masa sepanjang tempoh sewaan. Jika berlaku kegagalan atau penamatan, kami boleh, seperti yang dibenarkan undang-undang, memasuki lokasi barangan dengan notis munasabah (atau tanpa notis jika dibenarkan undang-undang) untuk mengalih keluar dan mengambil balik aset kami; anda hendaklah memberikan akses dan kerjasama. Kos pengalihan, pengangkutan dan pemulihan adalah ditanggung oleh anda."),
+        ("Kerosakan & Kehilangan (Sewaan). Anda bertanggungjawab atas sebarang kerosakan atau kehilangan selain daripada haus dan lusuh biasa. Kos pembaikan, alat ganti dan penggantian (termasuk logistik dan masa juruteknik) akan dicajkan. Jika kerosakan menyebabkan peralatan tidak boleh digunakan, caj sewaan boleh diteruskan sepanjang tempoh henti yang berpunca daripada tindakan/kelalaian anda."),
+        ("Penghantaran, Risiko & Insurans. Risiko berpindah semasa penghantaran bagi jualan; bagi sewaan, risiko kehilangan/kerosakan berada pada anda sementara peralatan berada dalam jagaan anda. Anda bersetuju menjaga peralatan dengan sewajarnya dan, jika berkenaan, mengekalkan insurans yang sesuai."),
+        ("Penyerahan & Pengutipan Pihak Ketiga. Kami boleh pada bila-bila masa menyerah hak, menovat atau menjual mana-mana terimaan atau perjanjian ini kepada pembiaya atau agensi kutipan. Kewajipan anda tidak berubah."),
+        ("Had Tanggungan. Setakat yang dibenarkan undang-undang, kami tidak bertanggungan atas kerugian tidak langsung, khas atau berbangkit. Jumlah tanggungan kami terhad kepada harga yang dibayar bagi barangan/perkhidmatan yang berkaitan."),
+        ("Undang-undang Mentadbir & Bidang Kuasa. Terma ini ditadbir oleh undang-undang Malaysia. Anda bersetuju tertakluk kepada bidang kuasa eksklusif Mahkamah Kuala Lumpur."),
+        ("Penerimaan. Dengan menandatangani, membuat pesanan, menerima penghantaran, atau membuat sebarang pembayaran, anda bersetuju dengan Terma & Syarat ini."),
     ]
     for para in malay_terms:
         elems.append(Paragraph(para, styles["Small"]))
