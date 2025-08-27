@@ -42,7 +42,7 @@ export function RouteCard({
     >
       <h2 style={{ marginTop: 0 }}>{route.name}</h2>
       <div>Driver: {driverName || '-'}</div>
-      <div>Stops: {route.stops.length}</div>
+      <div>Stops: —</div>
       <button
         onClick={(e) => {
           e.stopPropagation();
