@@ -63,23 +63,16 @@ Install the dependencies and start the development server:
 
 ```bash
 cd frontend
-npm install tailwindcss puppeteer
+npm install
 npm run dev
 ```
 
-To produce a printable PDF for an invoice, run the render script in another
-terminal. The invoice ID defaults to the first CLI argument but can be
-overridden with the `INVOICE_ID` environment variable:
+To print an invoice, open
+`http://localhost:3000/invoice/<ID>/print`, which iframes the backend's
+`/_api/orders/<ID>/invoice.pdf` endpoint.
 
-```bash
-cd frontend
-INVOICE_ID=123 npx tsx ../scripts/render-invoice.ts
-```
-
-The script opens `http://localhost:3000/invoice/<ID>/print` in a headless
-browser and writes `invoice-<ID>.pdf` with A4 margins and backgrounds
-included. Invoice templates can embed QR codes by using `payment.qrDataUrl`
-as the image source.
+Invoice templates can embed QR codes by using `payment.qrDataUrl` as the
+image source.
 
 ## Export Runs
 
