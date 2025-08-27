@@ -16,10 +16,11 @@ interface Props {
 
 export default function RouteDetailDrawer({ route, onClose }: Props) {
   const qc = useQueryClient();
-  const { data: unassigned } = useQuery({
+  const unassignedQuery = useQuery({
     queryKey: ['unassigned', route.date],
     queryFn: () => fetchUnassigned(route.date),
   });
+  const unassigned = unassignedQuery.data || [];
 
   const assignedQuery = useQuery({
     queryKey: ['route-orders', route.id, route.date],
@@ -27,8 +28,37 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
   });
 
   const assignMutation = useMutation({
-    mutationFn: (orderId: string) => assignOrdersToRoute(route.id, [orderId]),
-    onSuccess: () => {
+    mutationFn: (orderIds: string[]) => assignOrdersToRoute(route.id, orderIds),
+    onMutate: async (orderIds: string[]) => {
+      await qc.cancelQueries({ queryKey: ['unassigned', route.date] });
+      await qc.cancelQueries({ queryKey: ['route-orders', route.id, route.date] });
+      const prevUnassigned =
+        qc.getQueryData<Order[]>(['unassigned', route.date]) || [];
+      const prevAssigned =
+        qc.getQueryData<Order[]>(['route-orders', route.id, route.date]) || [];
+      const moved = prevUnassigned.filter((o) => orderIds.includes(o.id));
+      qc.setQueryData<Order[]>(
+        ['unassigned', route.date],
+        prevUnassigned.filter((o) => !orderIds.includes(o.id)),
+      );
+      if (moved.length > 0) {
+        qc.setQueryData<Order[]>(
+          ['route-orders', route.id, route.date],
+          [...prevAssigned, ...moved],
+        );
+      }
+      return { prevUnassigned, prevAssigned };
+    },
+    onError: (_err, _orderIds, ctx) => {
+      if (ctx) {
+        qc.setQueryData(['unassigned', route.date], ctx.prevUnassigned);
+        qc.setQueryData(
+          ['route-orders', route.id, route.date],
+          ctx.prevAssigned,
+        );
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['routes', route.date] });
       qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
       qc.invalidateQueries({ queryKey: ['route-orders', route.id, route.date] });
@@ -37,7 +67,37 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
 
   const removeMutation = useMutation({
     mutationFn: (orderId: string) => removeOrdersFromRoute(route.id, [orderId]),
-    onSuccess: () => {
+    onMutate: async (orderId: string) => {
+      await qc.cancelQueries({ queryKey: ['unassigned', route.date] });
+      await qc.cancelQueries({ queryKey: ['route-orders', route.id, route.date] });
+      const prevUnassigned =
+        qc.getQueryData<Order[]>(['unassigned', route.date]) || [];
+      const prevAssigned =
+        qc.getQueryData<Order[]>(['route-orders', route.id, route.date]) || [];
+      const order = prevAssigned.find((o) => o.id === orderId);
+      qc.setQueryData<Order[]>(
+        ['route-orders', route.id, route.date],
+        prevAssigned.filter((o) => o.id !== orderId),
+      );
+      if (order) {
+        qc.setQueryData<Order[]>(
+          ['unassigned', route.date],
+          [...prevUnassigned, order],
+        );
+      }
+      return { prevUnassigned, prevAssigned };
+    },
+    onError: (_err, _orderId, ctx) => {
+      if (ctx) {
+        qc.setQueryData(['unassigned', route.date], ctx.prevUnassigned);
+        qc.setQueryData([
+          'route-orders',
+          route.id,
+          route.date,
+        ], ctx.prevAssigned);
+      }
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['routes', route.date] });
       qc.invalidateQueries({ queryKey: ['unassigned', route.date] });
       qc.invalidateQueries({ queryKey: ['route-orders', route.id, route.date] });
@@ -84,6 +144,20 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
     };
   }, [onClose]);
 
+  const [selected, setSelected] = React.useState<string[]>([]);
+  const toggle = (id: string, checked: boolean) => {
+    setSelected((prev) => {
+      if (checked) return [...prev, id];
+      return prev.filter((x) => x !== id);
+    });
+  };
+
+  const handleAddSelected = () => {
+    if (selected.length === 0) return;
+    assignMutation.mutate(selected);
+    setSelected([]);
+  };
+
   return (
     <div
       ref={dialogRef}
@@ -129,16 +203,29 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
       {unassigned && unassigned.length > 0 && (
         <div style={{ marginTop: 24 }}>
           <h3>Add from Unassigned</h3>
+          <button
+            onClick={handleAddSelected}
+            disabled={selected.length === 0}
+            style={{ marginBottom: 8 }}
+          >
+            Add Selected
+          </button>
           <ul>
             {unassigned.map((o: Order) => (
               <li key={o.id} style={{ marginBottom: 4 }}>
-                {o.orderNo}{' '}
-                {getOrderBadges(o, route.date).map((b) => (
-                  <span key={b} style={{ marginLeft: 4, fontSize: '0.8em', color: '#c00' }}>
-                    {b}
-                  </span>
-                ))}{' '}
-                <button onClick={() => assignMutation.mutate(o.id)}>Add</button>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.id)}
+                    onChange={(e) => toggle(o.id, e.target.checked)}
+                  />
+                  <span>{o.orderNo}</span>
+                  {getOrderBadges(o, route.date).map((b) => (
+                    <span key={b} style={{ marginLeft: 4, fontSize: '0.8em', color: '#c00' }}>
+                      {b}
+                    </span>
+                  ))}
+                </label>
               </li>
             ))}
           </ul>
