@@ -8,7 +8,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("driver_devices", sa.Column("token", sa.String(length=255), nullable=False))
+
     op.add_column("driver_devices", sa.Column("app_version", sa.String(length=20), nullable=True))
     op.add_column("driver_devices", sa.Column("model", sa.String(length=100), nullable=True))
     op.add_column(
