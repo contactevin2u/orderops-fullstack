@@ -6,7 +6,10 @@ const API_BASE =
 module.exports = {
   reactStrictMode: true,
   images: {
-    remotePatterns: [{ protocol: 'https', hostname: '**' }],
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' },
+      { protocol: 'http', hostname: '**' },
+    ],
   },
   async rewrites() {
     // Proxy path you can use for local dev if you prefer: /_api/* -> API_BASE/*

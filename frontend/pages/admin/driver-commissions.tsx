@@ -135,7 +135,9 @@ function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPaySuccess:
     String(o?.trip?.commission?.computed_amount ?? o?.commission ?? '')
   );
 
-  const pod = o?.trip?.pod_photo_url || o?.pod_photo_url;
+  const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+  let pod = o?.trip?.pod_photo_url || o?.pod_photo_url;
+  if (pod && !pod.startsWith('http')) pod = `${apiBase}${pod}`;
   const canSuccess =
     o.status === 'DELIVERED' &&
     !!pod &&
