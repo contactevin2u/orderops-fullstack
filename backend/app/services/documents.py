@@ -39,7 +39,7 @@ BANK_NAME = "CIMB Bank"
 BANK_ACCOUNT_NO = "8011366127"
 
 # Fallback remote images (overridable via settings.*_URL or local *_PATH)
-DEFAULT_LOGO_URL = "https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png"
+DEFAULT_LOGO_URL = "https://static.wixstatic.com/media/20c5f7_20e21e26b3d34e9e8bfd489819ff628a~mv2.png"
 DEFAULT_QR_URL = "https://static.wixstatic.com/media/20c5f7_98a9fa77aba04052833d15b05fadbe30~mv2.png"
 
 
@@ -276,63 +276,73 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
             c.restoreState()
 
     def _draw_enhanced_header(c, d):
-        """Enhanced header with better logo positioning and styling."""
+        """Enhanced header with fixed logo positioning and styling."""
         c.saveState()
         try:
             # Header background with gradient effect
-            header_height = 25 * mm
+            header_height = 22 * mm
+            header_y = PAGE_HEIGHT - header_height
+            
             c.setFillColor(HexColor(BRAND_COLOR))
-            c.rect(0, PAGE_HEIGHT - header_height, PAGE_WIDTH, header_height, fill=1, stroke=0)
+            c.rect(0, header_y, PAGE_WIDTH, header_height, fill=1, stroke=0)
             
-            # Add a subtle accent line
+            # Add a subtle accent line at the bottom of header
             c.setFillColor(HexColor(ACCENT_COLOR))
-            c.rect(0, PAGE_HEIGHT - header_height, PAGE_WIDTH, 3, fill=1, stroke=0)
+            c.rect(0, header_y, PAGE_WIDTH, 2, fill=1, stroke=0)
             
-            # Logo positioning with proper scaling
+            # Logo positioning with proper scaling and centering
             if logo_reader:
                 try:
-                    logo_x = d.leftMargin + 5
-                    logo_y = PAGE_HEIGHT - header_height + 5
-                    logo_max_height = header_height - 10
-                    logo_max_width = 80  # Maximum width in points
+                    # Logo positioning - left side with proper margins
+                    logo_margin = 8  # Margin from left edge
+                    logo_x = logo_margin
+                    logo_max_height = header_height - 8  # Leave some padding
+                    logo_max_width = 60  # Reasonable maximum width
                     
                     # Get original dimensions
                     orig_width, orig_height = logo_reader.getSize()
                     
                     # Calculate scaling to fit within constraints
-                    height_scale = logo_max_height / orig_height if orig_height > 0 else 1
-                    width_scale = logo_max_width / orig_width if orig_width > 0 else 1
-                    scale = min(height_scale, width_scale, 1.0)  # Don't upscale
-                    
-                    final_width = orig_width * scale
-                    final_height = orig_height * scale
-                    
-                    c.drawImage(
-                        logo_reader,
-                        logo_x,
-                        logo_y,
-                        width=final_width,
-                        height=final_height,
-                        preserveAspectRatio=True,
-                        mask="auto"
-                    )
-                    
-                    logger.info(f"Logo drawn: {final_width}x{final_height} at ({logo_x}, {logo_y})")
+                    if orig_height > 0 and orig_width > 0:
+                        height_scale = logo_max_height / orig_height
+                        width_scale = logo_max_width / orig_width
+                        scale = min(height_scale, width_scale, 1.0)  # Don't upscale
+                        
+                        final_width = orig_width * scale
+                        final_height = orig_height * scale
+                        
+                        # Center vertically in header
+                        logo_y = header_y + (header_height - final_height) / 2
+                        
+                        c.drawImage(
+                            logo_reader,
+                            logo_x,
+                            logo_y,
+                            width=final_width,
+                            height=final_height,
+                            preserveAspectRatio=True,
+                            mask="auto"
+                        )
+                        
+                        logger.info(f"Logo drawn: {final_width:.1f}x{final_height:.1f} at ({logo_x:.1f}, {logo_y:.1f})")
                     
                 except Exception as e:
                     logger.error(f"Error drawing logo: {str(e)}")
             
-            # Company name in header (right side)
+            # Company name in header (right side) - better positioning
             c.setFillColor(colors.white)
-            c.setFont(BASE_BOLD, 14)
-            text_y = PAGE_HEIGHT - header_height + 8
-            c.drawRightString(PAGE_WIDTH - d.rightMargin - 5, text_y, company_name)
+            c.setFont(BASE_BOLD, 12)
+            
+            # Position company name in center-right of header
+            company_name_y = header_y + header_height/2 + 3  # Slightly above center
+            c.drawRightString(PAGE_WIDTH - 15, company_name_y, company_name)
             
             # Contact info (smaller, below company name)
             company_phone = getattr(settings, "COMPANY_PHONE", "")
             if company_phone:
                 c.setFont(BASE_FONT, 9)
-                c.drawRightString(PAGE_WIDTH - d.rightMargin - 5, text_y - 12, company_phone)
+                c.setFillColor(HexColor("#E2E8F0"))  # Lighter color for contact
+                c.drawRightString(PAGE_WIDTH - 15, company_name_y - 10, company_phone)
             
         except Exception as e:
             logger.error(f"Error drawing header: {str(e)}")
@@ -377,8 +387,8 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     inv_date = getattr(order, "created_at", None)
     due_date = getattr(order, "due_date", None)
 
-    # Add some space after header
-    elems.append(Spacer(1, 10))
+    # Add some space after header (adjusted for new header height)
+    elems.append(Spacer(1, 5))
     
     # Title with enhanced styling
     title_para = Paragraph(f"{title} <font color='{ACCENT_COLOR}'>{inv_code}</font>", styles["H1"])
@@ -721,10 +731,10 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     elems.append(Paragraph(terms_text, styles["Small"]))
     elems.append(Spacer(1, 10))
     
-    # Add signature section
-    elems.append(Paragraph("_" * 50, styles["Center"]))
-    elems.append(Spacer(1, 3))
-    elems.append(Paragraph("Authorized Signature", styles["Center"]))
+    # Add computer-generated document notice instead of signature
+    elems.append(Spacer(1, 15))
+    elems.append(Paragraph("This is a computer-generated document. No signature is required.", styles["Center"]))
+    elems.append(Spacer(1, 5))
 
     # --- Second page with detailed terms (bilingual) ----------------------
     elems.append(PageBreak())
@@ -1044,16 +1054,10 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
     
     elems.append(Spacer(1, 20))
     
-    # Signature section
-    elems.append(Paragraph("Agreement Acceptance", styles["H2"]))
+    # Signature section - replaced with computer-generated notice
+    elems.append(Spacer(1, 20))
+    elems.append(Paragraph("This is a computer-generated document. No signature is required.", styles["Center"]))
     elems.append(Spacer(1, 10))
-    elems.append(Paragraph("Customer Signature: _" * 30, styles["Normal"]))
-    elems.append(Spacer(1, 8))
-    elems.append(Paragraph("Date: _" * 20, styles["Normal"]))
-    elems.append(Spacer(1, 15))
-    elems.append(Paragraph("Company Representative: _" * 30, styles["Normal"]))
-    elems.append(Spacer(1, 8))
-    elems.append(Paragraph("Date: _" * 20, styles["Normal"]))
 
     # Add detailed terms on subsequent pages (same as invoice)
     elems.append(PageBreak())
