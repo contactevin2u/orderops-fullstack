@@ -1,7 +1,7 @@
 from alembic import op
 import sqlalchemy as sa
 
-revision = '0011_add_upfront_billed_amount_to_plans'
+revision = '0011_add_upfront_billed_to_plans'
 down_revision = '0010_update_driver_device_fields'
 branch_labels = None
 depends_on = None
