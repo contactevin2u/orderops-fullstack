@@ -2,7 +2,13 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
-import { fetchRoutes, fetchUnassigned, fetchOnHold, Route } from '@/utils/apiAdapter';
+import {
+  fetchRoutes,
+  fetchUnassigned,
+  fetchOnHold,
+  fetchDrivers,
+  Route,
+} from '@/utils/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
 import AdminLayout from '@/components/admin/AdminLayout';
 
@@ -13,10 +19,12 @@ export function RouteCard({
   route,
   onSelect,
   onEdit,
+  driverName,
 }: {
   route: Route;
   onSelect: (r: Route) => void;
   onEdit: (r: Route) => void;
+  driverName?: string;
 }) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -33,7 +41,7 @@ export function RouteCard({
       style={{ border: '1px solid #ccc', padding: 8, cursor: 'pointer' }}
     >
       <h2 style={{ marginTop: 0 }}>{route.name}</h2>
-      <div>Driver: {route.driverId || '-'}</div>
+      <div>Driver: {driverName || '-'}</div>
       <div>Stops: {route.stops.length}</div>
       <button
         onClick={(e) => {
@@ -71,9 +79,22 @@ export default function AdminRoutesPage() {
     queryKey: ['onHold', date],
     queryFn: () => fetchOnHold(date),
   });
+  const driversQuery = useQuery({
+    queryKey: ['drivers'],
+    queryFn: fetchDrivers,
+  });
   const routes = routesQuery.data || [];
   const unassigned = unassignedQuery.data || [];
   const onHold = onHoldQuery.data || [];
+  const drivers = driversQuery.data || [];
+
+  const driverNameById = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    drivers.forEach((d) => {
+      map[d.id] = d.name || '';
+    });
+    return map;
+  }, [drivers]);
 
   const counts = React.useMemo(() => {
     let noDate = 0;
@@ -119,6 +140,7 @@ export default function AdminRoutesPage() {
                 route={r}
                 onSelect={setSelectedRoute}
                 onEdit={setEditingRoute}
+                driverName={driverNameById[r.driverId || '']}
               />
             ))}
           </div>
