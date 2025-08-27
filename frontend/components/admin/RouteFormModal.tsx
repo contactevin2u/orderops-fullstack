@@ -74,7 +74,7 @@ export default function RouteFormModal({ date, route, onClose }: Props) {
           </>
         )}
         <div style={{ marginTop: 16 }}>
-          <button onClick={() => mutation.mutate()} disabled={!driverId || mutation.isLoading}>
+          <button onClick={() => mutation.mutate()} disabled={!driverId || mutation.isPending}>
             {route ? 'Save' : 'Create'}
           </button>{' '}
           <button onClick={onClose}>Cancel</button>
