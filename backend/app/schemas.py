@@ -158,8 +158,10 @@ class OrderOut(BaseModel):
 
 
 class DeviceRegisterIn(BaseModel):
-    fcm_token: str
+    token: str
     platform: str
+    app_version: str | None = None
+    model: str | None = None
 
 
 class DriverOut(BaseModel):

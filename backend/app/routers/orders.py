@@ -38,7 +38,7 @@ from ..services.status_updates import (
 from ..services.documents import invoice_pdf
 from ..utils.responses import envelope
 from ..utils.normalize import to_decimal
-from .drivers import notify_assignment
+from ..services.fcm import notify_order_assigned
 
 APP_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 
@@ -428,8 +428,7 @@ def assign_order(
     db.commit()
     db.refresh(trip)
     log_action(db, current_user, "order.assign_driver", f"order_id={order.id},driver_id={driver.id}")
-    tokens = [d.fcm_token for d in driver.devices]
-    notify_assignment(tokens, order.id)
+    notify_order_assigned(db, driver.id, order)
     return envelope({"order_id": order.id, "driver_id": driver.id, "trip_id": trip.id})
 
 

@@ -22,26 +22,6 @@ from ..utils.storage import save_pod_image
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
-
-def notify_assignment(fcm_tokens: list[str], order_id: int) -> None:
-    """Send an FCM notification to driver devices about a new assignment."""
-    if not fcm_tokens:
-        return
-    try:
-        from firebase_admin import messaging
-
-        payload = messaging.MulticastMessage(
-            tokens=fcm_tokens,
-            notification=messaging.Notification(
-                title="New order assigned", body="Open to view."
-            ),
-            data={"type": "order_assigned", "order_id": str(order_id)},
-        )
-        messaging.send_multicast(payload, app=_get_app())
-    except Exception:
-        # Silently ignore notification errors
-        pass
-
 def _order_to_driver_out(order: Order, status: str) -> dict:
     # delivery_date may be datetime or date
     dd = None
@@ -125,7 +105,7 @@ def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
     return driver
 
 
-@router.post("/devices/register")
+@router.post("/devices")
 def register_device(
     payload: DeviceRegisterIn,
     driver=Depends(driver_auth),
@@ -133,22 +113,23 @@ def register_device(
 ):
     device = (
         db.query(DriverDevice)
-        .filter(
-            DriverDevice.driver_id == driver.id,
-            DriverDevice.fcm_token == payload.fcm_token,
-        )
+        .filter(DriverDevice.token == payload.token)
         .one_or_none()
     )
     if device:
+        device.driver_id = driver.id
         device.platform = payload.platform
+        device.app_version = payload.app_version
+        device.model = payload.model
     else:
         device = DriverDevice(
             driver_id=driver.id,
-            fcm_token=payload.fcm_token,
+            token=payload.token,
             platform=payload.platform,
+            app_version=payload.app_version,
+            model=payload.model,
         )
         db.add(device)
-    device.last_seen_at = datetime.now(timezone.utc)
     db.commit()
     return {"status": "ok"}
 
