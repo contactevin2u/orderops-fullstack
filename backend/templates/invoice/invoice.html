@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>{{ doc_title }}</title>
+</head>
+<body>
+<div class="invoice-box{% if rtl %} rtl{% endif %}">
+    <table cellpadding="0" cellspacing="0">
+        <tr class="top">
+            <td colspan="4">
+                <table>
+                    <tr>
+                        <td class="title">
+                            {% if company.logo_url %}
+                            <img src="{{ company.logo_url }}" style="width:100%; max-width:300px" />
+                            {% else %}
+                            {{ company.name }}
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ doc_title }} #: {{ invoice.number }}<br />
+                            {{ invoice.date }}<br />
+                            {% if invoice.due_date %}Due: {{ invoice.due_date }}{% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        <tr class="information">
+            <td colspan="4">
+                <table>
+                    <tr>
+                        <td>
+                            {{ company.name }}{% if company.reg_no %} ({{ company.reg_no }}){% endif %}<br />
+                            {% for line in company.address_lines %}{{ line }}<br />{% endfor %}
+                            {% if company.phone %}{{ company.phone }}<br />{% endif %}
+                            {% if company.email %}{{ company.email }}{% endif %}
+                        </td>
+                        <td>
+                            {{ bill_to.name }}<br />
+                            {% for line in bill_to.address_lines %}{{ line }}<br />{% endfor %}
+                            {% if bill_to.phone %}{{ bill_to.phone }}<br />{% endif %}
+                            {% if bill_to.email %}{{ bill_to.email }}{% endif %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+
+        {% if ship_to %}
+        <tr class="information">
+            <td colspan="4">
+                <table>
+                    <tr>
+                        <td>Ship To:</td>
+                        <td>
+                            {{ ship_to.name }}<br />
+                            {% for line in ship_to.address_lines %}{{ line }}<br />{% endfor %}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+        {% endif %}
+
+        <tr class="heading">
+            <td>Description</td>
+            <td class="qty">Qty</td>
+            <td class="price">Unit Price</td>
+            <td class="line">Amount</td>
+        </tr>
+
+        {% for it in items %}
+        <tr class="item{% if loop.last %} last{% endif %}">
+            <td>{{ it.description }}</td>
+            <td class="qty">{{ "%.2f"|format(it.qty) }}</td>
+            <td class="price">{{ "%.2f"|format(it.unit_price) }}</td>
+            <td class="line">{{ "%.2f"|format(it.line_total) }}</td>
+        </tr>
+        {% endfor %}
+
+        <tr class="total">
+            <td colspan="3">Subtotal</td>
+            <td>{{ "%.2f"|format(summary.subtotal) }}</td>
+        </tr>
+        {% if summary.discount %}
+        <tr class="total">
+            <td colspan="3">Discount</td>
+            <td>-{{ "%.2f"|format(summary.discount) }}</td>
+        </tr>
+        {% endif %}
+        {% if summary.delivery_fee %}
+        <tr class="total">
+            <td colspan="3">Delivery Fee</td>
+            <td>{{ "%.2f"|format(summary.delivery_fee) }}</td>
+        </tr>
+        {% endif %}
+        {% if summary.penalty_amount %}
+        <tr class="total">
+            <td colspan="3">Penalty</td>
+            <td>{{ "%.2f"|format(summary.penalty_amount) }}</td>
+        </tr>
+        {% endif %}
+        {% if summary.buyback_amount %}
+        <tr class="total">
+            <td colspan="3">Buyback</td>
+            <td>-{{ "%.2f"|format(summary.buyback_amount) }}</td>
+        </tr>
+        {% endif %}
+        <tr class="total">
+            <td colspan="3">{{ company.tax_label }}{% if company.tax_percent %} ({{ company.tax_percent }}%) {% endif %}</td>
+            <td>{{ "%.2f"|format(summary.tax_amount) }}</td>
+        </tr>
+        <tr class="total">
+            <td colspan="3">Total</td>
+            <td>{{ "%.2f"|format(summary.total) }}</td>
+        </tr>
+    </table>
+
+    <div class="bank">
+        <table>
+            <tr>
+                <td>
+                    {% if company.bank.name %}{{ company.bank.name }}<br />{% endif %}
+                    {% if company.bank.beneficiary %}{{ company.bank.beneficiary }}<br />{% endif %}
+                    {% if company.bank.acct_no %}Account: {{ company.bank.acct_no }}<br />{% endif %}
+                    {% if company.bank.iban %}IBAN: {{ company.bank.iban }}<br />{% endif %}
+                    {% if company.bank.swift %}SWIFT: {{ company.bank.swift }}<br />{% endif %}
+                </td>
+                {% if qr_url %}
+                <td class="qr"><img src="{{ qr_url }}" alt="QR" /></td>
+                {% endif %}
+            </tr>
+        </table>
+    </div>
+
+    {% if notes %}
+    <p class="notes">{{ notes }}</p>
+    {% endif %}
+</div>
+</body>
+</html>

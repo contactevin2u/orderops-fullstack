@@ -1,12 +1,18 @@
+import os
 import sys
 from pathlib import Path
 from datetime import date
 from types import SimpleNamespace
+from io import BytesIO
 
 # Ensure backend package is importable
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from app.services.documents import invoice_pdf, receipt_pdf, installment_agreement_pdf  # noqa: E402
+from app.services.documents import (
+    invoice_pdf,
+    receipt_pdf,
+    installment_agreement_pdf,
+)  # noqa: E402
 
 
 def _sample_order():
@@ -41,18 +47,78 @@ def _sample_plan():
     return SimpleNamespace(months=6, monthly_amount=1.0)
 
 
-def test_invoice_pdf_generates_bytes():
+def test_invoice_pdf_bytes():
     order = _sample_order()
+    os.environ["USE_HTML_TEMPLATE_INVOICE"] = "1"
     pdf = invoice_pdf(order)
     assert isinstance(pdf, (bytes, bytearray))
-    assert len(pdf) > 0
+    assert pdf.startswith(b"%PDF")
 
 
-def test_invoice_pdf_credit_note_title():
+def test_credit_note_title():
     order = _sample_order()
     order.total = -5.0
+    os.environ["USE_HTML_TEMPLATE_INVOICE"] = "1"
     pdf = invoice_pdf(order)
-    assert b"CREDIT NOTE" in pdf
+    try:
+        from pdfminer.high_level import extract_text
+
+        text = extract_text(BytesIO(pdf))
+        assert "CREDIT NOTE" in text
+    except Exception:
+        import pytest
+
+        if sys.platform.startswith("win"):
+            pytest.xfail("pdfminer unavailable on Windows")
+        else:
+            raise
+
+
+def test_invoice_template_smoke():
+    from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+    env = Environment(
+        loader=FileSystemLoader("backend/templates"),
+        autoescape=select_autoescape(["html"]),
+    )
+    tmpl = env.get_template("invoice/invoice.html")
+    html = tmpl.render(
+        doc_title="INVOICE",
+        company={
+            "name": "ACME",
+            "logo_url": "",
+            "reg_no": "",
+            "tax_label": "Tax",
+            "tax_percent": 0,
+            "address_lines": [],
+            "phone": "",
+            "email": "",
+            "bank": {
+                "name": "",
+                "acct_no": "",
+                "beneficiary": "",
+                "iban": "",
+                "swift": "",
+            },
+        },
+        invoice={"number": "1", "date": "", "due_date": ""},
+        bill_to={"name": "John", "address_lines": [], "phone": "", "email": ""},
+        ship_to=None,
+        items=[],
+        summary={
+            "subtotal": 0,
+            "discount": 0,
+            "delivery_fee": 0,
+            "penalty_amount": 0,
+            "buyback_amount": 0,
+            "tax_amount": 0,
+            "total": 0,
+        },
+        notes="",
+        qr_url=None,
+        rtl=False,
+    )
+    assert "INVOICE" in html
 
 
 def test_receipt_pdf_generates_bytes():
