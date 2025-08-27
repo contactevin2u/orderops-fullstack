@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { fetchRoutes, fetchUnassigned, fetchOnHold, Route } from '@/utils/apiAdapter';
+import { getOrderBadges } from '@/utils/orderBadges';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 const RouteDetailDrawer = dynamic(() => import('@/components/admin/RouteDetailDrawer'));
@@ -57,6 +58,17 @@ export default function AdminRoutesPage() {
   const unassigned = unassignedQuery.data || [];
   const onHold = onHoldQuery.data || [];
 
+  const counts = React.useMemo(() => {
+    let noDate = 0;
+    let overdue = 0;
+    unassigned.forEach((o) => {
+      const badges = getOrderBadges(o, date);
+      if (badges.includes('No date')) noDate += 1;
+      if (badges.some((b) => b.startsWith('Overdue'))) overdue += 1;
+    });
+    return { noDate, overdue };
+  }, [unassigned, date]);
+
   const [selectedRoute, setSelectedRoute] = React.useState<Route | null>(null);
 
   return (
@@ -71,7 +83,9 @@ export default function AdminRoutesPage() {
             onChange={(e) => router.push({ pathname: '/admin/routes', query: { date: e.target.value } })}
           />
         </label>
-        <span aria-live="polite">Routes: {routes.length} Unassigned: {unassigned.length} On Hold: {onHold.length}</span>
+        <span aria-live="polite">
+          Routes: {routes.length} Unassigned: {unassigned.length} (No date: {counts.noDate} Overdue: {counts.overdue}) On Hold: {onHold.length}
+        </span>
       </header>
       <div style={{ marginTop: 16 }}>
         {routesQuery.isLoading && <p role="status">Loading...</p>}
