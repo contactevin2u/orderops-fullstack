@@ -39,6 +39,12 @@ The backend also exposes `/auth/register` which allows creating an initial
 `ADMIN` account when there are no users. Disable or guard this endpoint in
 production.
 
+## Invoice Template
+
+Invoices are rendered using the [Sparksuite Simple HTML Invoice Template](https://github.com/sparksuite/simple-html-invoice-template) via WeasyPrint. The template and stylesheet live in `backend/templates/invoice/` and `backend/static/invoice/`.
+
+Set `USE_HTML_TEMPLATE_INVOICE=1` to enable this HTML-based renderer. If the environment variable is unset or WeasyPrint is unavailable, the system falls back to the legacy ReportLab implementation. Customize the layout by editing the vendored template files.
+
 ## Environment variables
 
 - `FIREBASE_SERVICE_ACCOUNT_JSON`: JSON string for Firebase service account used to verify driver ID tokens.
