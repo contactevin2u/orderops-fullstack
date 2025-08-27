@@ -3,18 +3,12 @@ package com.yourco.driverAA.push
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.google.firebase.messaging.FirebaseMessaging
 import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
-import java.net.HttpURLConnection
-import java.net.URL
-import org.json.JSONObject
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
@@ -23,7 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 class MyFcmService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
-        registerToken(applicationContext, token)
+        // Token registration handled in React Native layer.
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
@@ -71,33 +65,7 @@ class MyFcmService : FirebaseMessagingService() {
     }
 
     companion object {
-        private const val CHANNEL_ID = "orders_high"
-
-        fun registerToken(context: Context, token: String) {
-            try {
-                val url = URL("https://your-backend.example.com/api/driver/devices")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/json")
-                val payload = JSONObject().apply {
-                    put("token", token)
-                    put("platform", "android")
-                    put("app_version", BuildConfig.VERSION_NAME)
-                    put("model", android.os.Build.MODEL)
-                }
-                conn.outputStream.use { it.write(payload.toString().toByteArray()) }
-                conn.responseCode
-            } catch (e: Exception) {
-                Log.w("MyFcmService", "registerToken failed", e)
-            }
-        }
-
-        fun refreshToken(context: Context) {
-            FirebaseMessaging.getInstance().token.addOnSuccessListener {
-                registerToken(context, it)
-            }
-        }
+        private const val CHANNEL_ID = "orders"
 
         fun requestPermission(activity: AppCompatActivity, requestCode: Int = 1001) {
             if (Build.VERSION.SDK_INT >= 33 &&

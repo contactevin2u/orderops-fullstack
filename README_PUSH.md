@@ -1,12 +1,39 @@
-# Push Notification Debugging
+# Push Notification Smoke Tests
 
-Send a test push notification using the backend debug endpoint. The backend will use the
-Android channel `orders` by default (overridable via `PUSH_ANDROID_CHANNEL_ID`).
+## Env
+
+Ensure on Render:
+
+FIREBASE_SERVICE_ACCOUNT_JSON = full JSON
+
+DATABASE_URL set
+
+PUSH_ANDROID_CHANNEL_ID=orders (or whatever matches app)
+
+Optional local .env example:
+
+PUSH_ANDROID_CHANNEL_ID=orders
+
+## Audit routes check
 
 ```bash
-curl -X POST http://localhost:8000/debug/push \
-  -H 'Content-Type: application/json' \
-  -d '{"token":"<FCM_TOKEN>","title":"Test","body":"Hello","data":{}}'
-```
+curl -s https://<API_BASE>/_audit/routes | jq
 ```
 
+## FCM health
+
+```bash
+curl -s https://<API_BASE>/_audit/fcm | jq
+# expect: {"ok":true,"project_id":"...","access_token_len":...}
+```
+
+## Get device token from the app
+
+Open the driver app (RN), ensure it creates channel "orders" and logs/shows FCM token.
+
+## DB & token presence
+
+```bash
+curl -s "https://<API_BASE>/_audit/db?driver_id=<DRIVER_ID>" | jq
+# expect: tokens array with recent entries
+```
