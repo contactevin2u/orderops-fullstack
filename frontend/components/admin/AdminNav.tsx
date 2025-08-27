@@ -19,8 +19,8 @@ export default function AdminNav() {
         borderBottom: '1px solid #eee',
         background: '#fff',
         position: 'sticky',
-        top: 0,
-        zIndex: 10,
+        top: 'var(--app-header-h, 64px)',
+        zIndex: 900,
       }}
     >
       {items.map((item) => (
