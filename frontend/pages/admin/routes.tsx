@@ -7,8 +7,17 @@ import { getOrderBadges } from '@/utils/orderBadges';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 const RouteDetailDrawer = dynamic(() => import('@/components/admin/RouteDetailDrawer'));
+const RouteFormModal = dynamic(() => import('@/components/admin/RouteFormModal'));
 
-export function RouteCard({ route, onSelect }: { route: Route; onSelect: (r: Route) => void }) {
+export function RouteCard({
+  route,
+  onSelect,
+  onEdit,
+}: {
+  route: Route;
+  onSelect: (r: Route) => void;
+  onEdit: (r: Route) => void;
+}) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
@@ -26,6 +35,14 @@ export function RouteCard({ route, onSelect }: { route: Route; onSelect: (r: Rou
       <h2 style={{ marginTop: 0 }}>{route.name}</h2>
       <div>Driver: {route.driverId || '-'}</div>
       <div>Stops: {route.stops.length}</div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onEdit(route);
+        }}
+      >
+        Edit
+      </button>
     </article>
   );
 }
@@ -70,6 +87,8 @@ export default function AdminRoutesPage() {
   }, [unassigned, date]);
 
   const [selectedRoute, setSelectedRoute] = React.useState<Route | null>(null);
+  const [creating, setCreating] = React.useState(false);
+  const [editingRoute, setEditingRoute] = React.useState<Route | null>(null);
 
   return (
     <div style={{ padding: 16 }}>
@@ -83,6 +102,7 @@ export default function AdminRoutesPage() {
             onChange={(e) => router.push({ pathname: '/admin/routes', query: { date: e.target.value } })}
           />
         </label>
+        <button onClick={() => setCreating(true)}>Create Route</button>
         <span aria-live="polite">
           Routes: {routes.length} Unassigned: {unassigned.length} (No date: {counts.noDate} Overdue: {counts.overdue}) On Hold: {onHold.length}
         </span>
@@ -94,13 +114,26 @@ export default function AdminRoutesPage() {
         {!routesQuery.isLoading && routes.length > 0 && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
             {routes.map((r) => (
-              <RouteCard key={r.id} route={r} onSelect={setSelectedRoute} />
+              <RouteCard
+                key={r.id}
+                route={r}
+                onSelect={setSelectedRoute}
+                onEdit={setEditingRoute}
+              />
             ))}
           </div>
         )}
       </div>
       {selectedRoute && (
         <RouteDetailDrawer route={selectedRoute} onClose={() => setSelectedRoute(null)} />
+      )}
+      {creating && <RouteFormModal date={date} onClose={() => setCreating(false)} />}
+      {editingRoute && (
+        <RouteFormModal
+          date={date}
+          route={editingRoute}
+          onClose={() => setEditingRoute(null)}
+        />
       )}
     </div>
   );

@@ -1,4 +1,11 @@
-import { listRoutes, listOrders, addOrdersToRoute, createRoute as apiCreateRoute } from './api';
+import {
+  listRoutes,
+  listOrders,
+  addOrdersToRoute,
+  createRoute as apiCreateRoute,
+  updateRoute as apiUpdateRoute,
+  listDrivers,
+} from './api';
 
 export type Order = {
   id: string;
@@ -31,6 +38,11 @@ export type Route = {
   etaRange?: { start?: string; end?: string };
 };
 
+export type Driver = {
+  id: string;
+  name?: string;
+};
+
 function mapOrder(o: any): Order {
   return {
     id: String(o.id ?? ''),
@@ -56,6 +68,10 @@ function mapOrder(o: any): Order {
     notes: o.notes || '',
     trip: o.trip,
   };
+}
+
+function mapDriver(d: any): Driver {
+  return { id: String(d.id ?? ''), name: d.name };
 }
 
 function mapRoute(r: any): Route {
@@ -88,6 +104,11 @@ export async function fetchRoutes(date: string): Promise<Route[]> {
   return Array.isArray(data) ? data.map(mapRoute) : [];
 }
 
+export async function fetchDrivers(): Promise<Driver[]> {
+  const data = await listDrivers();
+  return Array.isArray(data) ? data.map(mapDriver) : [];
+}
+
 export async function fetchUnassigned(date: string): Promise<Order[]> {
   const { items } = await listOrders(undefined, undefined, undefined, 500, {
     date,
@@ -115,6 +136,14 @@ export async function createRoute(payload: {
   notes?: string;
 }): Promise<Route> {
   const r = await apiCreateRoute(payload);
+  return mapRoute(r);
+}
+
+export async function updateRoute(
+  routeId: string,
+  payload: { driver_id?: number; route_date?: string; name?: string; notes?: string },
+): Promise<Route> {
+  const r = await apiUpdateRoute(Number(routeId), payload);
   return mapRoute(r);
 }
 

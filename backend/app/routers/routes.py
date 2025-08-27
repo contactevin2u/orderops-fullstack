@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_session
 from ..models import DriverRoute, Trip, Order, Driver, Role
-from ..schemas import RouteCreateIn, RouteOut
+from ..schemas import RouteCreateIn, RouteOut, RouteUpdateIn
 from ..auth.deps import require_roles
 
 router = APIRouter(
@@ -29,6 +29,27 @@ def create_route(payload: RouteCreateIn, db: Session = Depends(get_session)):
     db.commit()
     db.refresh(r)
     return r
+
+
+@router.patch("/{route_id}", response_model=RouteOut)
+def update_route(route_id: int, payload: RouteUpdateIn, db: Session = Depends(get_session)):
+    route = db.get(DriverRoute, route_id)
+    if not route:
+        raise HTTPException(404, "Route not found")
+    if payload.driver_id is not None:
+        driver = db.get(Driver, payload.driver_id)
+        if not driver:
+            raise HTTPException(404, "Driver not found")
+        route.driver_id = driver.id
+    if payload.route_date is not None:
+        route.route_date = dt_date.fromisoformat(payload.route_date)
+    if payload.name is not None:
+        route.name = payload.name
+    if payload.notes is not None:
+        route.notes = payload.notes
+    db.commit()
+    db.refresh(route)
+    return route
 
 
 @router.get("", response_model=list[RouteOut])

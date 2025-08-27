@@ -208,6 +208,13 @@ class RouteCreateIn(BaseModel):
     notes: str | None = None
 
 
+class RouteUpdateIn(BaseModel):
+    driver_id: int | None = None
+    route_date: str | None = None
+    name: str | None = None
+    notes: str | None = None
+
+
 class RouteOut(BaseModel):
     id: int
     driver_id: int
