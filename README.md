@@ -4,24 +4,35 @@ This repository contains a FastAPI backend and a Next.js frontend. The CI workfl
 
 ## Authentication
 
-All application pages now require authentication and unauthenticated users are redirected to `/login`.
+All application pages require a logged-in user and unauthenticated visitors are redirected to `/login`.
 
-On first run when no users exist, visit `/register` to create an administrator account.
-Signed-in administrators can create additional users as needed.
-
-
-
-On first run when no users exist, visit `/register` to create an administrator account.
-Signed-in administrators can create additional users as needed.
-
-Upon running the migration adding user support, a default administrator account is created:
+During the first run you can create an administrator account at `/register`. After running the migration that adds user support, a default admin user exists:
 
 - username: `admin`
 - password: `admin123`
 
-Use these credentials to sign in initially and create additional users as needed.
+Administrators can sign in with these credentials and create additional users.
 
+## Local development
 
+### Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn app.main:app --reload
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
 
 ## Running checks locally
 
