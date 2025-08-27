@@ -2,12 +2,13 @@
 PDF generation utilities (ReportLab-only).
 
 Renders:
-- Invoice / Credit Note (styled ReportLab template)
+- Invoice / Credit Note (styled ReportLab template with watermark)
 - Receipt
 - Installment Agreement
 
 No HTML/Jinja/WeasyPrint paths.
-Images: prefer local paths; fallback to remote URLs with timeout.
+Images: prefer local files; fallback to remote URLs with timeout.
+SKU & Description cells wrap (CJK wrapping) to avoid overlap.
 """
 
 from io import BytesIO
@@ -37,6 +38,7 @@ BENEFICIARY_NAME = "AA Alive Sdn. Bhd."
 BANK_NAME = "CIMB Bank"
 BANK_ACCOUNT_NO = "8011366127"
 
+# Fallback remote images (overridable via settings.*_URL or local *_PATH)
 DEFAULT_LOGO_URL = "https://static.wixstatic.com/media/20c5f7_f890d2de838e43ccb1b30e72b247f0b2~mv2.png"
 DEFAULT_QR_URL = "https://static.wixstatic.com/media/20c5f7_98a9fa77aba04052833d15b05fadbe30~mv2.png"
 
@@ -61,19 +63,6 @@ def _file_exists(path: str | None) -> bool:
         return False
 
 
-def _fetch_image_reader(url: str, timeout: float = 5.0):
-    """Try to fetch a remote image and return an ImageReader; None on failure."""
-    try:
-        from reportlab.lib.utils import ImageReader
-        import urllib.request
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = resp.read()
-        return ImageReader(BytesIO(data))
-    except Exception:
-        return None
-
-
 def _fetch_image_bytes(url: str, timeout: float = 5.0):
     """Fetch a remote image and return raw bytes; None on failure."""
     try:
@@ -85,12 +74,35 @@ def _fetch_image_bytes(url: str, timeout: float = 5.0):
         return None
 
 
+def _image_reader(local_path: str | None, url: str | None, timeout: float = 5.0):
+    """Return a ReportLab ImageReader from a local path or remote URL bytes."""
+    try:
+        from reportlab.lib.utils import ImageReader
+    except Exception:
+        return None
+    # Prefer local
+    if _file_exists(local_path):
+        try:
+            return ImageReader(local_path)
+        except Exception:
+            pass
+    # Fallback to remote
+    if url:
+        data = _fetch_image_bytes(url, timeout=timeout)
+        if data:
+            try:
+                return ImageReader(BytesIO(data))
+            except Exception:
+                pass
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Polished ReportLab invoice template
 # ---------------------------------------------------------------------------
 
 def _reportlab_invoice_pdf(order: Order) -> bytes:
-    """Render an invoice using a polished ReportLab template (styling + images)."""
+    """Render an invoice using a polished ReportLab template (styling + images + watermark)."""
     try:  # pragma: no cover - exercised indirectly in tests
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
@@ -110,7 +122,6 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.lib.colors import HexColor
-        from reportlab.lib.utils import ImageReader
     except ImportError as exc:  # pragma: no cover - tested by import
         raise RuntimeError(
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
@@ -150,30 +161,24 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     LOGO_URL = getattr(settings, "COMPANY_LOGO_URL", None) or DEFAULT_LOGO_URL
     QR_URL = getattr(settings, "PAYMENT_QR_URL", None) or getattr(settings, "COMPANY_QR_URL", None) or DEFAULT_QR_URL
 
-    # Prepare header logo drawable for canvas.drawImage:
-    # - If local path exists, draw with that string path.
-    # - Else try remote URL -> ImageReader.
-    logo_drawable = None  # str path or ImageReader
-    if _file_exists(LOGO_PATH):
-        logo_drawable = LOGO_PATH
-    else:
-        ir = _fetch_image_reader(LOGO_URL) if LOGO_URL else None
-        if ir:
-            logo_drawable = ir  # drawImage accepts ImageReader
+    # ImageReaders
+    logo_reader = _image_reader(LOGO_PATH, LOGO_URL)
+    # QR image is used as a Flowable later (we'll feed bytes to Image)
+    qr_remote_bytes = None  # lazily fetched if needed
 
     # --- styles --------------------------------------------------------------
     styles = getSampleStyleSheet()
     styles["Normal"].fontName = BASE_FONT
     styles["Title"].fontName = BASE_BOLD
+
     styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11))
     styles.add(ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT))
     styles.add(ParagraphStyle(name="Muted", parent=styles["Small"], textColor="#555555"))
     styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=14, leading=16))
-    styles.add(ParagraphStyle(name="MetaKey", parent=styles["Small"], textColor="#6B7280"))
-    styles.add(ParagraphStyle(name="MetaVal", parent=styles["Small"], alignment=TA_RIGHT))
-    styles.add(ParagraphStyle(name="Wrap", parent=styles["Normal"], wordWrap="CJK"))  # wrap long text
+    styles.add(ParagraphStyle(name="Wrap", parent=styles["Normal"], wordWrap="CJK"))
+    styles.add(ParagraphStyle(name="WrapBold", parent=styles["Wrap"], fontName=BASE_BOLD))
 
-    # --- doc & canvas deco ---------------------------------------------------
+    # --- doc & page decoration ----------------------------------------------
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -188,7 +193,31 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     BAR_H = 18  # header band height (pt)
     company_name = getattr(settings, "COMPANY_NAME", "")
 
+    def _draw_watermark(c, d):
+        """Diagonal watermark drawn behind content."""
+        text = getattr(order, "status", None)
+        text = (str(text).upper() if text else company_name or "INVOICE")
+        c.saveState()
+        # Very light gray + alpha if available
+        try:
+            c.setFillColorRGB(0.85, 0.85, 0.85)
+            set_alpha = getattr(c, "setFillAlpha", None)
+            if set_alpha:
+                set_alpha(0.08)
+        except Exception:
+            pass
+        c.translate(d.leftMargin + d.width / 2.0, d.bottomMargin + d.height / 2.0)
+        c.rotate(45)
+        c.setFont(BASE_BOLD, 90)
+        # Centered text
+        tw = c.stringWidth(text, BASE_BOLD, 90)
+        c.drawString(-tw / 2.0, -20, text)
+        c.restoreState()
+
     def _page_deco(c, d):
+        # Watermark first (behind)
+        _draw_watermark(c, d)
+
         c.saveState()
         # Top brand bar
         c.setFillColor(HexColor(BRAND_COLOR))
@@ -200,14 +229,18 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
             fill=1,
             stroke=0,
         )
-        # Header logo (local path or ImageReader)
-        if logo_drawable:
+        # Header logo with explicit sizing
+        if logo_reader:
             try:
+                iw, ih = logo_reader.getSize()
+                target_h = BAR_H - 4
+                target_w = (iw / float(ih)) * target_h if ih else target_h
                 c.drawImage(
-                    logo_drawable,
+                    logo_reader,
                     d.leftMargin,
                     d.height + d.topMargin + d.bottomMargin - BAR_H + 2,
-                    height=BAR_H - 4,
+                    width=target_w,
+                    height=target_h,
                     preserveAspectRatio=True,
                     mask="auto",
                 )
@@ -229,7 +262,7 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
 
     elems = []
 
-    # --- top block (title + dates)  [NO TABLE HERE] --------------------------
+    # --- top block (title + dates)  [NO fragile header tables] ---------------
     title = "CREDIT NOTE" if float(getattr(order, "total", 0) or 0) < 0 else "INVOICE"
     inv_code = getattr(order, "code", "") or ""
     inv_date = getattr(order, "created_at", None)
@@ -252,15 +285,13 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
         if address: bits.append(address)
         if email: bits.append(email)
         if phone: bits.append(phone)
-        return Paragraph("<br/>".join(bits), styles["Normal"])
+        return Paragraph("<br/>".join(bits), styles["Wrap"])
 
-    # Company "From"
     company_addr = getattr(settings, "COMPANY_ADDRESS", "") or ""
     company_email = getattr(settings, "COMPANY_EMAIL", "") or ""
     company_phone = getattr(settings, "COMPANY_PHONE", "") or ""
     from_block = block("From", company_name, company_addr, company_email, company_phone)
 
-    # Bill To
     cust = getattr(order, "customer", None) or type("X", (), {})()
     bill_name = getattr(cust, "name", "") or ""
     bill_addr = getattr(cust, "address", None) or ""
@@ -268,7 +299,6 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     bill_phone = getattr(cust, "phone", None) or ""
     bill_block = block("Bill To", bill_name, bill_addr, bill_email, bill_phone)
 
-    # Ship To (optional)
     ship = getattr(order, "shipping_to", None)
     ship_block = None
     if ship:
@@ -283,10 +313,10 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     from reportlab.lib.units import mm as _mm  # mm->pt
 
     if ship_block:
-        cols_mm = [56, 56, 56]  # sums to 168mm
+        cols_mm = [56, 56, 56]  # ~168mm
         data = [[from_block, bill_block, ship_block]]
     else:
-        cols_mm = [85, 85]  # sums to 170mm
+        cols_mm = [85, 85]  # ~170mm
         data = [[from_block, bill_block]]
 
     bt_cols = _fit_colwidths([v * _mm for v in cols_mm], FRAME_W)
@@ -302,7 +332,7 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     ]))
     elems += [bt, Spacer(1, 10)]
 
-    # --- items table ---------------------------------------------------------
+    # --- items table (CJK wrapping for SKU & Description) --------------------
     header = ["SKU", "Description", "Qty", "Unit", "Unit Price", "Disc", "Tax", "Amount"]
     data = [header]
     for it in getattr(order, "items", []) or []:
@@ -316,10 +346,15 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
         taxr = getattr(it, "tax_rate", None)
         discounted = unit_price * (1 - (disc or 0))
         amount = discounted * float(qty or 0)
-        desc = name + (f"<br/><font color='#6B7280' size='9'>{note}</font>" if note else "")
+
+        # Use Paragraphs with CJK wrapping to avoid overlap even for long strings
+        sku_para = Paragraph(sku, styles["Wrap"])
+        desc_text = name + (f"<br/><font color='#6B7280' size='9'>{note}</font>" if note else "")
+        desc_para = Paragraph(desc_text, styles["Wrap"])
+
         data.append([
-            sku,
-            Paragraph(desc, styles["Wrap"]),
+            sku_para,
+            desc_para,
             _fmt_qty(qty),
             unit,
             money(unit_price),
@@ -328,7 +363,8 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
             money(amount),
         ])
 
-    raw_cols_mm = [18, 58, 12, 12, 22, 12, 12, 24]  # ~170mm
+    # Give SKU a bit more room, description gets the bulk, ensure totals fit
+    raw_cols_mm = [24, 66, 14, 16, 24, 14, 14, 24]  # ~196mm pre-scale; will scale to frame
     itab_cols_pts = [v * _mm for v in raw_cols_mm]
     itab_cols = _fit_colwidths(itab_cols_pts, FRAME_W)
 
@@ -341,7 +377,8 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.white]),
         ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#E5E7EB")),
         ("ALIGN", (2, 1), (-1, -1), "RIGHT"),
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 1), (0, -1), "LEFT"),   # SKU
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 6),
         ("RIGHTPADDING", (0, 0), (-1, -1), 6),
         ("TOPPADDING", (0, 0), (-1, -1), 4),
@@ -351,7 +388,7 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
 
     # --- summary -------------------------------------------------------------
     def row(k, v):
-        return [Paragraph(k, styles["Normal"]), Paragraph(v, styles["Right"])]
+        return [Paragraph(k, styles["Wrap"]), Paragraph(v, styles["Right"])]
 
     subtotal = getattr(order, "subtotal", None)
     discount = getattr(order, "discount", None)
@@ -379,17 +416,16 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
     if deposit: summary.append(row("Deposit Paid", "-" + money(deposit)))
 
     if summary:
-        stab_cols = _fit_colwidths([50 * mm, 45 * mm], FRAME_W)
-        stab = Table(summary, colWidths=stab_cols, hAlign="RIGHT")
+        stab = Table(summary, colWidths=_fit_colwidths([60 * mm, 45 * mm], FRAME_W), hAlign="RIGHT")
         stab.setStyle(TableStyle([
             ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
             ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ]))
         elems.append(KeepTogether([stab, Spacer(1, 6)]))
 
     if total is not None:
-        trow_cols = _fit_colwidths([50 * mm, 45 * mm], FRAME_W)
-        trow = Table([row("Total", money(total))], colWidths=trow_cols, hAlign="RIGHT")
+        trow = Table([row("Total", money(total))], colWidths=_fit_colwidths([60 * mm, 45 * mm], FRAME_W), hAlign="RIGHT")
         trow.setStyle(TableStyle([
             ("LINEABOVE", (0, 0), (-1, 0), 1.2, HexColor(ACCENT_COLOR)),
             ("FONTNAME", (0, 0), (-1, -1), BASE_BOLD),
@@ -432,11 +468,9 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
             qr_img_flow = None
 
     if qr_img_flow:
-        pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
-        ptab = Table([[p[0], qr_img_flow]], colWidths=pay_cols)
+        ptab = Table([[p[0], qr_img_flow]], colWidths=_fit_colwidths([100 * mm, 40 * mm], FRAME_W))
     else:
-        pay_cols = _fit_colwidths([100 * mm], FRAME_W)
-        ptab = Table([[p[0]]], colWidths=pay_cols)
+        ptab = Table([[p[0]]], colWidths=_fit_colwidths([100 * mm], FRAME_W))
 
     ptab.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#E5E7EB")),
@@ -444,6 +478,7 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
         ("RIGHTPADDING", (0, 0), (-1, -1), 8),
         ("TOPPADDING", (0, 0), (-1, -1), 8),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
     elems += [ptab, Spacer(1, 12)]
 
