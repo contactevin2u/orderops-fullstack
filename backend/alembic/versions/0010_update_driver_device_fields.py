@@ -36,8 +36,14 @@ def upgrade() -> None:
     # make it NOT NULL after backfill
     op.alter_column("driver_devices", "token", nullable=False)
 
-    # unique index on token to match the model
-    op.create_index("ix_driver_devices_token", "driver_devices", ["token"], unique=True)
+    # allow duplicates across drivers but not per-driver
+    op.execute('DROP INDEX IF EXISTS ix_driver_devices_token')
+    op.create_index(
+        "uq_driver_devices_driver_id_token",
+        "driver_devices",
+        ["driver_id", "token"],
+        unique=True,
+    )
 
     # remove legacy column/index
     op.drop_index("ix_driver_devices_fcm_token", table_name="driver_devices")
@@ -45,7 +51,7 @@ def upgrade() -> None:
     op.drop_column("driver_devices", "last_seen_at")
 
 def downgrade() -> None:
-    op.drop_index("ix_driver_devices_token", table_name="driver_devices")
+    op.drop_index("uq_driver_devices_driver_id_token", table_name="driver_devices")
     op.drop_column("driver_devices", "token")
     op.add_column("driver_devices", sa.Column("last_seen_at", sa.DateTime(timezone=True), nullable=True))
     op.add_column("driver_devices", sa.Column("fcm_token", sa.String(length=255), nullable=False))
