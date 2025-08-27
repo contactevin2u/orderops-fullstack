@@ -7,6 +7,7 @@ from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from sqlalchemy.orm import Session
 
+from ..core.push import PUSH_ANDROID_CHANNEL_ID
 from ..models import Driver, Order
 
 _SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
@@ -44,7 +45,7 @@ def send_to_token(token: str, title: str, body: str, data: Dict[str, Any]) -> No
             "data": data,
             "android": {
                 "priority": "HIGH",
-                "notification": {"channel_id": "orders_high"},
+                "notification": {"channel_id": PUSH_ANDROID_CHANNEL_ID},
             },
         }
     }
