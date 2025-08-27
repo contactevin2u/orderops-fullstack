@@ -1,12 +1,12 @@
 """
 PDF generation utilities (ReportLab-only).
 
-This module renders:
+Renders:
 - Invoice / Credit Note (styled ReportLab template)
-- Receipt (simple)
-- Installment Agreement (simple)
+- Receipt
+- Installment Agreement
 
-HTML/Jinja/WeasyPrint path removed for simplicity and reliability.
+No HTML/Jinja/WeasyPrint paths for simplicity and reliability.
 """
 
 from io import BytesIO
@@ -31,7 +31,7 @@ def invoice_pdf(order: Order) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# Internal utilities
+# Internal utilities (images & constants)
 # ---------------------------------------------------------------------------
 
 DEFAULT_LOGO_URL = (
@@ -55,6 +55,15 @@ def _fetch_image_bytes(url: str, timeout: float = 6.0) -> BytesIO | None:
         return BytesIO(data)
     except Exception:
         return None
+
+
+def _fit_colwidths(widths, frame_width_pts: float):
+    """Scale a list of widths (already in points) to fit the available frame width."""
+    total = sum(widths)
+    if total <= frame_width_pts:
+        return widths
+    scale = frame_width_pts / float(total)
+    return [w * scale for w in widths]
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +145,8 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=14, leading=16))
     styles.add(ParagraphStyle(name="MetaKey", parent=styles["Small"], textColor="#6B7280"))
     styles.add(ParagraphStyle(name="MetaVal", parent=styles["Small"], alignment=TA_RIGHT))
+    # Wrap-friendly paragraph for long descriptions (prevents infinite height)
+    styles.add(ParagraphStyle(name="Wrap", parent=styles["Normal"], wordWrap="CJK"))
 
     # --- doc & canvas deco ---------------------------------------------------
     buf = BytesIO()
@@ -147,6 +158,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         topMargin=20 * mm,
         bottomMargin=20 * mm,
     )
+    FRAME_W = doc.width  # available frame width in points
 
     BAR_H = 18  # header band height (pt)
     company_name = getattr(settings, "COMPANY_NAME", "")
@@ -196,7 +208,6 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     title = "CREDIT NOTE" if float(getattr(order, "total", 0) or 0) < 0 else "INVOICE"
     inv_date = getattr(order, "created_at", None)
 
-    # Company lines
     company_lines = [
         getattr(settings, "COMPANY_NAME", ""),
         getattr(settings, "COMPANY_ADDRESS", ""),
@@ -212,12 +223,14 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
             styles["Normal"],
         ),
     ])
-    from reportlab.platypus import Table  # local import to keep lints happy
-    ht = Table([[left, right]], colWidths=[110 * mm, 70 * mm])
+
+    # Fit header table to frame width
+    header_cols = _fit_colwidths([100 * mm, 70 * mm], FRAME_W)
+    ht = Table([[left, right]], colWidths=header_cols)
     ht.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP")]))
     elems += [ht, Spacer(1, 8)]
 
-    # --- meta table (clean, right-aligned values) ----------------------------
+    # --- meta table ----------------------------------------------------------
     meta_rows = []
     def add_meta(k, v):
         if v:
@@ -231,7 +244,8 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         add_meta("Tax ID", tax_id)
 
     if meta_rows:
-        mt = Table(meta_rows, colWidths=[35 * mm, 55 * mm], hAlign="RIGHT")
+        mt_cols = _fit_colwidths([35 * mm, 55 * mm], FRAME_W)
+        mt = Table(meta_rows, colWidths=mt_cols, hAlign="RIGHT")
         mt.setStyle(TableStyle([
             ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
             ("LEFTPADDING", (0, 0), (-1, -1), 4),
@@ -239,7 +253,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         ]))
         elems += [mt, Spacer(1, 8)]
 
-    # --- bill/ship blocks in a soft box -------------------------------------
+    # --- bill/ship block -----------------------------------------------------
     def block(label, obj):
         obj = obj or type("X", (), {})()
         bits = [f"<b>{label}</b>", getattr(obj, "name", "") or ""]
@@ -253,10 +267,13 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
 
     bill = block("Bill To", getattr(order, "customer", None))
     ship_to = getattr(order, "shipping_to", None)
-    bt = Table(
-        [[bill, block("Ship To", ship_to)]] if ship_to else [[bill]],
-        colWidths=[90 * mm, 90 * mm] if ship_to else [180 * mm],
-    )
+    if ship_to:
+        bt_cols = _fit_colwidths([85 * mm, 85 * mm], FRAME_W)
+        bt_data = [[bill, block("Ship To", ship_to)]]
+    else:
+        bt_cols = _fit_colwidths([170 * mm], FRAME_W)
+        bt_data = [[bill]]
+    bt = Table(bt_data, colWidths=bt_cols)
     bt.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#E5E7EB")),
         ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F9FAFB")),
@@ -267,7 +284,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     ]))
     elems += [bt, Spacer(1, 10)]
 
-    # --- items table (zebra rows, right-aligned numbers) ---------------------
+    # --- items table ---------------------------------------------------------
     header = ["SKU", "Description", "Qty", "Unit", "Unit Price", "Disc", "Tax", "Amount"]
     data = [header]
     for it in getattr(order, "items", []) or []:
@@ -279,13 +296,13 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         unit_price = float(getattr(it, "unit_price", 0) or 0)
         disc = getattr(it, "discount_rate", None)
         taxr = getattr(it, "tax_rate", None)
-        # display amount; keep original calc style for consistency
         discounted = unit_price * (1 - (disc or 0))
         amount = discounted * float(qty or 0)
         desc = name + (f"<br/><font color='#6B7280' size='9'>{note}</font>" if note else "")
+        # Use wrap-friendly style for long descriptions
         data.append([
             sku,
-            Paragraph(desc, styles["Normal"]),
+            Paragraph(desc, styles["Wrap"]),
             _fmt_qty(qty),
             unit,
             money(unit_price),
@@ -294,8 +311,13 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
             money(amount),
         ])
 
-    colw = [22 * mm, 66 * mm, 15 * mm, 15 * mm, 25 * mm, 15 * mm, 15 * mm, 27 * mm]
-    itab = Table(data, colWidths=colw, repeatRows=1)
+    # Fit columns to frame width (sum must be <= FRAME_W)
+    # Target distribution totalling 170mm: 18, 58, 12, 12, 22, 12, 12, 24
+    raw_cols = [18, 58, 12, 12, 22, 12, 12, 24]
+    itab_cols_pts = [v * mm for v in raw_cols]
+    itab_cols = _fit_colwidths(itab_cols_pts, FRAME_W)
+
+    itab = Table(data, colWidths=itab_cols, repeatRows=1)
     itab.setStyle(TableStyle([
         # header
         ("BACKGROUND", (0, 0), (-1, 0), HexColor(BRAND_COLOR)),
@@ -314,11 +336,10 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     ]))
     elems += [itab, Spacer(1, 12)]
 
-    # --- summary (dynamic rows + bold total strip) --------------------------
+    # --- summary -------------------------------------------------------------
     def row(k, v):
         return [Paragraph(k, styles["Normal"]), Paragraph(v, styles["Right"])]
 
-    # Common fields (show when present)
     subtotal = getattr(order, "subtotal", None)
     discount = getattr(order, "discount", None)
     tax_total = getattr(order, "tax_total", None)
@@ -333,29 +354,20 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     tax_label = getattr(getattr(order, "company", None), "tax_label", "Tax") or "Tax"
 
     summary = []
-    if subtotal is not None:
-        summary.append(row("Subtotal", money(subtotal)))
-    if discount:
-        summary.append(row("Discount", "-" + money(discount)))
-    if shipping:
-        summary.append(row("Delivery Fee", money(shipping)))
-    if return_delivery:
-        summary.append(row("Return Delivery", money(return_delivery)))
-    if penalty:
-        summary.append(row("Penalty", money(penalty)))
-    if other:
-        summary.append(row("Other", money(other)))
-    if rounding:
-        summary.append(row("Rounding", money(rounding)))
-    if buyback:
-        summary.append(row("Buyback", "-" + money(buyback)))
-    if tax_total is not None:
-        summary.append(row(tax_label, money(tax_total)))
-    if deposit:
-        summary.append(row("Deposit Paid", "-" + money(deposit)))
+    if subtotal is not None: summary.append(row("Subtotal", money(subtotal)))
+    if discount: summary.append(row("Discount", "-" + money(discount)))
+    if shipping: summary.append(row("Delivery Fee", money(shipping)))
+    if return_delivery: summary.append(row("Return Delivery", money(return_delivery)))
+    if penalty: summary.append(row("Penalty", money(penalty)))
+    if other: summary.append(row("Other", money(other)))
+    if rounding: summary.append(row("Rounding", money(rounding)))
+    if buyback: summary.append(row("Buyback", "-" + money(buyback)))
+    if tax_total is not None: summary.append(row(tax_label, money(tax_total)))
+    if deposit: summary.append(row("Deposit Paid", "-" + money(deposit)))
 
     if summary:
-        stab = Table(summary, colWidths=[50 * mm, 45 * mm], hAlign="RIGHT")
+        stab_cols = _fit_colwidths([50 * mm, 45 * mm], FRAME_W)
+        stab = Table(summary, colWidths=stab_cols, hAlign="RIGHT")
         stab.setStyle(TableStyle([
             ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
             ("RIGHTPADDING", (0, 0), (-1, -1), 4),
@@ -363,7 +375,8 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         elems.append(KeepTogether([stab, Spacer(1, 6)]))
 
     if total is not None:
-        trow = Table([row("Total", money(total))], colWidths=[50 * mm, 45 * mm], hAlign="RIGHT")
+        trow_cols = _fit_colwidths([50 * mm, 45 * mm], FRAME_W)
+        trow = Table([row("Total", money(total))], colWidths=trow_cols, hAlign="RIGHT")
         trow.setStyle(TableStyle([
             ("LINEABOVE", (0, 0), (-1, 0), 1.2, HexColor(ACCENT_COLOR)),
             ("FONTNAME", (0, 0), (-1, -1), BASE_BOLD),
@@ -373,7 +386,6 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
         elems.append(KeepTogether([trow, Spacer(1, 10)]))
 
     # --- payment box (with QR image) ----------------------------------------
-    # Always show the requested bank details explicitly.
     bank_lines = [
         f"Beneficiary: {BENEFICIARY_NAME}",
         f"Bank: {BANK_NAME}",
@@ -381,33 +393,38 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     ]
     p = [Paragraph("<br/>".join(bank_lines), styles["Normal"])]
 
-    # Prefer base64 QR if provided; otherwise load remote QR image
     qr = getattr(getattr(order, "payment", None), "qrDataUrl", None)
     if qr:
         try:
             import base64
             img_data = qr.split(",", 1)[-1]
             qr_img = Image(BytesIO(base64.b64decode(img_data)), width=40 * mm, height=40 * mm)
-            ptab = Table([[p[0], qr_img]], colWidths=[100 * mm, 40 * mm])
+            pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
+            ptab = Table([[p[0], qr_img]], colWidths=pay_cols)
         except Exception:
-            # fallback to remote QR
             if qr_fallback_bytes:
                 try:
                     qr_img = Image(qr_fallback_bytes, width=40 * mm, height=40 * mm)
-                    ptab = Table([[p[0], qr_img]], colWidths=[100 * mm, 40 * mm])
+                    pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
+                    ptab = Table([[p[0], qr_img]], colWidths=pay_cols)
                 except Exception:
-                    ptab = Table([[p[0]]], colWidths=[100 * mm])
+                    pay_cols = _fit_colwidths([100 * mm], FRAME_W)
+                    ptab = Table([[p[0]]], colWidths=pay_cols)
             else:
-                ptab = Table([[p[0]]], colWidths=[100 * mm])
+                pay_cols = _fit_colwidths([100 * mm], FRAME_W)
+                ptab = Table([[p[0]]], colWidths=pay_cols)
     else:
         if qr_fallback_bytes:
             try:
                 qr_img = Image(qr_fallback_bytes, width=40 * mm, height=40 * mm)
-                ptab = Table([[p[0], qr_img]], colWidths=[100 * mm, 40 * mm])
+                pay_cols = _fit_colwidths([100 * mm, 40 * mm], FRAME_W)
+                ptab = Table([[p[0], qr_img]], colWidths=pay_cols)
             except Exception:
-                ptab = Table([[p[0]]], colWidths=[100 * mm])
+                pay_cols = _fit_colwidths([100 * mm], FRAME_W)
+                ptab = Table([[p[0]]], colWidths=pay_cols)
         else:
-            ptab = Table([[p[0]]], colWidths=[100 * mm])
+            pay_cols = _fit_colwidths([100 * mm], FRAME_W)
+            ptab = Table([[p[0]]], colWidths=pay_cols)
 
     ptab.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.6, colors.HexColor("#E5E7EB")),
@@ -433,7 +450,7 @@ def legacy_reportlab_invoice_pdf(order: Order) -> bytes:
     elems.append(Spacer(1, 6))
     elems.append(Paragraph("<br/>".join(f"• {t}" for t in terms), styles["Small"]))
 
-    # Optional bilingual page (kept from your original)
+    # Optional bilingual page
     elems.append(PageBreak())
     elems.append(Paragraph("Terms & Conditions", styles["H2"]))
     elems.append(Spacer(1, 6))
@@ -530,7 +547,6 @@ def receipt_pdf(order: Order, payment: Payment) -> bytes:
         f"Amount: {money(getattr(payment, 'amount', 0))}",
         f"Method: {getattr(payment, 'method', '-') or '-'}  Ref: {getattr(payment, 'reference', '-') or '-'}",
         f"Status: {getattr(payment, 'status', '-')}",
-        # Hard-coded bank details as requested
         f"Beneficiary: {BENEFICIARY_NAME}",
         f"Bank: {BANK_NAME}",
         f"Account No.: {BANK_ACCOUNT_NO}",
