@@ -2,7 +2,7 @@ import React from 'react';
 import Image from 'next/image';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listDrivers, listDriverCommissions, addPayment, markSuccess, updateCommission } from '@/utils/api';
+import { listDrivers, listDriverOrders, addPayment, markSuccess, updateCommission } from '@/utils/api';
 import StatusBadge from '@/components/StatusBadge';
 
 export default function DriverCommissionsPage() {
@@ -15,8 +15,8 @@ export default function DriverCommissionsPage() {
     queryFn: listDrivers,
   });
   const rowsQuery = useQuery({
-    queryKey: ['commissions', driverId, month],
-    queryFn: () => (driverId ? listDriverCommissions(Number(driverId)) : Promise.resolve([])),
+    queryKey: ['driver-orders', driverId, month],
+    queryFn: () => (driverId ? listDriverOrders(Number(driverId), month) : Promise.resolve([])),
     enabled: !!driverId,
   });
   const drivers = driversQuery.data || [];
@@ -36,12 +36,12 @@ export default function DriverCommissionsPage() {
       }
       await markSuccess(orderId);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['commissions', driverId, month] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['driver-orders', driverId, month] }),
   });
 
   const saveCommission = useMutation({
     mutationFn: async ({ orderId, amount }: any) => updateCommission(orderId, Number(amount)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['commissions', driverId, month] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['driver-orders', driverId, month] }),
   });
 
   return (
