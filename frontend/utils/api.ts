@@ -306,6 +306,13 @@ export function createRoute(body: { driver_id: number; route_date: string; name?
   return request<any>('/routes', { json: body });
 }
 
+export function updateRoute(
+  routeId: number,
+  body: { driver_id?: number; route_date?: string; name?: string; notes?: string },
+) {
+  return request<any>(`/routes/${routeId}`, { method: 'PATCH', json: body });
+}
+
 export function listRoutes(date?: string) {
   const qs = date ? `?date=${encodeURIComponent(date)}` : '';
   return request<any[]>(`/routes${qs}`);
