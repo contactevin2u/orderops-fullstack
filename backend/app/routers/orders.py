@@ -51,6 +51,13 @@ def kl_day_bounds(d: datetime | date_cls):
     end_local = start_local + timedelta(days=1)
     return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
 
+
+def kl_month_bounds(year: int, month: int):
+    """Return (start_utc, end_utc) for KL local month."""
+    start_local = datetime(year, month, 1, tzinfo=APP_TZ)
+    end_local = (start_local.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
+
 router = APIRouter(
     prefix="/orders",
     tags=["orders"],
@@ -67,6 +74,8 @@ def list_orders(
     type: str | None = None,
     date: str | None = None,
     unassigned: bool = False,
+    driver_id: int | None = None,
+    month: str | None = None,
     limit: int = Query(50, ge=1, le=500),
     db: Session = Depends(get_session),
 ):
@@ -76,10 +85,12 @@ def list_orders(
             Customer.name.label("customer_name"),
             Trip,
             Driver.name.label("driver_name"),
+            Commission,
         )
         .join(Customer, Customer.id == Order.customer_id)
         .join(Trip, Trip.order_id == Order.id, isouter=True)
         .join(Driver, Driver.id == Trip.driver_id, isouter=True)
+        .join(Commission, Commission.trip_id == Trip.id, isouter=True)
     )
     if q:
         like = f"%{q}%"
@@ -90,6 +101,19 @@ def list_orders(
         stmt = stmt.where(Order.status == status)
     if type:
         stmt = stmt.where(Order.type == type)
+
+    if driver_id is not None:
+        stmt = stmt.where(Trip.driver_id == driver_id)
+
+    if month:
+        try:
+            y, m = map(int, month.split("-"))
+            start_utc, end_utc = kl_month_bounds(y, m)
+            stmt = stmt.where(
+                and_(Order.delivery_date >= start_utc, Order.delivery_date < end_utc)
+            )
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid month format (expected YYYY-MM)")
 
     # --- Date filtering (backlog semantics) ---
     if date:
@@ -123,17 +147,26 @@ def list_orders(
     stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
-    for (order, customer_name, trip, driver_name) in rows:
+    for (order, customer_name, trip, driver_name, commission) in rows:
         dto = OrderOut.model_validate(order).model_dump()
         dto["customer_name"] = customer_name
         if trip:
-            dto["trip"] = {
+            trip_dto = {
                 "id": trip.id,
                 "driver_id": trip.driver_id,
                 "status": trip.status,
                 "driver_name": driver_name,
                 "route_id": trip.route_id,
             }
+            if commission:
+                trip_dto["commission"] = {
+                    "id": commission.id,
+                    "scheme": commission.scheme,
+                    "rate": commission.rate,
+                    "computed_amount": commission.computed_amount,
+                    "actualized_at": commission.actualized_at,
+                }
+            dto["trip"] = trip_dto
         out.append(OrderListOut.model_validate(dto))
     return envelope(out)
 

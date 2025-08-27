@@ -334,3 +334,12 @@ export function createDriver(payload: {
 export function listDriverCommissions(driverId: number) {
   return request<any[]>(`/drivers/${driverId}/commissions`);
 }
+
+export async function listDriverOrders(driverId: number, month?: string, limit = 500) {
+  const sp = new URLSearchParams({ driver_id: String(driverId), limit: String(limit) });
+  if (month) sp.set('month', month);
+  const data = await request<any>(`/orders?${sp.toString()}`);
+  if (Array.isArray(data)) return data;
+  if (data && typeof data === 'object' && Array.isArray(data.items)) return data.items;
+  return [];
+}
