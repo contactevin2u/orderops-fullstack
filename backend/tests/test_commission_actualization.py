@@ -75,7 +75,9 @@ def test_commission_on_success(monkeypatch):
         db.commit()
         db.refresh(cust)
 
-        order = Order(code="O1", type="OUTRIGHT", customer_id=cust.id, total=Decimal("600"))
+        order = Order(
+            code="O1", type="OUTRIGHT", customer_id=cust.id, total=Decimal("600")
+        )
         db.add(order)
         db.commit()
         db.refresh(order)
@@ -98,10 +100,10 @@ def test_commission_on_success(monkeypatch):
         assert commission.actualized_at is not None
         assert commission.computed_amount == Decimal("30.00")
         assert commission.actualization_reason == "manual_success"
+        refreshed = db.get(Order, order.id)
+        assert refreshed.status == "COMPLETED"
 
-    resp = client.patch(
-        f"/orders/{order.id}/commission", json={"amount": 40}
-    )
+    resp = client.patch(f"/orders/{order.id}/commission", json={"amount": 40})
     assert resp.status_code == 200
 
     with SessionLocal() as db:

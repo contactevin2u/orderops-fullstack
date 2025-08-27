@@ -2,7 +2,14 @@ import React from 'react';
 import Image from 'next/image';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listDrivers, listDriverOrders, addPayment, markSuccess, updateCommission } from '@/utils/api';
+import {
+  listDrivers,
+  listOrders,
+  listDriverCommissions,
+  addPayment,
+  markSuccess,
+  updateCommission,
+} from '@/utils/api';
 import StatusBadge from '@/components/StatusBadge';
 
 export default function DriverCommissionsPage() {
@@ -16,11 +23,28 @@ export default function DriverCommissionsPage() {
   });
   const rowsQuery = useQuery({
     queryKey: ['driver-orders', driverId, month],
-    queryFn: () => (driverId ? listDriverOrders(Number(driverId), month) : Promise.resolve([])),
+    queryFn: async () => {
+      if (!driverId) return [];
+      const { items } = await listOrders(undefined, undefined, undefined, 500);
+      return items.filter(
+        (o: any) =>
+          o.trip?.driver_id === Number(driverId) &&
+          (o.delivery_date || '').slice(0, 7) === month,
+      );
+    },
     enabled: !!driverId,
   });
+
+  const commissionSummaryQuery = useQuery({
+    queryKey: ['driver-commissions', driverId],
+    queryFn: () => (driverId ? listDriverCommissions(Number(driverId)) : Promise.resolve([])),
+    enabled: !!driverId,
+  });
+
   const drivers = driversQuery.data || [];
   const rows = rowsQuery.data || [];
+  const monthlyTotal =
+    commissionSummaryQuery.data?.find((c: any) => c.month === month)?.total ?? 0;
 
   const payAndSuccess = useMutation({
     mutationFn: async ({ orderId, amount, method, reference }: any) => {
@@ -120,7 +144,10 @@ export default function DriverCommissionsPage() {
           </tbody>
         </table>
       </div>
-      <p aria-live="polite" style={{ marginTop: 8, fontSize: '0.875rem', opacity: 0.7 }}>
+      <p style={{ marginTop: 8, fontSize: '0.875rem', opacity: 0.7 }}>
+        Total commission for {month}: {monthlyTotal}
+      </p>
+      <p aria-live="polite" style={{ marginTop: 4, fontSize: '0.875rem', opacity: 0.7 }}>
         {rows.length} orders loaded.
       </p>
     </div>

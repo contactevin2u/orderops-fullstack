@@ -10,7 +10,6 @@ from ..db import get_session
 from ..models import (
     Order,
     OrderItem,
-    Plan,
     Customer,
     IdempotentRequest,
     Role,
@@ -58,14 +57,17 @@ def kl_month_bounds(year: int, month: int):
     end_local = (start_local.replace(day=28) + timedelta(days=4)).replace(day=1)
     return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
 
+
 router = APIRouter(
     prefix="/orders",
     tags=["orders"],
     dependencies=[Depends(require_roles(Role.ADMIN, Role.CASHIER))],
 )
 
+
 class OrderListOut(OrderOut):
     customer_name: str
+
 
 @router.get("", response_model=dict)
 def list_orders(
@@ -95,7 +97,11 @@ def list_orders(
     if q:
         like = f"%{q}%"
         stmt = stmt.where(
-            or_(Order.code.ilike(like), Customer.name.ilike(like), Customer.phone.ilike(like))
+            or_(
+                Order.code.ilike(like),
+                Customer.name.ilike(like),
+                Customer.phone.ilike(like),
+            )
         )
     if status:
         stmt = stmt.where(Order.status == status)
@@ -113,14 +119,18 @@ def list_orders(
                 and_(Order.delivery_date >= start_utc, Order.delivery_date < end_utc)
             )
         except Exception:
-            raise HTTPException(status_code=400, detail="Invalid month format (expected YYYY-MM)")
+            raise HTTPException(
+                status_code=400, detail="Invalid month format (expected YYYY-MM)"
+            )
 
     # --- Date filtering (backlog semantics) ---
     if date:
         try:
             d = datetime.fromisoformat(date).date()
         except Exception:
-            raise HTTPException(status_code=400, detail="Invalid date format (expected YYYY-MM-DD)")
+            raise HTTPException(
+                status_code=400, detail="Invalid date format (expected YYYY-MM-DD)"
+            )
 
         start_utc, end_utc = kl_day_bounds(d)
 
@@ -147,7 +157,7 @@ def list_orders(
     stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
-    for (order, customer_name, trip, driver_name, commission) in rows:
+    for order, customer_name, trip, driver_name, commission in rows:
         dto = OrderOut.model_validate(order).model_dump()
         dto["customer_name"] = customer_name
         if trip:
@@ -169,6 +179,7 @@ def list_orders(
             dto["trip"] = trip_dto
         out.append(OrderListOut.model_validate(dto))
     return envelope(out)
+
 
 class ManualOrderIn(BaseModel):
     customer: dict
@@ -209,6 +220,7 @@ class OrderPatch(BaseModel):
     items: list[OrderItemPatch] | None = None
     delete_items: list[int] | None = None
 
+
 @router.post("", response_model=dict, status_code=201)
 def create_order(
     body: ManualOrderIn,
@@ -218,10 +230,14 @@ def create_order(
 ):
     try:
         if idempotency_key:
-            existing = db.query(Order).filter_by(idempotency_key=idempotency_key).one_or_none()
+            existing = (
+                db.query(Order).filter_by(idempotency_key=idempotency_key).one_or_none()
+            )
             if existing:
                 return envelope(OrderOut.model_validate(existing))
-        order = create_order_from_parsed(db, {"customer": body.customer, "order": body.order})
+        order = create_order_from_parsed(
+            db, {"customer": body.customer, "order": body.order}
+        )
         if idempotency_key:
             order.idempotency_key = idempotency_key
         db.commit()
@@ -231,6 +247,7 @@ def create_order(
     except Exception as e:
         db.rollback()
         raise HTTPException(400, f"Create failed: {e}")
+
 
 @router.get("/{order_id}", response_model=dict)
 def get_order(order_id: int, db: Session = Depends(get_session)):
@@ -254,7 +271,9 @@ def get_invoice_pdf(order_id: int, db: Session = Depends(get_session)):
 
 
 @router.get("/{order_id}/due", response_model=dict)
-def get_order_due(order_id: int, as_of: date_cls | None = None, db: Session = Depends(get_session)):
+def get_order_due(
+    order_id: int, as_of: date_cls | None = None, db: Session = Depends(get_session)
+):
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
@@ -270,7 +289,10 @@ def get_order_due(order_id: int, as_of: date_cls | None = None, db: Session = De
     if order.status in {"CANCELLED", "RETURNED"}:
         expected = q2(
             sum(
-                (Decimal(getattr(ch, "total", 0) or 0) for ch in getattr(order, "adjustments", []) or []),
+                (
+                    Decimal(getattr(ch, "total", 0) or 0)
+                    for ch in getattr(order, "adjustments", []) or []
+                ),
                 Decimal("0"),
             )
         )
@@ -341,7 +363,9 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
                 setattr(order.plan, k, plan_patch[k])
         if plan_patch.get("start_date"):
             try:
-                order.plan.start_date = datetime.fromisoformat(plan_patch["start_date"]).date()
+                order.plan.start_date = datetime.fromisoformat(
+                    plan_patch["start_date"]
+                ).date()
             except Exception:
                 pass
 
@@ -375,10 +399,14 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
                 qty = int(ip.get("qty") or 0)
                 unit_price = Decimal(str(ip.get("unit_price") or 0))
                 lt_input = ip.get("line_total")
-                line_total = Decimal(str(lt_input)) if lt_input is not None else unit_price * qty
+                line_total = (
+                    Decimal(str(lt_input)) if lt_input is not None else unit_price * qty
+                )
                 if item_type in {"RENTAL", "INSTALLMENT"}:
                     if lt_input is not None and Decimal(str(lt_input)) > 0:
-                        raise HTTPException(400, "Plan items cannot have positive totals")
+                        raise HTTPException(
+                            400, "Plan items cannot have positive totals"
+                        )
                     if line_total >= 0:
                         unit_price = Decimal("0")
                         line_total = Decimal("0")
@@ -393,7 +421,6 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
                         line_total=line_total,
                     )
                 )
-
 
     # Recompute monetary totals based on current state
     recompute_financials(order)
@@ -426,7 +453,12 @@ def assign_order(
         db.add(trip)
     db.commit()
     db.refresh(trip)
-    log_action(db, current_user, "order.assign_driver", f"order_id={order.id},driver_id={driver.id}")
+    log_action(
+        db,
+        current_user,
+        "order.assign_driver",
+        f"order_id={order.id},driver_id={driver.id}",
+    )
     tokens = [d.fcm_token for d in driver.devices]
     notify_assignment(tokens, order.id)
     return envelope({"order_id": order.id, "driver_id": driver.id, "trip_id": trip.id})
@@ -474,10 +506,13 @@ def mark_success(
         )
         db.add(commission)
     trip.status = "SUCCESS"
+    order.status = "COMPLETED"
     db.commit()
     db.refresh(commission)
     log_action(db, current_user, "order.success", f"order_id={order.id}")
-    return envelope({"commission_id": commission.id, "amount": float(commission.computed_amount)})
+    return envelope(
+        {"commission_id": commission.id, "amount": float(commission.computed_amount)}
+    )
 
 
 @router.patch("/{order_id}/commission", response_model=dict)
@@ -502,7 +537,9 @@ def update_commission(
     db.commit()
     db.refresh(commission)
     log_action(db, current_user, "commission.update", f"commission_id={commission.id}")
-    return envelope({"commission_id": commission.id, "amount": float(commission.computed_amount)})
+    return envelope(
+        {"commission_id": commission.id, "amount": float(commission.computed_amount)}
+    )
 
 
 @router.post("/{order_id}/void", response_model=dict)
@@ -572,7 +609,9 @@ def return_order(
             body.reference if body else None,
             date_cls.fromisoformat(body.date) if body and body.date else None,
         )
-        db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="return"))
+        db.add(
+            IdempotentRequest(key=idempotency_key, order_id=order.id, action="return")
+        )
         db.commit()
         db.refresh(order)
     except Exception as e:
@@ -618,7 +657,9 @@ def buyback_order(
             body.method,
             body.reference,
         )
-        db.add(IdempotentRequest(key=idempotency_key, order_id=order.id, action="buyback"))
+        db.add(
+            IdempotentRequest(key=idempotency_key, order_id=order.id, action="buyback")
+        )
         db.commit()
         db.refresh(order)
     except ValueError as e:
@@ -661,7 +702,9 @@ def cancel_installment_order(
             body.reference,
         )
         db.add(
-            IdempotentRequest(key=idempotency_key, order_id=order.id, action="cancel_installment")
+            IdempotentRequest(
+                key=idempotency_key, order_id=order.id, action="cancel_installment"
+            )
         )
         db.commit()
         db.refresh(order)

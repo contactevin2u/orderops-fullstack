@@ -4,7 +4,6 @@ import {
   listDrivers,
   assignOrderToDriver,
   listDriverCommissions,
-  listDriverOrders,
 } from '@/utils/api';
 
 // Use Vitest's vi to mock fetch
@@ -111,19 +110,4 @@ describe('api request unwrapping', () => {
     );
   });
 
-  it('fetches driver orders', async () => {
-    const data = [{ id: 1 }];
-    (global as any).fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      text: async () => JSON.stringify({ items: data }),
-      headers: { get: () => 'application/json' },
-    });
-
-    const result = await listDriverOrders(1, '2024-01');
-    expect(result).toEqual(data);
-    expect((global as any).fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/orders?'),
-      expect.any(Object)
-    );
-  });
 });

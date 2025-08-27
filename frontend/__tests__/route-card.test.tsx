@@ -8,7 +8,8 @@ describe('RouteCard', () => {
   it('calls onSelect with keyboard', async () => {
     const route: any = { id: '1', name: 'Route A', driverId: '', stops: [] };
     const onSelect = vi.fn();
-    render(<RouteCard route={route} onSelect={onSelect} />);
+    const onEdit = vi.fn();
+    render(<RouteCard route={route} onSelect={onSelect} onEdit={onEdit} />);
     const card = screen.getByRole('button', { name: /route a/i });
     card.focus();
     const user = userEvent.setup();
