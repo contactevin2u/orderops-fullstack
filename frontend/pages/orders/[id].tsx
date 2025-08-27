@@ -91,10 +91,13 @@ export default function OrderDetailPage(){
 
   React.useEffect(()=>{ if(order) loadDue(order.id, asOf); },[order, asOf, loadDue]);
 
-  if(!order) return <Card>Loading...</Card>;
+  if(!order) return <Card aria-busy="true">Loading order...</Card>;
   const profile = order.company_profile || {};
   const invoiceUrl = invoicePrintUrl(order.id);
-  function copyInvoice(){ navigator.clipboard.writeText(invoiceUrl); alert(t('documents.copied')); }
+  function copyInvoice(){
+    navigator.clipboard.writeText(invoiceUrl);
+    setMsg(t('documents.copied'));
+  }
 
   function updateItem(idx:number, field:string, value:any){
     const copy = [...items];
@@ -261,7 +264,13 @@ export default function OrderDetailPage(){
             </div>
             <div className="kv">
               <div>Type</div><div>{order.type}</div>
-              <div>Customer</div><div>{order.customer?.name} ({order.customer?.phone})</div>
+              <div>Customer</div>
+              <div>
+                {order.customer?.name}
+                {order.customer?.phone && (
+                  <> (<a href={`tel:${order.customer.phone}`}>{order.customer.phone}</a>)</>
+                )}
+              </div>
               <div>Address</div><div>{order.customer?.address}</div>
               <div>Delivery</div><div>{order.delivery_date ? String(order.delivery_date).slice(0,10) : "-"}</div>
             </div>
@@ -283,9 +292,9 @@ export default function OrderDetailPage(){
                             <option>FEE</option>
                           </select>
                         </td>
-                        <td><input className="input" type="number" value={it.qty} onChange={e=>updateItem(idx,'qty',e.target.value)} /></td>
-                        <td><input className="input" type="number" value={it.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} /></td>
-                        <td><input className="input" type="number" value={it.monthly_amount} onChange={e=>updateItem(idx,'monthly_amount',e.target.value)} /></td>
+                        <td><input className="input" type="number" min="1" step="1" value={it.qty} onChange={e=>updateItem(idx,'qty',e.target.value)} /></td>
+                        <td><input className="input" type="number" min="0" step="0.01" value={it.unit_price} onChange={e=>updateItem(idx,'unit_price',e.target.value)} /></td>
+                        <td><input className="input" type="number" min="0" step="0.01" value={it.monthly_amount} onChange={e=>updateItem(idx,'monthly_amount',e.target.value)} /></td>
                         <td>RM {(Number(it.unit_price||0)*Number(it.qty||0)).toFixed(2)}</td>
                         <td><button className="btn secondary" onClick={()=>removeItem(idx)}>Remove</button></td>
                       </tr>
@@ -330,7 +339,7 @@ export default function OrderDetailPage(){
               </div>
               <div className="col" style={{display:"flex",flexDirection:"column",gap:4}}>
                 <label><input type="checkbox" checked={retCollect} onChange={e=>setRetCollect(e.target.checked)} /> Collect</label>
-                <input className="input" type="number" placeholder="Return fee" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} />
+                <input className="input" type="number" min="0" step="0.01" placeholder="Return fee" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} />
                 <input className="input" placeholder="Method" value={retMethod} onChange={e=>setRetMethod(e.target.value)} />
                 <input className="input" placeholder="Reference" value={retRef} onChange={e=>setRetRef(e.target.value)} />
                 <button className="btn secondary" onClick={onReturned} disabled={busy}>Mark Returned (Rental)</button>
@@ -339,6 +348,8 @@ export default function OrderDetailPage(){
                 <input
                   className="input"
                   type="number"
+                  min="0"
+                  step="0.01"
                   placeholder="Buyback amount"
                   value={buybackAmt}
                   onChange={e=>setBuybackAmt(e.target.value)}
@@ -357,6 +368,8 @@ export default function OrderDetailPage(){
                   <input
                     className="input"
                     type="number"
+                    min="0"
+                    step="0.01"
                     placeholder="Value"
                     value={buybackDiscVal}
                     onChange={e=>setBuybackDiscVal(e.target.value)}
@@ -394,12 +407,12 @@ export default function OrderDetailPage(){
                 <label>Delivery Date</label>
                 <input className="input" type="date" value={deliveryDate} onChange={e=>setDeliveryDate(e.target.value)} />
               </div>
-              <div className="col"><label>Penalty Fee</label><input className="input" type="number" value={penalty} onChange={e=>setPenalty(e.target.value)} /></div>
-              <div className="col"><label>Discount</label><input className="input" type="number" value={disc} onChange={e=>setDisc(e.target.value)} /></div>
+              <div className="col"><label>Penalty Fee</label><input className="input" type="number" min="0" step="0.01" value={penalty} onChange={e=>setPenalty(e.target.value)} /></div>
+              <div className="col"><label>Discount</label><input className="input" type="number" min="0" step="0.01" value={disc} onChange={e=>setDisc(e.target.value)} /></div>
             </div>
             <div className="row">
-              <div className="col"><label>Delivery Fee</label><input className="input" type="number" value={delFee} onChange={e=>setDelFee(e.target.value)} /></div>
-              <div className="col"><label>Return Delivery Fee</label><input className="input" type="number" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} /></div>
+              <div className="col"><label>Delivery Fee</label><input className="input" type="number" min="0" step="0.01" value={delFee} onChange={e=>setDelFee(e.target.value)} /></div>
+              <div className="col"><label>Return Delivery Fee</label><input className="input" type="number" min="0" step="0.01" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} /></div>
             </div>
             <div className="row">
               <div className="col">
@@ -410,8 +423,8 @@ export default function OrderDetailPage(){
                   <option>RENTAL</option>
                 </select>
               </div>
-              <div className="col"><label>Months</label><input className="input" type="number" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
-              <div className="col"><label>Monthly Amount</label><input className="input" type="number" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
+              <div className="col"><label>Months</label><input className="input" type="number" min="1" step="1" value={planMonths} onChange={e=>setPlanMonths(e.target.value)} /></div>
+              <div className="col"><label>Monthly Amount</label><input className="input" type="number" min="0" step="0.01" value={planMonthly} onChange={e=>setPlanMonthly(e.target.value)} /></div>
             </div>
             <div style={{marginTop:8}}>
               <label>Notes</label>
@@ -449,7 +462,7 @@ export default function OrderDetailPage(){
           <Card>
             <h3 className="m-0">Payments</h3>
             <div className="row">
-              <div className="col"><input className="input" type="number" placeholder="Amount" value={payAmt} onChange={e=>setPayAmt(e.target.value)} /></div>
+              <div className="col"><input className="input" type="number" min="0" step="0.01" placeholder="Amount" value={payAmt} onChange={e=>setPayAmt(e.target.value)} /></div>
               <div className="col"><input className="input" type="date" placeholder="Date" value={payDate} onChange={e=>setPayDate(e.target.value)} /></div>
             </div>
             <div className="row">
@@ -484,7 +497,7 @@ export default function OrderDetailPage(){
               )}
               {order.trip?.commission && (
                 <div style={{marginTop:8}}>
-                  <input className="input" type="number" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
+                  <input className="input" type="number" min="0" step="0.01" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
                   <button className="btn" style={{marginTop:4}} onClick={saveCommission} disabled={busy}>Save Commission</button>
                 </div>
               )}
