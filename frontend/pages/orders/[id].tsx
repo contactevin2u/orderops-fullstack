@@ -249,11 +249,11 @@ export default function OrderDetailPage(){
 
   return (
         <>
-        <Link href="/orders" className="btn secondary mb-2 inline-block">&larr; Back to Orders</Link>
+        <Link href="/orders" className="btn secondary mb-4">&larr; Back to Orders</Link>
         <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(300px,1fr)]">
           <div>
             <Card>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="m-0">{order.code || order.id} <span className="badge">{order.status}</span></h2>
               <a className="btn secondary" href={invoicePrintUrl(order.id)} target="_blank" rel="noreferrer">
                 Invoice PDF
@@ -370,7 +370,7 @@ export default function OrderDetailPage(){
             </div>
           </Card>
         </div>
-        <div className="sticky top-2 space-y-4">
+        <div className="space-y-4 lg:sticky lg:top-2">
           <Card>
             <h3 className="m-0">Edit Order</h3>
             <div className="row">
