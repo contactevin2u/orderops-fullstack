@@ -35,10 +35,11 @@ def compute_expected_for_order(order, as_of) -> Decimal:
     if order.status in {"CANCELLED", "RETURNED"}:
         child_total = sum((Decimal(ch.total or 0) for ch in getattr(order, "adjustments", []) or []), Decimal("0"))
         return q2(child_total)
-    plan_due = calculate_plan_due(getattr(order, "plan", None), as_of)
-    if plan_due > 0:
-        return q2(plan_due + fees)
-    return q2(order.total or 0)
+    one_time_net = q2((order.subtotal or 0) - (order.discount or 0))
+    plan = getattr(order, "plan", None)
+    plan_accrued = calculate_plan_due(plan, as_of)
+    upfront_billed = q2(getattr(plan, "upfront_billed_amount", 0) or 0)
+    return q2(one_time_net + fees + max(plan_accrued - upfront_billed, Decimal("0")))
 
 
 def compute_balance(order, as_of) -> Decimal:
