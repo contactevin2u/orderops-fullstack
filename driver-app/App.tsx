@@ -144,13 +144,13 @@ export default function App() {
       const current = auth().currentUser;
       if (!current) return;
       const idt = await current.getIdToken(true);
-      await fetch(`${API_BASE}/drivers/devices/register`, {
+      await fetch(`${API_BASE}/drivers/devices`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idt}`,
         },
-        body: JSON.stringify({ fcm_token: newToken, platform: Platform.OS }),
+        body: JSON.stringify({ token: newToken, platform: Platform.OS }),
       });
     });
     return sub;
@@ -179,13 +179,13 @@ export default function App() {
 
       // 4) Register device with backend
       setRegisterStatus('registering…');
-      const res = await fetch(`${API_BASE}/drivers/devices/register`, {
+      const res = await fetch(`${API_BASE}/drivers/devices`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${idt}`,
         },
-        body: JSON.stringify({ fcm_token: token, platform: Platform.OS }),
+        body: JSON.stringify({ token: token, platform: Platform.OS }),
       });
       setRegisterStatus(res.ok ? 'OK' : `Failed: ${res.status}`);
 

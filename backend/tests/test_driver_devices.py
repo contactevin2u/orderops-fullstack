@@ -50,8 +50,8 @@ def test_device_register(monkeypatch):
     client = TestClient(app)
 
     resp = client.post(
-        "/drivers/devices/register",
-        json={"fcm_token": "tok", "platform": "android"},
+        "/drivers/devices",
+        json={"token": "tok", "platform": "android", "app_version": "1.0", "model": "Pixel"},
         headers={"Authorization": "Bearer good"},
     )
     assert resp.status_code == 200
@@ -64,6 +64,6 @@ def test_device_register(monkeypatch):
         devices = db.query(DriverDevice).all()
         assert len(devices) == 1
         assert devices[0].driver_id == drivers[0].id
-        assert devices[0].fcm_token == "tok"
+        assert devices[0].token == "tok"
 
     app.dependency_overrides.clear()

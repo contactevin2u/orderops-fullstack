@@ -23,6 +23,7 @@ from app.models import (
     OrderItem,
     Payment,
     Plan,
+    Commission,
     Role,
 )  # noqa: E402
 from app.routers import orders as orders_router  # noqa: E402
@@ -52,6 +53,9 @@ def _setup_db():
     Payment.__table__.c.order_id.type = Integer()
     Plan.__table__.c.id.type = Integer()
     Plan.__table__.c.order_id.type = Integer()
+    Commission.__table__.c.id.type = Integer()
+    Commission.__table__.c.driver_id.type = Integer()
+    Commission.__table__.c.trip_id.type = Integer()
     Base.metadata.create_all(
         engine,
         tables=[
@@ -62,6 +66,7 @@ def _setup_db():
             OrderItem.__table__,
             Payment.__table__,
             Plan.__table__,
+            Commission.__table__,
         ],
     )
     return sessionmaker(bind=engine, expire_on_commit=False)
