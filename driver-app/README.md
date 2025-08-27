@@ -2,6 +2,17 @@
 
 This directory contains the React Native driver application built with Expo.
 
+## Config & Secrets
+
+Runtime settings come from [`app.config.ts`](./app.config.ts) and are exposed via
+`expo-constants`. The app requires an `API_BASE` value which is read in
+`src/config/env.ts`; the app will crash on startup if it is missing. Provide this
+value through the `API_BASE` environment variable when building.
+
+Firebase configuration files (`google-services.json` and
+`GoogleService-Info.plist`) are not committed. CI pipelines should supply them at
+build time. If credentials were previously committed, rotate the keys.
+
 ## Building APKs
 
 The repository includes GitHub Actions workflows that build Android packages

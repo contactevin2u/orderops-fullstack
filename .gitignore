@@ -3,5 +3,7 @@ frontend/.next/
 frontend/storybook-static/
 __pycache__/
 *.pyc
-.env
+.env*
+**/google-services.json
+**/GoogleService-Info.plist
 driver-app/node_modules/

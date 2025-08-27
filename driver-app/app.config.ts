@@ -28,7 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   // backend URL for the app
   extra: {
-    apiBase: process.env.API_BASE || "https://orderops-api-v1.onrender.com",
+    API_BASE: process.env.API_BASE,
   },
 
   runtimeVersion: { policy: "sdkVersion" },
