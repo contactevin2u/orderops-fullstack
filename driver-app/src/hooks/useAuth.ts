@@ -6,7 +6,6 @@ import { api } from '../lib/api';
 
 interface AuthHook {
   user: FirebaseAuthTypes.User | null;
-  idToken: string | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -14,49 +13,40 @@ interface AuthHook {
 
 export function useAuth(): AuthHook {
   const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
-  const [idToken, setIdToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const registeredRef = useRef(false);
 
-  const registerDevice = useCallback(async (idt: string) => {
+  const registerDevice = useCallback(async () => {
     try {
       await messaging().requestPermission();
     } catch {}
     try {
       const token = await messaging().getToken();
-      await api.post('/drivers/devices', idt, { token, platform: Platform.OS });
+      await api.post('/drivers/devices', { token, platform: Platform.OS });
     } catch {}
   }, []);
 
   useEffect(() => {
-    const unsub = auth().onIdTokenChanged(async (current) => {
+    const unsub = auth().onAuthStateChanged(async (current) => {
       setUser(current);
       if (current) {
-        const t = await current.getIdToken();
-        setIdToken(t);
+        if (!registeredRef.current) {
+          registerDevice();
+          registeredRef.current = true;
+        }
       } else {
-        setIdToken(null);
         registeredRef.current = false;
       }
     });
     return unsub;
-  }, []);
-
-  useEffect(() => {
-    if (user && idToken && !registeredRef.current) {
-      registerDevice(idToken);
-      registeredRef.current = true;
-    }
-  }, [user, idToken, registerDevice]);
+  }, [registerDevice]);
 
   useEffect(() => {
     const sub = messaging().onTokenRefresh(async (fcmToken) => {
       const current = auth().currentUser;
       if (!current) return;
-      const t = await current.getIdToken(true);
-      setIdToken(t);
       try {
-        await api.post('/drivers/devices', t, { token: fcmToken, platform: Platform.OS });
+        await api.post('/drivers/devices', { token: fcmToken, platform: Platform.OS });
       } catch {}
     });
     return sub;
@@ -75,5 +65,5 @@ export function useAuth(): AuthHook {
     await auth().signOut();
   }, []);
 
-  return { user, idToken, loading, signIn, signOut };
+  return { user, loading, signIn, signOut };
 }
