@@ -43,6 +43,8 @@ describe('RouteDetailDrawer', () => {
     const route = { id: '1', name: 'Route A', date: '2024-07-01' } as any;
     render(<RouteDetailDrawer route={route} onClose={() => {}} />);
     expect(screen.getByText('ORD1')).toBeInTheDocument();
+    expect(screen.getByText('Status')).toBeInTheDocument();
+    expect(screen.getByText('ASSIGNED')).toBeInTheDocument();
   });
 
   it('allows selecting unassigned orders', () => {

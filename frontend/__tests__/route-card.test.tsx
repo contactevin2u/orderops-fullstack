@@ -8,7 +8,7 @@ describe('RouteCard', () => {
   it('calls onSelect with keyboard', async () => {
     const route: any = { id: '1', name: 'Route A', driverId: '', stops: [] };
     const onSelect = vi.fn();
-    render(<RouteCard route={route} onSelect={onSelect} />);
+    render(<RouteCard route={route} onSelect={onSelect} onEdit={() => {}} />);
     const card = screen.getByRole('button', { name: /route a/i });
     card.focus();
     const user = userEvent.setup();
@@ -16,5 +16,11 @@ describe('RouteCard', () => {
     card.focus();
     await user.keyboard(' ');
     expect(onSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows driver name when provided', () => {
+    const route: any = { id: '1', name: 'Route A', driverId: '1', stops: [] };
+    render(<RouteCard route={route} onSelect={() => {}} onEdit={() => {}} driverName="Alice" />);
+    expect(screen.getByText(/driver: alice/i)).toBeInTheDocument();
   });
 });
