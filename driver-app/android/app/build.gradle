@@ -2,14 +2,16 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
+    // RN Gradle plugin (reads version from node_modules and sets RN minor = 75)
+    id("com.facebook.react")
 }
 
+// Use Expo CLI bundler for release (export:embed)
 react {
-    // Resolve @expo/cli path for Gradle
+    // Resolve @expo/cli so Gradle invokes Expo’s bundler
     cliFile = new File(["node", "--print", "require.resolve('@expo/cli')"].execute(null, rootDir).text.trim())
-    // Use the Expo export bundler so assets/embedded bundle are created correctly
     bundleCommand = "export:embed"
-    // Resolve the entry file via Expo helper (works with index.js or App.tsx)
+    // Resolve entry file via Expo helper
     def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
     entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
 }
