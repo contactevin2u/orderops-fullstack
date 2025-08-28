@@ -2,6 +2,8 @@ import { View, Text } from "react-native";
 import { Link } from "expo-router";
 import { useOrders } from "../../src/presentation/hooks/useOrders";
 
+// TODO: replace useOrders with react-query using OrderRepository
+
 export default function ActiveTab() {
   const { active } = useOrders();
   return (

@@ -2,6 +2,8 @@ import { View, Text } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useOrders } from "../../src/presentation/hooks/useOrders";
 
+// TODO: replace useOrders with OrderRepository and React Query
+
 export default function OrderDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { active, completed } = useOrders();
