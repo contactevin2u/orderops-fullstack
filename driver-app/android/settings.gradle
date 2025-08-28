@@ -1,0 +1,29 @@
+pluginManagement {
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+    google()
+    // Let Gradle find the RN Android artifacts locally
+    maven { url("$rootDir/../node_modules/react-native/android") }
+  }
+    // Use the RN Gradle plugin from node_modules to ensure correct RN detection (minor=75)
+    includeBuild("../node_modules/@react-native/gradle-plugin")
+  }
+
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+  repositories {
+    google()
+    mavenCentral()
+    // RN Android artifacts (react-android, hermes-android, etc.)
+    maven { url("$rootDir/../node_modules/react-native/android") }
+  }
+}
+
+rootProject.name = "driver-app"
+include(":app")
+
+// Autolink Expo modules
+apply from: new File(["node", "--print", "require.resolve('expo/scripts/autolinking.gradle')"].execute(null, rootDir).text.trim())
+useExpoModules()
+
