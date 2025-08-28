@@ -4,6 +4,16 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+react {
+    // Resolve @expo/cli path for Gradle
+    cliFile = new File(["node", "--print", "require.resolve('@expo/cli')"].execute(null, rootDir).text.trim())
+    // Use the Expo export bundler so assets/embedded bundle are created correctly
+    bundleCommand = "export:embed"
+    // Resolve the entry file via Expo helper (works with index.js or App.tsx)
+    def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+    entryFile = file(["node", "-e", "require('expo/scripts/resolveAppEntry')", projectRoot, "android", "absolute"].execute(null, rootDir).text.trim())
+}
+
 android {
     namespace "com.yourco.driverAA"
     compileSdk 34

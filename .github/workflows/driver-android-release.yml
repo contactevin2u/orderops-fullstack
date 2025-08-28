@@ -105,28 +105,12 @@ jobs:
       - name: Ensure Metro config exists
         working-directory: driver-app
         run: |
-          if [ ! -f metro.config.js ]; then
-            printf "const { getDefaultConfig } = require('expo/metro-config');\nmodule.exports = getDefaultConfig(__dirname);\n" > metro.config.js
-            echo "Created metro.config.js"
+          if [ ! -f metro.config.js ] || ! grep -q "expo/metro-config" metro.config.js; then
+            printf "const { getDefaultConfig } = require('expo/metro-config');\nconst config = getDefaultConfig(__dirname);\nmodule.exports = config;\n" > metro.config.js
+            echo "Wrote Expo metro.config.js"
           else
-            echo "metro.config.js already present"
+            echo "Expo metro.config.js already present"
           fi
-
-      - name: Create JS bundle for Release (offline)
-        working-directory: driver-app
-        run: |
-          mkdir -p android/app/src/main/assets
-          ENTRY="index.js"; [ -f "$ENTRY" ] || ENTRY="App.tsx"
-          npx react-native bundle \
-            --platform android \
-            --dev false \
-            --config metro.config.js \
-            --entry-file "$ENTRY" \
-            --bundle-output android/app/src/main/assets/index.android.bundle \
-            --assets-dest android/app/src/main/res
-          test -f android/app/src/main/assets/index.android.bundle || (echo "::error::Bundle not created"; exit 1)
-          echo "Bundled JS from $ENTRY"
-
       - name: Ensure gradlew exists
         id: gradle_check
         working-directory: driver-app/android
@@ -140,6 +124,9 @@ jobs:
             exit 1
           fi
 
+      - name: Clean old Android assets (optional)
+        working-directory: driver-app
+        run: rm -rf android/app/src/main/assets android/app/src/main/res/drawable-*/node_modules*
       - name: Build release APK
         if: steps.gradle_check.outputs.found == 'true'
         working-directory: driver-app/android
