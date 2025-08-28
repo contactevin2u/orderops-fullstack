@@ -10,6 +10,10 @@ pluginManagement {
     includeBuild("../node_modules/@react-native/gradle-plugin")
   }
 
+// Make RN minor version & RN dir visible to all included subprojects (expo-modules-core, etc.)
+gradle.ext.set("reactNativeMinorVersion", 75)
+gradle.ext.set("reactNativeDir", file("../node_modules/react-native"))
+
 dependencyResolutionManagement {
   repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
   repositories {

@@ -18,7 +18,7 @@
     "@react-native-firebase/messaging": "^21.4.0",
     "@react-native-firebase/storage": "^21.4.0",
     "@react-native/gradle-plugin": "^0.75.5",
-    "@react-native/metro-config": "^0.74.0",
+    "@react-native/metro-config": "^0.75.0",
     "expo": "~52.0.0",
     "expo-image-manipulator": "^12.0.5",
     "expo-image-picker": "^15.0.5",
