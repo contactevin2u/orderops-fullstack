@@ -42,6 +42,10 @@ export default function OrderItem({ order, onUpdate, onComplete }: Props) {
             {order.status}
           </Text>
 
+          {order.podPending && (
+            <Text style={{ fontSize: 12, color: '#888' }}>PoD pending (will sync)</Text>
+          )}
+
           {!!cust.name && <Text>Customer: {cust.name}</Text>}
           {!!cust.phone && (
             <Text onPress={() => Linking.openURL(`tel:${cust.phone}`)} style={{ textDecorationLine: 'underline' }}>

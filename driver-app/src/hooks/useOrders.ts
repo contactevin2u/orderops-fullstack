@@ -28,7 +28,7 @@ export function useOrders(options?: Options) {
   const [error, setError] = useState<string | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const { online } = useNetwork();
-  const { enqueue, syncing } = useOutbox();
+  const { enqueue, syncing, lastSyncAt } = useOutbox();
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -108,10 +108,10 @@ export function useOrders(options?: Options) {
       };
 
       if (!online) {
-        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: 'DELIVERED' } : o)));
+        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, podPending: true } : o)));
         await enqueue(uploadJob);
         await enqueue(patchJob);
-        toast.show('Queued. Will send when back online.');
+        toast.show('PoD upload queued. Will sync when back online.', 'info');
         return;
       }
 
@@ -121,10 +121,10 @@ export function useOrders(options?: Options) {
           toast.show('Proof of Delivery is required.', 'error');
           return;
         }
-        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: 'DELIVERED' } : o)));
+        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, podPending: true } : o)));
         await enqueue(uploadJob);
         await enqueue(patchJob);
-        toast.show(uploadRes.error || 'Upload failed. Will retry.', 'error');
+        toast.show('PoD upload queued. Will sync when online.', 'info');
         return;
       }
 
@@ -133,7 +133,9 @@ export function useOrders(options?: Options) {
         await enqueue(patchJob);
         toast.show(patchRes.error || 'Failed to update. Will retry.', 'error');
       } else {
-        setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: 'DELIVERED' } : o)));
+        setOrders((prev) =>
+          prev.map((o) => (o.id === id ? { ...o, status: 'DELIVERED', podPending: false } : o)),
+        );
       }
     },
     [online, enqueue, setOrders],
@@ -166,6 +168,10 @@ export function useOrders(options?: Options) {
       sub.remove();
     };
   }, [refresh, options?.skipPolling, syncing]);
+
+  useEffect(() => {
+    if (lastSyncAt) refresh();
+  }, [lastSyncAt, refresh]);
 
   return { orders, loading, error, refresh, update, completeWithPhoto, pendingCount };
 }

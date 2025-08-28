@@ -22,6 +22,7 @@ export interface Order {
   description?: string;    // compat
   code?: string;           // new explicit order code
   status: string;
+  podPending?: boolean;
 
   delivery_date?: string;
   notes?: string;
