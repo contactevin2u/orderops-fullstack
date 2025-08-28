@@ -1,3 +1,3 @@
-// Expo Metro config (required for react-native bundle in CI)
-const { getDefaultConfig } = require('expo/metro-config');
-module.exports = getDefaultConfig(__dirname);
+const { getDefaultConfig, mergeConfig } = require('@react-native/metro-config');
+const defaultConfig = getDefaultConfig(__dirname);
+module.exports = mergeConfig(defaultConfig, {});
