@@ -13,6 +13,7 @@ allprojects {
     }
 }
 
+// Ensure every Kotlin Android subproject compiles with JVM 17
 subprojects {
   plugins.withId("org.jetbrains.kotlin.android") {
     kotlin {
@@ -29,6 +30,16 @@ subprojects {
       freeCompilerArgs += ["-Xjvm-default=all-compatibility"]
       // (Optional) help with some kapt/worker edge cases on CI:
       // freeCompilerArgs += ["-Xuse-k2"]
+    }
+  }
+
+  // Stop transitive Kotlin mismatches (some libs bring 1.8/1.9)
+  configurations.all {
+    resolutionStrategy {
+      force "org.jetbrains.kotlin:kotlin-stdlib:2.0.0"
+      force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:2.0.0"
+      force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:2.0.0"
+      force "org.jetbrains.kotlin:kotlin-reflect:2.0.0"
     }
   }
 }
