@@ -3,11 +3,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaView, StatusBar } from "react-native";
 import { useEffect } from "react";
 import { useRouter } from "expo-router";
-import {
-  registerDevice,
-  initNotifications,
-  onNotificationOpenOrder,
-} from "src/infrastructure/firebase/NotificationService";
+import { registerDevice, initNotifications } from "@infra/firebase/NotificationService";
+import { on, ORDER_OPEN_EVENT } from "@infra/events/bus";
 
 const queryClient = new QueryClient();
 
@@ -18,11 +15,15 @@ export default function RootLayout() {
       // swallow registration errors during bootstrap
     });
     initNotifications().catch(() => {});
-    const sub = onNotificationOpenOrder((orderId) => {
+    const off = on(ORDER_OPEN_EVENT, ({ orderId }: { orderId: string }) => {
       router.push(`/order/${orderId}`);
-      // TODO: invalidate orders query when React Query wiring is ready
+      try {
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
+      } catch {
+        // ignore if query client not available
+      }
     });
-    return sub;
+    return off;
   }, [router]);
   return (
     <QueryClientProvider client={queryClient}>
