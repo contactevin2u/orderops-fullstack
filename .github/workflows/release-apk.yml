@@ -20,21 +20,18 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Install dependencies
-        run: |
-          cd driver-app
-          npm install
+        working-directory: driver-app
+        run: npm install
+      - name: Prebuild Android project
+        working-directory: driver-app
+        run: npx expo prebuild -p android --non-interactive
       - name: Set up google-services.json
         run: |
           mkdir -p driver-app/android/app
           echo "$GOOGLE_SERVICES_JSON" > driver-app/android/app/google-services.json
-      - name: Prebuild Android project
-        run: |
-          cd driver-app
-          npx expo prebuild -p android
       - name: Build release APK
-        run: |
-          cd driver-app/android
-          ./gradlew assembleRelease
+        working-directory: driver-app/android
+        run: ./gradlew assembleRelease
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
