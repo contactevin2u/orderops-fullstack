@@ -9,6 +9,7 @@ interface Ctx {
   enqueue: (job: OutboxJob) => Promise<void>;
   syncing: boolean;
   lastSyncAt: number | null;
+  pending: number;
 }
 
 const OutboxContext = createContext<Ctx | undefined>(undefined);
@@ -17,6 +18,7 @@ function useProvider(): Ctx {
   const { online } = useNetwork();
   const [syncing, setSyncing] = useState(false);
   const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
+  const [pending, setPending] = useState(0);
   const timer = useRef<NodeJS.Timeout | null>(null);
 
   const send = useCallback(async (job: OutboxJob) => {
@@ -40,6 +42,7 @@ function useProvider(): Ctx {
   const flush = useCallback(async () => {
     if (syncing) return;
     const jobs = await list();
+    setPending(jobs.length);
     if (!jobs.length) {
       setLastSyncAt(Date.now());
       return;
@@ -51,6 +54,7 @@ function useProvider(): Ctx {
       if (res.ok) {
         remaining = remaining.filter((j) => j.id !== job.id);
         await replaceAll(remaining);
+        setPending(remaining.length);
       } else {
         job.attempts += 1;
         await replaceAll(remaining);
@@ -78,10 +82,16 @@ function useProvider(): Ctx {
 
   const enqueue = useCallback(async (job: OutboxJob) => {
     await persistEnqueue(job);
+    const jobs = await list();
+    setPending(jobs.length);
     if (online) flush();
   }, [flush, online]);
 
-  return { enqueue, syncing, lastSyncAt };
+  useEffect(() => {
+    list().then((jobs) => setPending(jobs.length));
+  }, []);
+
+  return { enqueue, syncing, lastSyncAt, pending };
 }
 
 export const OutboxProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
