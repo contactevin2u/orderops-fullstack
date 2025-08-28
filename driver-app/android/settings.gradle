@@ -6,12 +6,12 @@ pluginManagement {
     // Let Gradle find the RN Android artifacts locally
     maven { url("$rootDir/../node_modules/react-native/android") }
   }
-    // Use the RN Gradle plugin from node_modules to ensure correct RN detection (minor=75)
+    // Use the RN Gradle plugin from node_modules to ensure correct RN detection (minor=76)
     includeBuild("../node_modules/@react-native/gradle-plugin")
   }
 
 // Make RN minor version & RN dir visible to all included subprojects (expo-modules-core, etc.)
-gradle.ext.set("reactNativeMinorVersion", 75)
+gradle.ext.set("reactNativeMinorVersion", 76)
 gradle.ext.set("reactNativeDir", file("../node_modules/react-native"))
 
 dependencyResolutionManagement {

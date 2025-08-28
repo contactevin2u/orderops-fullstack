@@ -2,7 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.gms.google-services")
-    // RN Gradle plugin (reads version from node_modules and sets RN minor = 75)
+    // RN Gradle plugin (reads version from node_modules and sets RN minor = 76)
     id("com.facebook.react")
 }
 
@@ -18,12 +18,12 @@ react {
 
 android {
     namespace "com.yourco.driverAA"
-    compileSdk 34
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.yourco.driverAA"
         minSdk 24
-        targetSdk 34
+        targetSdk 35
         versionCode 1
         versionName "1.0"
     }

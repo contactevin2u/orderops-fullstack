@@ -127,6 +127,22 @@ jobs:
       - name: Clean old Android assets (optional)
         working-directory: driver-app
         run: rm -rf android/app/src/main/assets android/app/src/main/res/drawable-*/node_modules*
+      - name: Purge caches (Gradle + npm)
+        run: |
+          rm -rf ~/.gradle/caches ~/.gradle/daemon ~/.gradle/native
+          rm -rf ~/.npm
+      - name: Ensure RN 0.76 deps
+        working-directory: driver-app
+        run: |
+          npx expo install react-native@~0.76.6 @react-native/metro-config@^0.76.0
+      - name: Print RN/Expo versions
+        working-directory: driver-app
+        run: |
+          node -e "console.log('react-native', require('./node_modules/react-native/package.json').version)"
+          node -e "console.log('expo', require('./node_modules/expo/package.json').version)"
+      - name: expo-modules-core deps (releaseCompileClasspath)
+        working-directory: driver-app/android
+        run: ./gradlew :expo-modules-core:dependencies --configuration releaseCompileClasspath || true
       - name: Kotlin compile diagnostic (non-fatal)
         working-directory: driver-app/android
         run: ./gradlew :expo-modules-core:compileReleaseKotlin --stacktrace --info || true
