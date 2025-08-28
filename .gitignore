@@ -7,3 +7,4 @@ __pycache__/
 driver-app/android/app/google-services.json
 driver-app/**/GoogleService-Info.plist
 driver-app/node_modules/
+driver-app/android/

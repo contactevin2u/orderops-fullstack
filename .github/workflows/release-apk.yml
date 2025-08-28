@@ -1,0 +1,42 @@
+name: Build Android Release APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      API_BASE: ${{ secrets.API_BASE }}
+      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Install dependencies
+        run: |
+          cd driver-app
+          npm install
+      - name: Set up google-services.json
+        run: |
+          mkdir -p driver-app/android/app
+          echo "$GOOGLE_SERVICES_JSON" > driver-app/android/app/google-services.json
+      - name: Prebuild Android project
+        run: |
+          cd driver-app
+          npx expo prebuild -p android
+      - name: Build release APK
+        run: |
+          cd driver-app/android
+          ./gradlew assembleRelease
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: driver-app/android/app/build/outputs/apk/release/app-release.apk
