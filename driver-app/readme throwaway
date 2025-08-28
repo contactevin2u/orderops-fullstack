@@ -1,0 +1,379 @@
+DRIVER APP — BOOTSTRAP ROADMAP (throwaway README)
+
+Purpose: a single source of truth to restart the driver app from zero with a small scaffold and a clear big-picture layout. Keep this doc while wiring links and delete it once the skeleton runs.
+
+0) Scope & Principles
+
+Small first: boot with 2 tabs (Active / Completed), 1 detail screen, and a Commission summary.
+
+Keep endpoints ‘as-is’: we adapt the client, not the server.
+
+Strict TypeScript: ISO date strings, money as integer cents.
+
+Stable links: one place to define API base, deep links, notification routes.
+
+Offline-first: enqueue mutations on failure; single-flight flush on reconnect.
+
+1) Tech Baseline
+
+Expo SDK 52, React Native 0.76.x
+
+Expo Router for navigation
+
+TypeScript (strict)
+
+React Query for fetching + cache (optional in v1; can stub)
+
+AsyncStorage for offline queue (v1)
+
+@react-native-firebase/messaging + notifee (add after UI boots)
+
+2) Folders (minimal to start)
+driver-app/
+  app/
+    (tabs)/
+      index.tsx            # Active orders
+      completed.tsx        # Completed orders
+    order/
+      [id].tsx             # Order detail: Start/Hold/Resume/Complete + PoD
+    commissions/
+      index.tsx            # Monthly commission summary
+    _layout.tsx            # Providers (React Query), SafeArea, StatusBar
+
+  src/
+    core/
+      entities/
+        Order.ts           # Domain types (ISO strings, cents)
+    infrastructure/
+      api/
+        ApiClient.ts       # apiGet/apiPost/apiPatch/apiUpload (Bearer + retries)
+        OrderRepository.ts # calls to server; mapping+validation (later)
+      storage/
+        OfflineQueue.ts    # typed job queue (later)
+      firebase/
+        NotificationService.ts      # foreground/opened handlers (later)
+        background-handler.ts       # FCM background handler (later)
+      services/
+        ImageService.ts     # PoD compress to ≤500 KB (later)
+        NetworkService.ts   # online/offline listener (later)
+    presentation/
+      hooks/
+        useOrders.ts        # seed → later React Query + repo
+        useCommission.ts    # commission fetch/compute (later)
+      components/
+        OfflineBanner.tsx   # shows offline/queued state (later)
+      contexts/
+        AppContext.tsx      # orderUseCases, services (later)
+    shared/
+      constants/
+        config.ts           # API_BASE resolver; throws if missing
+      utils/
+        formatting.ts       # money/date formatters
+
+3) Routing Map & Deep Links
+
+Tabs
+
+/ (tabs)/index → Active
+
+/ (tabs)/completed → Completed
+
+Order Detail
+
+/order/[id] (e.g., driver://order/123)
+
+Commissions
+
+/commissions (month query via state; optional /commissions?month=YYYY-MM)
+
+Deep-link intents from notifications
+
+driver://order/<id> on notification press for assignment/updates.
+
+4) Domain Types (strict)
+// src/core/entities/Order.ts
+export type ISODateString = string;
+export type Cents = number;
+
+export enum OrderStatus {
+  ASSIGNED = "ASSIGNED",
+  IN_TRANSIT = "IN_TRANSIT",
+  ON_HOLD = "ON_HOLD",
+  DELIVERED = "DELIVERED",
+  CANCELLED = "CANCELLED"
+}
+
+export interface Customer {
+  id: number;
+  name: string;
+  phone: string;
+  address: string;
+  mapUrl?: string;
+}
+
+export interface Pricing {
+  subtotal_cents: Cents;
+  discount_cents: Cents;
+  delivery_fee_cents: Cents;
+  return_delivery_fee_cents: Cents;
+  penalty_fee_cents: Cents;
+  total_cents: Cents;
+  paid_amount_cents: Cents;
+  balance_cents: Cents;
+}
+
+export interface Order {
+  id: number;
+  code: string;
+  status: OrderStatus;
+  deliveryDate: ISODateString;
+  customer: Customer;
+  pricing?: Pricing;
+  metadata?: {
+    createdAt?: ISODateString;
+    updatedAt?: ISODateString;
+    podUrl?: string;
+    podPending?: boolean;
+  };
+}
+
+5) Actions & Status Rules
+
+Allowed transitions
+
+ASSIGNED → IN_TRANSIT (Start)
+
+IN_TRANSIT → ON_HOLD (On Hold)
+
+ON_HOLD → IN_TRANSIT (Resume)
+
+IN_TRANSIT → DELIVERED (Complete requires PoD)
+
+Client guards
+
+Don’t allow Start if not ASSIGNED.
+
+Don’t allow Complete unless IN_TRANSIT.
+
+Complete = PoD upload then patch status to DELIVERED.
+
+6) API Endpoints (assumed / to confirm)
+
+List orders
+GET /drivers/orders → { data: ApiOrder[] }
+
+Get one
+GET /drivers/orders/:id
+
+Update status
+PATCH /drivers/orders/:id body { status: 'IN_TRANSIT'|'ON_HOLD'|'DELIVERED' }
+
+Upload PoD
+POST /drivers/orders/:id/pod-photo (multipart form-data, file)
+
+Register device
+POST /drivers/devices { fcm_token: string }
+
+Commission
+GET /drivers/commissions?month=YYYY-MM&tz=Asia%2FKuala_Lumpur
+
+If not available, fallback to GET /drivers/orders?from=YYYY-MM-01&to=YYYY-MM-<end> and compute client-side.
+
+Headers (all requests)
+
+Authorization: Bearer <Firebase ID Token>
+
+Accept: application/json
+
+Headers (mutations only)
+
+X-Idempotency-Key: <uuid or queueItemId>
+
+HTTP retry policy (ApiClient)
+
+Transient retry at most 1–2 times for 502/503/504 or timeout; small jitter.
+
+No infinite retry here—enqueue at repository layer if needed.
+
+7) Notifications (to add after UI boots)
+
+FCM data payloads (examples)
+
+// Order assigned
+{
+  "type": "order_assigned",
+  "order_id": "123",
+  "code": "#10023",
+  "pickup_address": "Warehouse A",
+  "dropoff_address": "PJ, Selangor"
+}
+
+
+Handlers
+
+Background (background-handler.ts): show Notifee notification; prefetch /drivers/orders (optional); record messageId to dedupe.
+
+Foreground (NotificationService.ts): display banner/notification; invalidate ['orders'].
+
+Press: deep-link to driver://order/123.
+
+Token lifecycle
+
+On login and on token refresh: POST /drivers/devices { fcm_token }.
+
+8) Offline Queue (later)
+
+Job union
+
+UPDATE_STATUS { orderId, status }
+
+UPLOAD_POD { orderId, imageUri }
+
+Behavior
+
+Store in AsyncStorage under @offline_queue_v1.
+
+Exponential backoff + jitter; single-flight flush.
+
+Flush triggers: network regain, app focus, login success, notification received.
+
+Mutations use X-Idempotency-Key = queue item id.
+
+UI
+
+Global “Sync” banner if pending.
+
+PoD chip “Queued” on order card.
+
+9) State & Caching (when we add React Query)
+
+Query keys
+
+Orders: ['orders']
+
+One order: ['order', id]
+
+Commission month: ['commissions', 'YYYY-MM']
+
+Invalidations
+
+On any status change or PoD success: invalidate ['orders'], ['order', id], and current month commission.
+
+10) Screens — MVP Behavior
+Active (tabs/index)
+
+Fetch (or seed) orders; show those not DELIVERED.
+
+Pull-to-refresh → refetch orders.
+
+Tap → /order/[id].
+
+Completed (tabs/completed)
+
+Show DELIVERED orders; later add date filter.
+
+Order Detail (/order/[id])
+
+Buttons:
+
+Start → PATCH status IN_TRANSIT
+
+On Hold → PATCH status ON_HOLD
+
+Resume → PATCH status IN_TRANSIT
+
+Complete → capture/select PoD → compress (≤500 KB; max 1600px; strip EXIF) → POST /pod-photo → PATCH status DELIVERED
+
+Show PoD thumbnail if available; show “Queued” if pending.
+
+Commissions (/commissions)
+
+Month picker (default current month, TZ Asia/Kuala_Lumpur).
+
+Show Total and per-order lines.
+
+If server API absent, compute client-side with a single function calcCommission(order).
+
+11) Config & Env
+
+API_BASE must be resolvable from:
+
+EXPO_PUBLIC_API_BASE env, or
+
+app.config.ts -> extra.API_BASE
+
+If missing, throw a clear error at app boot (from src/shared/constants/config.ts).
+
+Firebase config (google-services.json) added once notifications are wired.
+
+12) Startup Wiring (bootstrap order)
+
+Scaffold UI only: tabs + detail with seeded data; config loader that throws if API_BASE missing.
+
+Add ApiClient (GET only) and slowly replace seeds with live list.
+
+Add OrderRepository with PATCH + PoD upload; switch detail actions to live.
+
+Add React Query around list & detail; invalidate on actions.
+
+Add OfflineQueue: enqueue on failure; Sync banner.
+
+Add Notifications: bg handler + foreground service + deep link.
+
+Add Commission query/screen.
+
+13) Verification Checklist (linkages)
+
+ EXPO_PUBLIC_API_BASE set → app boots; missing → friendly error.
+
+ GET /drivers/orders returns → Active & Completed show correct items.
+
+ Start/Hold/Resume/Complete call PATCH /drivers/orders/:id with proper Authorization and X-Idempotency-Key.
+
+ PoD: selects/captures image → compressed ≤500 KB → POST /drivers/orders/:id/pod-photo (multipart, field file) → then PATCH DELIVERED.
+
+ React Query invalidates ['orders'] (and ['commissions', month] if needed) after completion.
+
+ Offline: simulate airplane mode → actions enqueue; reconnect → auto flush once; server shows updated status.
+
+ Notifications: FCM message order_assigned arrives:
+
+Background: Notifee shows; tapping opens /order/[id].
+
+Foreground: in-app banner; list invalidated.
+
+ Commission: GET /drivers/commissions?month=YYYY-MM&tz=Asia%2FKuala_Lumpur returns total & lines OR client computes from delivered orders.
+
+14) Minimal Task Board (do in this order)
+
+Scaffold tabs + detail + config.ts + seed hook (no backend)
+
+ApiClient (GET) + Active/Completed list from live /drivers/orders
+
+Order actions (PATCH) with optimistic UI (no queue), then PoD upload
+
+React Query + cache invalidation
+
+Commission screen (server first; fallback compute)
+
+Offline queue + Sync banner
+
+Notifications (bg handler, channel, deep link)
+
+15) Testing Notes
+
+Unit: mapping API→domain, commission calculator, status guard logic, queue backoff schedule.
+
+Integration: 401 refresh path; PoD upload + follow-up PATCH; offline enqueue + reconnect flush; notification dedupe.
+
+E2E: Start→Hold→Resume→Complete with PoD; offline completion queued; commission total updates.
+
+16) Open Questions (fill then delete)
+
+Server returns commission per order or we compute? (Which rule?)
+
+Pagination or since cursor on /drivers/orders?
+
+Any extra statuses (e.g., FAILED, CANCELLED_BY_ADMIN)?
+
+Does PoD require metadata (lat/long, timestamp, notes)?
