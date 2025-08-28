@@ -57,17 +57,17 @@ jobs:
       - name: Ensure expo-splash-screen installed
         working-directory: driver-app
 
-        run: npx --yes expo@^51.0.0 install expo-splash-screen
+        run: npx --yes expo@^52.0.0 install expo-splash-screen
 
       - name: Check Expo CLI version
         working-directory: driver-app
-        run: npx --yes expo@^51.0.0 --version
+        run: npx --yes expo@^52.0.0 --version
 
       - name: Prebuild native Android project (CLEAN + LOG)
         working-directory: driver-app
         run: |
           set -o pipefail
-          npx --yes expo@^51.0.0 prebuild --platform android --non-interactive --clean 2>&1 | tee prebuild.log
+          npx --yes expo@^52.0.0 prebuild --platform android --non-interactive --clean 2>&1 | tee prebuild.log
 
       - name: Upload prebuild log (always)
         if: always()
