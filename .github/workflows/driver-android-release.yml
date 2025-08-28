@@ -35,17 +35,18 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Write google-services.json from secret
+      - name: Write google-services.json
+        working-directory: driver-app
         run: |
-          mkdir -p driver-app
-          echo "$GOOGLE_SERVICES_JSON" > driver-app/google-services.json
+          mkdir -p android/app
+          echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
 
       - name: Sanity check (android.package vs google-services.json)
         run: |
           node -e "const fs=require('fs');\
-          const p='driver-app/google-services.json';\
+          const p='driver-app/android/app/google-services.json';\
           if(!fs.existsSync(p)){console.error('Missing '+p+' — commit it or provide GOOGLE_SERVICES_JSON secret.');process.exit(1)}\
           const gs=JSON.parse(fs.readFileSync(p,'utf8'));\
           const pkg=(gs.client||[]).find(c=>c.client_info&&c.client_info.android_client_info)?.client_info.android_client_info.package_name;\
@@ -124,16 +125,6 @@ jobs:
             --assets-dest android/app/src/main/res
           test -f android/app/src/main/assets/index.android.bundle || (echo "::error::Bundle not created"; exit 1)
           echo "Bundled JS from $ENTRY"
-
-      - name: Ensure google-services.json copied to android/app
-        working-directory: driver-app
-        run: |
-          if [ ! -f android/app/google-services.json ]; then
-            cp google-services.json android/app/google-services.json
-            echo "Copied google-services.json to android/app/"
-          else
-            echo "google-services.json already in android/app/"
-          fi
 
       - name: Ensure gradlew exists
         id: gradle_check
