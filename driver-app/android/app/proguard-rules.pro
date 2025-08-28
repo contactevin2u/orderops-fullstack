@@ -15,3 +15,13 @@
 -keep class kotlin.** { *; }
 -keep class kotlinx.** { *; }
 -dontwarn kotlin.**, kotlinx.**, com.facebook.**
+
+# Firebase and networking
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.** { *; }
+-keep class retrofit2.** { *; }
+-keep class okhttp3.** { *; }
+-keep class com.squareup.moshi.** { *; }
+-keep class kotlinx.coroutines.** { *; }
+-keep class com.yourco.driverAA.** { *; }
+-dontwarn okhttp3.**, retrofit2.**, com.squareup.moshi.**, kotlinx.coroutines.**
