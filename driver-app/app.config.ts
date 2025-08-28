@@ -14,17 +14,33 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     googleServicesFile: "./google-services.json",
     permissions: ["POST_NOTIFICATIONS"],
     versionCode: 2,
+    splash: {
+      image: "./assets/splash.png",
+      backgroundColor: "#FFFFFF",
+      resizeMode: "contain",
+    },
   },
 
   // plugins we rely on
   plugins: [
-    ["expo-splash-screen", { backgroundColor: "#FFFFFF", resizeMode: "contain" }],
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/splash.png",
+        backgroundColor: "#FFFFFF",
+        resizeMode: "contain",
+      },
+    ],
     "@react-native-firebase/app",
     "@react-native-firebase/messaging",
   ],
 
   // optional mirror (plugin reads it too)
-  splash: { backgroundColor: "#FFFFFF", resizeMode: "contain" },
+  splash: {
+    image: "./assets/splash.png",
+    backgroundColor: "#FFFFFF",
+    resizeMode: "contain",
+  },
 
   // backend URL for the app
   extra: {
