@@ -1,13 +1,8 @@
 package com.yourco.driverAA
 
-import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
-import com.yourco.driverAA.push.MyFcmService
+import com.facebook.react.ReactActivity
 
-class MainActivity : AppCompatActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        MyFcmService.requestPermission(this)
-        MyFcmService.refreshToken(this)
-    }
+class MainActivity : ReactActivity() {
+  // Matches the name registered via registerRootComponent("main")
+  override fun getMainComponentName(): String = "main"
 }
