@@ -1,0 +1,6 @@
+// Example google-services.json - copy to android/app/google-services.json and replace with your Firebase config
+{
+  "project_info": {
+    "project_id": "your-project-id"
+  }
+}

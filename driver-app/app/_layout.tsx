@@ -1,3 +1,4 @@
+import "../src/infrastructure/firebase/background-handler";
 import { Slot } from "expo-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { SafeAreaView, StatusBar } from "react-native";

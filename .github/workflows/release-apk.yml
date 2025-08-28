@@ -7,33 +7,46 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      API_BASE: ${{ secrets.API_BASE }}
       FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
       GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+      API_BASE: ${{ secrets.API_BASE }}
+    defaults:
+      run:
+        working-directory: driver-app
     steps:
       - uses: actions/checkout@v3
-      - name: Set up JDK
-        uses: actions/setup-java@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: driver-app/package-lock.json
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
-      - name: Install dependencies
-        working-directory: driver-app
-        run: npm install
-      - name: Prebuild Android project
-        working-directory: driver-app
-        run: npx expo prebuild -p android --non-interactive
-      - name: Set up google-services.json
+          cache: 'gradle'
+      - name: Diagnostics
         run: |
-          mkdir -p driver-app/android/app
-          echo "$GOOGLE_SERVICES_JSON" > driver-app/android/app/google-services.json
+          java -version
+          keytool -list -cacerts | head -n 20
+      - name: Install dependencies
+        run: npm ci
+      - name: Prebuild Android project
+        run: npx expo prebuild --platform android --non-interactive --clean
+      - name: Set up google-services.json
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+      - name: Ensure android project generated
+        run: test -d android || exit 1
       - name: Build release APK
-        working-directory: driver-app/android
+        working-directory: android
         run: ./gradlew assembleRelease
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: app-release
-          path: driver-app/android/app/build/outputs/apk/release/app-release.apk
+          path: android/app/build/outputs/apk/release/*.apk
