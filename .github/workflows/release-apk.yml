@@ -6,6 +6,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      API_BASE: ${{ secrets.API_BASE }}
+      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK
@@ -17,6 +23,10 @@ jobs:
         run: |
           cd driver-app
           npm install
+      - name: Set up google-services.json
+        run: |
+          mkdir -p driver-app/android/app
+          echo "$GOOGLE_SERVICES_JSON" > driver-app/android/app/google-services.json
       - name: Prebuild Android project
         run: |
           cd driver-app
