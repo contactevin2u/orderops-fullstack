@@ -1,11 +1,11 @@
 import { ExpoConfig } from "@expo/config";
 
 export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
-  const apiBase = process.env.API_BASE || process.env.EXPO_PUBLIC_API_BASE;
   return {
     ...config,
     name: "DriverApp",
     slug: "driver-app",
+    scheme: "driver",
     plugins: [
       ...(config.plugins ?? []),
       "@react-native-firebase/app",
@@ -13,7 +13,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
       "@notifee/react-native",
     ],
     extra: {
-      API_BASE: apiBase,
+      API_BASE: process.env.API_BASE || process.env.EXPO_PUBLIC_API_BASE,
     },
   };
 };
