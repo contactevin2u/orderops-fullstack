@@ -127,6 +127,9 @@ jobs:
       - name: Clean old Android assets (optional)
         working-directory: driver-app
         run: rm -rf android/app/src/main/assets android/app/src/main/res/drawable-*/node_modules*
+      - name: Kotlin compile diagnostic (non-fatal)
+        working-directory: driver-app/android
+        run: ./gradlew :expo-modules-core:compileReleaseKotlin --stacktrace --info || true
       - name: Build release APK
         if: steps.gradle_check.outputs.found == 'true'
         working-directory: driver-app/android
