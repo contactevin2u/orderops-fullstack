@@ -6,6 +6,12 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     ...config,
     name: "DriverApp",
     slug: "driver-app",
+    plugins: [
+      ...(config.plugins ?? []),
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      "@notifee/react-native",
+    ],
     extra: {
       API_BASE: apiBase,
     },
