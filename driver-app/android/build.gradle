@@ -19,4 +19,16 @@ subprojects {
       jvmToolchain(17)
     }
   }
+
+  // Enforce Kotlin compile options for ALL Kotlin tasks (including transitive modules)
+  tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    kotlinOptions {
+      // Align with Java 17 toolchain; avoids mismatched target errors in subprojects
+      jvmTarget = "17"
+      // Compatibility default methods for interfaces (safe for Android/Expo libs)
+      freeCompilerArgs += ["-Xjvm-default=all-compatibility"]
+      // (Optional) help with some kapt/worker edge cases on CI:
+      // freeCompilerArgs += ["-Xuse-k2"]
+    }
+  }
 }
