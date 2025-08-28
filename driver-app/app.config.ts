@@ -29,6 +29,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   // backend URL for the app
   extra: {
     API_BASE: process.env.API_BASE,
+    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
   },
 
   runtimeVersion: { policy: "sdkVersion" },
