@@ -6,17 +6,23 @@ import {
   incrementRetries,
   OutboxJob,
 } from "../storage/Outbox";
+import { ApiOrderSchema, ApiOrderListSchema, mapOrder } from "./schemas";
+import { Order } from "@core/entities/Order";
 
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-export async function getAll() {
-  return ApiClient.get("/drivers/orders");
+export async function getAll(): Promise<Order[]> {
+  const json = await ApiClient.get("/drivers/orders");
+  const parsed = ApiOrderListSchema.parse(json);
+  return parsed.map(mapOrder);
 }
 
-export async function getById(id: string | number) {
-  return ApiClient.get(`/drivers/orders/${id}`);
+export async function getById(id: string | number): Promise<Order> {
+  const json = await ApiClient.get(`/drivers/orders/${id}`);
+  const parsed = ApiOrderSchema.parse(json);
+  return mapOrder(parsed);
 }
 
 export async function updateStatus(id: string | number, status: string) {
