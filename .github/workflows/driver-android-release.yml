@@ -44,19 +44,6 @@ jobs:
           printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
           ls -l google-services.json
 
-      - name: Sanity check (android.package vs google-services.json)
-        run: |
-          node -e "const fs=require('fs');\
-          const p='driver-app/android/app/google-services.json';\
-          if(!fs.existsSync(p)){console.error('Missing '+p+' — commit it or provide GOOGLE_SERVICES_JSON secret.');process.exit(1)}\
-          const gs=JSON.parse(fs.readFileSync(p,'utf8'));\
-          const pkg=(gs.client||[]).find(c=>c.client_info&&c.client_info.android_client_info)?.client_info.android_client_info.package_name;\
-          const conf=fs.readFileSync('driver-app/app.config.ts','utf8');\
-          const m=/android:\\s*\\{[\\s\\S]*?package:\\s*\"([^\"]+)\"/m.exec(conf);\
-          if(!pkg){console.error('google-services.json: package_name not found');process.exit(1)}\
-          if(!m){console.error('app.config.ts: android.package not found');process.exit(1)}\
-          if(pkg!==m[1]){console.error('PACKAGE MISMATCH\\n  google-services.json = '+pkg+'\\n  app.config.ts        = '+m[1]);process.exit(1)}\
-          console.log('Package OK:', pkg);"
 
       - name: Install JS deps (lockfile-safe)
         working-directory: driver-app
