@@ -2,13 +2,13 @@ package com.orderops.driver.notifications
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.navigation.NavDeepLinkBuilder
 import com.orderops.driver.R
-import com.orderops.driver.util.DeepLinks
 
 object Notifications {
     const val JOBS_CHANNEL = "jobs"
@@ -25,20 +25,26 @@ object Notifications {
         }
     }
 
-    fun jobAssignedNotification(context: Context, jobId: String): androidx.core.app.NotificationCompat.Builder {
+    fun jobAssignedNotification(context: Context, jobId: String): NotificationCompat.Builder {
         createJobsChannel(context)
-        val pendingIntent = NavDeepLinkBuilder(context)
-            .setComponentName(com.orderops.driver.MainActivity::class.java)
-            .setGraph(R.navigation.nav_graph)
-            .setDestination(R.id.jobDetail)
-            .setArguments(android.os.Bundle().apply { putString("jobId", jobId) })
-            .createPendingIntent()
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("driver://job/$jobId")
+        ).setPackage(context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+
+        val pi = PendingIntent.getActivity(
+            context, jobId.hashCode(), intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         return NotificationCompat.Builder(context, JOBS_CHANNEL)
             .setSmallIcon(R.drawable.ic_notification_foreground)
             .setContentTitle("New job assigned")
             .setContentText("Job $jobId")
             .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
+            .setContentIntent(pi)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
     }
 }
+
