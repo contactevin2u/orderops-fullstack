@@ -9,6 +9,7 @@ jobs:
     env:
       EXPO_NO_TELEMETRY: 1
       CI: true
+      # Make ONLY the five secrets available to the build
       API_BASE: ${{ secrets.API_BASE }}
       FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
       FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
@@ -24,9 +25,15 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: driver-app/package-lock.json
+      - name: Install dependencies (include dev deps)
+        env:
+          NODE_ENV: ""
+        run: npm ci --include=dev
+      - name: Expo sanity check
+        run: npx expo doctor || true
       - name: Create google-services.json from secret (RAW JSON, not base64)
         run: |
-          if [ -z "${GOOGLE_SERVICES_JSON}" ]; then
+          if [ -z "${GOOGLE_SERVICES_JSON:-}" ]; then
             echo "ERROR: Missing GOOGLE_SERVICES_JSON secret"; exit 1
           fi
           VAL="${GOOGLE_SERVICES_JSON}"
@@ -34,77 +41,32 @@ jobs:
             \"*) VAL="${VAL%\"}"; VAL="${VAL#\"}";;
             \'*) VAL="${VAL%\'}"; VAL="${VAL#\'}";;
           esac
-          printf "%s" "$VAL" > google-services.json
-          test -s google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
-      - name: Pre-bundle diagnostics
-        run: |
-          node -v
-          yarn -v || echo "Yarn not installed"
-          npm -v
-          if [ -n "$API_BASE" ]; then echo "API_BASE is set"; else echo "API_BASE is not set"; fi
-      - name: Install dependencies (allow new deps)
-        env:
-          NODE_ENV: ""
-        run: npm install --no-audit --no-fund
-      - name: Verify JS bundle (Expo) and capture logs
-        env:
-          EXPO_DEBUG: 1
-          CI: 1
-        run: |
-          set -o pipefail
-          # Try Expo export first (SDK 50+). Defaults to production; no --dev/--no-dev flag.
-          (npx expo export --platform android \
-            --output-dir .expo/export \
-            --dump-sourcemap --dump-assetmap --clear) 2>&1 | tee -a expo-bundle.log
-          STATUS=${PIPESTATUS[0]}
-          if [ $STATUS -ne 0 ]; then
-            echo "expo export failed, trying direct Metro bundle..." | tee -a expo-bundle.log
-            (npx react-native bundle --platform android --dev false --reset-cache \
-              --entry-file node_modules/expo-router/entry.js \
-              --bundle-output .expo/export/index.android.bundle \
-              --assets-dest .expo/export) 2>&1 | tee -a expo-bundle.log
-            STATUS=${PIPESTATUS[0]}
-          fi
-          if [ $STATUS -ne 0 ]; then
-            echo "JS bundling failed (see expo-bundle.log). Failing early before Gradle..." >&2
-            exit 1
-          fi
-      - name: Upload bundling log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: expo-bundle-log
-          path: driver-app/expo-bundle.log
-
+          mkdir -p android/app
+          printf "%s" "$VAL" > android/app/google-services.json
+          test -s android/app/google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
       - name: Prebuild Android project
-        run: npx expo prebuild --platform android --non-interactive --clean
-
+        run: npx expo prebuild --platform android --clean
       - name: Ensure android project generated
         run: test -d android && test -f android/gradlew
-
       - name: Set Kotlin/JVM compiler target and Gradle memory (post-prebuild)
         run: |
           {
             echo "kotlin.jvm.target=17"
-            # add Gradle & Kotlin daemon memory if not present
             if ! grep -q "^org\.gradle\.jvmargs=" android/gradle.properties; then
               echo "org.gradle.jvmargs=-Xmx4096m -Dkotlin.daemon.jvm.options=-Xmx2048m"
             fi
           } >> android/gradle.properties
-
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
           cache: gradle
           cache-dependency-path: driver-app/android/gradle/wrapper/gradle-wrapper.properties
-
       - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace --info assembleRelease
-
       - uses: actions/upload-artifact@v4
         with:
           name: app-release
