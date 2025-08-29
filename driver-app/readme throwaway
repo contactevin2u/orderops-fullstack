@@ -298,7 +298,7 @@ If server API absent, compute client-side with a single function calcCommission(
 
 API_BASE must be resolvable from:
 
-EXPO_PUBLIC_API_BASE env, or
+API_BASE env, or
 
 app.config.ts -> extra.API_BASE
 
@@ -324,7 +324,7 @@ Add Commission query/screen.
 
 13) Verification Checklist (linkages)
 
- EXPO_PUBLIC_API_BASE set → app boots; missing → friendly error.
+ API_BASE set → app boots; missing → friendly error.
 
  GET /drivers/orders returns → Active & Completed show correct items.
 

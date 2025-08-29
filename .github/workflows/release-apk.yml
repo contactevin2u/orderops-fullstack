@@ -7,8 +7,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       API_BASE: ${{ secrets.API_BASE }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      EXPO_NO_TELEMETRY: 1
+      NODE_ENV: production
+      CI: true
     defaults:
       run:
         working-directory: driver-app
@@ -36,8 +39,12 @@ jobs:
       - name: Ensure gradlew exists
         run: test -f android/gradlew || (echo "missing gradlew" && exit 1)
       - name: Set up google-services.json
-        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
-        run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+      - name: Print API_BASE for Metro
+        run: |
+          echo "API_BASE=$API_BASE"
+          node -e "console.log('Node sees API_BASE:', process.env.API_BASE || 'UNSET')"
       - name: Build release APK
         run: |
           cd android
