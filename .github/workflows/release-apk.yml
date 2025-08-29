@@ -42,15 +42,10 @@ jobs:
           yarn -v || echo "Yarn not installed"
           npm -v
           if [ -n "$API_BASE" ]; then echo "API_BASE is set"; else echo "API_BASE is not set"; fi
-      - name: Install dependencies (include dev deps)
+      - name: Install dependencies (allow new deps)
         env:
-          # Unset NODE_ENV so npm installs devDependencies (Babel plugins, etc.)
           NODE_ENV: ""
-        run: npm ci
-      - name: Verify babel-plugin-module-resolver present
-        run: |
-          npm ls --depth=0 babel-plugin-module-resolver || true
-          node -e "console.log('module-resolver path:', require.resolve('babel-plugin-module-resolver'))"
+        run: npm install --no-audit --no-fund
       - name: Verify JS bundle (Expo) and capture logs
         env:
           EXPO_DEBUG: 1
