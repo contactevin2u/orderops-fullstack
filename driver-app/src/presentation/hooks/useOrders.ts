@@ -1,56 +1,55 @@
-import { useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { Order, OrderStatus } from "../../core/entities/Order";
-import {
-  updateStatus as repoUpdateStatus,
-  uploadProofOfDelivery as repoUploadProof,
-} from "@infra/api/OrderRepository";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import * as orderRepo from "@infra/api/OrderRepository";
+import { OrderStatus } from "@core/entities/Order";
 
-const seed: Order[] = [
-  {
-    id: 1,
-    code: "A1",
-    status: OrderStatus.ASSIGNED,
-    deliveryDate: "2024-01-01",
-    customer: { id: 1, name: "Alice", phone: "123", address: "123 Street" },
-    pricing: { total_cents: 0 },
-  },
-  {
-    id: 2,
-    code: "B2",
-    status: OrderStatus.DELIVERED,
-    deliveryDate: "2024-01-02",
-    customer: { id: 2, name: "Bob", phone: "456", address: "456 Avenue" },
-    pricing: { total_cents: 0 },
-  },
-];
+export function useOrders(repo = orderRepo) {
+  const qc = useQueryClient();
+  const {
+    data: orders = [],
+    isLoading,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["orders"],
+    queryFn: repo.getAll,
+    staleTime: 30_000,
+  });
 
-export function useOrders() {
-  const [orders] = useState(seed);
+  const startDelivery = useMutation({
+    mutationFn: (id: number) => repo.updateStatus(id, OrderStatus.IN_TRANSIT),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+
+  const holdDelivery = useMutation({
+    mutationFn: (id: number) => repo.updateStatus(id, OrderStatus.ON_HOLD),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+
+  const resumeDelivery = useMutation({
+    mutationFn: (id: number) => repo.updateStatus(id, OrderStatus.IN_TRANSIT),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+
+  const completeDelivery = useMutation({
+    mutationFn: async ({ id, proofUri }: { id: number; proofUri: string }) => {
+      await repo.uploadProofOfDelivery(id, proofUri);
+      await repo.updateStatus(id, OrderStatus.DELIVERED);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["orders"] }),
+  });
+
   const active = orders.filter((o) => o.status !== OrderStatus.DELIVERED);
   const completed = orders.filter((o) => o.status === OrderStatus.DELIVERED);
-  return { active, completed };
-}
 
-export function useOrderMutations() {
-  const queryClient = useQueryClient();
-  const invalidate = () => {
-    try {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-    } catch {
-      // TODO: provide QueryClient for invalidation
-    }
+  return {
+    activeOrders: active,
+    completedOrders: completed,
+    loading: isLoading,
+    error,
+    refresh: refetch,
+    startDelivery,
+    holdDelivery,
+    resumeDelivery,
+    completeDelivery,
   };
-
-  const updateStatus = async (id: number | string, status: string) => {
-    await repoUpdateStatus(id, status);
-    invalidate();
-  };
-
-  const uploadProofOfDelivery = async (id: number | string, uri: string) => {
-    await repoUploadProof(id, uri);
-    invalidate();
-  };
-
-  return { updateStatus, uploadProofOfDelivery };
 }
