@@ -10,6 +10,11 @@ jobs:
       EXPO_NO_TELEMETRY: 1
       NODE_ENV: production
       CI: true
+      API_BASE: ${{ secrets.API_BASE }}
+      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
     defaults:
       run:
         working-directory: driver-app
@@ -20,33 +25,24 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: driver-app/package-lock.json
-      - name: Load DRIVER_APP_ENV secret
-        env:
-          DRIVER_APP_ENV: ${{ secrets.DRIVER_APP_ENV || vars.DRIVER_APP_ENV }}
-        run: |
-          if [ -z "${DRIVER_APP_ENV}" ]; then
-            echo "ERROR: DRIVER_APP_ENV is missing. Add a repo/org Actions Secret (or Variable) with KEY=VALUE lines." >&2
-            exit 1
-          fi
-          printf "%s\n" "${DRIVER_APP_ENV}" > .env
-          while IFS= read -r line; do
-            [ -z "$line" ] && continue
-            case "$line" in \#*) continue;; esac
-            echo "$line" >> "$GITHUB_ENV"
-          done < .env
-
-      - name: Create google-services.json from $GOOGLE_SERVICES_JSON
+      - name: Create google-services.json from secret
         run: |
           if [ -z "${GOOGLE_SERVICES_JSON}" ]; then
-            echo "ERROR: GOOGLE_SERVICES_JSON not found in .env/DRIVER_APP_ENV"; exit 1
+            echo "ERROR: Missing GOOGLE_SERVICES_JSON secret"; exit 1
           fi
-          CLEAN_JSON="${GOOGLE_SERVICES_JSON}"
-          CLEAN_JSON="${CLEAN_JSON#\"}"
-          CLEAN_JSON="${CLEAN_JSON%\"}"
-          CLEAN_JSON="${CLEAN_JSON#\'}"
-          CLEAN_JSON="${CLEAN_JSON%\'}"
-          printf "%s" "${CLEAN_JSON}" > google-services.json
-          test -s google-services.json || { echo "ERROR: google-services.json is empty"; exit 1; }
+          # Strip one layer of surrounding quotes if a user pasted it quoted
+          VAL="${GOOGLE_SERVICES_JSON}"
+          case "$VAL" in
+            \"*) VAL="${VAL%\"}"; VAL="${VAL#\"}";;
+            \'*) VAL="${VAL%\'}"; VAL="${VAL#\'}";;
+          esac
+          printf "%s" "$VAL" > google-services.json
+          test -s google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
+
+      # - name: (Optional) Write service-account.json for Firebase tools
+      #   run: |
+      #     printf "%s" "$FIREBASE_SERVICE_ACCOUNT_JSON" > service-account.json
+      #     test -s service-account.json
 
       - name: Install dependencies
         run: npm ci
@@ -62,6 +58,7 @@ jobs:
           distribution: temurin
           java-version: 17
           cache: gradle
+          cache-dependency-path: driver-app/android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Build release APK
         run: |
