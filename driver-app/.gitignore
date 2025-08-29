@@ -1,3 +1,2 @@
 # Ignore local secrets
-google-services.json
-.env
+android/app/google-services.json
