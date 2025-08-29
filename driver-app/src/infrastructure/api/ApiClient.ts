@@ -15,8 +15,12 @@ class ApiClient {
   ): Promise<any> {
     const url = `${API_BASE}${path}`;
     const headers: Record<string, string> = {
+      Accept: "application/json",
       ...(opts.headers || {}),
     };
+    if (body && !(body instanceof FormData)) {
+      headers["Content-Type"] = "application/json";
+    }
     if (opts.idempotencyKey) {
       headers["X-Idempotency-Key"] = opts.idempotencyKey;
     }
@@ -40,7 +44,12 @@ class ApiClient {
           signal: controller.signal,
         });
         if ([502, 503, 504].includes(res.status)) {
-          throw new Error(`Transient error: ${res.status}`);
+          throw Object.assign(new Error(`Transient error: ${res.status}`), {
+            status: res.status,
+          });
+        }
+        if (!res.ok) {
+          throw Object.assign(new Error(`HTTP ${res.status}`), { status: res.status });
         }
         const text = await res.text();
         try {
@@ -75,9 +84,7 @@ class ApiClient {
     return this.request("PATCH", path, body, opts);
   }
 
-  upload(path: string, uri: string, opts?: RequestOptions) {
-    const form = new FormData();
-    form.append("file", { uri, name: "file", type: "application/octet-stream" } as any);
+  upload(path: string, form: FormData, opts?: RequestOptions) {
     return this.request("POST", path, form, opts);
   }
 }

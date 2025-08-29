@@ -1,15 +1,11 @@
 import messaging from "@react-native-firebase/messaging";
 import notifee, { EventType } from "@notifee/react-native";
-import { API_BASE } from "@shared/constants/config";
 import { emit } from "@infra/events/bus";
 import { ORDER_OPEN_EVENT } from "@infra/events/bus";
+import ApiClient from "@infra/api/ApiClient";
 
 async function postToken(token: string) {
-  await fetch(`${API_BASE}/drivers/devices`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ token }),
-  });
+  await ApiClient.post("/drivers/devices", { fcm_token: token });
 }
 
 export async function registerDevice() {

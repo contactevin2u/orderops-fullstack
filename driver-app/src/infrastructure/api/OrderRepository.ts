@@ -6,26 +6,54 @@ import {
   incrementRetries,
   OutboxJob,
 } from "../storage/Outbox";
-import { ApiOrderSchema, ApiOrderListSchema, mapOrder } from "./schemas";
+import { ApiOrderSchema, ApiOrderListSchema, ApiOrder } from "./schemas";
 import { Order } from "@core/entities/Order";
 
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+export function mapApiOrder(api: ApiOrder): Order {
+  return {
+    id: api.id,
+    code: api.code,
+    status: api.status,
+    deliveryDate: api.delivery_date,
+    customer: {
+      id: api.customer.id,
+      name: api.customer.name,
+      phone: api.customer.phone,
+      address: api.customer.address,
+      mapUrl: api.customer.map_url,
+    },
+    pricing: {
+      total_cents: api.pricing.total_cents,
+    },
+  };
+}
+
 export async function getAll(): Promise<Order[]> {
   const json = await ApiClient.get("/drivers/orders");
   const parsed = ApiOrderListSchema.parse(json);
-  return parsed.map(mapOrder);
+  return parsed.map(mapApiOrder);
 }
 
-export async function getById(id: string | number): Promise<Order> {
-  const json = await ApiClient.get(`/drivers/orders/${id}`);
-  const parsed = ApiOrderSchema.parse(json);
-  return mapOrder(parsed);
+export async function getById(id: string | number): Promise<Order | null> {
+  try {
+    const json = await ApiClient.get(`/drivers/orders/${id}`);
+    const parsed = ApiOrderSchema.parse(json);
+    return mapApiOrder(parsed);
+  } catch (err: any) {
+    if (err?.status === 404) return null;
+    throw err;
+  }
 }
 
-export async function updateStatus(id: string | number, status: string) {
+export async function updateStatus(
+  id: string | number,
+  status: string,
+  invalidate?: () => void
+) {
   const jobId = generateId();
   try {
     await ApiClient.patch(
@@ -33,6 +61,7 @@ export async function updateStatus(id: string | number, status: string) {
       { status },
       { idempotencyKey: jobId }
     );
+    invalidate?.();
   } catch {
     const job: OutboxJob = {
       type: "UPDATE_STATUS",
@@ -46,14 +75,21 @@ export async function updateStatus(id: string | number, status: string) {
   }
 }
 
-export async function uploadProofOfDelivery(id: string | number, uri: string) {
+export async function uploadProofOfDelivery(
+  id: string | number,
+  uri: string,
+  invalidate?: () => void
+) {
   const jobId = generateId();
   try {
+    const form = new FormData();
+    form.append("file", { uri, name: "pod.jpg", type: "image/jpeg" } as any);
     await ApiClient.upload(
       `/drivers/orders/${id}/pod-photo`,
-      uri,
+      form,
       { idempotencyKey: jobId }
     );
+    invalidate?.();
   } catch {
     const job: OutboxJob = {
       type: "UPLOAD_POD",
@@ -78,9 +114,15 @@ export async function syncPendingChanges() {
           { idempotencyKey: job.id }
         );
       } else {
+        const form = new FormData();
+        form.append("file", {
+          uri: job.payload.uri,
+          name: "pod.jpg",
+          type: "image/jpeg",
+        } as any);
         await ApiClient.upload(
           `/drivers/orders/${job.orderId}/pod-photo`,
-          job.payload.uri,
+          form,
           { idempotencyKey: job.id }
         );
       }

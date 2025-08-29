@@ -19,6 +19,11 @@ export interface Customer {
 
 export interface Order {
   id: number;
+  code: string;
   status: OrderStatus;
+  deliveryDate: ISODateString;
   customer: Customer;
+  pricing: {
+    total_cents: Cents;
+  };
 }
