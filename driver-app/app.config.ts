@@ -15,5 +15,9 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     extra: {
       API_BASE: process.env.API_BASE || process.env.EXPO_PUBLIC_API_BASE,
     },
+    android: {
+      ...config.android,
+      package: "com.anonymous.driverapp",
+    },
   };
 };
