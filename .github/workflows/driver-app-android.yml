@@ -22,7 +22,7 @@ jobs:
       run:
         working-directory: driver-app
     env:
-      CI: true
+      CI: 1
       EXPO_NO_TELEMETRY: 1
       API_BASE: ${{ secrets.API_BASE }}
       FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
@@ -61,7 +61,7 @@ jobs:
           test -s google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
 
       - name: Prebuild native project
-        run: npx expo prebuild --platform android --clean
+        run: CI=1 npx expo prebuild --platform android --clean
 
       - name: Ensure android project exists
         run: test -d android && test -f android/gradlew
