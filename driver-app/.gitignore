@@ -1,5 +1,4 @@
-android/app/google-services.json
-google-services.json
+/google-services.json
 .env
 .env.*
 

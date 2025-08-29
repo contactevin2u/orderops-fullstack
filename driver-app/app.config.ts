@@ -4,6 +4,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
   const android: ExpoConfig["android"] = {
     ...config.android,
     package: "com.yourco.driverAA",
+    googleServicesFile: "./android/app/google-services.json",
   };
 
   return {

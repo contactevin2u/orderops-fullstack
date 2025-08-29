@@ -4,10 +4,10 @@ frontend/storybook-static/
 __pycache__/
 *.pyc
 .env*
-driver-app/android/app/google-services.json
 driver-app/**/GoogleService-Info.plist
 driver-app/node_modules/
 driver-app/android/*
 !driver-app/android/app/
 driver-app/android/app/*
+!driver-app/android/app/google-services.json
 !driver-app/android/app/google-services.json.example
