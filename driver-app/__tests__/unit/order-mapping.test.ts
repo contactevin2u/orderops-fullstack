@@ -1,5 +1,5 @@
-import { ApiOrderSchema } from '@infra/api/schemas';
-import { OrderStatus } from '@core/entities/Order';
+import { ApiOrderSchema } from '@/infrastructure/api/schemas';
+import { OrderStatus } from '@/core/entities/Order';
 
 jest.mock('@react-native-firebase/auth', () => ({
   __esModule: true,
@@ -15,9 +15,9 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   },
 }));
 
-jest.mock('@shared/constants/config', () => ({ API_BASE: '' }));
+jest.mock('@/shared/constants/config', () => ({ API_BASE: '' }));
 
-jest.mock('@infra/api/ApiClient', () => ({
+jest.mock('@/infrastructure/api/ApiClient', () => ({
   __esModule: true,
   default: {
     get: jest.fn(),
@@ -27,7 +27,7 @@ jest.mock('@infra/api/ApiClient', () => ({
   },
 }));
 
-const { mapApiOrder } = require('@infra/api/OrderRepository');
+const { mapApiOrder } = require('@/infrastructure/api/OrderRepository');
 
 describe('order mapping', () => {
   test('parses and maps to domain', () => {

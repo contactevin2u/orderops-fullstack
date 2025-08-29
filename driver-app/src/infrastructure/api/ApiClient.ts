@@ -1,5 +1,5 @@
 import auth from "@react-native-firebase/auth";
-import { API_BASE } from "@shared/constants/config";
+import { API_BASE } from "@/shared/constants/config";
 
 type RequestOptions = {
   headers?: Record<string, string>;

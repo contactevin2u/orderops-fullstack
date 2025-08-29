@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { OrderStatus } from '@core/entities/Order';
+import { OrderStatus } from '@/core/entities/Order';
 
 export const ApiCustomerSchema = z.object({
   id: z.number(),
