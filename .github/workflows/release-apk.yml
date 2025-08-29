@@ -20,11 +20,6 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: driver-app/package-lock.json
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-          cache: gradle
       - name: Create .env from secret
         run: |
           if [ -z "${{ secrets.DRIVER_APP_ENV }}" ]; then
@@ -39,25 +34,24 @@ jobs:
         run: |
           printf '%s' "$GOOGLE_SERVICES_JSON" | sed "s/^'//; s/'$//" > google-services.json
           test -s google-services.json
-      - name: Diagnostics
-        run: |
-          java -version
-          keytool -list -cacerts | head -n 20
-          echo "API_BASE=$API_BASE"
       - name: Install dependencies
         run: npm ci
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --non-interactive --clean
       - name: Ensure android project generated
         run: test -d android && test -f android/gradlew
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+          cache-dependency-path: driver-app/android/gradle/wrapper/gradle-wrapper.properties
       - name: Build release APK
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+          ./gradlew --no-daemon assembleRelease
+      - uses: actions/upload-artifact@v4
         with:
           name: app-release
           path: driver-app/android/app/build/outputs/apk/release/*.apk
-

@@ -13,9 +13,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      JAVA_TOOL_OPTIONS: -Djavax.net.ssl.trustStore=$JAVA_HOME/lib/security/cacerts -Djavax.net.ssl.trustStoreType=JKS
-      GRADLE_OPTS: -Dorg.gradle.jvmargs="-Xmx2g"
     defaults:
       run:
         working-directory: driver-app
@@ -24,13 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
           cache-dependency-path: driver-app/package-lock.json
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-      - run: java -version && keytool -list -cacerts | head -n 5
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
