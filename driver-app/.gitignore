@@ -1,2 +1,3 @@
+# Ignore local secrets
 google-services.json
 .env
