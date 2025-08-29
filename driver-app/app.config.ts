@@ -5,7 +5,7 @@ export default ({ config }: any) => ({
   android: {
     // Provide a source file in the project root; Expo will copy it into android/app/ on prebuild
     googleServicesFile: "google-services.json",
-    package: "com.orderops.driver"
+    package: "com.yourco.driverAA"
   },
   extra: {
     apiBase: process.env.API_BASE ?? "",
