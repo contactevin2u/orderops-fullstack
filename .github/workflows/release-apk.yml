@@ -48,10 +48,11 @@ jobs:
       - name: Verify JS bundle (Expo) and capture logs
         env:
           EXPO_DEBUG: 1
+          CI: 1
         run: |
           set -o pipefail
-          # Try Expo export first (SDK 50+): use --no-dev instead of '--dev false'
-          (npx expo export --platform android --no-dev --non-interactive \
+          # Try Expo export first (SDK 50+). Defaults to production; no --dev/--no-dev flag.
+          (npx expo export --platform android \
             --output-dir .expo/export \
             --dump-sourcemap --dump-assetmap --clear) 2>&1 | tee -a expo-bundle.log
           STATUS=${PIPESTATUS[0]}
