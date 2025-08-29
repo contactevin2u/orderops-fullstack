@@ -45,7 +45,13 @@ export async function enqueue(job: OutboxJob): Promise<void> {
 }
 
 export async function getPending(): Promise<OutboxJob[]> {
-  return read();
+  const jobs = await read();
+  const now = Date.now();
+  return jobs.filter((j) => {
+    if (!j.lastAttempt) return true;
+    const delay = 2000 * Math.pow(2, j.retries) + Math.random() * 200;
+    return now - j.lastAttempt >= delay;
+  });
 }
 
 export async function markCompleted(id: string): Promise<void> {

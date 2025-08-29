@@ -1,28 +1,28 @@
 import { z } from 'zod';
-import { Order, OrderStatus } from '@core/entities/Order';
+import { OrderStatus } from '@core/entities/Order';
 
 export const ApiCustomerSchema = z.object({
   id: z.number(),
   name: z.string(),
   phone: z.string(),
   address: z.string(),
-  mapUrl: z.string().optional(),
+  map_url: z.string().optional(),
+});
+
+export const ApiPricingSchema = z.object({
+  total_cents: z.number(),
 });
 
 export const ApiOrderSchema = z.object({
   id: z.number(),
+  code: z.string(),
   status: z.nativeEnum(OrderStatus),
+  delivery_date: z.string(),
   customer: ApiCustomerSchema,
+  pricing: ApiPricingSchema,
 });
-
-export type ApiOrder = z.infer<typeof ApiOrderSchema>;
 
 export const ApiOrderListSchema = z.array(ApiOrderSchema);
 
-export function mapOrder(api: ApiOrder): Order {
-  return {
-    id: api.id,
-    status: api.status,
-    customer: api.customer,
-  };
-}
+export type ApiOrder = z.infer<typeof ApiOrderSchema>;
+export type ApiOrderList = z.infer<typeof ApiOrderListSchema>;
