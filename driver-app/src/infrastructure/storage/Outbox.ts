@@ -44,14 +44,25 @@ export async function enqueue(job: OutboxJob): Promise<void> {
   await write(jobs);
 }
 
+const BASE = 2000; // ms
+
 export async function getPending(): Promise<OutboxJob[]> {
   const jobs = await read();
   const now = Date.now();
   return jobs.filter((j) => {
-    if (!j.lastAttempt) return true;
-    const delay = 2000 * Math.pow(2, j.retries) + Math.random() * 250;
+    if (j.retries === 0 || !j.lastAttempt) return true;
+    const delay = BASE * Math.pow(2, j.retries) + Math.floor(Math.random() * 250);
     return now - j.lastAttempt >= delay;
   });
+}
+
+export async function markAttempt(id: string): Promise<void> {
+  const jobs = await read();
+  const job = jobs.find((j) => j.id === id);
+  if (job) {
+    job.lastAttempt = Date.now();
+    await write(jobs);
+  }
 }
 
 export async function markCompleted(id: string): Promise<void> {
@@ -61,9 +72,8 @@ export async function markCompleted(id: string): Promise<void> {
 
 export async function incrementRetries(id: string): Promise<void> {
   const jobs = await read();
-  const now = Date.now();
   const updated = jobs.map((j) =>
-    j.id === id ? { ...j, retries: j.retries + 1, lastAttempt: now } : j
+    j.id === id ? { ...j, retries: j.retries + 1 } : j
   );
   await write(updated);
 }
