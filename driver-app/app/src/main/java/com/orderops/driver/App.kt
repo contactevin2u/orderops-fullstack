@@ -16,7 +16,7 @@ class App : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         Timber.plant(Timber.DebugTree())
-        // Schedule periodic upload job (15m) at app start
+        // schedule periodic upload (15m) on app start
         WorkScheduling.scheduleUpload(this)
     }
 
@@ -25,4 +25,3 @@ class App : Application(), Configuration.Provider {
             .setWorkerFactory(workerFactory)
             .build()
 }
-
