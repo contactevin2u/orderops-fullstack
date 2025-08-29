@@ -1,74 +1,40 @@
-# .github/workflows/android.yml
-name: Android Release
-
+name: Android Release APK
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
-  workflow_dispatch:
-
+    paths: [ "driver-app/**" ]
 jobs:
-  android:
-    runs-on: ubuntu-latest
-
+  build:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: driver-app
+    env:
+      API_BASE: ${{ secrets.API_BASE }}
+      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: driver-app/package-lock.json
-
       - uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install JS deps (include devDeps!)
-        working-directory: driver-app
-        run: npm ci
-
-      - name: Provide google-services.json from secrets
-        working-directory: driver-app
-        env:
-          PKG: com.yourco.driverAA
-          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          FIREBASE_ANDROID_SENDER_ID: ${{ secrets.FIREBASE_ANDROID_SENDER_ID }}
-          FIREBASE_ANDROID_API_KEY: ${{ secrets.FIREBASE_ANDROID_API_KEY }}
+          distribution: temurin
+          java-version: 17
+      - name: Materialize google-services.json
         run: |
-          set -e
-          mkdir -p android/app
-          cat > android/app/google-services.json <<JSON
-          {
-            "project_info": {
-              "project_number": "${FIREBASE_ANDROID_SENDER_ID}",
-              "project_id": "${FIREBASE_PROJECT_ID}",
-              "storage_bucket": "${FIREBASE_PROJECT_ID}.appspot.com"
-            },
-            "client": [
-              {
-                "client_info": {
-                  "mobilesdk_app_id": "${FIREBASE_ANDROID_APP_ID}",
-                  "android_client_info": { "package_name": "${PKG}" }
-                },
-                "api_key": [{ "current_key": "${FIREBASE_ANDROID_API_KEY}" }],
-                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
-              }
-            ],
-            "configuration_version": "1"
-          }
-          JSON
-
-      - name: Assemble Release APK
-        working-directory: driver-app/android
-        env:
-          CI: "1"
-          ORG_GRADLE_PROJECT_android.enableR8: "true"
-        run: ./gradlew :app:assembleRelease --no-daemon
-
-      # (optional) upload artifact
+          printf "%s" "$GOOGLE_SERVICES_JSON" > google-services.json
+          test -s google-services.json
+      - name: Create local.properties
+        run: |
+          echo API_BASE=$API_BASE >> local.properties
+      - name: Build (release)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.9
+          arguments: ":app:assembleRelease"
       - uses: actions/upload-artifact@v4
         with:
-          name: app-release-apk
-          path: driver-app/android/app/build/outputs/apk/release/app-release.apk
+          name: driver-app-release-apk
+          path: driver-app/app/build/outputs/apk/release/*.apk

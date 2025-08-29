@@ -1,3 +1,10 @@
-# Ignore local secrets
-android/app/google-services.json
+app/build/
+build/
+.gradle/
+*.apk
+*.aab
+*.jar
+*.keystore
+*.jks
+*.so
 google-services.json
