@@ -50,8 +50,10 @@ jobs:
           EXPO_DEBUG: 1
         run: |
           set -o pipefail
-          # Try Expo export first (SDK 52)
-          (npx expo export --platform android --dev false --output-dir .expo/export --dump-sourcemap --dump-assetmap --clear) 2>&1 | tee -a expo-bundle.log
+          # Try Expo export first (SDK 50+): use --no-dev instead of '--dev false'
+          (npx expo export --platform android --no-dev --non-interactive \
+            --output-dir .expo/export \
+            --dump-sourcemap --dump-assetmap --clear) 2>&1 | tee -a expo-bundle.log
           STATUS=${PIPESTATUS[0]}
           if [ $STATUS -ne 0 ]; then
             echo "expo export failed, trying direct Metro bundle..." | tee -a expo-bundle.log
