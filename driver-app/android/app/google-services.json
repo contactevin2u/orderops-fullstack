@@ -1,0 +1,6 @@
+{
+  "//": "Copy this file to android/app/google-services.json for local dev.",
+  "project_info": { "project_id": "your-project-id" },
+  "client": [ { "client_info": { "mobilesdk_app_id": "1:123:android:abc" } } ]
+}
+
