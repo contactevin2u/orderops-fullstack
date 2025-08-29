@@ -4,11 +4,12 @@ frontend/storybook-static/
 __pycache__/
 *.pyc
 .env*
-driver-app/**/GoogleService-Info.plist
-driver-app/node_modules/
-driver-app/android/*
-!driver-app/android/app/
-driver-app/android/app/*
-# Allow committing example config but ignore the real firebase config
-!driver-app/android/app/google-services.json.example
-driver-app/android/app/google-services.json
+/driver-app/.gradle/
+/driver-app/app/build/
+*.apk
+*.aab
+*.jar
+*.keystore
+*.jks
+*.so
+google-services.json
