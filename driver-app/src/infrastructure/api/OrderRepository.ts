@@ -2,6 +2,7 @@ import ApiClient from "./ApiClient";
 import {
   enqueue,
   getPending,
+  markAttempt,
   markCompleted,
   incrementRetries,
   OutboxJob,
@@ -12,6 +13,8 @@ import { Order } from "@core/entities/Order";
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
+
+let flushLock: Promise<void> | null = null;
 
 export function mapApiOrder(api: ApiOrder): Order {
   return {
@@ -101,27 +104,36 @@ export async function uploadProofOfDelivery(
   }
 }
 
-export async function syncPendingChanges() {
-  const pending = await getPending();
-  for (const job of pending) {
+export async function syncPendingChanges(): Promise<void> {
+  if (flushLock) return flushLock;
+  flushLock = (async () => {
     try {
-      if (job.type === "UPDATE_STATUS") {
-        await ApiClient.patch(
-          `/drivers/orders/${job.orderId}`,
-          { status: job.payload.status },
-          { idempotencyKey: job.id }
-        );
-      } else {
-        await ApiClient.upload(
-          `/drivers/orders/${job.orderId}/pod-photo`,
-          job.payload.uri,
-          { idempotencyKey: job.id }
-        );
+      const pending = await getPending();
+      for (const job of pending) {
+        await markAttempt(job.id);
+        try {
+          if (job.type === "UPDATE_STATUS") {
+            await ApiClient.patch(
+              `/drivers/orders/${job.orderId}`,
+              { status: job.payload.status },
+              { idempotencyKey: job.id }
+            );
+          } else {
+            await ApiClient.upload(
+              `/drivers/orders/${job.orderId}/pod-photo`,
+              job.payload.uri,
+              { idempotencyKey: job.id }
+            );
+          }
+          await markCompleted(job.id);
+        } catch {
+          await incrementRetries(job.id);
+        }
       }
-      await markCompleted(job.id);
-    } catch {
-      await incrementRetries(job.id);
+    } finally {
+      flushLock = null;
     }
-  }
+  })();
+  return flushLock;
 }
 
