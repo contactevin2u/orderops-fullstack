@@ -5,7 +5,7 @@ export default ({ config }: any) => ({
   android: {
     // Source file in project root; Expo copies to android/app/ during prebuild
     googleServicesFile: 'google-services.json',
-    package: 'com.orderops.driver',
+    package: 'com.yourco.driverAA',
   },
   extra: {
     // Canonical UPPER_CASE (what app should read)
