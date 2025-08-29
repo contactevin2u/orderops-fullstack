@@ -17,6 +17,5 @@ export default ({ config }: any) => ({
     ['expo-build-properties', { android: { compileSdkVersion: 35, targetSdkVersion: 34, kotlinVersion: '1.9.25' } }],
     '@react-native-firebase/app',
     '@react-native-firebase/messaging',
-    '@notifee/react-native',
   ],
 });
