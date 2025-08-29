@@ -82,6 +82,16 @@ jobs:
       - name: Ensure android project generated
         run: test -d android && test -f android/gradlew
 
+      - name: Set Kotlin/JVM compiler target and Gradle memory (post-prebuild)
+        run: |
+          {
+            echo "kotlin.jvm.target=17"
+            # add Gradle & Kotlin daemon memory if not present
+            if ! grep -q "^org\.gradle\.jvmargs=" android/gradle.properties; then
+              echo "org.gradle.jvmargs=-Xmx4096m -Dkotlin.daemon.jvm.options=-Xmx2048m"
+            fi
+          } >> android/gradle.properties
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

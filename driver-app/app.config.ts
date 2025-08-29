@@ -14,6 +14,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     scheme: "driver",
     plugins: [
       ...(config.plugins ?? []),
+      ["expo-build-properties", { android: { kotlinVersion: "1.9.24" } }],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "@notifee/react-native",
