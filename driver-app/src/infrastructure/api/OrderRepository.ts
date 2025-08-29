@@ -82,11 +82,9 @@ export async function uploadProofOfDelivery(
 ) {
   const jobId = generateId();
   try {
-    const form = new FormData();
-    form.append("file", { uri, name: "pod.jpg", type: "image/jpeg" } as any);
     await ApiClient.upload(
       `/drivers/orders/${id}/pod-photo`,
-      form,
+      uri,
       { idempotencyKey: jobId }
     );
     invalidate?.();
@@ -114,15 +112,9 @@ export async function syncPendingChanges() {
           { idempotencyKey: job.id }
         );
       } else {
-        const form = new FormData();
-        form.append("file", {
-          uri: job.payload.uri,
-          name: "pod.jpg",
-          type: "image/jpeg",
-        } as any);
         await ApiClient.upload(
           `/drivers/orders/${job.orderId}/pod-photo`,
-          form,
+          job.payload.uri,
           { idempotencyKey: job.id }
         );
       }
