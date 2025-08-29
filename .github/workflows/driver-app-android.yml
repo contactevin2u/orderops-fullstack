@@ -51,14 +51,14 @@ jobs:
           if [ -z "${GOOGLE_SERVICES_JSON:-}" ]; then
             echo "ERROR: Missing GOOGLE_SERVICES_JSON secret"; exit 1
           fi
-          mkdir -p android/app
           VAL="${GOOGLE_SERVICES_JSON}"
           case "$VAL" in
             \"*) VAL="${VAL%\"}"; VAL="${VAL#\"}";;
             \'*) VAL="${VAL%\'}"; VAL="${VAL#\'}";;
           esac
-          printf "%s" "$VAL" > android/app/google-services.json
-          test -s android/app/google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
+          # Write to project root so Expo prebuild can copy it into android/app/
+          printf "%s" "$VAL" > google-services.json
+          test -s google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
 
       - name: Prebuild native project
         run: npx expo prebuild --platform android --clean

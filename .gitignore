@@ -9,5 +9,8 @@ driver-app/node_modules/
 driver-app/android/*
 !driver-app/android/app/
 driver-app/android/app/*
-!driver-app/android/app/google-services.json
+# Allow committing example config but ignore the real firebase config
 !driver-app/android/app/google-services.json.example
+
+# Firebase config materialized from CI secret
+driver-app/google-services.json

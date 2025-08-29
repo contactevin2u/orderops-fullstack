@@ -3,8 +3,8 @@ export default ({ config }: any) => ({
   name: "driver-app",
   slug: "driver-app",
   android: {
-    // We materialize this file at android/app/google-services.json in CI
-    googleServicesFile: "android/app/google-services.json",
+    // Provide a source file in the project root; Expo will copy it into android/app/ on prebuild
+    googleServicesFile: "google-services.json",
     package: "com.orderops.driver"
   },
   extra: {
