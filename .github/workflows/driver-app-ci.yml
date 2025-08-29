@@ -30,7 +30,6 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
       - run: java -version && keytool -list -cacerts | head -n 5
       - run: npm ci
       - run: npm run typecheck

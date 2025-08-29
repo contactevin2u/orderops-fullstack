@@ -23,7 +23,6 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-          cache: 'gradle'
       - name: Diagnostics
         run: |
           java -version
