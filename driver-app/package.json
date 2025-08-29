@@ -6,7 +6,7 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "prebuild:android": "npx expo prebuild --platform android --non-interactive --clean",
+    "prebuild:android": "npx expo prebuild --platform android --clean",
     "android:bundle": "expo export:embed --platform android --dev false --reset-cache",
     "android:release": "cd android && ./gradlew assembleRelease",
     "test": "jest --passWithNoTests",

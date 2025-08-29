@@ -61,7 +61,7 @@ jobs:
           test -s android/app/google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
 
       - name: Prebuild native project
-        run: npx expo prebuild --platform android --non-interactive --clean
+        run: npx expo prebuild --platform android --clean
 
       - name: Ensure android project exists
         run: test -d android && test -f android/gradlew
