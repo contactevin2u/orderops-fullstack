@@ -1,0 +1,76 @@
+name: Driver App Android Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: driver-app
+
+    env:
+      CI: true
+      EXPO_NO_TELEMETRY: 1
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: driver-app/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Install NPM deps
+        run: npm ci
+
+      - name: Ensure Expo CLI
+        run: npx expo --version
+
+      - name: Write google-services.json from secret
+        run: |
+          mkdir -p android/app
+          # write multi-line JSON exactly:
+          printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+
+      - name: Write .env from DRIVER_APP_ENV
+        run: |
+          if [ -z "${DRIVER_APP_ENV:-}" ]; then
+            echo "ERROR: DRIVER_APP_ENV is missing. Add repo/org secret with KEY=VALUE lines." >&2
+            exit 1
+          fi
+          printf '%s\n' "$DRIVER_APP_ENV" > .env
+
+          # Export only valid KEY=VALUE lines (skip blank & comments) to GITHUB_ENV
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            case "$line" in \#*) continue;; esac
+            if printf '%s' "$line" | grep -qE '^[A-Za-z_][A-Za-z0-9_]*='; then
+              echo "$line" >> "$GITHUB_ENV"
+            fi
+          done < .env
+        env:
+          DRIVER_APP_ENV: ${{ secrets.DRIVER_APP_ENV }}
+
+      - name: Bundle JS for Android (Expo export:embed)
+        run: npx expo export:embed --platform android --dev false --reset-cache
+
+      - name: Build Android release
+        run: |
+          cd android
+          ./gradlew --no-daemon :app:assembleRelease
