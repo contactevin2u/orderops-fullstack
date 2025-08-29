@@ -37,9 +37,7 @@ jobs:
       - name: Ensure gradlew exists
         run: test -f android/gradlew || (echo "missing gradlew" && exit 1)
       - name: Set up google-services.json
-        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
-        env:
-          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        if: ${{ env.GOOGLE_SERVICES_JSON != '' }}
         run: echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
       - name: Build release APK
         run: |
