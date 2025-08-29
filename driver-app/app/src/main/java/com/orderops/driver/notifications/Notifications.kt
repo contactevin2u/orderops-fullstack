@@ -35,7 +35,7 @@ object Notifications {
 
         val pi = PendingIntent.getActivity(
             context, jobId.hashCode(), intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or Intent.FLAG_IMMUTABLE
         )
 
         return NotificationCompat.Builder(context, JOBS_CHANNEL)
@@ -47,4 +47,3 @@ object Notifications {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
     }
 }
-

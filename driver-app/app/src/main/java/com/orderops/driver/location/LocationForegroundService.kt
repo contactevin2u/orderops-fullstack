@@ -30,14 +30,17 @@ class LocationForegroundService : Service() {
         super.onCreate()
         client = LocationServices.getFusedLocationProviderClient(this)
         startForeground(1, notification())
+
         val hasFine = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasCoarse = ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (!hasFine && !hasCoarse) {
-            // permissions not granted; stop early to avoid SecurityException
             stopSelf()
             return
         }
-        val request = LocationRequest.Builder(LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY, 15000).build()
+
+        val request = LocationRequest.Builder(
+            LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY, 15000
+        ).build()
         client.requestLocationUpdates(request, callback, mainLooper)
     }
 
@@ -74,4 +77,3 @@ class LocationForegroundService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 }
-
