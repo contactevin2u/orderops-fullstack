@@ -37,7 +37,12 @@ jobs:
           esac
           printf "%s" "$VAL" > google-services.json
           test -s google-services.json || { echo "ERROR: google-services.json empty"; exit 1; }
-
+      - name: Pre-bundle diagnostics
+        run: |
+          node -v
+          yarn -v || echo "Yarn not installed"
+          npm -v
+          if [ -n "$API_BASE" ]; then echo "API_BASE is set"; else echo "API_BASE is not set"; fi
       - name: Install dependencies
         run: npm ci
 
@@ -58,7 +63,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew --no-daemon assembleRelease
+          ./gradlew --no-daemon --stacktrace --info assembleRelease
 
       - uses: actions/upload-artifact@v4
         with:
