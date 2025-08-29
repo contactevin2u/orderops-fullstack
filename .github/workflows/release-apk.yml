@@ -8,7 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       EXPO_NO_TELEMETRY: 1
-      NODE_ENV: production
       CI: true
       API_BASE: ${{ secrets.API_BASE }}
       FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
@@ -43,11 +42,15 @@ jobs:
           yarn -v || echo "Yarn not installed"
           npm -v
           if [ -n "$API_BASE" ]; then echo "API_BASE is set"; else echo "API_BASE is not set"; fi
-      - name: Install dependencies
+      - name: Install dependencies (include dev deps)
+        env:
+          # Unset NODE_ENV so npm installs devDependencies (Babel plugins, etc.)
+          NODE_ENV: ""
         run: npm ci
-      - name: Ensure babel-plugin-module-resolver is present (CI safety)
+      - name: Verify babel-plugin-module-resolver present
         run: |
-          node -e "require.resolve('babel-plugin-module-resolver')" >/dev/null 2>&1 || npm i --no-save babel-plugin-module-resolver@^5
+          npm ls --depth=0 babel-plugin-module-resolver || true
+          node -e "console.log('module-resolver path:', require.resolve('babel-plugin-module-resolver'))"
       - name: Verify JS bundle (Expo) and capture logs
         env:
           EXPO_DEBUG: 1
