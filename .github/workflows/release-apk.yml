@@ -45,6 +45,32 @@ jobs:
           if [ -n "$API_BASE" ]; then echo "API_BASE is set"; else echo "API_BASE is not set"; fi
       - name: Install dependencies
         run: npm ci
+      - name: Verify JS bundle (Expo) and capture logs
+        env:
+          EXPO_DEBUG: 1
+        run: |
+          set -o pipefail
+          # Try Expo export first (SDK 52)
+          (npx expo export --platform android --dev false --output-dir .expo/export --dump-sourcemap --dump-assetmap --clear) 2>&1 | tee -a expo-bundle.log
+          STATUS=${PIPESTATUS[0]}
+          if [ $STATUS -ne 0 ]; then
+            echo "expo export failed, trying direct Metro bundle..." | tee -a expo-bundle.log
+            (npx react-native bundle --platform android --dev false --reset-cache \
+              --entry-file node_modules/expo-router/entry.js \
+              --bundle-output .expo/export/index.android.bundle \
+              --assets-dest .expo/export) 2>&1 | tee -a expo-bundle.log
+            STATUS=${PIPESTATUS[0]}
+          fi
+          if [ $STATUS -ne 0 ]; then
+            echo "JS bundling failed (see expo-bundle.log). Failing early before Gradle..." >&2
+            exit 1
+          fi
+      - name: Upload bundling log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-bundle-log
+          path: driver-app/expo-bundle.log
 
       - name: Prebuild Android project
         run: npx expo prebuild --platform android --non-interactive --clean
