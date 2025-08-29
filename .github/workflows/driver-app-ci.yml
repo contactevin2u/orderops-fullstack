@@ -21,6 +21,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
+          # Node 20 LTS with npm cache
           node-version: 20
           cache: npm
           cache-dependency-path: driver-app/package-lock.json

@@ -1,5 +1,5 @@
 {
-  "//": "Copy this file to android/app/google-services.json for local dev.",
+  "//": "Place real google-services.json at driver-app/google-services.json; expo prebuild copies it into android/app/.",
   "project_info": { "project_id": "your-project-id" },
   "client": [ { "client_info": { "mobilesdk_app_id": "1:123:android:abc" } } ]
 }
