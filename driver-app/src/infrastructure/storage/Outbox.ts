@@ -49,7 +49,7 @@ export async function getPending(): Promise<OutboxJob[]> {
   const now = Date.now();
   return jobs.filter((j) => {
     if (!j.lastAttempt) return true;
-    const delay = 2000 * Math.pow(2, j.retries) + Math.random() * 200;
+    const delay = 2000 * Math.pow(2, j.retries) + Math.random() * 250;
     return now - j.lastAttempt >= delay;
   });
 }

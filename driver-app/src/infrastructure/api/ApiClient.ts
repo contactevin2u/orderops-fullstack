@@ -15,9 +15,11 @@ class ApiClient {
   ): Promise<any> {
     const url = `${API_BASE}${path}`;
     const headers: Record<string, string> = {
-      Accept: "application/json",
       ...(opts.headers || {}),
     };
+    if (!(body instanceof FormData)) {
+      headers["Accept"] = "application/json";
+    }
     if (body && !(body instanceof FormData)) {
       headers["Content-Type"] = "application/json";
     }
@@ -84,7 +86,9 @@ class ApiClient {
     return this.request("PATCH", path, body, opts);
   }
 
-  upload(path: string, form: FormData, opts?: RequestOptions) {
+  upload(path: string, uri: string, opts?: RequestOptions) {
+    const form = new FormData();
+    form.append("file", { uri, name: "pod.jpg", type: "image/jpeg" } as any);
     return this.request("POST", path, form, opts);
   }
 }
