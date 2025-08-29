@@ -1,26 +1,36 @@
-export default ({ config }: any) => ({
+import 'dotenv/config';
+
+export default ({ config }) => ({
   ...config,
-  name: 'driver-app',
-  slug: 'driver-app',
+  name: config?.name ?? "Driver",
+  slug: config?.slug ?? "driver-app",
+  scheme: config?.scheme ?? "driver",
+  owner: config?.owner ?? undefined,
+
   android: {
-    // Source file in project root; Expo copies to android/app/ during prebuild
-    googleServicesFile: 'google-services.json',
-    package: 'com.yourco.driverAA',
+    package: "com.yourco.driverAA",
+    // IMPORTANT: source is project root; plugin copies it into android/app
+    googleServicesFile: "./google-services.json",
+    // keep default expo gradle settings; don't hardcode AGP/Kotlin here
   },
+
   extra: {
-    // Canonical UPPER_CASE (what app should read)
-    API_BASE: process.env.API_BASE ?? '',
-    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? '',
-    FIREBASE_ANDROID_APP_ID: process.env.FIREBASE_ANDROID_APP_ID ?? '',
-    // Back-compat camelCase
-    apiBase: process.env.API_BASE ?? '',
-    firebaseProjectId: process.env.FIREBASE_PROJECT_ID ?? '',
-    firebaseAndroidAppId: process.env.FIREBASE_ANDROID_APP_ID ?? '',
+    // USE EXACT UPPER_CASE KEYS (your app reads these)
+    API_BASE: process.env.API_BASE ?? "",
+    FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID ?? "",
+    FIREBASE_ANDROID_APP_ID: process.env.FIREBASE_ANDROID_APP_ID ?? "",
+    // keep available for tooling if needed later:
+    FIREBASE_SERVICE_ACCOUNT_JSON: process.env.FIREBASE_SERVICE_ACCOUNT_JSON ?? "",
   },
+
+  experiments: {
+    tsconfigPaths: true
+  },
+
   plugins: [
-    // Let Expo manage Kotlin & AGP; just set SDK levels
-    ['expo-build-properties', { android: { compileSdkVersion: 35, targetSdkVersion: 34 } }],
-    '@react-native-firebase/app',
-    '@react-native-firebase/messaging',
+    // DO NOT register "@notifee/react-native" as a config plugin here.
+    // Notifee works without a config plugin for compile; the plugin was causing ESM/typeof errors.
+    // If there is "@notifee/react-native" in plugins now, REMOVE it.
   ],
 });
+
