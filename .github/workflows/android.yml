@@ -1,83 +1,74 @@
-name: Android Release APK
+# .github/workflows/android.yml
+name: Android Release
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main ]
-    paths:
-      - 'driver-app/**'
+  workflow_dispatch:
 
 jobs:
-  android-apk:
-    runs-on: ubuntu-22.04
-    defaults:
-      run:
-        working-directory: driver-app
-    env:
-      EXPO_NO_TELEMETRY: 1
-      CI: 1
-      # Expose ONLY the five secrets to the app/config
-      API_BASE: ${{ secrets.API_BASE }}
-      FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+  android:
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: driver-app/package-lock.json
 
-      - name: Setup Java 17
-        uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: 'temurin'
           java-version: '17'
 
-      - name: Install npm deps
+      - name: Install JS deps (include devDeps!)
+        working-directory: driver-app
         run: npm ci
 
-      - name: Prebuild (clean)
+      - name: Provide google-services.json from secrets
+        working-directory: driver-app
+        env:
+          PKG: com.yourco.driverAA
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_ANDROID_APP_ID: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
+          FIREBASE_ANDROID_SENDER_ID: ${{ secrets.FIREBASE_ANDROID_SENDER_ID }}
+          FIREBASE_ANDROID_API_KEY: ${{ secrets.FIREBASE_ANDROID_API_KEY }}
         run: |
-          npm run clean:android || true
-          npm run prebuild:android
+          set -e
+          mkdir -p android/app
+          cat > android/app/google-services.json <<JSON
+          {
+            "project_info": {
+              "project_number": "${FIREBASE_ANDROID_SENDER_ID}",
+              "project_id": "${FIREBASE_PROJECT_ID}",
+              "storage_bucket": "${FIREBASE_PROJECT_ID}.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "${FIREBASE_ANDROID_APP_ID}",
+                  "android_client_info": { "package_name": "${PKG}" }
+                },
+                "api_key": [{ "current_key": "${FIREBASE_ANDROID_API_KEY}" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          JSON
 
-      - name: Setup Java 17 (enable Gradle cache post-prebuild)
-        uses: actions/setup-java@v4
+      - name: Assemble Release APK
+        working-directory: driver-app/android
+        env:
+          CI: "1"
+          ORG_GRADLE_PROJECT_android.enableR8: "true"
+        run: ./gradlew :app:assembleRelease --no-daemon
+
+      # (optional) upload artifact
+      - uses: actions/upload-artifact@v4
         with:
-          distribution: temurin
-          java-version: '17'
-          cache: gradle
-          cache-dependency-path: |
-            driver-app/android/**/gradle-wrapper.properties
-            driver-app/android/**/*.gradle*
-            driver-app/android/gradle/*.versions.toml
-            driver-app/android/**/versions.properties
-
-      - name: Patch Android Gradle properties (1st pass)
-        run: node scripts/ci/patch-android-gradle.js || true
-
-      - name: Write google-services.json from secret
-        run: node scripts/ci/write-google-services-json.js
-
-      - name: Validate google-services package name
-        run: node scripts/ci/validate-package.js
-
-      - name: Patch Android Gradle properties (2nd pass)
-        run: node scripts/ci/patch-android-gradle.js || true
-
-      - name: Build APK
-        run: |
-          cd android
-          ./gradlew --no-daemon clean :app:assembleRelease
-
-      - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: driver-release-apk
+          name: app-release-apk
           path: driver-app/android/app/build/outputs/apk/release/app-release.apk
-          if-no-files-found: error
