@@ -1,8 +1,18 @@
 module.exports = function (api) {
   api.cache(true);
-  const plugins = [
-    ['module-resolver', { root: ['./'], alias: { '@': './' } }],
-  ];
-  try { require.resolve('react-native-reanimated/package.json'); plugins.push('react-native-reanimated/plugin'); } catch {}
-  return { presets: ['babel-preset-expo'], plugins };
+  return {
+    presets: ['babel-preset-expo'],
+    plugins: [
+      ['module-resolver', {
+        root: ['./'],
+        alias: {
+          '@': './src',
+        },
+        extensions: ['.ts', '.tsx', '.js', '.jsx', '.json']
+      }],
+      // MUST BE LAST
+      'react-native-reanimated/plugin',
+    ],
+  };
 };
+
