@@ -17,7 +17,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     },
     android: {
       ...config.android,
-      package: "com.anonymous.driverapp",
+      package: "com.yourco.driverAA",
     },
   };
 };
