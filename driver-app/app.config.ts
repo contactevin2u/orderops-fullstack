@@ -4,7 +4,7 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
   const android: ExpoConfig["android"] = {
     ...config.android,
     package: "com.yourco.driverAA",
-    googleServicesFile: "./google-services.json",
+    googleServicesFile: "android/app/google-services.json",
   };
 
   return {
@@ -14,7 +14,16 @@ export default ({ config }: { config: ExpoConfig }): ExpoConfig => {
     scheme: "driver",
     plugins: [
       ...(config.plugins ?? []),
-      ["expo-build-properties", { android: { kotlinVersion: "1.9.24" } }],
+      [
+        "expo-build-properties",
+        {
+          android: {
+            compileSdkVersion: 35,
+            targetSdkVersion: 34,
+            kotlinVersion: "1.9.25",
+          },
+        },
+      ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
       "@notifee/react-native",
