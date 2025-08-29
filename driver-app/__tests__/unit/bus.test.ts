@@ -1,4 +1,4 @@
-import { on, emit, ORDER_OPEN_EVENT } from '@infra/events/bus';
+import { on, emit, ORDER_OPEN_EVENT } from '@/infrastructure/events/bus';
 
 describe('event bus', () => {
   test('on/emit/off', () => {

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import * as orderRepo from "@infra/api/OrderRepository";
-import { OrderStatus } from "@core/entities/Order";
+import * as orderRepo from "@/infrastructure/api/OrderRepository";
+import { OrderStatus } from "@/core/entities/Order";
 
 export function useOrders(repo = orderRepo) {
   const qc = useQueryClient();

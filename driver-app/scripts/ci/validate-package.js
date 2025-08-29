@@ -2,18 +2,16 @@
 const fs = require('fs');
 const path = require('path');
 
-const gs = JSON.parse(fs.readFileSync(path.join('driver-app/android/app/google-services.json'), 'utf8'));
+const projectRoot = path.resolve(__dirname, '..', '..');
+const gsPath = path.join(projectRoot, 'android', 'app', 'google-services.json');
 const expected = 'com.yourco.driverAA';
 
-let packageName;
-try {
-  // prefer client[0].client_info.android_client_info.package_name
-  const c0 = gs.client?.[0];
-  packageName = c0?.client_info?.android_client_info?.package_name;
-} catch {}
+const raw = fs.readFileSync(gsPath, 'utf8');
+const gs = JSON.parse(raw);
+const pkg = gs?.client?.[0]?.client_info?.android_client_info?.package_name;
 
-if (packageName !== expected) {
-  console.error(`google-services.json package_name=${packageName} does not match android.package=${expected}`);
+if (pkg !== expected) {
+  console.error(`google-services.json package_name=${pkg} != ${expected}`);
   process.exit(1);
 }
-console.log('google-services.json package name OK:', packageName);
+console.log('google-services.json package OK:', pkg);

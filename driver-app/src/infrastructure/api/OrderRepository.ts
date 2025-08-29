@@ -8,7 +8,7 @@ import {
   OutboxJob,
 } from "../storage/Outbox";
 import { ApiOrderSchema, ApiOrderListSchema, ApiOrder } from "./schemas";
-import { Order } from "@core/entities/Order";
+import { Order } from "@/core/entities/Order";
 
 function generateId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
