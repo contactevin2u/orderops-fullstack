@@ -5,7 +5,10 @@
       "WebFetch(domain:stackoverflow.com)",
       "Bash(git add:*)",
       "Bash(git push:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run lint)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

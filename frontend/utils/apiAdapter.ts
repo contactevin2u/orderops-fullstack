@@ -5,6 +5,7 @@ import {
   createRoute as apiCreateRoute,
   updateRoute as apiUpdateRoute,
   listDrivers,
+  createDriver,
 } from './api';
 
 export type Order = {
