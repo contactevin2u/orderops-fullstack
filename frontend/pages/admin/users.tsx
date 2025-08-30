@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import Link from 'next/link';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 export default function AdminUsersPage() {
@@ -39,7 +40,7 @@ export default function AdminUsersPage() {
         <h1 className="text-2xl font-bold mb-2">User Management</h1>
         <p className="text-gray-600">
           Create admin and cashier accounts for the web application. 
-          For drivers, use the <a href="/admin/drivers" className="text-blue-600 hover:underline">Drivers section</a> instead.
+          For drivers, use the <Link href="/admin/drivers" className="text-blue-600 hover:underline">Drivers section</Link> instead.
         </p>
       </div>
 
