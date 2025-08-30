@@ -42,13 +42,24 @@ private fun normalizePhoneNumber(phone: String?): String? {
     val digitsOnly = cleanPhone.replace("+", "")
     
     return when {
-        // If it already looks like an international number (10+ digits), use as is
+        // Already has Malaysia country code (60)
+        digitsOnly.startsWith("60") && (digitsOnly.length == 12 || digitsOnly.length == 13) -> {
+            digitsOnly
+        }
+        // Malaysian number starting with 0 (local format)
+        digitsOnly.startsWith("0") && (digitsOnly.length == 10 || digitsOnly.length == 11) -> {
+            "60" + digitsOnly.substring(1) // Remove 0 and add 60
+        }
+        // Malaysian mobile without leading 0 (10-11 digits starting with 1)
+        digitsOnly.startsWith("1") && (digitsOnly.length == 9 || digitsOnly.length == 10) -> {
+            "60$digitsOnly" // Add 60 prefix
+        }
+        // Other international numbers (already formatted)
         digitsOnly.length >= 10 -> {
             digitsOnly
         }
-        // If it's too short, it's probably invalid
-        digitsOnly.length < 7 -> null
-        else -> digitsOnly
+        // Too short, probably invalid
+        else -> null
     }
 }
 
