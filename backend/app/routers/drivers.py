@@ -309,15 +309,21 @@ def update_order_status(
     
     # Business rule: Only one trip can be IN_TRANSIT at a time per driver
     if payload.status == "IN_TRANSIT":
-        active_trips = db.query(Trip).filter(
+        active_trip = db.query(Trip).filter(
             Trip.driver_id == driver.id,
             Trip.status == "IN_TRANSIT",
             Trip.id != trip.id  # Exclude current trip
-        ).count()
-        print(f"DEBUG: Found {active_trips} other trips in IN_TRANSIT status for driver {driver.id}")
-        if active_trips > 0:
-            print(f"DEBUG: Blocking IN_TRANSIT status due to existing active trips")
-            raise HTTPException(400, "You already have an order in transit. Please put it on hold or complete it first.")
+        ).first()
+        
+        if active_trip:
+            # Get order details for better error message
+            active_order = db.get(Order, active_trip.order_id)
+            order_info = f"Order #{active_order.code}" if active_order and active_order.code else f"Order ID {active_trip.order_id}"
+            print(f"DEBUG: Blocking IN_TRANSIT - driver {driver.id} has active trip {active_trip.id} for {order_info}")
+            raise HTTPException(
+                400, 
+                f"You already have an order in transit ({order_info}). Please put it on hold or complete it first."
+            )
     
     trip.status = payload.status
     now = datetime.now(timezone.utc)
