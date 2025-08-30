@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 export default function PodViewer({ url }: { url: string }) {
   const isPdf = /\.pdf($|\?)/i.test(url);
@@ -10,5 +11,15 @@ export default function PodViewer({ url }: { url: string }) {
       </object>
     );
   }
-  return <img src={url} alt="POD" style={{ maxWidth: '100%', height: 'auto' }} data-testid="pod-image" />;
+  return (
+    <Image 
+      src={url} 
+      alt="POD" 
+      width={800} 
+      height={600}
+      style={{ maxWidth: '100%', height: 'auto' }} 
+      data-testid="pod-image" 
+      unoptimized={true}
+    />
+  );
 }

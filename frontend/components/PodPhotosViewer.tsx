@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 interface PodPhotosViewerProps {
   podPhotoUrls: string[];
@@ -56,10 +57,13 @@ export default function PodPhotosViewer({ podPhotoUrls = [], legacyPodUrl }: Pod
                 }}
                 className="w-12 h-12 bg-gray-100 rounded border overflow-hidden hover:opacity-80 transition-opacity"
               >
-                <img
+                <Image
                   src={photo}
                   alt={`PoD photo ${index + 1}`}
+                  width={48}
+                  height={48}
                   className="w-full h-full object-cover"
+                  unoptimized={true}
                 />
               </button>
             )}
@@ -108,11 +112,16 @@ export default function PodPhotosViewer({ podPhotoUrls = [], legacyPodUrl }: Pod
             
             {/* Current image */}
             <div className="bg-white rounded-lg p-2">
-              <img
-                src={photos[currentImageIndex]}
-                alt={`PoD photo ${currentImageIndex + 1}`}
-                className="max-w-full max-h-[80vh] object-contain mx-auto block"
-              />
+              <div className="relative max-w-full max-h-[80vh] mx-auto">
+                <Image
+                  src={photos[currentImageIndex]}
+                  alt={`PoD photo ${currentImageIndex + 1}`}
+                  width={800}
+                  height={600}
+                  className="max-w-full max-h-[80vh] object-contain mx-auto block"
+                  unoptimized={true}
+                />
+              </div>
               <div className="text-center text-gray-600 text-sm mt-2">
                 Photo {currentImageIndex + 1} of {photos.length}
               </div>

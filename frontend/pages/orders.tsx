@@ -84,7 +84,7 @@ export default function OperatorOrdersPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active]);
+  }, [active, current, buyback, cancelInst, markReturnOrCollect, recordPayment]);
 
   const items = data?.items || [];
   let filtered = items as any[];

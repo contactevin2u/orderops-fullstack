@@ -24,7 +24,7 @@ export default function AdminAssignPage() {
     queryKey: ['unassigned', date],
     queryFn: () => fetchUnassigned(date),
   });
-  const orders = ordersQuery.data || [];
+  const orders = React.useMemo(() => ordersQuery.data || [], [ordersQuery.data]);
 
   const counts = React.useMemo(() => {
     let noDate = 0;

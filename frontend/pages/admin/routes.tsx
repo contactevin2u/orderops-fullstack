@@ -83,10 +83,10 @@ export default function AdminRoutesPage() {
     queryKey: ['drivers'],
     queryFn: fetchDrivers,
   });
-  const routes = routesQuery.data || [];
-  const unassigned = unassignedQuery.data || [];
-  const onHold = onHoldQuery.data || [];
-  const drivers = driversQuery.data || [];
+  const routes = React.useMemo(() => routesQuery.data || [], [routesQuery.data]);
+  const unassigned = React.useMemo(() => unassignedQuery.data || [], [unassignedQuery.data]);
+  const onHold = React.useMemo(() => onHoldQuery.data || [], [onHoldQuery.data]);
+  const drivers = React.useMemo(() => driversQuery.data || [], [driversQuery.data]);
 
   const driverNameById = React.useMemo(() => {
     const map: Record<string, string> = {};
