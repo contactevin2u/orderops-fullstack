@@ -26,15 +26,18 @@ object AppModule {
     @Provides
     @Singleton
     fun provideRetrofit(): DriverApi {
+        val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+    }
         val contentType = "application/json".toMediaType()
-        
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = if (BuildConfig.DEBUG) {
-                HttpLoggingInterceptor.Level.BODY
-            } else {
-                HttpLoggingInterceptor.Level.NONE
-            }
-        }
+        val retrofit = Retrofit.Builder()
+            .baseUrl(BuildConfig.API_BASE.ifEmpty { "https://api.example.com/" })
+            .client(OkHttpClient.Builder().build())
+            .addConverterFactory(json.asConverterFactory(contentType))
+            .build()
+        return retrofit.create(DriverApi::class.java)
+}
         
         val client = OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
