@@ -137,6 +137,7 @@ export async function fetchRouteOrders(
 
 export async function createRoute(payload: {
   driver_id: number;
+  secondary_driver_id?: number;
   route_date: string;
   name?: string;
   notes?: string;
@@ -147,7 +148,7 @@ export async function createRoute(payload: {
 
 export async function updateRoute(
   routeId: string,
-  payload: { driver_id?: number; route_date?: string; name?: string; notes?: string },
+  payload: { driver_id?: number; secondary_driver_id?: number; route_date?: string; name?: string; notes?: string },
 ): Promise<Route> {
   const r = await apiUpdateRoute(Number(routeId), payload);
   return mapRoute(r);
