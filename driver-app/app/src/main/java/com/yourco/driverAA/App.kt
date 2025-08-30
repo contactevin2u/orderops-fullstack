@@ -8,6 +8,7 @@ import javax.inject.Inject
 import androidx.hilt.work.HiltWorkerFactory
 import timber.log.Timber
 import com.yourco.driverAA.BuildConfig
+import androidx.work.Configuration
 
 @HiltAndroidApp
 class App : Application(), Configuration.Provider {
