@@ -11,6 +11,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.runtime.*
 import androidx.hilt.navigation.compose.hiltViewModel
 
@@ -31,7 +32,7 @@ fun JobsListScreen(onJobClick: (String) -> Unit, viewModel: JobsListViewModel = 
         )
         if (loading) {
             Box(
-                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -41,7 +42,7 @@ fun JobsListScreen(onJobClick: (String) -> Unit, viewModel: JobsListViewModel = 
                 items(jobs) { job ->
                     ListItem(
                         headlineText = { Text("Job $job") },
-                        modifier = androidx.compose.ui.Modifier.clickable { onJobClick(job) }
+                        modifier = Modifier.clickable { onJobClick(job) }
                     )
                 }
             }

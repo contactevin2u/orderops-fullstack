@@ -16,7 +16,6 @@ import javax.inject.Singleton
 import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
-import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.kotlinx.serialization.asConverterFactory
 
@@ -26,24 +25,15 @@ object AppModule {
     @Provides
     @Singleton
     fun provideRetrofit(): DriverApi {
-        val contentType = "application/json".toMediaType()
-        
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
-            level = if (BuildConfig.DEBUG) {
-                HttpLoggingInterceptor.Level.BODY
-            } else {
-                HttpLoggingInterceptor.Level.NONE
-            }
+        val json = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
         }
-        
-        val client = OkHttpClient.Builder()
-            .addInterceptor(loggingInterceptor)
-            .build()
-        
+        val contentType = "application/json".toMediaType()
         val retrofit = Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE)
-            .client(client)
-            .addConverterFactory(Json.asConverterFactory(contentType))
+            .baseUrl(BuildConfig.API_BASE.ifEmpty { "https://api.example.com/" })
+            .client(OkHttpClient.Builder().build())
+            .addConverterFactory(json.asConverterFactory(contentType))
             .build()
         return retrofit.create(DriverApi::class.java)
     }
