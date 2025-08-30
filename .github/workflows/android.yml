@@ -48,12 +48,12 @@ jobs:
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/firebase-sa.json" >> $GITHUB_ENV
 
 
-      - name: Build (unsigned)
+      - name: Build Debug APK (for testing)
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 8.9
           build-root-directory: driver-app
-          arguments: ":app:assembleUnsigned"
+          arguments: ":app:assembleDebug"
         env:
           # Increase Gradle JVM heap size
           GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
@@ -65,5 +65,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: driver-app-unsigned-apk
-          path: driver-app/app/build/outputs/apk/unsigned/*.apk
+          name: driver-app-debug-apk
+          path: driver-app/app/build/outputs/apk/debug/*.apk
