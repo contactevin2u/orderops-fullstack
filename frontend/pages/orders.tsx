@@ -64,50 +64,6 @@ export default function OperatorOrdersPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const current = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
 
-  React.useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.target && (e.target as HTMLElement).tagName === "INPUT") return;
-      if (e.key === "ArrowDown") {
-        e.preventDefault();
-        setActive((a) => Math.min(a + 1, current.length - 1));
-      } else if (e.key === "ArrowUp") {
-        e.preventDefault();
-        setActive((a) => Math.max(a - 1, 0));
-      } else if (e.key === "Enter" && active >= 0) {
-        e.preventDefault();
-        const order = current[active];
-        if (order) window.open(`/orders/${order.id}`, "_blank");
-      } else if (e.ctrlKey && active >= 0) {
-        const order = current[active];
-        if (!order) return;
-        if (e.key.toLowerCase() === "p") {
-          e.preventDefault();
-          recordPayment(order);
-        } else if (e.key.toLowerCase() === "r") {
-          e.preventDefault();
-          markReturnOrCollect(order);
-        } else if (e.key.toLowerCase() === "b") {
-          e.preventDefault();
-          buyback(order);
-        } else if (e.key.toLowerCase() === "m") {
-          e.preventDefault();
-          cancelInst(order);
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [active, current, buyback, cancelInst, markReturnOrCollect, recordPayment]);
-
-  function toggleSelect(id: number) {
-    setSelected((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  }
-
   const recordPayment = React.useCallback(async (order: any) => {
     const amount = window.prompt("Amount?");
     if (!amount) return;
@@ -168,6 +124,50 @@ export default function OperatorOrdersPage() {
       alert(e?.message || "Failed");
     }
   }, [mutate]);
+
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.target && (e.target as HTMLElement).tagName === "INPUT") return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setActive((a) => Math.min(a + 1, current.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setActive((a) => Math.max(a - 1, 0));
+      } else if (e.key === "Enter" && active >= 0) {
+        e.preventDefault();
+        const order = current[active];
+        if (order) window.open(`/orders/${order.id}`, "_blank");
+      } else if (e.ctrlKey && active >= 0) {
+        const order = current[active];
+        if (!order) return;
+        if (e.key.toLowerCase() === "p") {
+          e.preventDefault();
+          recordPayment(order);
+        } else if (e.key.toLowerCase() === "r") {
+          e.preventDefault();
+          markReturnOrCollect(order);
+        } else if (e.key.toLowerCase() === "b") {
+          e.preventDefault();
+          buyback(order);
+        } else if (e.key.toLowerCase() === "m") {
+          e.preventDefault();
+          cancelInst(order);
+        }
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, current, buyback, cancelInst, markReturnOrCollect, recordPayment]);
+
+  function toggleSelect(id: number) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
 
   async function markDone(order: any) {
     try {
