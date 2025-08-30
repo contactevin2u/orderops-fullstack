@@ -37,6 +37,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Disable crashlytics mapping upload to save memory
+            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
+                mappingFileUploadEnabled = false
+            }
         }
         debug {
             isMinifyEnabled = false
@@ -58,11 +62,34 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+        // Reduce Kotlin compiler memory usage
+        freeCompilerArgs += listOf(
+            "-Xjvm-default=all"
+        )
+    }
+
+    // Lint optimizations to reduce memory usage
+    lint {
+        // Disable resource-intensive lint checks
+        disable += setOf(
+            "UnusedResources",
+            "IconDensities",
+            "IconDuplicates",
+            "IconLocation",
+            "IconMissingDensityFolder",
+            "IconXmlAndPng"
+        )
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 
 kapt {
     correctErrorTypes = true
+    // Reduce KAPT memory usage
+    arguments {
+        arg("room.schemaLocation", "$projectDir/schemas")
+    }
 }
 
 dependencies {
