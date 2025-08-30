@@ -33,11 +33,12 @@ android {
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
 
-
     buildTypes {
         release {
             isMinifyEnabled = false  // Disable for testing
             isShrinkResources = false  // Disable for testing
+            isDebuggable = true  // Enable debugging for testing
+            // Use debug signing for testing (this is the standard approach)
             
             // Disable crashlytics mapping upload to save memory
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
