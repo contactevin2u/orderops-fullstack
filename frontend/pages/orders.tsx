@@ -51,6 +51,19 @@ export default function OperatorOrdersPage() {
     return () => clearTimeout(t);
   }, [params, mutate]);
 
+  const items = data?.items || [];
+  let filtered = items as any[];
+  if (outstanding) {
+    filtered = filtered.filter((o) =>
+      outstanding === "yes" ? Number(o.balance || o.outstanding || 0) > 0 : Number(o.balance || o.outstanding || 0) <= 0
+    );
+  }
+  if (start) filtered = filtered.filter((o) => o.updated_at && o.updated_at >= start);
+  if (end) filtered = filtered.filter((o) => o.updated_at && o.updated_at <= `${end}T23:59:59`);
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const current = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.target && (e.target as HTMLElement).tagName === "INPUT") return;
@@ -86,19 +99,6 @@ export default function OperatorOrdersPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [active, current, buyback, cancelInst, markReturnOrCollect, recordPayment]);
 
-  const items = data?.items || [];
-  let filtered = items as any[];
-  if (outstanding) {
-    filtered = filtered.filter((o) =>
-      outstanding === "yes" ? Number(o.balance || o.outstanding || 0) > 0 : Number(o.balance || o.outstanding || 0) <= 0
-    );
-  }
-  if (start) filtered = filtered.filter((o) => o.updated_at && o.updated_at >= start);
-  if (end) filtered = filtered.filter((o) => o.updated_at && o.updated_at <= `${end}T23:59:59`);
-
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const current = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-
   function toggleSelect(id: number) {
     setSelected((s) => {
       const n = new Set(s);
@@ -108,7 +108,7 @@ export default function OperatorOrdersPage() {
     });
   }
 
-  async function recordPayment(order: any) {
+  const recordPayment = React.useCallback(async (order: any) => {
     const amount = window.prompt("Amount?");
     if (!amount) return;
     const method = window.prompt("Method?") || undefined;
@@ -125,9 +125,9 @@ export default function OperatorOrdersPage() {
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }
+  }, [mutate]);
 
-  async function markReturnOrCollect(order: any) {
+  const markReturnOrCollect = React.useCallback(async (order: any) => {
     const collect = window.confirm("Collect item?");
     try {
       if (order.type === 'RENTAL' || !collect) {
@@ -147,18 +147,18 @@ export default function OperatorOrdersPage() {
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }
+  }, [mutate]);
 
-  async function cancelInst(order: any) {
+  const cancelInst = React.useCallback(async (order: any) => {
     try {
       await cancelInstallment(order.id, {});
       mutate();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }
+  }, [mutate]);
 
-  async function buyback(order: any) {
+  const buyback = React.useCallback(async (order: any) => {
     const amt = window.prompt("Buyback amount?");
     if (!amt) return;
     try {
@@ -167,7 +167,7 @@ export default function OperatorOrdersPage() {
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }
+  }, [mutate]);
 
   async function markDone(order: any) {
     try {
