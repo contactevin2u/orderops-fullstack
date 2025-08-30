@@ -37,7 +37,7 @@ class JobDetailViewModel @Inject constructor(
                     _loading.value = false
                 }
                 is Result.Error -> {
-                    _error.value = result.exception.message ?: "Failed to load job"
+                    _error.value = result.throwable.message ?: "Failed to load job"
                     _loading.value = false
                 }
                 is Result.Loading -> {
@@ -60,7 +60,7 @@ class JobDetailViewModel @Inject constructor(
                     _loading.value = false
                 }
                 is Result.Error -> {
-                    _error.value = result.exception.message ?: "Failed to update status"
+                    _error.value = result.throwable.message ?: "Failed to update status"
                     _loading.value = false
                 }
                 is Result.Loading -> {
