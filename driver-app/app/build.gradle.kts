@@ -63,19 +63,10 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            
-            // Use the release signing config if available
-            signingConfig = if (rootProject.file("keystore.jks").exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            isMinifyEnabled = false  // Disable for testing
+            isShrinkResources = false  // Disable for testing
+            // Remove signing config for unsigned APK
+            signingConfig = null
             
             // Disable crashlytics mapping upload to save memory
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
@@ -87,6 +78,14 @@ android {
                 artifactType = "APK"
                 groups = "testers"
             }
+        }
+        create("testing") {
+            initWith(getByName("release"))
+            isDebuggable = true
+            versionNameSuffix = "-testing"
+            applicationIdSuffix = ".testing"
+            // Explicitly no signing config for testing builds
+            signingConfig = null
         }
         debug {
             isMinifyEnabled = false

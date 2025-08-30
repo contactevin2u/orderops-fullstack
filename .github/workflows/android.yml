@@ -56,12 +56,12 @@ jobs:
         working-directory: driver-app
         run: echo "$SIGNING_KEYSTORE_B64" | base64 -d > keystore.jks
 
-      - name: Build (release)
+      - name: Build (testing - unsigned)
         uses: gradle/gradle-build-action@v3
         with:
           gradle-version: 8.9
           build-root-directory: driver-app
-          arguments: ":app:assembleRelease"
+          arguments: ":app:assembleTesting"
         env:
           # Increase Gradle JVM heap size
           GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
@@ -73,5 +73,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: driver-app-release-apk
-          path: driver-app/app/build/outputs/apk/release/*.apk
+          name: driver-app-testing-apk-unsigned
+          path: driver-app/app/build/outputs/apk/testing/*.apk
