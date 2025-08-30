@@ -37,6 +37,8 @@ services:
         value: "SST"
       - key: TAX_PERCENT
         value: "0"
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
 
   - type: worker
     runtime: python            # modern key; replaces `env: python`
@@ -72,6 +74,8 @@ services:
         value: "SST"
       - key: TAX_PERCENT
         value: "0"
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
 
 databases:
   - name: orderops-db-v1
