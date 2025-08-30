@@ -13,10 +13,6 @@ jobs:
       API_BASE: ${{ secrets.API_BASE }}
       GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
       FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
-      SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
-      SIGNING_KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
-      SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-      SIGNING_STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
 
     steps:
       - uses: actions/checkout@v4
@@ -51,10 +47,6 @@ jobs:
           echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > firebase-sa.json
           echo "GOOGLE_APPLICATION_CREDENTIALS=$PWD/firebase-sa.json" >> $GITHUB_ENV
 
-      - name: (Optional) Create keystore if provided
-        if: ${{ env.SIGNING_KEYSTORE_B64 != '' }}
-        working-directory: driver-app
-        run: echo "$SIGNING_KEYSTORE_B64" | base64 -d > keystore.jks
 
       - name: Build (unsigned)
         uses: gradle/gradle-build-action@v3

@@ -33,33 +33,6 @@ android {
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
 
-    signingConfigs {
-        create("release") {
-            val keystoreFile = rootProject.file("keystore.jks")
-            if (keystoreFile.exists()) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: "android"
-                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "androiddebugkey"
-                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: "android"
-            } else {
-                // Fallback to debug keystore if no release keystore
-                val debugKeystore = rootProject.file("debug.keystore")
-                if (debugKeystore.exists()) {
-                    storeFile = debugKeystore
-                    storePassword = "android"
-                    keyAlias = "androiddebugkey"
-                    keyPassword = "android"
-                }
-            }
-        }
-        getByName("debug") {
-            // Use the Android SDK's debug keystore for debug builds
-            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
-    }
 
     buildTypes {
         release {
@@ -83,7 +56,8 @@ android {
             initWith(getByName("release"))
             isDebuggable = true
             versionNameSuffix = "-unsigned"
-            applicationIdSuffix = ".unsigned"
+            // Keep same package name as release for google-services.json compatibility
+            // applicationIdSuffix = ".unsigned"  // Removed to avoid Firebase config issues
             // Explicitly no signing config for unsigned builds
             signingConfig = null
         }
@@ -92,7 +66,6 @@ android {
             // Remove suffix for Firebase App Distribution
             // applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
-            signingConfig = signingConfigs.getByName("debug")
             
             // Firebase App Distribution properties
             firebaseAppDistribution {
