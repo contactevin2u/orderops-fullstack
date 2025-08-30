@@ -87,6 +87,24 @@ def list_drivers(db: Session = Depends(get_session)):
     return db.query(Driver).filter(Driver.is_active == True).all()
 
 
+@router.post("/register", response_model=DriverOut)
+def register_driver_for_testing(payload: DriverCreateIn, db: Session = Depends(get_session)):
+    """Register a new driver (testing endpoint - no admin required)"""
+    try:
+        fb_user = firebase_auth.create_user(
+            email=payload.email,
+            password=payload.password,
+            display_name=payload.name,
+            app=_get_app(),
+        )
+    except Exception as exc:  # pragma: no cover - network/cred failures
+        raise HTTPException(400, "Failed to create driver") from exc
+    driver = Driver(firebase_uid=fb_user.uid, name=payload.name, phone=payload.phone)
+    db.add(driver)
+    db.commit()
+    db.refresh(driver)
+    return driver
+
 @router.post("", response_model=DriverOut, dependencies=[Depends(require_roles(Role.ADMIN))])
 def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
     try:

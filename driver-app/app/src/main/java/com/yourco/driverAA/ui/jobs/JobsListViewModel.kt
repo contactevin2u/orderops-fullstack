@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,19 +16,14 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class JobsListViewModel @Inject constructor(
-    private val repo: JobsRepository,
-    @ApplicationContext private val context: Context
+    private val repo: JobsRepository
 ) : ViewModel() {
-    private val prefs = context.getSharedPreferences("driver", Context.MODE_PRIVATE)
     
-    private val _jobs = MutableStateFlow<List<String>>(emptyList())
-    val jobs: StateFlow<List<String>> = _jobs.asStateFlow()
+    private val _jobs = MutableStateFlow<List<JobDto>>(emptyList())
+    val jobs: StateFlow<List<JobDto>> = _jobs.asStateFlow()
     
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
-    
-    var token: String = prefs.getString("token", "") ?: ""
-        private set
 
     init {
         loadJobs()
@@ -49,10 +45,5 @@ class JobsListViewModel @Inject constructor(
                 }
             }
         }
-    }
-
-    fun saveToken(value: String) {
-        token = value
-        prefs.edit().putString("token", value).apply()
     }
 }

@@ -14,23 +14,24 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun JobsListScreen(onJobClick: (String) -> Unit, viewModel: JobsListViewModel = hiltViewModel()) {
     val jobs by viewModel.jobs.collectAsState(initial = emptyList())
-    var token by remember { mutableStateOf(viewModel.token) }
+    val loading by viewModel.loading.collectAsState()
 
     Column {
-        OutlinedTextField(
-            value = token,
-            onValueChange = {
-                token = it
-                viewModel.saveToken(it)
-            },
-            label = { Text("Auth Token") }
-        )
-        LazyColumn {
-            items(jobs) { job ->
-                ListItem(
-                    headlineContent = { Text("Job $job") },
-                    modifier = Modifier.clickable { onJobClick(job) }
-                )
+        if (loading) {
+            Text("Loading jobs...")
+        } else if (jobs.isEmpty()) {
+            Text("No jobs available")
+        } else {
+            LazyColumn {
+                items(jobs) { job ->
+                    ListItem(
+                        headlineContent = { Text("Job ${job.id}") },
+                        supportingContent = { 
+                            Text("Customer: ${job.customer_name ?: "Unknown"}")
+                        },
+                        modifier = Modifier.clickable { onJobClick(job.id) }
+                    )
+                }
             }
         }
     }
