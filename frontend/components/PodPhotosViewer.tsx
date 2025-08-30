@@ -22,7 +22,7 @@ export default function PodPhotosViewer({ podPhotoUrls = [], legacyPodUrl }: Pod
   const photos = allPhotos.map(url => {
     if (!url) return null;
     return url.startsWith('http') ? url : `${apiBase}${url}`;
-  }).filter(Boolean);
+  }).filter(Boolean) as string[];
 
   if (photos.length === 0) {
     return (
