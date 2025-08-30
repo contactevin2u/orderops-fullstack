@@ -88,6 +88,10 @@ class JobDetailViewModel @Inject constructor(
                     _error.value = result.throwable.message ?: "Failed to upload photo $photoNumber"
                     _loading.value = false
                 }
+                is Result.Loading -> {
+                    // Loading state is already handled above with _loading.value = true
+                    // This branch should not be reached in practice
+                }
             }
         }
     }
