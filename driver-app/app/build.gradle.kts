@@ -1,4 +1,6 @@
 import java.util.Properties
+import java.io.FileInputStream
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -8,6 +10,7 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
     id("com.google.gms.google-services")
     id("com.google.firebase.crashlytics")
+    id("com.google.firebase.appdistribution")
 }
 
 android {
@@ -30,20 +33,73 @@ android {
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreFile = rootProject.file("keystore.jks")
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD") ?: "android"
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS") ?: "androiddebugkey"
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD") ?: "android"
+            } else {
+                // Fallback to debug keystore if no release keystore
+                val debugKeystore = rootProject.file("debug.keystore")
+                if (debugKeystore.exists()) {
+                    storeFile = debugKeystore
+                    storePassword = "android"
+                    keyAlias = "androiddebugkey"
+                    keyPassword = "android"
+                }
+            }
+        }
+        getByName("debug") {
+            // Use the Android SDK's debug keystore for debug builds
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            
+            // Use the release signing config if available
+            signingConfig = if (rootProject.file("keystore.jks").exists()) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+            
             // Disable crashlytics mapping upload to save memory
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
                 mappingFileUploadEnabled = false
             }
+            
+            // Firebase App Distribution properties
+            firebaseAppDistribution {
+                artifactType = "APK"
+                groups = "testers"
+            }
         }
         debug {
             isMinifyEnabled = false
+            // Remove suffix for Firebase App Distribution
+            // applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            signingConfig = signingConfigs.getByName("debug")
+            
+            // Firebase App Distribution properties
+            firebaseAppDistribution {
+                artifactType = "APK"
+                groups = "testers"
+            }
         }
     }
 
