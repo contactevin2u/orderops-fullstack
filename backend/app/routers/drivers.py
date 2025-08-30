@@ -105,6 +105,52 @@ def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
     return driver
 
 
+@router.get("/jobs")
+def get_driver_jobs(
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    """Get jobs assigned to the current driver"""
+    # For now, return orders assigned to this driver
+    # You may need to adjust this query based on your Order model structure
+    orders = db.query(Order).filter(
+        Order.driver_id == driver.id,
+        Order.status.in_(["confirmed", "in_progress", "ready_for_pickup", "picked_up"])
+    ).all()
+    
+    return [
+        _order_to_driver_out(order, "assigned")
+        for order in orders
+    ]
+
+@router.get("/jobs/{job_id}")
+def get_driver_job(
+    job_id: str,
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    """Get specific job details for the driver"""
+    order = db.query(Order).filter(
+        Order.id == job_id,
+        Order.driver_id == driver.id
+    ).first()
+    
+    if not order:
+        raise HTTPException(404, "Job not found")
+    
+    return _order_to_driver_out(order, "assigned")
+
+@router.post("/locations")
+def post_driver_locations(
+    locations: list,
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    """Receive location updates from driver app"""
+    # For now, just return success
+    # You can implement location storage here if needed
+    return {"status": "ok", "count": len(locations)}
+
 @router.post("/devices")
 def register_device(
     payload: DeviceRegisterIn,

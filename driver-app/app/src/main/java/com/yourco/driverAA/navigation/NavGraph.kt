@@ -1,12 +1,15 @@
 package com.yourco.driverAA.navigation
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
+import androidx.hilt.navigation.compose.hiltViewModel
+import com.yourco.driverAA.data.auth.AuthService
+import com.yourco.driverAA.ui.auth.LoginScreen
 import com.yourco.driverAA.ui.jobs.JobsListScreen
 import com.yourco.driverAA.ui.jobdetail.JobDetailScreen
 import com.yourco.driverAA.util.DeepLinks
@@ -14,7 +17,21 @@ import com.yourco.driverAA.util.DeepLinks
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = "jobs") {
+    val authService: AuthService = hiltViewModel<AuthViewModel>().authService
+    val currentUser by authService.currentUser.collectAsState(initial = null)
+    
+    val startDestination = if (currentUser != null) "jobs" else "login"
+    
+    NavHost(navController = navController, startDestination = startDestination) {
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate("jobs") {
+                        popUpTo("login") { inclusive = true }
+                    }
+                }
+            )
+        }
         composable("jobs") {
             JobsListScreen(onJobClick = { id -> navController.navigate("job/$id") })
         }
