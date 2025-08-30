@@ -20,15 +20,17 @@ export default function RouteFormModal({ date, route, onClose }: Props) {
   const mutation = useMutation({
     mutationFn: () => {
       const routeData = {
-        driver_id: Number(driverId) || null,
-        secondary_driver_id: secondaryDriverId ? Number(secondaryDriverId) : null,
+        driver_id: driverId ? Number(driverId) : undefined,
+        secondary_driver_id: secondaryDriverId ? Number(secondaryDriverId) : undefined,
         name: name || undefined,
       };
       return route
         ? updateRoute(route.id, routeData)
         : createRoute({
-            ...routeData,
+            driver_id: Number(driverId), // Required for create
+            secondary_driver_id: secondaryDriverId ? Number(secondaryDriverId) : undefined,
             route_date: date,
+            name: name || undefined,
           });
     },
     onSuccess: () => {

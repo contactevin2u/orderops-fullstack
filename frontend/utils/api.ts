@@ -302,13 +302,13 @@ export function assignOrderToDriver(orderId: number | string, driverId: string) 
   return request(`/orders/${orderId}/assign`, { json: { driver_id: driverId } });
 }
 
-export function createRoute(body: { driver_id: number; route_date: string; name?: string; notes?: string }) {
+export function createRoute(body: { driver_id: number; secondary_driver_id?: number; route_date: string; name?: string; notes?: string }) {
   return request<any>('/routes', { json: body });
 }
 
 export function updateRoute(
   routeId: number,
-  body: { driver_id?: number; route_date?: string; name?: string; notes?: string },
+  body: { driver_id?: number; secondary_driver_id?: number; route_date?: string; name?: string; notes?: string },
 ) {
   return request<any>(`/routes/${routeId}`, { method: 'PATCH', json: body });
 }
