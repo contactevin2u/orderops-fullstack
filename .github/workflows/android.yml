@@ -62,6 +62,13 @@ jobs:
           gradle-version: 8.9
           build-root-directory: driver-app
           arguments: ":app:assembleRelease"
+        env:
+          # Increase Gradle JVM heap size
+          GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"
+          # Increase Kotlin daemon heap size
+          KOTLIN_DAEMON_JVMARGS: "-Xmx2g"
+          # Increase KAPT heap size
+          KAPT_OPTS: "-Xmx2g"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
