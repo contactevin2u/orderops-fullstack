@@ -148,8 +148,8 @@ dependencies {
 
     implementation("com.jakewharton.timber:timber:5.0.1")
     
-    // Image loading
-    implementation("io.coil-kt:coil-compose:2.7.0")
+    // Image loading - removed for build issues
+    // implementation("io.coil-kt:coil-compose:2.7.0")
 
     implementation(platform("com.google.firebase:firebase-bom:33.2.0"))
     implementation("com.google.firebase:firebase-messaging-ktx")

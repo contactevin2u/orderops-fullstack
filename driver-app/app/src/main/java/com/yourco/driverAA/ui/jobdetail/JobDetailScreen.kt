@@ -6,7 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+// import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -22,8 +22,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import coil.compose.rememberAsyncImagePainter
+// import coil.compose.rememberAsyncImagePainter
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -680,27 +681,16 @@ private fun PhotoCaptureButton(
         onClick = onTakePhoto
     ) {
         if (photoFile != null && photoFile.exists()) {
-            // Show photo preview
-            Image(
-                painter = rememberAsyncImagePainter(photoFile),
-                contentDescription = "Photo $photoNumber preview",
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(MaterialTheme.shapes.small),
-                contentScale = ContentScale.Crop
-            )
-            // Add a small camera icon overlay to indicate it can be retaken
+            // Show photo taken indicator 
             Box(
                 modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.TopEnd
+                contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    Icons.Default.Add,
-                    contentDescription = "Retake photo $photoNumber",
-                    modifier = Modifier
-                        .size(16.dp)
-                        .padding(2.dp),
-                    tint = Color.White
+                Text(
+                    "📷\nPhoto $photoNumber\nTaken",
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
         } else {
@@ -754,11 +744,9 @@ private fun CustomerPhoneSection(phone: String) {
                 ),
                 contentPadding = PaddingValues(8.dp)
             ) {
-                Icon(
-                    Icons.Default.Send, // Using send icon as proxy for WhatsApp
-                    contentDescription = "WhatsApp",
-                    modifier = Modifier.size(16.dp),
-                    tint = Color.White
+                Text(
+                    "💬",
+                    style = MaterialTheme.typography.labelSmall
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
