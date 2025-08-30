@@ -91,7 +91,7 @@ private fun JobDetailContent(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Order #${job.id}",
+                            text = "Order #${job.code ?: job.id}",
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )

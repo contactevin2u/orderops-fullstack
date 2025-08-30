@@ -64,6 +64,7 @@ def _order_to_driver_out(order: Order, status: str) -> dict:
 
     return {
         "id": str(order.id),
+        "code": getattr(order, "code", None),
         "status": status,
         "customer_name": customer.get("name") if customer else None,
         "customer_phone": customer.get("phone") if customer else None,

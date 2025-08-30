@@ -94,7 +94,7 @@ private fun OrderCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Order #${job.id}",
+                    text = "Order #${job.code ?: job.id}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

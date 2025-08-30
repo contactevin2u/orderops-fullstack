@@ -36,6 +36,7 @@ interface DriverApi {
 @Serializable
 data class JobDto(
     val id: String,
+    val code: String? = null,
     val status: String? = null,
     val customer_name: String? = null,
     val customer_phone: String? = null,
