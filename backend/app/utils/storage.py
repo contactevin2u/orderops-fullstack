@@ -30,15 +30,24 @@ def save_pod_image(file_bytes: bytes) -> str:
     
     # Use Firebase Storage for production
     if FIREBASE_STORAGE_BUCKET:
+        print(f"DEBUG: Using Firebase Storage bucket: {FIREBASE_STORAGE_BUCKET}")
         try:
             bucket = storage.bucket(FIREBASE_STORAGE_BUCKET)
-            blob = bucket.blob(f"pod-images/{name}")
+            blob_path = f"pod-images/{name}"
+            blob = bucket.blob(blob_path)
+            print(f"DEBUG: Uploading to Firebase Storage path: {blob_path}")
             blob.upload_from_string(processed_bytes, content_type="image/jpeg")
             blob.make_public()
-            return blob.public_url
+            public_url = blob.public_url
+            print(f"DEBUG: Firebase Storage upload successful: {public_url}")
+            return public_url
         except Exception as e:
             # Fallback to local storage if Firebase fails
-            print(f"Firebase storage failed, falling back to local: {e}")
+            print(f"ERROR: Firebase storage failed, falling back to local: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        print("DEBUG: FIREBASE_STORAGE_BUCKET not set, using local storage")
     
     # Local storage fallback for development or Firebase failure
     path = os.path.join(UPLOAD_DIR, name)

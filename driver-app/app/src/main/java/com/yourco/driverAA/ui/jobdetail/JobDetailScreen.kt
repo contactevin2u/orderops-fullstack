@@ -702,10 +702,9 @@ private fun PhotoCaptureButton(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(
-                        Icons.Default.Add,
-                        contentDescription = "Take photo $photoNumber",
-                        modifier = Modifier.size(24.dp)
+                    Text(
+                        text = "📷",
+                        style = MaterialTheme.typography.headlineMedium
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
