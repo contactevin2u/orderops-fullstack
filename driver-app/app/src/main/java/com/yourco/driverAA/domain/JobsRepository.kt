@@ -2,6 +2,7 @@ package com.yourco.driverAA.domain
 
 import com.yourco.driverAA.data.api.DriverApi
 import com.yourco.driverAA.data.api.JobDto
+import com.yourco.driverAA.data.api.OrderStatusUpdateDto
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -25,6 +26,13 @@ class JobsRepository @Inject constructor(
     suspend fun getJob(id: String): Result<JobDto> = try {
         val job = api.getJob(id)
         Result.Success(job)
+    } catch (e: Exception) {
+        Result.Error(e)
+    }
+    
+    suspend fun updateOrderStatus(orderId: String, status: String): Result<JobDto> = try {
+        val updatedJob = api.updateOrderStatus(orderId, OrderStatusUpdateDto(status))
+        Result.Success(updatedJob)
     } catch (e: Exception) {
         Result.Error(e)
     }

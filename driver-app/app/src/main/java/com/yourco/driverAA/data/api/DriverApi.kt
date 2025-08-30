@@ -3,6 +3,7 @@ package com.yourco.driverAA.data.api
 import kotlinx.serialization.Serializable
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -16,6 +17,9 @@ interface DriverApi {
 
     @POST("drivers/locations")
     suspend fun postLocations(@Body locations: List<LocationPingDto>)
+    
+    @PATCH("drivers/orders/{id}")
+    suspend fun updateOrderStatus(@Path("id") orderId: String, @Body update: OrderStatusUpdateDto): JobDto
 }
 
 @Serializable
@@ -44,3 +48,6 @@ data class JobItemDto(
 
 @Serializable
 data class LocationPingDto(val lat: Double, val lng: Double, val accuracy: Float, val speed: Float, val ts: Long)
+
+@Serializable
+data class OrderStatusUpdateDto(val status: String)

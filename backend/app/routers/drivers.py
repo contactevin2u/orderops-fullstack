@@ -144,8 +144,15 @@ def get_driver_jobs(
     
     orders = query.order_by(Order.delivery_date.desc().nullslast(), Order.created_at.desc()).all()
     
+    # Get trips for proper status
+    trips_dict = {}
+    for order in orders:
+        trip = db.query(Trip).filter(Trip.order_id == order.id, Trip.driver_id == driver.id).first()
+        if trip:
+            trips_dict[order.id] = trip
+    
     return [
-        _order_to_driver_out(order, order.status.lower())
+        _order_to_driver_out(order, trips_dict.get(order.id).status.lower() if trips_dict.get(order.id) else order.status.lower())
         for order in orders
     ]
 
@@ -170,7 +177,11 @@ def get_driver_job(
     if not order:
         raise HTTPException(404, "Job not found")
     
-    return _order_to_driver_out(order, order.status.lower())
+    # Get trip for proper status
+    trip = db.query(Trip).filter(Trip.order_id == order.id, Trip.driver_id == driver.id).first()
+    trip_status = trip.status.lower() if trip else order.status.lower()
+    
+    return _order_to_driver_out(order, trip_status)
 
 @router.post("/locations")
 def post_driver_locations(
@@ -282,6 +293,17 @@ def update_order_status(
         raise HTTPException(404, "Trip not found")
     if payload.status not in {"IN_TRANSIT", "DELIVERED", "ON_HOLD"}:
         raise HTTPException(400, "Invalid status")
+    
+    # Business rule: Only one trip can be IN_TRANSIT at a time per driver
+    if payload.status == "IN_TRANSIT":
+        active_trips = db.query(Trip).filter(
+            Trip.driver_id == driver.id,
+            Trip.status == "IN_TRANSIT",
+            Trip.id != trip.id  # Exclude current trip
+        ).count()
+        if active_trips > 0:
+            raise HTTPException(400, "You already have an order in transit. Please put it on hold or complete it first.")
+    
     trip.status = payload.status
     now = datetime.now(timezone.utc)
     if payload.status == "IN_TRANSIT":
