@@ -21,7 +21,7 @@ from ..models import (
 )
 from ..auth.deps import require_roles
 from ..utils.audit import log_action
-from ..schemas import OrderOut, AssignDriverIn
+from ..schemas import OrderOut, AssignDriverIn, AssignSecondDriverIn
 from ..services.ordersvc import (
     create_order_from_parsed,
     recompute_financials,
@@ -413,6 +413,35 @@ def assign_order(
     return envelope({"order_id": order.id, "driver_id": driver.id, "trip_id": trip.id})
 
 
+@router.post("/{order_id}/assign-second-driver", response_model=dict)
+def assign_second_driver(
+    order_id: int,
+    body: AssignSecondDriverIn,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
+):
+    order = db.get(Order, order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    driver_2 = db.get(Driver, body.driver_id_2)
+    if not driver_2:
+        raise HTTPException(404, "Second driver not found")
+    trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    if trip.status in {"DELIVERED", "SUCCESS"}:
+        raise HTTPException(400, "Completed trips cannot have second driver assigned")
+    
+    # Assign the second driver
+    trip.driver_id_2 = driver_2.id
+    db.commit()
+    db.refresh(trip)
+    
+    log_action(db, current_user, "order.assign_second_driver", f"order_id={order.id},driver_id_2={driver_2.id}")
+    notify_order_assigned(db, driver_2.id, order)
+    return envelope({"order_id": order.id, "driver_id_2": driver_2.id, "trip_id": trip.id})
+
+
 class CommissionUpdateIn(BaseModel):
     amount: Decimal
 
@@ -436,29 +465,42 @@ def mark_success(
         rate = Decimal("30")
     else:
         rate = Decimal("50")
-    commission = db.query(Commission).filter_by(trip_id=trip.id).one_or_none()
+    # Clear existing commissions for this trip
+    db.query(Commission).filter_by(trip_id=trip.id).delete()
+    
+    # Calculate commission per driver (split if dual drivers)
+    driver_ids = trip.driver_ids
+    commission_per_driver = rate / len(driver_ids)
+    
     now = datetime.utcnow()
-    if commission:
-        commission.rate = rate
-        commission.computed_amount = rate
-        commission.actualized_at = now
-        commission.actualization_reason = "manual_success"
-    else:
+    commissions = []
+    
+    # Create commission for each driver
+    for driver_id in driver_ids:
         commission = Commission(
-            driver_id=trip.driver_id,
+            driver_id=driver_id,
             trip_id=trip.id,
             scheme="FLAT",
             rate=rate,
-            computed_amount=rate,
+            computed_amount=commission_per_driver,
             actualized_at=now,
             actualization_reason="manual_success",
         )
         db.add(commission)
+        commissions.append(commission)
+    
     trip.status = "SUCCESS"
     db.commit()
-    db.refresh(commission)
+    
+    total_amount = sum(float(c.computed_amount) for c in commissions)
+    commission_ids = [c.id for c in commissions]
+    
     log_action(db, current_user, "order.success", f"order_id={order.id}")
-    return envelope({"commission_id": commission.id, "amount": float(commission.computed_amount)})
+    return envelope({
+        "commission_ids": commission_ids, 
+        "total_amount": total_amount,
+        "drivers_count": len(driver_ids)
+    })
 
 
 @router.patch("/{order_id}/commission", response_model=dict)
@@ -474,24 +516,38 @@ def update_commission(
     trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
     if not trip:
         raise HTTPException(404, "Trip not found")
-    commission = db.query(Commission).filter_by(trip_id=trip.id).one_or_none()
+    # Clear existing commissions for this trip
+    db.query(Commission).filter_by(trip_id=trip.id).delete()
+    
+    # Calculate commission per driver (split if dual drivers)
+    driver_ids = trip.driver_ids
     amt = to_decimal(body.amount)
-    if commission:
-        commission.rate = amt
-        commission.computed_amount = amt
-    else:
+    commission_per_driver = amt / len(driver_ids)
+    
+    commissions = []
+    # Create commission for each driver
+    for driver_id in driver_ids:
         commission = Commission(
-            driver_id=trip.driver_id,
+            driver_id=driver_id,
             trip_id=trip.id,
             scheme="FLAT",
             rate=amt,
-            computed_amount=amt,
+            computed_amount=commission_per_driver,
         )
         db.add(commission)
+        commissions.append(commission)
+    
     db.commit()
-    db.refresh(commission)
-    log_action(db, current_user, "commission.update", f"commission_id={commission.id}")
-    return envelope({"commission_id": commission.id, "amount": float(commission.computed_amount)})
+    
+    total_amount = sum(float(c.computed_amount) for c in commissions)
+    commission_ids = [c.id for c in commissions]
+    
+    log_action(db, current_user, "commission.update", f"commission_ids={commission_ids}")
+    return envelope({
+        "commission_ids": commission_ids,
+        "total_amount": total_amount,
+        "drivers_count": len(driver_ids)
+    })
 
 
 @router.post("/{order_id}/void", response_model=dict)

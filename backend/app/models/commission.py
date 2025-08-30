@@ -20,7 +20,7 @@ class Commission(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id"), nullable=False)
     trip_id: Mapped[int] = mapped_column(
-        ForeignKey("trips.id"), nullable=False, unique=True
+        ForeignKey("trips.id"), nullable=False
     )
     scheme: Mapped[str] = mapped_column(String(20), nullable=False)
     rate: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)

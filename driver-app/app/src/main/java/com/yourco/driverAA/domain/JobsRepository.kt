@@ -4,6 +4,7 @@ import com.yourco.driverAA.data.api.DriverApi
 import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.OrderStatusUpdateDto
 import com.yourco.driverAA.data.api.PodUploadResponse
+import com.yourco.driverAA.data.api.CommissionMonthDto
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -50,4 +51,6 @@ class JobsRepository @Inject constructor(
     } catch (e: Exception) {
         Result.Error(e)
     }
+    
+    suspend fun getCommissions(): List<CommissionMonthDto> = api.getCommissions()
 }

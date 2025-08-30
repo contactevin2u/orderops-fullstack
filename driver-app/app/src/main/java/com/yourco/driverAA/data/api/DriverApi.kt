@@ -31,6 +31,9 @@ interface DriverApi {
         @Part file: MultipartBody.Part,
         @Query("photo_number") photoNumber: Int = 1
     ): PodUploadResponse
+    
+    @GET("drivers/commissions")
+    suspend fun getCommissions(): List<CommissionMonthDto>
 }
 
 @Serializable
@@ -66,3 +69,9 @@ data class OrderStatusUpdateDto(val status: String)
 
 @Serializable
 data class PodUploadResponse(val url: String, val photo_number: Int)
+
+@Serializable
+data class CommissionMonthDto(
+    val month: String,
+    val total: Double
+)

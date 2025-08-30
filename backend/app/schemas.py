@@ -206,6 +206,10 @@ class AssignDriverIn(BaseModel):
     driver_id: int
 
 
+class AssignSecondDriverIn(BaseModel):
+    driver_id_2: int
+
+
 class RouteCreateIn(BaseModel):
     driver_id: int
     route_date: str

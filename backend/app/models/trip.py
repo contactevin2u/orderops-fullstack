@@ -20,6 +20,7 @@ class Trip(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), nullable=False)
     driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id"), nullable=False)
+    driver_id_2: Mapped[int | None] = mapped_column(ForeignKey("drivers.id"), nullable=True, index=True)
     route_id: Mapped[int | None] = mapped_column(
         ForeignKey("driver_routes.id"), nullable=True, index=True
     )
@@ -41,7 +42,7 @@ class Trip(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    commission = relationship("Commission", uselist=False, back_populates="trip")
+    commissions = relationship("Commission", back_populates="trip")
 
     @property
     def pod_photo_urls(self) -> list[str]:
@@ -56,6 +57,19 @@ class Trip(Base):
     def has_pod_photos(self) -> bool:
         """Check if at least one PoD photo is uploaded"""
         return len(self.pod_photo_urls) > 0
+    
+    @property
+    def driver_ids(self) -> list[int]:
+        """Get all driver IDs for this trip (primary + secondary if exists)"""
+        drivers = [self.driver_id]
+        if self.driver_id_2:
+            drivers.append(self.driver_id_2)
+        return drivers
+    
+    @property
+    def has_dual_drivers(self) -> bool:
+        """Check if trip has two drivers assigned"""
+        return self.driver_id_2 is not None
 
     __table_args__ = (
         Index("ix_trips_driver_status_planned", "driver_id", "status", "planned_at"),
