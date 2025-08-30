@@ -1,4 +1,4 @@
-package com.orderops.driver.notifications
+package com.yourco.driverAA.notifications
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,7 +8,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import com.orderops.driver.R
+import com.yourco.driverAA.R
 
 object Notifications {
     const val JOBS_CHANNEL = "jobs"
