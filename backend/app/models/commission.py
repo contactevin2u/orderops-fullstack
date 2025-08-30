@@ -33,4 +33,4 @@ class Commission(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    trip = relationship("Trip", back_populates="commission")
+    trip = relationship("Trip", back_populates="commissions")
