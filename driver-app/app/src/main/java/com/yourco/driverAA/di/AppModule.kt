@@ -1,12 +1,12 @@
-package com.orderops.driver.di
+package com.yourco.driverAA.di
 
 import android.content.Context
 import androidx.room.Room
-import com.orderops.driver.BuildConfig
-import com.orderops.driver.data.api.DriverApi
-import com.orderops.driver.data.db.AppDatabase
-import com.orderops.driver.data.db.LocationPingDao
-import com.orderops.driver.domain.JobsRepository
+import com.yourco.driverAA.BuildConfig
+import com.yourco.driverAA.data.api.DriverApi
+import com.yourco.driverAA.data.db.AppDatabase
+import com.yourco.driverAA.data.db.LocationPingDao
+import com.yourco.driverAA.domain.JobsRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -48,5 +48,5 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideJobsRepository(): JobsRepository = JobsRepository()
+    fun provideJobsRepository(api: DriverApi): JobsRepository = JobsRepository(api)
 }
