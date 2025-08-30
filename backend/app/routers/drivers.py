@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select, func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
 import datetime as dt
 
@@ -126,7 +126,13 @@ def get_driver_jobs(
     db: Session = Depends(get_session),
 ):
     """Get jobs assigned to the current driver"""
-    query = db.query(Order).filter(Order.driver_id == driver.id)
+    # Query orders through trips (Order -> Trip -> Driver relationship)
+    query = (
+        db.query(Order)
+        .join(Trip, Order.id == Trip.order_id)
+        .filter(Trip.driver_id == driver.id)
+        .options(joinedload(Order.customer))
+    )
     
     if status_filter == "active":
         # Active orders: NEW, ACTIVE, or any pending delivery states
@@ -150,15 +156,21 @@ def get_driver_job(
     db: Session = Depends(get_session),
 ):
     """Get specific job details for the driver"""
-    order = db.query(Order).filter(
-        Order.id == job_id,
-        Order.driver_id == driver.id
-    ).first()
+    order = (
+        db.query(Order)
+        .join(Trip, Order.id == Trip.order_id)
+        .filter(
+            Order.id == job_id,
+            Trip.driver_id == driver.id
+        )
+        .options(joinedload(Order.customer))
+        .first()
+    )
     
     if not order:
         raise HTTPException(404, "Job not found")
     
-    return _order_to_driver_out(order, "assigned")
+    return _order_to_driver_out(order, order.status.lower())
 
 @router.post("/locations")
 def post_driver_locations(
