@@ -10,9 +10,8 @@ MAX_BYTES = 5 * 1024 * 1024
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET")
 
-# Create uploads directory for local development
-if not FIREBASE_STORAGE_BUCKET:
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Always create uploads directory as fallback
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def save_pod_image(file_bytes: bytes) -> str:

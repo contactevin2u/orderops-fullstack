@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
@@ -18,6 +19,10 @@ from .routers import (
     routes as routes_router,
 )
 from .audit import router as audit_router
+
+# Ensure uploads directory exists for static file serving
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI(title="OrderOps Fullstack v1", default_response_class=ORJSONResponse)
 
