@@ -11,7 +11,7 @@ plugins {
 }
 
 android {
-    namespace = "com.orderops.driver"
+    namespace = "com.yourco.driverAA"
     compileSdk = 34
 
     defaultConfig {
@@ -30,9 +30,21 @@ android {
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
 
+    signingConfigs {
+        create("release") {
+            if (System.getenv("SIGNING_KEYSTORE_B64") != null) {
+                storeFile = file("keystore.jks")
+                storePassword = System.getenv("SIGNING_STORE_PASSWORD")
+                keyAlias = System.getenv("SIGNING_KEY_ALIAS")
+                keyPassword = System.getenv("SIGNING_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
