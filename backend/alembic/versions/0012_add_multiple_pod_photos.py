@@ -1,7 +1,7 @@
 """add multiple pod photos support
 
-Revision ID: 0008
-Revises: 0007
+Revision ID: 0012
+Revises: 0011_add_upfront_billed_to_plans
 Create Date: 2025-08-30 20:00:00.000000
 
 """
@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '0008'
-down_revision = '0007'
+revision = '0012'
+down_revision = '0011_add_upfront_billed_to_plans'
 branch_labels = None
 depends_on = None
 
