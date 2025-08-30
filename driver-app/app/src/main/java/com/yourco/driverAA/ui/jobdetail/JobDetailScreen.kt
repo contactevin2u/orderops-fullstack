@@ -35,25 +35,20 @@ import java.io.File
 private fun normalizePhoneNumber(phone: String?): String? {
     if (phone.isNullOrBlank()) return null
     
-    // Remove all non-digit characters
-    val digitsOnly = phone.replace(Regex("[^\\d]"), "")
+    // Remove all non-digit characters except +
+    val cleanPhone = phone.replace(Regex("[^\\d+]"), "")
+    
+    // Remove + and get digits only
+    val digitsOnly = cleanPhone.replace("+", "")
     
     return when {
-        // If it starts with country code (e.g., 234), use as is
-        digitsOnly.length > 10 && (digitsOnly.startsWith("234") || digitsOnly.startsWith("1") || digitsOnly.startsWith("44")) -> {
+        // If it already looks like an international number (10+ digits), use as is
+        digitsOnly.length >= 10 -> {
             digitsOnly
         }
-        // If it's a typical Nigerian number starting with 0, replace with 234
-        digitsOnly.startsWith("0") && digitsOnly.length == 11 -> {
-            "234" + digitsOnly.substring(1)
-        }
-        // If it's 10 digits, assume Nigerian and add 234
-        digitsOnly.length == 10 -> {
-            "234$digitsOnly"
-        }
-        // For other patterns, return as is if it looks valid
-        digitsOnly.length >= 10 -> digitsOnly
-        else -> null
+        // If it's too short, it's probably invalid
+        digitsOnly.length < 7 -> null
+        else -> digitsOnly
     }
 }
 
