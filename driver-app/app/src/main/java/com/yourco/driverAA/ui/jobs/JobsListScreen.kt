@@ -28,7 +28,7 @@ fun JobsListScreen(onJobClick: (String) -> Unit, viewModel: JobsListViewModel = 
         LazyColumn {
             items(jobs) { job ->
                 ListItem(
-                    headlineText = { Text("Job $job") },
+                    headlineContent = { Text("Job $job") },
                     modifier = Modifier.clickable { onJobClick(job) }
                 )
             }
