@@ -289,15 +289,23 @@ def update_order_status(
     driver=Depends(driver_auth),
     db: Session = Depends(get_session),
 ):
+    # Debug logging
+    print(f"DEBUG: Driver {driver.id} attempting to update order {order_id} to status '{payload.status}'")
+    
     trip = (
         db.query(Trip)
         .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
         .one_or_none()
     )
     if not trip:
+        print(f"DEBUG: Trip not found for order {order_id}, driver {driver.id}")
         raise HTTPException(404, "Trip not found")
+    
+    print(f"DEBUG: Current trip status: {trip.status}")
+    
     if payload.status not in {"IN_TRANSIT", "DELIVERED", "ON_HOLD"}:
-        raise HTTPException(400, "Invalid status")
+        print(f"DEBUG: Invalid status received: '{payload.status}'")
+        raise HTTPException(400, f"Invalid status: '{payload.status}'. Must be one of: IN_TRANSIT, DELIVERED, ON_HOLD")
     
     # Business rule: Only one trip can be IN_TRANSIT at a time per driver
     if payload.status == "IN_TRANSIT":
@@ -306,7 +314,9 @@ def update_order_status(
             Trip.status == "IN_TRANSIT",
             Trip.id != trip.id  # Exclude current trip
         ).count()
+        print(f"DEBUG: Found {active_trips} other trips in IN_TRANSIT status for driver {driver.id}")
         if active_trips > 0:
+            print(f"DEBUG: Blocking IN_TRANSIT status due to existing active trips")
             raise HTTPException(400, "You already have an order in transit. Please put it on hold or complete it first.")
     
     trip.status = payload.status
@@ -315,7 +325,9 @@ def update_order_status(
         if not trip.started_at:
             trip.started_at = now
     elif payload.status == "DELIVERED":
+        print(f"DEBUG: Checking PoD photo for DELIVERED status. Current PoD URL: {trip.pod_photo_url}")
         if not trip.pod_photo_url:
+            print(f"DEBUG: Blocking DELIVERED status - PoD photo required but not found")
             raise HTTPException(400, "PoD photo required")
         trip.delivered_at = now
     elif payload.status == "ON_HOLD":
