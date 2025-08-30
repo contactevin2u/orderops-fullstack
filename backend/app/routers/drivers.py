@@ -135,14 +135,21 @@ def get_driver_jobs(
     )
     
     if status_filter == "active":
-        # Active orders: NEW, ACTIVE, or any pending delivery states
-        query = query.filter(Order.status.in_(["NEW", "ACTIVE"]))
+        # Active trips: ASSIGNED, IN_TRANSIT, ON_HOLD (not yet delivered)
+        query = query.filter(Trip.status.in_(["ASSIGNED", "IN_TRANSIT", "ON_HOLD"]))
+        print(f"DEBUG: Filtering active jobs for driver {driver.id} - looking for trip statuses: ASSIGNED, IN_TRANSIT, ON_HOLD")
     elif status_filter == "completed":
-        # Completed orders: COMPLETED, RETURNED, CANCELLED
-        query = query.filter(Order.status.in_(["COMPLETED", "RETURNED", "CANCELLED"]))
+        # Completed trips: DELIVERED or cancelled/returned orders
+        query = query.filter(
+            (Trip.status == "DELIVERED") |
+            (Order.status.in_(["COMPLETED", "RETURNED", "CANCELLED"]))
+        )
+        print(f"DEBUG: Filtering completed jobs for driver {driver.id} - looking for trip status DELIVERED or order status COMPLETED/RETURNED/CANCELLED")
     # if "all", no additional filtering
     
     orders = query.order_by(Order.delivery_date.desc().nullslast(), Order.created_at.desc()).all()
+    
+    print(f"DEBUG: Found {len(orders)} orders with status_filter='{status_filter}' for driver {driver.id}")
     
     # Get trips for proper status
     trips_dict = {}
@@ -150,6 +157,7 @@ def get_driver_jobs(
         trip = db.query(Trip).filter(Trip.order_id == order.id, Trip.driver_id == driver.id).first()
         if trip:
             trips_dict[order.id] = trip
+            print(f"DEBUG: Order {order.id} - Order status: {order.status}, Trip status: {trip.status}")
     
     return [
         _order_to_driver_out(order, trips_dict.get(order.id).status.lower() if trips_dict.get(order.id) else order.status.lower())
