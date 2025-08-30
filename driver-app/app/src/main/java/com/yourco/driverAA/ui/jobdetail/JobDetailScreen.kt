@@ -695,7 +695,7 @@ private fun PhotoCaptureButton(
                 contentAlignment = Alignment.TopEnd
             ) {
                 Icon(
-                    Icons.Default.PhotoCamera,
+                    Icons.Default.Add,
                     contentDescription = "Retake photo $photoNumber",
                     modifier = Modifier
                         .size(16.dp)
@@ -755,7 +755,7 @@ private fun CustomerPhoneSection(phone: String) {
                 contentPadding = PaddingValues(8.dp)
             ) {
                 Icon(
-                    Icons.Default.Chat, // Using chat icon as proxy for WhatsApp
+                    Icons.Default.Send, // Using send icon as proxy for WhatsApp
                     contentDescription = "WhatsApp",
                     modifier = Modifier.size(16.dp),
                     tint = Color.White
