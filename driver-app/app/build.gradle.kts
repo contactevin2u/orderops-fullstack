@@ -79,12 +79,12 @@ android {
                 groups = "testers"
             }
         }
-        create("testing") {
+        create("unsigned") {
             initWith(getByName("release"))
             isDebuggable = true
-            versionNameSuffix = "-testing"
-            applicationIdSuffix = ".testing"
-            // Explicitly no signing config for testing builds
+            versionNameSuffix = "-unsigned"
+            applicationIdSuffix = ".unsigned"
+            // Explicitly no signing config for unsigned builds
             signingConfig = null
         }
         debug {
