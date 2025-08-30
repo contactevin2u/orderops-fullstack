@@ -1,4 +1,4 @@
-pro# Kotlinx Serialization
+# Kotlinx Serialization
 -keepattributes *Annotation*, InnerClasses
 -dontnote kotlinx.serialization.AnnotationsKt
 -keepclassmembers class kotlinx.serialization.json.** {
@@ -35,4 +35,3 @@ pro# Kotlinx Serialization
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
-
