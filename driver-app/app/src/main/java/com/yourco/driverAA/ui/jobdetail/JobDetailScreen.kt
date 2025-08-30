@@ -186,7 +186,7 @@ private fun JobDetailContent(
                     
                     job.total?.let { total ->
                         DetailRow(
-                            icon = Icons.Default.Info,
+                            icon = Icons.Default.Star,
                             label = "Total",
                             value = "$$total"
                         )
@@ -194,7 +194,7 @@ private fun JobDetailContent(
                     
                     job.paid_amount?.let { paid ->
                         DetailRow(
-                            icon = Icons.Default.Check,
+                            icon = Icons.Default.Star,
                             label = "Paid",
                             value = "$$paid"
                         )
@@ -203,7 +203,7 @@ private fun JobDetailContent(
                     job.balance?.let { balance ->
                         if (balance != "0.00") {
                             DetailRow(
-                                icon = Icons.Default.Error,
+                                icon = Icons.Default.Star,
                                 label = "Balance",
                                 value = "$$balance",
                                 valueColor = MaterialTheme.colorScheme.error
@@ -393,7 +393,7 @@ private fun StatusActionButtons(
                                 containerColor = MaterialTheme.colorScheme.secondary
                             )
                         ) {
-                            Icon(Icons.Default.Close, contentDescription = null)
+                            Icon(Icons.Default.Star, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
                             Text("Hold")
                         }
