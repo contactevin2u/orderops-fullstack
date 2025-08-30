@@ -63,21 +63,17 @@ def _order_to_driver_out(order: Order, status: str) -> dict:
         }
 
     return {
-        "id": order.id,
-        "description": getattr(order, "code", None),
-        "code": getattr(order, "code", None),
+        "id": str(order.id),
         "status": status,
-        "delivery_date": dd,
+        "customer_name": customer.get("name") if customer else None,
+        "customer_phone": customer.get("phone") if customer else None,
+        "address": customer.get("address") if customer else None,
+        "delivery_date": str(dd) if dd else None,
         "notes": getattr(order, "notes", None),
-        "subtotal": getattr(order, "subtotal", Decimal("0")) or Decimal("0"),
-        "discount": getattr(order, "discount", Decimal("0")) or Decimal("0"),
-        "delivery_fee": getattr(order, "delivery_fee", Decimal("0")) or Decimal("0"),
-        "return_delivery_fee": getattr(order, "return_delivery_fee", Decimal("0")) or Decimal("0"),
-        "penalty_fee": getattr(order, "penalty_fee", Decimal("0")) or Decimal("0"),
-        "total": getattr(order, "total", Decimal("0")) or Decimal("0"),
-        "paid_amount": getattr(order, "paid_amount", Decimal("0")) or Decimal("0"),
-        "balance": getattr(order, "balance", Decimal("0")) or Decimal("0"),
-        "customer": customer,
+        "total": str(getattr(order, "total", Decimal("0")) or Decimal("0")),
+        "paid_amount": str(getattr(order, "paid_amount", Decimal("0")) or Decimal("0")),
+        "balance": str(getattr(order, "balance", Decimal("0")) or Decimal("0")),
+        "type": getattr(order, "type", None),
         "items": items,
     }
 
@@ -125,19 +121,25 @@ def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
 
 @router.get("/jobs")
 def get_driver_jobs(
+    status_filter: str = "active",  # active|completed|all
     driver=Depends(driver_auth),
     db: Session = Depends(get_session),
 ):
     """Get jobs assigned to the current driver"""
-    # For now, return orders assigned to this driver
-    # You may need to adjust this query based on your Order model structure
-    orders = db.query(Order).filter(
-        Order.driver_id == driver.id,
-        Order.status.in_(["confirmed", "in_progress", "ready_for_pickup", "picked_up"])
-    ).all()
+    query = db.query(Order).filter(Order.driver_id == driver.id)
+    
+    if status_filter == "active":
+        # Active orders: NEW, ACTIVE, or any pending delivery states
+        query = query.filter(Order.status.in_(["NEW", "ACTIVE"]))
+    elif status_filter == "completed":
+        # Completed orders: COMPLETED, RETURNED, CANCELLED
+        query = query.filter(Order.status.in_(["COMPLETED", "RETURNED", "CANCELLED"]))
+    # if "all", no additional filtering
+    
+    orders = query.order_by(Order.delivery_date.desc().nullslast(), Order.created_at.desc()).all()
     
     return [
-        _order_to_driver_out(order, "assigned")
+        _order_to_driver_out(order, order.status.lower())
         for order in orders
     ]
 

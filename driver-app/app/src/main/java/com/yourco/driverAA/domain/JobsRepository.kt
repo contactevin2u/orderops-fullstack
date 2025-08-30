@@ -12,10 +12,10 @@ import javax.inject.Singleton
 class JobsRepository @Inject constructor(
     private val api: DriverApi
 ) {
-    fun getJobs(): Flow<Result<List<JobDto>>> = flow {
+    fun getJobs(statusFilter: String = "active"): Flow<Result<List<JobDto>>> = flow {
         emit(Result.Loading)
         try {
-            val jobs = api.getJobs()
+            val jobs = api.getJobs(statusFilter)
             emit(Result.Success(jobs))
         } catch (e: Exception) {
             emit(Result.Error(e))

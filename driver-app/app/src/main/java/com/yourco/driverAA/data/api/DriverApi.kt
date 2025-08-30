@@ -5,10 +5,11 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
 import retrofit2.http.Path
+import retrofit2.http.Query
 
 interface DriverApi {
     @GET("drivers/jobs")
-    suspend fun getJobs(): List<JobDto>
+    suspend fun getJobs(@Query("status_filter") statusFilter: String = "active"): List<JobDto>
 
     @GET("drivers/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDto
@@ -27,6 +28,9 @@ data class JobDto(
     val delivery_date: String? = null,
     val notes: String? = null,
     val total: String? = null,
+    val paid_amount: String? = null,
+    val balance: String? = null,
+    val type: String? = null, // OUTRIGHT | INSTALLMENT | RENTAL | MIXED
     val items: List<JobItemDto>? = null
 )
 

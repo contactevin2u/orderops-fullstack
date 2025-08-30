@@ -10,7 +10,7 @@ import androidx.navigation.navDeepLink
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.auth.AuthService
 import com.yourco.driverAA.ui.auth.LoginScreen
-import com.yourco.driverAA.ui.jobs.JobsListScreen
+import com.yourco.driverAA.ui.main.MainScreen
 import com.yourco.driverAA.ui.jobdetail.JobDetailScreen
 import com.yourco.driverAA.util.DeepLinks
 
@@ -33,7 +33,7 @@ fun NavGraph() {
             )
         }
         composable("jobs") {
-            JobsListScreen(onJobClick = { id -> navController.navigate("job/$id") })
+            MainScreen(onJobClick = { id -> navController.navigate("job/$id") })
         }
         composable(
             route = "job/{jobId}",
