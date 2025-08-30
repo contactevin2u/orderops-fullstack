@@ -78,7 +78,8 @@ def notify_order_assigned(db: Session, driver_id: int, order: Order) -> None:
     title = "New Order Assigned"
     body = f"Order #{getattr(order, 'code', '')}"
     data = {
-        "type": "ORDER_ASSIGNED",
+        "type": "job_assigned",
+        "jobId": str(getattr(order, 'id', '')),
         "order_id": str(getattr(order, 'id', '')),
         "code": getattr(order, "code", ""),
         "pickup_address": getattr(order, "pickup_address", ""),
