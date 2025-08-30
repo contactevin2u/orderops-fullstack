@@ -158,16 +158,21 @@ def get_driver_jobs(
 
 @router.get("/jobs/{job_id}")
 def get_driver_job(
-    job_id: str,
+    job_id: str,  # Keep as str for URL parameter
     driver=Depends(driver_auth),
     db: Session = Depends(get_session),
 ):
     """Get specific job details for the driver"""
+    try:
+        order_id_int = int(job_id)  # Convert string to int
+    except ValueError:
+        raise HTTPException(400, "Invalid job ID")
+        
     order = (
         db.query(Order)
         .join(Trip, Order.id == Trip.order_id)
         .filter(
-            Order.id == job_id,
+            Order.id == order_id_int,  # Use converted int
             Trip.driver_id == driver.id
         )
         .options(joinedload(Order.customer))
@@ -277,7 +282,7 @@ def upload_pod_photo(
     return {"url": url}
 
 
-@router.patch("/orders/{order_id}", response_model=DriverOrderOut)
+@router.patch("/orders/{order_id}", response_model=DriverOrderOut)  
 def update_order_status(
     order_id: int,
     payload: DriverOrderUpdateIn,
