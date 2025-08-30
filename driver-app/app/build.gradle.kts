@@ -33,13 +33,22 @@ android {
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Use the Android SDK's debug keystore for all builds
+            storeFile = file(System.getProperty("user.home") + "/.android/debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
 
     buildTypes {
         release {
             isMinifyEnabled = false  // Disable for testing
             isShrinkResources = false  // Disable for testing
-            // Remove signing config for unsigned APK
-            signingConfig = null
+            // Use debug signing for testing (no custom keystore needed)
+            signingConfig = signingConfigs.getByName("debug")
             
             // Disable crashlytics mapping upload to save memory
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
@@ -58,14 +67,15 @@ android {
             versionNameSuffix = "-unsigned"
             // Keep same package name as release for google-services.json compatibility
             // applicationIdSuffix = ".unsigned"  // Removed to avoid Firebase config issues
-            // Explicitly no signing config for unsigned builds
-            signingConfig = null
+            // Use debug signing for testing
+            signingConfig = signingConfigs.getByName("debug")
         }
         debug {
             isMinifyEnabled = false
             // Remove suffix for Firebase App Distribution
             // applicationIdSuffix = ".debug"
             versionNameSuffix = "-debug"
+            signingConfig = signingConfigs.getByName("debug")
             
             // Firebase App Distribution properties
             firebaseAppDistribution {
