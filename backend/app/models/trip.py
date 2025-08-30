@@ -28,7 +28,10 @@ class Trip(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     failure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
-    pod_photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pod_photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)  # Deprecated, kept for backward compatibility
+    pod_photo_url_1: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pod_photo_url_2: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pod_photo_url_3: Mapped[str | None] = mapped_column(Text, nullable=True)
     payment_method: Mapped[str | None] = mapped_column(String(30), nullable=True)
     payment_reference: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -39,6 +42,20 @@ class Trip(Base):
     )
 
     commission = relationship("Commission", uselist=False, back_populates="trip")
+
+    @property
+    def pod_photo_urls(self) -> list[str]:
+        """Get all non-empty PoD photo URLs"""
+        urls = []
+        for url in [self.pod_photo_url_1, self.pod_photo_url_2, self.pod_photo_url_3]:
+            if url and url.strip():
+                urls.append(url)
+        return urls
+
+    @property  
+    def has_pod_photos(self) -> bool:
+        """Check if at least one PoD photo is uploaded"""
+        return len(self.pod_photo_urls) > 0
 
     __table_args__ = (
         Index("ix_trips_driver_status_planned", "driver_id", "status", "planned_at"),

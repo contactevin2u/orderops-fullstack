@@ -126,7 +126,8 @@ class TripOut(BaseModel):
     status: str
     driver_name: str | None = None
     route_id: int | None = None
-    pod_photo_url: str | None = None
+    pod_photo_url: str | None = None  # Deprecated, kept for backward compatibility
+    pod_photo_urls: list[str] = []
     commission: CommissionOut | None = None
 
     class Config:

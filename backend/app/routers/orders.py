@@ -158,7 +158,8 @@ def list_orders(
                 "status": trip.status,
                 "driver_name": driver_name,
                 "route_id": trip.route_id,
-                "pod_photo_url": trip.pod_photo_url,
+                "pod_photo_url": trip.pod_photo_url,  # Kept for backward compatibility
+                "pod_photo_urls": trip.pod_photo_urls,
             }
             if commission:
                 trip_dto["commission"] = {

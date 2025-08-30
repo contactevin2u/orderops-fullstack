@@ -1,10 +1,13 @@
 package com.yourco.driverAA.data.api
 
 import kotlinx.serialization.Serializable
+import okhttp3.MultipartBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -20,6 +23,14 @@ interface DriverApi {
     
     @PATCH("drivers/orders/{id}")
     suspend fun updateOrderStatus(@Path("id") orderId: String, @Body update: OrderStatusUpdateDto): JobDto
+    
+    @Multipart
+    @POST("drivers/orders/{id}/pod-photo")
+    suspend fun uploadPodPhoto(
+        @Path("id") orderId: String, 
+        @Part file: MultipartBody.Part,
+        @Query("photo_number") photoNumber: Int = 1
+    ): PodUploadResponse
 }
 
 @Serializable
@@ -51,3 +62,6 @@ data class LocationPingDto(val lat: Double, val lng: Double, val accuracy: Float
 
 @Serializable
 data class OrderStatusUpdateDto(val status: String)
+
+@Serializable
+data class PodUploadResponse(val url: String, val photo_number: Int)

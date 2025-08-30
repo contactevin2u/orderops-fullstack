@@ -4,6 +4,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { listDrivers, listDriverOrders, addPayment, markSuccess, updateCommission } from '@/utils/api';
 import StatusBadge from '@/components/StatusBadge';
+import PodPhotosViewer from '@/components/PodPhotosViewer';
 
 export default function DriverCommissionsPage() {
   const qc = useQueryClient();
@@ -136,14 +137,14 @@ export function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPayS
   );
   const [msg, setMsg] = React.useState('');
 
-  const apiBase = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
-  let pod = o?.trip?.pod_photo_url || o?.pod_photo_url;
-  if (pod && !pod.startsWith('http')) pod = `${apiBase}${pod}`;
-  const isPdf = pod ? /\.pdf($|\?)/i.test(pod) : false;
-  const podHref = pod ? `/pod-viewer?url=${encodeURIComponent(pod)}` : '';
+  // Get PoD photo URLs - support both new multiple photos and legacy single photo
+  const podPhotoUrls = o?.trip?.pod_photo_urls || [];
+  const legacyPodUrl = o?.trip?.pod_photo_url || o?.pod_photo_url;
+  const hasAnyPodPhoto = podPhotoUrls.length > 0 || !!legacyPodUrl;
+  
   const canSuccess =
     o.status === 'DELIVERED' &&
-    !!pod &&
+    hasAnyPodPhoto &&
     ((method === '' && amount === '') || (!!method && !!amount));
 
   const handleSave = async () => {
@@ -172,28 +173,10 @@ export function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPayS
       <td>{o.code || o.id}</td>
       <td><StatusBadge value={o.status} /></td>
       <td>
-        {pod ? (
-          <a href={podHref} target="_blank" rel="noreferrer">
-            {isPdf ? (
-              <span
-                style={{
-                  display: 'inline-block',
-                  width: 64,
-                  height: 64,
-                  lineHeight: '64px',
-                  textAlign: 'center',
-                  background: '#eee',
-                }}
-              >
-                PDF
-              </span>
-            ) : (
-              <Image src={pod} alt="POD" width={64} height={64} unoptimized />
-            )}
-          </a>
-        ) : (
-          <span style={{ opacity: 0.6 }}>No POD</span>
-        )}
+        <PodPhotosViewer 
+          podPhotoUrls={podPhotoUrls}
+          legacyPodUrl={legacyPodUrl}
+        />
       </td>
       <td>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -253,7 +236,7 @@ export function OrderRow({ o, onPaySuccess, onSaveCommission }: { o: any; onPayS
         <button
           className="btn"
           disabled={!canSuccess}
-          title={!canSuccess ? 'Requires POD and valid payment (if provided)' : undefined}
+          title={!canSuccess ? 'Requires at least one PoD photo and valid payment (if provided)' : undefined}
           onClick={handleSuccess}
         >
           Mark Success

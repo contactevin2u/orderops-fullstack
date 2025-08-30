@@ -261,6 +261,7 @@ def get_assigned_order(order_id: int, driver=Depends(driver_auth), db: Session =
 def upload_pod_photo(
     order_id: int,
     file: UploadFile = File(...),
+    photo_number: int = 1,  # Which photo slot (1, 2, or 3)
     driver=Depends(driver_auth),
     db: Session = Depends(get_session),
 ):
@@ -271,15 +272,31 @@ def upload_pod_photo(
     )
     if not trip:
         raise HTTPException(404, "Trip not found")
+    
+    if photo_number not in [1, 2, 3]:
+        raise HTTPException(400, "Photo number must be 1, 2, or 3")
+        
     data = file.file.read()
     try:
         url = save_pod_image(data)
     except Exception as e:  # pragma: no cover - pillow errors
         raise HTTPException(400, str(e)) from e
-    trip.pod_photo_url = url
+    
+    # Store in the appropriate photo slot
+    if photo_number == 1:
+        trip.pod_photo_url_1 = url
+    elif photo_number == 2:
+        trip.pod_photo_url_2 = url
+    elif photo_number == 3:
+        trip.pod_photo_url_3 = url
+    
+    # Also update the legacy field for backward compatibility
+    if photo_number == 1:
+        trip.pod_photo_url = url
+        
     db.commit()
     db.refresh(trip)
-    return {"url": url}
+    return {"url": url, "photo_number": photo_number}
 
 
 @router.patch("/orders/{order_id}", response_model=DriverOrderOut)  
@@ -331,10 +348,11 @@ def update_order_status(
         if not trip.started_at:
             trip.started_at = now
     elif payload.status == "DELIVERED":
-        print(f"DEBUG: Checking PoD photo for DELIVERED status. Current PoD URL: {trip.pod_photo_url}")
-        if not trip.pod_photo_url:
-            print(f"DEBUG: Blocking DELIVERED status - PoD photo required but not found")
-            raise HTTPException(400, "PoD photo required")
+        pod_urls = trip.pod_photo_urls
+        print(f"DEBUG: Checking PoD photos for DELIVERED status. Found {len(pod_urls)} photos: {pod_urls}")
+        if not trip.has_pod_photos:
+            print(f"DEBUG: Blocking DELIVERED status - PoD photos required but not found")
+            raise HTTPException(400, "At least one Proof of Delivery photo is required before marking order as delivered. Please take photos of the delivered items first.")
         trip.delivered_at = now
     elif payload.status == "ON_HOLD":
         pass

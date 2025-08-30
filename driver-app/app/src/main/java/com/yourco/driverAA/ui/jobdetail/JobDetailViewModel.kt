@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 @HiltViewModel
@@ -65,6 +66,27 @@ class JobDetailViewModel @Inject constructor(
                 }
                 is Result.Loading -> {
                     _loading.value = true
+                }
+            }
+        }
+    }
+    
+    fun uploadPodPhoto(photoFile: File, photoNumber: Int = 1) {
+        val currentJob = _job.value ?: return
+        
+        viewModelScope.launch {
+            _loading.value = true
+            _error.value = null
+            
+            when (val result = repository.uploadPodPhoto(currentJob.id, photoFile, photoNumber)) {
+                is Result.Success -> {
+                    _loading.value = false
+                    // Reload job to get updated status with PoD photo
+                    loadJob(currentJob.id)
+                }
+                is Result.Error -> {
+                    _error.value = result.throwable.message ?: "Failed to upload photo $photoNumber"
+                    _loading.value = false
                 }
             }
         }
