@@ -13,8 +13,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.*
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.compose.ui.Modifier
 
 @Composable
+
+// Then in the composable:
+ListItem(
+    headlineText = { Text("Job $job") },
+    modifier = Modifier.clickable { onJobClick(job) }
 fun JobsListScreen(onJobClick: (String) -> Unit, viewModel: JobsListViewModel = hiltViewModel()) {
     val jobs by viewModel.jobs.collectAsState()
     val loading by viewModel.loading.collectAsState()
