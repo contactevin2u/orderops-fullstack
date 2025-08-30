@@ -5,6 +5,8 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import com.yourco.driverAA.notifications.Notifications
 import com.yourco.driverAA.BuildConfig
+import com.yourco.driverAA.data.auth.AuthService
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -12,8 +14,13 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class DriverFirebaseMessagingService : FirebaseMessagingService() {
+    
+    @Inject
+    lateinit var authService: AuthService
     override fun onMessageReceived(message: RemoteMessage) {
         val type = message.data["type"]
         if (type == "job_assigned") {
@@ -28,10 +35,17 @@ class DriverFirebaseMessagingService : FirebaseMessagingService() {
         val body = """{"token":"$token"}""".toRequestBody("application/json".toMediaType())
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val req = Request.Builder()
+                val idToken = authService.getIdToken()
+                val requestBuilder = Request.Builder()
                     .url("${BuildConfig.API_BASE.trimEnd('/')}/driver/push-tokens")
                     .post(body)
-                    .build()
+                
+                // Add authorization header if token is available
+                if (idToken != null) {
+                    requestBuilder.header("Authorization", "Bearer $idToken")
+                }
+                
+                val req = requestBuilder.build()
                 client.newCall(req).execute().use { response ->
                     if (!response.isSuccessful) {
                         // Log error but don't crash

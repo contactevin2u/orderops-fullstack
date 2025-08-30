@@ -20,11 +20,13 @@ export function RouteCard({
   onSelect,
   onEdit,
   driverName,
+  secondaryDriverName,
 }: {
   route: Route;
   onSelect: (r: Route) => void;
   onEdit: (r: Route) => void;
   driverName?: string;
+  secondaryDriverName?: string;
 }) {
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -38,16 +40,33 @@ export function RouteCard({
       role="button"
       onClick={() => onSelect(route)}
       onKeyDown={onKeyDown}
-      style={{ border: '1px solid #ccc', padding: 8, cursor: 'pointer' }}
+      className="card cursor-pointer hover:shadow-lg transition-shadow duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
     >
-      <h2 style={{ marginTop: 0 }}>{route.name}</h2>
-      <div>Driver: {driverName || '-'}</div>
-      <div>Stops: —</div>
+      <h2 className="text-lg font-semibold text-gray-900 mb-2">{route.name}</h2>
+      <div className="space-y-1 text-sm text-gray-600 mb-4">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Primary:</span>
+          <span className={driverName ? 'text-gray-900' : 'text-gray-400'}>
+            {driverName || 'Unassigned'}
+          </span>
+        </div>
+        {secondaryDriverName && (
+          <div className="flex items-center gap-2">
+            <span className="font-medium">Secondary:</span>
+            <span className="text-gray-900">{secondaryDriverName}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <span className="font-medium">Stops:</span>
+          <span className="text-gray-400">—</span>
+        </div>
+      </div>
       <button
         onClick={(e) => {
           e.stopPropagation();
           onEdit(route);
         }}
+        className="btn btn-secondary text-sm px-3 py-1.5 min-h-0"
       >
         Edit
       </button>
@@ -112,28 +131,56 @@ export default function AdminRoutesPage() {
   const [editingRoute, setEditingRoute] = React.useState<Route | null>(null);
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Routes</h1>
-      <header style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span>Date</span>
+    <div className="container">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Routes</h1>
+      <header className="cluster mb-6 p-4 bg-white rounded-lg border border-gray-200">
+        <label className="cluster text-sm">
+          <span className="font-medium text-gray-700">Date:</span>
           <input
             type="date"
             value={date}
             onChange={(e) => router.push({ pathname: '/admin/routes', query: { date: e.target.value } })}
+            className="input text-sm"
           />
         </label>
-        <button onClick={() => setCreating(true)}>Create Route</button>
-        <span aria-live="polite">
-          Routes: {routes.length} Unassigned: {unassigned.length} (No date: {counts.noDate} Overdue: {counts.overdue}) On Hold: {onHold.length}
-        </span>
+        <button onClick={() => setCreating(true)} className="btn btn-primary">
+          Create Route
+        </button>
+        <div className="text-sm text-gray-600 flex flex-wrap gap-4" aria-live="polite">
+          <span className="flex items-center gap-1">
+            <span className="font-medium text-blue-600">{routes.length}</span> Routes
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="font-medium text-orange-600">{unassigned.length}</span> Unassigned
+          </span>
+          <span className="text-xs text-gray-500">
+            (No date: {counts.noDate}, Overdue: {counts.overdue})
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="font-medium text-purple-600">{onHold.length}</span> On Hold
+          </span>
+        </div>
       </header>
-      <div style={{ marginTop: 16 }}>
-        {routesQuery.isLoading && <p role="status">Loading...</p>}
-        {routesQuery.isError && <p role="alert">Failed to load</p>}
-        {!routesQuery.isLoading && routes.length === 0 && <p style={{ opacity: 0.6 }}>No routes</p>}
+      <div>
+        {routesQuery.isLoading && (
+          <div className="flex items-center justify-center py-12" role="status">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <span className="ml-3 text-gray-600">Loading routes...</span>
+          </div>
+        )}
+        {routesQuery.isError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg" role="alert">
+            Failed to load routes. Please try again.
+          </div>
+        )}
+        {!routesQuery.isLoading && routes.length === 0 && (
+          <div className="text-center py-12">
+            <div className="text-gray-400 text-lg mb-2">No routes found</div>
+            <p className="text-gray-500 text-sm">Create your first route to get started</p>
+          </div>
+        )}
         {!routesQuery.isLoading && routes.length > 0 && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(220px,1fr))', gap: 8 }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {routes.map((r) => (
               <RouteCard
                 key={r.id}
@@ -141,6 +188,7 @@ export default function AdminRoutesPage() {
                 onSelect={setSelectedRoute}
                 onEdit={setEditingRoute}
                 driverName={driverNameById[r.driverId || '']}
+                secondaryDriverName={driverNameById[r.secondaryDriverId || '']}
               />
             ))}
           </div>

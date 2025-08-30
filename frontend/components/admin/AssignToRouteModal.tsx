@@ -65,38 +65,67 @@ export default function AssignToRouteModal({ orderIds, date, onClose }: Props) {
   }, [onClose]);
 
   return (
-    <div
-      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.3)' }}
-    >
+    <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center p-4 z-50">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="assign-title"
         tabIndex={-1}
-        style={{ background: '#fff', padding: 16, maxWidth: 320, margin: '10% auto' }}
+        className="card max-w-md w-full"
       >
-        <h3 id="assign-title">Assign to route</h3>
-        {isLoading && <div role="status">Loading...</div>}
-        {isError && <div role="alert">Failed to load</div>}
+        <h3 id="assign-title" className="text-lg font-semibold text-gray-900 mb-4">
+          Assign {orderIds.length} order{orderIds.length === 1 ? '' : 's'} to route
+        </h3>
+        {isLoading && (
+          <div className="flex items-center justify-center py-4" role="status">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mr-2"></div>
+            Loading routes...
+          </div>
+        )}
+        {isError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded mb-4" role="alert">
+            Failed to load routes
+          </div>
+        )}
         {!isLoading && !isError && (
-          <label>
-            <span className="sr-only">Route</span>
-            <select value={routeId} onChange={(e) => setRouteId(e.target.value)}>
-              <option value="">Select route</option>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Select Route <span className="text-red-500">*</span>
+            </label>
+            <select 
+              value={routeId} 
+              onChange={(e) => setRouteId(e.target.value)}
+              className="select w-full"
+              required
+            >
+              <option value="">Choose a route...</option>
               {routes?.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
                 </option>
               ))}
             </select>
-          </label>
+          </div>
         )}
-        <div style={{ marginTop: 16 }}>
-          <button onClick={() => mutation.mutate()} disabled={!routeId}>
-            Assign
-          </button>{' '}
-          <button onClick={onClose}>Cancel</button>
+        <div className="flex justify-end space-x-3 pt-4 mt-6 border-t border-gray-200">
+          <button onClick={onClose} className="btn btn-secondary">
+            Cancel
+          </button>
+          <button 
+            onClick={() => mutation.mutate()} 
+            disabled={!routeId || mutation.isPending}
+            className="btn btn-primary"
+          >
+            {mutation.isPending ? (
+              <span className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Assigning...
+              </span>
+            ) : (
+              `Assign ${orderIds.length} Order${orderIds.length === 1 ? '' : 's'}`
+            )}
+          </button>
         </div>
       </div>
     </div>

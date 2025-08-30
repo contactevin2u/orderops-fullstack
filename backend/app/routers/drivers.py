@@ -81,7 +81,7 @@ def _order_to_driver_out(order: Order, status: str) -> dict:
 
 @router.get("", response_model=list[DriverOut])
 def list_drivers(db: Session = Depends(get_session)):
-    return db.query(Driver).filter(Driver.is_active == True).all()
+    return db.query(Driver).filter(Driver.is_active == True).limit(1000).all()
 
 
 @router.post("/register", response_model=DriverOut)

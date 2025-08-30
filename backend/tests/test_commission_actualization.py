@@ -3,16 +3,12 @@ from pathlib import Path
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from app.main import app  # noqa: E402
 from app.db import get_session  # noqa: E402
 from app.models import (
-    Base,
     Customer,
     Order,
     Driver,
@@ -23,61 +19,14 @@ from app.models import (
     Plan,
     Payment,
 )  # noqa: E402
+from tests.utils import setup_test_db, create_session_override  # noqa: E402
 
 
-def _setup_db():
-    engine = create_engine(
-        "sqlite://",
-        future=True,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    from sqlalchemy import Integer
-
-    Customer.__table__.c.id.type = Integer()
-    Order.__table__.c.id.type = Integer()
-    Order.__table__.c.customer_id.type = Integer()
-    Driver.__table__.c.id.type = Integer()
-    Trip.__table__.c.id.type = Integer()
-    Trip.__table__.c.order_id.type = Integer()
-    Trip.__table__.c.driver_id.type = Integer()
-    DriverRoute.__table__.c.id.type = Integer()
-    DriverRoute.__table__.c.driver_id.type = Integer()
-    Trip.__table__.c.route_id.type = Integer()
-    Commission.__table__.c.id.type = Integer()
-    Commission.__table__.c.driver_id.type = Integer()
-    Commission.__table__.c.trip_id.type = Integer()
-    OrderItem.__table__.c.id.type = Integer()
-    OrderItem.__table__.c.order_id.type = Integer()
-    Plan.__table__.c.id.type = Integer()
-    Plan.__table__.c.order_id.type = Integer()
-    Payment.__table__.c.id.type = Integer()
-    Payment.__table__.c.order_id.type = Integer()
-    Base.metadata.create_all(
-        engine,
-        tables=[
-            Customer.__table__,
-            Order.__table__,
-            Driver.__table__,
-            DriverRoute.__table__,
-            Trip.__table__,
-            Commission.__table__,
-            OrderItem.__table__,
-            Plan.__table__,
-            Payment.__table__,
-        ],
-    )
-    return sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def test_commission_on_success(monkeypatch):
-    SessionLocal = _setup_db()
-
-    def override_get_session():
-        with SessionLocal() as session:
-            yield session
-
-    app.dependency_overrides[get_session] = override_get_session
+    SessionLocal = setup_test_db()
+    app.dependency_overrides[get_session] = create_session_override(SessionLocal)
 
     client = TestClient(app)
 

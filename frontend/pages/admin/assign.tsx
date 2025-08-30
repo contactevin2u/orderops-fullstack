@@ -73,31 +73,43 @@ export default function AdminAssignPage() {
   };
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1>Assign Orders</h1>
-      <header style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span>Date</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => router.push({ pathname: '/admin/assign', query: { date: e.target.value } })}
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={showCompleted}
-            onChange={(e) => setShowCompleted(e.target.checked)}
-          />{' '}
-          Show completed
-        </label>
-        <span aria-live="polite">
-          Unassigned: {orders.length} (No date: {counts.noDate} Overdue: {counts.overdue})
-        </span>
-        <span aria-live="polite">Selected: {selected.size}</span>
+    <div className="container">
+      <h1 className="text-2xl font-bold text-gray-900 mb-6">Assign Orders</h1>
+      <header className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
+        <div className="flex flex-wrap items-center gap-4 mb-4">
+          <label className="flex items-center gap-2 text-sm">
+            <span className="font-medium text-gray-700">Date:</span>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => router.push({ pathname: '/admin/assign', query: { date: e.target.value } })}
+              className="input text-sm"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={showCompleted}
+              onChange={(e) => setShowCompleted(e.target.checked)}
+              className="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <span className="text-gray-700">Show completed</span>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+          <span className="flex items-center gap-1">
+            <span className="font-medium text-orange-600">{orders.length}</span> Unassigned
+          </span>
+          <span className="text-xs text-gray-500">
+            (No date: {counts.noDate}, Overdue: {counts.overdue})
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="font-medium text-blue-600">{selected.size}</span> Selected
+          </span>
+        </div>
       </header>
-      <table className="table" style={{ marginTop: 16 }}>
+      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+        <table className="table w-full">
         <caption className="sr-only">Unassigned orders</caption>
         <thead>
           <tr>
@@ -145,7 +157,7 @@ export default function AdminAssignPage() {
                 <td>
                   {o.deliveryDate}{' '}
                   {getOrderBadges(o, date).map((b) => (
-                    <span key={b} style={{ marginLeft: 4, fontSize: '0.8em', color: '#c00' }}>
+                    <span key={b} className="ml-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
                       {b}
                     </span>
                   ))}
@@ -155,35 +167,28 @@ export default function AdminAssignPage() {
             ))}
           {!ordersQuery.isLoading && visible.length === 0 && (
             <tr>
-              <td colSpan={4} style={{ opacity: 0.6 }}>
-                No orders
+              <td colSpan={4} className="text-center py-8 text-gray-500">
+                No orders found
               </td>
             </tr>
           )}
         </tbody>
       </table>
-      <div
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          background: '#fff',
-          paddingTop: 8,
-          paddingBottom: 8,
-          marginTop: 8,
-          display: 'flex',
-          gap: 8,
-          borderTop: '1px solid #eee',
-        }}
-      >
+      </div>
+      <div className="sticky bottom-0 bg-white p-4 mt-4 border-t border-gray-200 flex gap-3 rounded-lg">
         <button
-          className="btn secondary"
+          className="btn btn-secondary"
           onClick={() => setSelected(new Set())}
           disabled={selected.size === 0}
         >
-          Clear
+          Clear Selection
         </button>
-        <button className="btn" onClick={() => setShowModal(true)} disabled={selected.size === 0}>
-          Assign to route
+        <button 
+          className="btn btn-primary" 
+          onClick={() => setShowModal(true)} 
+          disabled={selected.size === 0}
+        >
+          Assign to Route
         </button>
       </div>
       {showModal && (

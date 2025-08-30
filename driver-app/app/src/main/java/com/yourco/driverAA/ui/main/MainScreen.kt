@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -15,7 +15,7 @@ fun MainScreen(onJobClick: (String) -> Unit) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     
     val tabs = listOf("Active Orders", "Completed Orders", "Commissions")
-    val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.AttachMoney)
+    val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star)
     
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTabIndex) {

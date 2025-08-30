@@ -571,7 +571,7 @@ private fun PhotoCaptureButton(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
-                    Icons.Default.CameraAlt,
+                    Icons.Default.Add,
                     contentDescription = "Take photo $photoNumber",
                     modifier = Modifier.size(24.dp)
                 )

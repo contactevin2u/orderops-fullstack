@@ -19,7 +19,9 @@ export default function OutstandingPage() {
       const r = await outstanding(type, asOf);
       setRows(r.items || []);
     } catch (e) {
-      console.error(e);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Failed to load outstanding orders:', e);
+      }
     }
     setLoading(false);
   }, [type, asOf]);

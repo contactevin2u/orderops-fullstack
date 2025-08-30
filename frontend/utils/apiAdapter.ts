@@ -33,6 +33,7 @@ export type Route = {
   team?: string;
   zone?: string;
   driverId?: string | null;
+  secondaryDriverId?: string | null;
   vehicleId?: string | null;
   capacity?: { stops?: number; weightKg?: number };
   stops: Array<{ orderId: string; seq: number }>;
@@ -83,6 +84,7 @@ function mapRoute(r: any): Route {
     team: r.team,
     zone: r.zone,
     driverId: r.driver_id?.toString() ?? r.driverId ?? null,
+    secondaryDriverId: r.driver_id_2?.toString() ?? r.secondaryDriverId ?? null,
     vehicleId: r.vehicle_id?.toString() ?? r.vehicleId ?? null,
     capacity: r.capacity
       ? {

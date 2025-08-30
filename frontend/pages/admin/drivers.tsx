@@ -253,7 +253,6 @@ export default function AdminDriversPage() {
                           className="text-blue-600 hover:text-blue-800"
                           onClick={() => {
                             // TODO: Implement view driver details
-                            console.log('View driver:', driver.id);
                           }}
                         >
                           View
@@ -262,7 +261,6 @@ export default function AdminDriversPage() {
                           className="text-indigo-600 hover:text-indigo-800"
                           onClick={() => {
                             // TODO: Implement edit driver
-                            console.log('Edit driver:', driver.id);
                           }}
                         >
                           Edit

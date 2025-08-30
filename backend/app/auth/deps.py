@@ -34,7 +34,10 @@ def get_current_user(
         payload = decode_access_token(raw_token)
     except Exception as exc:  # pragma: no cover
         raise HTTPException(401, "Invalid token") from exc
-    user_id = int(payload.get("sub"))
+    user_id_str = payload.get("sub")
+    if not user_id_str:
+        raise HTTPException(401, "Invalid token: missing user ID")
+    user_id = int(user_id_str)
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(401, "User not found")

@@ -211,7 +211,9 @@ export default function OperatorOrdersPage() {
           idempotencyKey: crypto.randomUUID(),
         });
       } catch (e: any) {
-        console.error(e);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Failed to create cash payment:', e);
+        }
       }
     }
     mutate();
@@ -235,7 +237,9 @@ export default function OperatorOrdersPage() {
         try {
           await assignOrderToDriver(id, choice);
         } catch (e: any) {
-          console.error(e);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Failed to assign order to driver:', e);
+          }
         }
       }
       mutate();

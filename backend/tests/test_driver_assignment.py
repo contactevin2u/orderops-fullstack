@@ -2,9 +2,6 @@ import sys
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, Integer
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
 
 # Ensure backend package importable
 sys.path.append(str(Path(__file__).resolve().parents[1]))
@@ -12,7 +9,6 @@ sys.path.append(str(Path(__file__).resolve().parents[1]))
 from app.main import app  # noqa: E402
 from app.db import get_session  # noqa: E402
 from app.models import (
-    Base,
     Driver,
     Customer,
     Order,
@@ -24,52 +20,14 @@ from app.models import (
 )  # noqa: E402
 from app.routers import orders as orders_router, routes as routes_router  # noqa: E402
 from app.auth import firebase as auth_firebase  # noqa: E402
+from tests.utils import setup_test_db, create_session_override  # noqa: E402
 
 
-def _setup_db():
-    engine = create_engine(
-        "sqlite://",
-        future=True,
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Driver.__table__.c.id.type = Integer()
-    Customer.__table__.c.id.type = Integer()
-    Order.__table__.c.id.type = Integer()
-    Order.__table__.c.customer_id.type = Integer()
-    DriverRoute.__table__.c.id.type = Integer()
-    DriverRoute.__table__.c.driver_id.type = Integer()
-    DriverDevice.__table__.c.id.type = Integer()
-    DriverDevice.__table__.c.driver_id.type = Integer()
-    Trip.__table__.c.id.type = Integer()
-    Trip.__table__.c.order_id.type = Integer()
-    Trip.__table__.c.driver_id.type = Integer()
-    Trip.__table__.c.route_id.type = Integer()
-    TripEvent.__table__.c.id.type = Integer()
-    TripEvent.__table__.c.trip_id.type = Integer()
-    Base.metadata.create_all(
-        engine,
-        tables=[
-            Driver.__table__,
-            Customer.__table__,
-            Order.__table__,
-            DriverRoute.__table__,
-            DriverDevice.__table__,
-            Trip.__table__,
-            TripEvent.__table__,
-        ],
-    )
-    return sessionmaker(bind=engine, expire_on_commit=False)
 
 
 def test_assign_order_to_driver(monkeypatch):
-    SessionLocal = _setup_db()
-
-    def override_get_session():
-        with SessionLocal() as session:
-            yield session
-
-    app.dependency_overrides[get_session] = override_get_session
+    SessionLocal = setup_test_db()
+    app.dependency_overrides[get_session] = create_session_override(SessionLocal)
 
     class DummyUser:
         id = 1

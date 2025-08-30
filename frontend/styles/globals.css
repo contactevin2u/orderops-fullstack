@@ -200,10 +200,25 @@ h6 {
   cursor: pointer;
   font-weight: 600;
 }
-.btn.secondary {
+.btn.secondary,
+.btn-secondary {
   background: var(--color-surface);
   color: var(--color-text);
   border: 1px solid var(--color-border-muted);
+}
+
+.btn-primary {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border: none;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 .btn:disabled {
   opacity: 0.6;
@@ -233,9 +248,22 @@ h6 {
 
 .table th,
 .table td {
-  padding: 8px;
+  padding: 12px;
   border-bottom: 1px solid var(--color-border);
   text-align: left;
+}
+
+.table th {
+  background: var(--color-bg);
+  font-weight: 600;
+  color: var(--color-text);
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.table tbody tr:hover {
+  background: #f9fafb;
 }
 
 .table th:first-child,
