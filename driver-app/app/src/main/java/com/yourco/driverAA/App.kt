@@ -1,14 +1,12 @@
 package com.yourco.driverAA
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.yourco.driverAA.work.WorkScheduling
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
-import androidx.hilt.work.HiltWorkerFactory
 import timber.log.Timber
-import com.yourco.driverAA.BuildConfig
-import androidx.work.Configuration
 
 @HiltAndroidApp
 class App : Application(), Configuration.Provider {
@@ -24,8 +22,8 @@ class App : Application(), Configuration.Provider {
         WorkScheduling.scheduleUpload(this)
     }
 
-    override fun getWorkManagerConfiguration(): Configuration =
-        Configuration.Builder()
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
             .setWorkerFactory(workerFactory)
             .build()
 }
