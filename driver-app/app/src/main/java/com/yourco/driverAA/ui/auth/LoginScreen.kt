@@ -12,7 +12,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit,
+    onLoginSuccess: (isAdmin: Boolean) -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,9 +76,9 @@ fun LoginScreen(
         }
     }
     
-    LaunchedEffect(uiState.isLoggedIn) {
+    LaunchedEffect(uiState.isLoggedIn, uiState.isAdmin) {
         if (uiState.isLoggedIn) {
-            onLoginSuccess()
+            onLoginSuccess(uiState.isAdmin)
         }
     }
 }

@@ -3,6 +3,7 @@ package com.yourco.driverAA.ui.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourco.driverAA.data.auth.AuthService
+import com.yourco.driverAA.data.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,12 +16,14 @@ data class LoginUiState(
     val password: String = "",
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
+    val isAdmin: Boolean = false,
     val error: String? = null
 )
 
 @HiltViewModel
 class LoginViewModel @Inject constructor(
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val userRepository: UserRepository
 ) : ViewModel() {
     
     private val _uiState = MutableStateFlow(LoginUiState())
@@ -46,11 +49,15 @@ class LoginViewModel @Inject constructor(
                 currentState.password
             ).fold(
                 onSuccess = {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isLoggedIn = true,
-                        error = null
-                    )
+                    viewModelScope.launch {
+                        val isAdmin = userRepository.isAdmin()
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            isLoggedIn = true,
+                            isAdmin = isAdmin,
+                            error = null
+                        )
+                    }
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(

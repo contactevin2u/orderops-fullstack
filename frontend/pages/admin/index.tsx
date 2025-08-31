@@ -17,6 +17,7 @@ export default function AdminIndexPage() {
       title: 'Order Management', 
       description: 'Handle order assignments and tracking',
       items: [
+        { href: '/admin/ai-assignments', label: 'AI Assignments', description: 'AI-powered order assignment and message parsing' },
         { href: '/admin/assign', label: 'Assign Orders', description: 'Assign orders to routes and drivers' },
       ]
     },

@@ -9,8 +9,10 @@ import androidx.navigation.navArgument
 import androidx.navigation.navDeepLink
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.auth.AuthService
+import com.yourco.driverAA.data.repository.UserRepository
 import com.yourco.driverAA.ui.auth.LoginScreen
 import com.yourco.driverAA.ui.main.MainScreen
+import com.yourco.driverAA.ui.admin.AdminMainScreen
 import com.yourco.driverAA.ui.jobdetail.JobDetailScreen
 import com.yourco.driverAA.ui.shifts.ClockInOutScreen
 import com.yourco.driverAA.util.DeepLinks
@@ -19,16 +21,39 @@ import com.yourco.driverAA.util.DeepLinks
 fun NavGraph() {
     val navController = rememberNavController()
     val authService: AuthService = hiltViewModel<AuthViewModel>().authService
+    val userRepository: UserRepository = hiltViewModel<AuthViewModel>().userRepository
     val currentUser by authService.currentUser.collectAsState(initial = null)
     
-    val startDestination = if (currentUser != null) "jobs" else "login"
+    var isAdmin by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(currentUser) {
+        if (currentUser != null) {
+            isAdmin = userRepository.isAdmin()
+        }
+    }
+    
+    val startDestination = when {
+        currentUser == null -> "login"
+        isAdmin -> "admin"
+        else -> "jobs"
+    }
     
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate("jobs") {
+                onLoginSuccess = { isAdminUser ->
+                    val destination = if (isAdminUser) "admin" else "jobs"
+                    navController.navigate(destination) {
                         popUpTo("login") { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable("admin") {
+            AdminMainScreen(
+                onLogout = {
+                    navController.navigate("login") {
+                        popUpTo("admin") { inclusive = true }
                     }
                 }
             )

@@ -12,6 +12,9 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface DriverApi {
+    @GET("auth/me")
+    suspend fun getCurrentUser(): UserDto
+    
     @GET("drivers/jobs")
     suspend fun getJobs(@Query("status_filter") statusFilter: String = "active"): List<JobDto>
 
@@ -49,7 +52,30 @@ interface DriverApi {
     
     @GET("drivers/shifts/history")
     suspend fun getShiftHistory(@Query("limit") limit: Int = 10): List<ShiftResponse>
+    
+    // Admin endpoints
+    @GET("ai-assignments/suggestions")
+    suspend fun getAIAssignmentSuggestions(): AssignmentSuggestionsResponse
+    
+    @POST("ai-assignments/apply")
+    suspend fun applyAssignment(@Body request: ApplyAssignmentRequest): AssignmentApplyResponse
+    
+    @GET("ai-assignments/available-drivers")
+    suspend fun getAvailableDrivers(): AvailableDriversResponse
+    
+    @GET("ai-assignments/pending-orders")
+    suspend fun getPendingOrders(): PendingOrdersResponse
+    
+    @POST("orders/simple")
+    suspend fun createOrder(@Body request: CreateOrderRequest): OrderDto
 }
+
+@Serializable
+data class UserDto(
+    val id: Int,
+    val username: String,
+    val role: String
+)
 
 @Serializable
 data class JobDto(
@@ -146,4 +172,100 @@ data class ShiftStatusResponse(
     val is_outstation: Boolean? = null,
     val location: String? = null,
     val message: String
+)
+
+// Admin DTOs
+@Serializable
+data class AssignmentSuggestion(
+    val order_id: Int,
+    val driver_id: Int,
+    val driver_name: String,
+    val distance_km: Double,
+    val confidence: String,
+    val reasoning: String
+)
+
+@Serializable
+data class AssignmentSuggestionsResponse(
+    val suggestions: List<AssignmentSuggestion>,
+    val method: String,
+    val available_drivers_count: Int,
+    val pending_orders_count: Int,
+    val ai_reasoning: String? = null
+)
+
+@Serializable
+data class ApplyAssignmentRequest(
+    val order_id: Int,
+    val driver_id: Int
+)
+
+@Serializable
+data class AssignmentApplyResponse(
+    val message: String,
+    val trip_id: Int,
+    val order_id: Int,
+    val driver_id: Int
+)
+
+@Serializable
+data class AvailableDriver(
+    val driver_id: Int,
+    val driver_name: String,
+    val phone: String?,
+    val shift_id: Int,
+    val clock_in_location: String?,
+    val clock_in_lat: Double,
+    val clock_in_lng: Double,
+    val is_outstation: Boolean,
+    val current_active_trips: Int,
+    val hours_worked: Double
+)
+
+@Serializable
+data class AvailableDriversResponse(
+    val available_drivers: List<AvailableDriver>,
+    val count: Int
+)
+
+@Serializable
+data class PendingOrder(
+    val order_id: Int,
+    val customer_name: String?,
+    val delivery_address: String?,
+    val estimated_lat: Double,
+    val estimated_lng: Double,
+    val total_value: Double,
+    val priority: String,
+    val delivery_date: String?
+)
+
+@Serializable
+data class PendingOrdersResponse(
+    val pending_orders: List<PendingOrder>,
+    val count: Int
+)
+
+@Serializable
+data class CreateOrderRequest(
+    val customer_name: String,
+    val customer_phone: String?,
+    val delivery_address: String,
+    val notes: String?,
+    val total_amount: Double,
+    val delivery_date: String? = null
+)
+
+@Serializable
+data class OrderDto(
+    val id: Int,
+    val code: String?,
+    val customer_name: String?,
+    val customer_phone: String?,
+    val delivery_address: String?,
+    val status: String,
+    val total_amount: Double?,
+    val notes: String?,
+    val delivery_date: String?,
+    val created_at: String
 )
