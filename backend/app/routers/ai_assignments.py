@@ -30,6 +30,7 @@ class AssignmentSuggestionsResponse(BaseModel):
     method: str
     available_drivers_count: int
     pending_orders_count: int
+    scheduled_drivers_count: int = 0
     total_drivers_count: int = 0
     ai_reasoning: str = ""
 

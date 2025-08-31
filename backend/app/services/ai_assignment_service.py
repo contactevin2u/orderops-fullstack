@@ -13,6 +13,7 @@ from app.models.driver_shift import DriverShift
 from app.models.trip import Trip
 from app.utils.geofencing import haversine_distance
 from app.config.clock_config import HOME_BASE_LAT, HOME_BASE_LNG
+from app.services.driver_schedule_service import DriverScheduleService
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,7 @@ except ImportError:
 class AIAssignmentService:
     def __init__(self, db: Session, openai_api_key: Optional[str] = None):
         self.db = db
+        self.schedule_service = DriverScheduleService(db)
         if openai_api_key and OPENAI_AVAILABLE:
             self.openai_client = OpenAI(api_key=openai_api_key)
             self.ai_enabled = True
@@ -105,17 +107,40 @@ class AIAssignmentService:
         available_drivers = self.get_available_drivers()
         pending_orders = self.get_pending_orders()
         
-        # Get total number of drivers in system (active drivers)
-        total_drivers_count = self.db.query(Driver).filter(Driver.is_active == True).count()
+        # Get scheduled drivers for today (much more intelligent than total drivers)
+        from datetime import date
+        today = date.today()
+        scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
+        scheduled_count = len(scheduled_drivers)
+        
+        # Get schedule summary for context
+        schedule_summary = self.schedule_service.get_schedule_summary(today)
 
         if not available_drivers:
+            # Build intelligent reasoning based on schedule
+            if scheduled_count == 0:
+                reasoning = "No drivers scheduled to work today. Check weekly roster and availability patterns."
+            else:
+                clocked_in_driver_ids = {d["driver_id"] for d in available_drivers}
+                scheduled_but_not_clocked = [
+                    d for d in scheduled_drivers 
+                    if d["driver_id"] not in clocked_in_driver_ids
+                ]
+                
+                if scheduled_but_not_clocked:
+                    missing_names = [d["driver_name"] for d in scheduled_but_not_clocked[:3]]
+                    reasoning = f"{scheduled_count} drivers scheduled for today ({', '.join(missing_names)}{' and others' if len(scheduled_but_not_clocked) > 3 else ''}) but none have clocked in yet."
+                else:
+                    reasoning = f"No drivers currently clocked in, though {scheduled_count} were scheduled for today."
+            
             return {
                 "suggestions": [],
                 "method": "drivers_not_clocked_in",
                 "available_drivers_count": 0,
                 "pending_orders_count": len(pending_orders),
-                "total_drivers_count": total_drivers_count,
-                "ai_reasoning": f"No drivers currently clocked in. {total_drivers_count} drivers are registered but haven't started their shifts yet."
+                "scheduled_drivers_count": scheduled_count,
+                "total_drivers_count": self.db.query(Driver).filter(Driver.is_active == True).count(),
+                "ai_reasoning": reasoning
             }
 
         if not pending_orders:
@@ -124,16 +149,17 @@ class AIAssignmentService:
                 "method": "no_orders",
                 "available_drivers_count": len(available_drivers),
                 "pending_orders_count": 0,
-                "total_drivers_count": total_drivers_count,
-                "ai_reasoning": "No pending orders to assign"
+                "scheduled_drivers_count": scheduled_count,
+                "total_drivers_count": self.db.query(Driver).filter(Driver.is_active == True).count(),
+                "ai_reasoning": f"No pending orders to assign. {len(available_drivers)} of {scheduled_count} scheduled drivers are clocked in."
             }
 
         if self.ai_enabled:
-            return self._ai_suggest_assignments(available_drivers, pending_orders, total_drivers_count)
+            return self._ai_suggest_assignments(available_drivers, pending_orders, scheduled_count)
         else:
-            return self._fallback_suggest_assignments(available_drivers, pending_orders, total_drivers_count)
+            return self._fallback_suggest_assignments(available_drivers, pending_orders, scheduled_count)
 
-    def _ai_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], total_drivers_count: int) -> Dict[str, Any]:
+    def _ai_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], scheduled_drivers_count: int) -> Dict[str, Any]:
         """Use OpenAI to suggest assignments"""
         try:
             prompt = self._build_assignment_prompt(drivers, orders)
@@ -163,14 +189,15 @@ class AIAssignmentService:
                 "method": "ai_optimized",
                 "available_drivers_count": len(drivers),
                 "pending_orders_count": len(orders),
-                "total_drivers_count": total_drivers_count
+                "scheduled_drivers_count": scheduled_drivers_count,
+                "total_drivers_count": self.db.query(Driver).filter(Driver.is_active == True).count()
             }
 
         except Exception as e:
             logger.error(f"AI assignment failed: {e}")
-            return self._fallback_suggest_assignments(drivers, orders, total_drivers_count)
+            return self._fallback_suggest_assignments(drivers, orders, scheduled_drivers_count)
 
-    def _fallback_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], total_drivers_count: int) -> Dict[str, Any]:
+    def _fallback_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], scheduled_drivers_count: int) -> Dict[str, Any]:
         """Fallback assignment logic using distance-based optimization"""
         suggestions = []
         
@@ -207,7 +234,8 @@ class AIAssignmentService:
             "method": "distance_optimized",
             "available_drivers_count": len(drivers),
             "pending_orders_count": len(orders),
-            "total_drivers_count": total_drivers_count
+            "scheduled_drivers_count": scheduled_drivers_count,
+            "total_drivers_count": self.db.query(Driver).filter(Driver.is_active == True).count()
         }
 
     def _build_assignment_prompt(self, drivers: List[Dict], orders: List[Dict]) -> str:

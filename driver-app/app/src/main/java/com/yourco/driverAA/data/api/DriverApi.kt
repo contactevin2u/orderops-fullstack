@@ -191,6 +191,7 @@ data class AssignmentSuggestionsResponse(
     val method: String,
     val available_drivers_count: Int,
     val pending_orders_count: Int,
+    val scheduled_drivers_count: Int = 0,
     val total_drivers_count: Int = 0,
     val ai_reasoning: String? = null
 )
