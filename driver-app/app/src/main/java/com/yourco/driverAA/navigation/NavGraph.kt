@@ -41,7 +41,14 @@ fun NavGraph() {
             deepLinks = listOf(navDeepLink { uriPattern = "${DeepLinks.JOB_BASE}/{jobId}" })
         ) { backStackEntry ->
             val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
-            JobDetailScreen(jobId)
+            JobDetailScreen(
+                jobId = jobId,
+                onNavigateToActiveOrders = {
+                    navController.navigate("jobs") {
+                        popUpTo("jobs") { inclusive = false }
+                    }
+                }
+            )
         }
     }
 }

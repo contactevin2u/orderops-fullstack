@@ -50,7 +50,8 @@ data class JobDto(
     val paid_amount: String? = null,
     val balance: String? = null,
     val type: String? = null, // OUTRIGHT | INSTALLMENT | RENTAL | MIXED
-    val items: List<JobItemDto>? = null
+    val items: List<JobItemDto>? = null,
+    val commission: CommissionDto? = null
 )
 
 @Serializable
@@ -59,6 +60,14 @@ data class JobItemDto(
     val name: String? = null,
     val qty: Int? = null,
     val unit_price: String? = null
+)
+
+@Serializable
+data class CommissionDto(
+    val amount: String,
+    val status: String, // "pending" or "actualized"
+    val scheme: String,
+    val rate: String
 )
 
 @Serializable

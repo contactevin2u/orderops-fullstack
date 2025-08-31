@@ -24,7 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-// import coil.compose.rememberAsyncImagePainter
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import android.graphics.BitmapFactory
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -681,11 +683,29 @@ private fun PhotoCaptureButton(
         onClick = onTakePhoto
     ) {
         if (photoFile != null && photoFile.exists()) {
-            // Show photo taken indicator 
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
+            // Show photo preview using BitmapFactory
+            try {
+                val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Photo $photoNumber preview",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(MaterialTheme.shapes.small),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    // Fallback if bitmap loading fails
+                    Text(
+                        "📷\nPhoto $photoNumber\nTaken",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            } catch (e: Exception) {
+                // Fallback if any error occurs
                 Text(
                     "📷\nPhoto $photoNumber\nTaken",
                     textAlign = TextAlign.Center,
