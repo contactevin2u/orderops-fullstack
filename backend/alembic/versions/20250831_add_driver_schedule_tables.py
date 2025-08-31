@@ -19,8 +19,8 @@ depends_on = None
 def upgrade() -> None:
     # Create driver_schedules table
     op.create_table('driver_schedules',
-        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('driver_id', sa.Integer(), nullable=False),
+        sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column('driver_id', sa.BigInteger(), nullable=False),
         sa.Column('schedule_date', sa.Date(), nullable=False),
         sa.Column('is_scheduled', sa.Boolean(), nullable=False, server_default='true'),
         sa.Column('shift_type', sa.String(length=20), nullable=False, server_default='FULL_DAY'),
@@ -37,8 +37,8 @@ def upgrade() -> None:
 
     # Create driver_availability_patterns table
     op.create_table('driver_availability_patterns',
-        sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('driver_id', sa.Integer(), nullable=False),
+        sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column('driver_id', sa.BigInteger(), nullable=False),
         sa.Column('monday', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('tuesday', sa.Boolean(), nullable=False, server_default='false'),
         sa.Column('wednesday', sa.Boolean(), nullable=False, server_default='false'),
