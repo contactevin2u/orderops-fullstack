@@ -3,6 +3,7 @@
 from datetime import date
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 
 from ..db import get_session
 from ..models.driver import Driver
