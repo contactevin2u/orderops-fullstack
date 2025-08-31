@@ -21,6 +21,14 @@ export default function DriverSchedulePage() {
 
   const queryClient = useQueryClient();
 
+  // Track locally scheduled drivers to make UI responsive
+  const [locallyScheduled, setLocallyScheduled] = useState<Set<number>>(new Set());
+
+  // Clear local state when date changes
+  React.useEffect(() => {
+    setLocallyScheduled(new Set());
+  }, [selectedDate]);
+
   // Fetch daily drivers for selected date - use simple /drivers endpoint that works
   const { data: dailyDrivers, isLoading: loadingDaily } = useQuery({
     queryKey: ['daily-drivers', selectedDate.format('YYYY-MM-DD')],
@@ -36,12 +44,12 @@ export default function DriverSchedulePage() {
             driver_id: driver.id,
             driver_name: driver.name || 'Unknown Driver',
             phone: driver.phone,
-            is_scheduled: false, // All drivers start as unscheduled
-            schedule_type: null,
-            shift_type: null,
-            status: null
+            is_scheduled: locallyScheduled.has(driver.id), // Check local state
+            schedule_type: locallyScheduled.has(driver.id) ? 'explicit' : null,
+            shift_type: locallyScheduled.has(driver.id) ? 'FULL_DAY' : null,
+            status: locallyScheduled.has(driver.id) ? 'SCHEDULED' : null
           })),
-          scheduled_count: 0,
+          scheduled_count: locallyScheduled.size,
           total_count: drivers.length
         }
       };
@@ -65,12 +73,29 @@ export default function DriverSchedulePage() {
           shift_type: 'FULL_DAY'
         }),
       });
-      if (!response.ok) throw new Error('Failed to set schedule');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to set schedule: ${response.status} ${errorText}`);
+      }
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data, variables) => {
+      // Update local state immediately for better UX
+      setLocallyScheduled(prev => {
+        const newSet = new Set(prev);
+        if (variables.is_scheduled) {
+          newSet.add(variables.driver_id);
+        } else {
+          newSet.delete(variables.driver_id);
+        }
+        return newSet;
+      });
       queryClient.invalidateQueries({ queryKey: ['daily-drivers'] });
     },
+    onError: (error) => {
+      console.error('Failed to update schedule:', error);
+      alert(`Failed to update schedule: ${error.message}`);
+    }
   });
 
   // Generate calendar days
