@@ -37,7 +37,7 @@ class AIAssignmentService:
             self.ai_enabled = False
 
     def get_available_drivers(self) -> List[Dict[str, Any]]:
-        """Get scheduled drivers currently clocked in, prioritized for assignment"""
+        """Get scheduled drivers currently clocked in, with fallback to all clocked-in drivers"""
         from datetime import date
         
         # Get drivers who are scheduled for today
@@ -45,13 +45,21 @@ class AIAssignmentService:
         scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
         scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
         
-        # Get active shifts only for scheduled drivers
-        active_shifts = self.db.query(DriverShift).filter(
-            and_(
-                DriverShift.status == "ACTIVE",
-                DriverShift.driver_id.in_(scheduled_driver_ids)  # Only scheduled drivers
-            )
-        ).all()
+        # Get active shifts - prefer scheduled drivers, but fallback to all if none scheduled
+        if scheduled_driver_ids:
+            # Get active shifts only for scheduled drivers
+            active_shifts = self.db.query(DriverShift).filter(
+                and_(
+                    DriverShift.status == "ACTIVE",
+                    DriverShift.driver_id.in_(scheduled_driver_ids)
+                )
+            ).all()
+        else:
+            # Fallback: if no drivers are scheduled, get ALL active shifts
+            # This prevents the system from being unusable when schedules aren't set up
+            active_shifts = self.db.query(DriverShift).filter(
+                DriverShift.status == "ACTIVE"
+            ).all()
 
         available_drivers = []
         for shift in active_shifts:
@@ -137,6 +145,11 @@ class AIAssignmentService:
         Returns:
             Dictionary with assignment suggestions and reasoning
         """
+        # Auto-create schedules if none exist (makes system usable)
+        schedules_created = self.auto_schedule_all_drivers_if_empty()
+        if schedules_created:
+            logger.info("Auto-created availability patterns for all drivers")
+        
         available_drivers = self.get_available_drivers()
         pending_orders = self.get_pending_orders()
         
@@ -150,9 +163,14 @@ class AIAssignmentService:
         schedule_summary = self.schedule_service.get_schedule_summary(today)
 
         if not available_drivers:
-            # Build intelligent reasoning based on schedule
-            if scheduled_count == 0:
-                reasoning = "No drivers scheduled to work today. Check weekly roster and availability patterns."
+            # Build intelligent reasoning based on schedule  
+            total_active_drivers = self.db.query(Driver).filter(Driver.is_active == True).count()
+            total_active_shifts = self.db.query(DriverShift).filter(DriverShift.status == "ACTIVE").count()
+            
+            if scheduled_count == 0 and total_active_shifts == 0:
+                reasoning = f"No drivers scheduled or clocked in today. {total_active_drivers} active drivers available - they need to clock in first."
+            elif scheduled_count == 0:
+                reasoning = f"No drivers scheduled for today, but {total_active_shifts} drivers are clocked in. Fallback mode should have included them - check shift data."
             else:
                 clocked_in_driver_ids = {d["driver_id"] for d in available_drivers}
                 scheduled_but_not_clocked = [
@@ -383,3 +401,44 @@ Provide assignments in JSON format:
             return "urgent"
         else:
             return "normal"
+
+    def auto_schedule_all_drivers_if_empty(self) -> bool:
+        """
+        Auto-create availability patterns for all active drivers if no schedules exist.
+        This is a fallback to make the system usable when schedules aren't configured.
+        
+        Returns:
+            True if schedules were created, False if schedules already exist
+        """
+        from datetime import date
+        
+        # Check if any schedules exist
+        schedule_count = self.db.query(DriverSchedule).count()
+        pattern_count = self.db.query(DriverAvailabilityPattern).count()
+        
+        if schedule_count > 0 or pattern_count > 0:
+            return False  # Schedules already exist
+        
+        # Get all active drivers
+        active_drivers = self.db.query(Driver).filter(Driver.is_active == True).all()
+        
+        if not active_drivers:
+            return False  # No drivers to schedule
+        
+        # Create a default weekday availability pattern for all drivers
+        today = date.today()
+        
+        for driver in active_drivers:
+            try:
+                # Monday to Friday availability pattern
+                self.schedule_service.create_availability_pattern(
+                    driver_id=driver.id,
+                    weekdays=[True, True, True, True, True, False, False],  # Mon-Fri
+                    pattern_name="Auto-generated Weekdays",
+                    start_date=today
+                )
+            except Exception as e:
+                logger.error(f"Failed to create auto-pattern for driver {driver.id}: {e}")
+                continue
+        
+        return True
