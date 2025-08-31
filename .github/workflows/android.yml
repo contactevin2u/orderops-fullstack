@@ -40,14 +40,18 @@ jobs:
         working-directory: driver-app
         run: echo API_BASE=$API_BASE >> local.properties
 
-      - name: Generate Signing Report (to get SHA-1 for Firebase)
-        uses: gradle/gradle-build-action@v3
-        with:
-          gradle-version: 8.9
-          build-root-directory: driver-app
-          arguments: "signingReport"
-        env:
-          GRADLE_OPTS: "-Xmx2g"
+      - name: Create debug keystore and show SHA-1
+        working-directory: driver-app
+        run: |
+          echo "🔧 Creating debug keystore..."
+          mkdir -p ~/.android
+          echo "🔑 Generating debug keystore and extracting SHA-1..."
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "C=US, O=Android, CN=Android Debug"
+          echo ""
+          echo "✅ Debug keystore created! Here's your SHA-1 fingerprint:"
+          keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android | grep SHA1
+          echo ""
+          echo "📋 Copy the SHA1 value above and add it to Firebase Console!"
 
       - name: (Optional) Materialize Firebase service account
         if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
