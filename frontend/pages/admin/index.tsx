@@ -1,16 +1,16 @@
 import Link from 'next/link';
 import React from 'react';
 import { 
-  TruckIcon, 
-  MapIcon, 
-  CurrencyDollarIcon, 
-  SparklesIcon, 
-  ClipboardDocumentListIcon,
-  UserGroupIcon,
-  CalendarDaysIcon,
-  ArrowRightIcon,
-  CheckCircleIcon
-} from '@heroicons/react/24/outline';
+  Truck as TruckIcon, 
+  Map as MapIcon, 
+  DollarSign as CurrencyDollarIcon, 
+  Sparkles as SparklesIcon, 
+  ClipboardList as ClipboardDocumentListIcon,
+  Users as UserGroupIcon,
+  Calendar as CalendarDaysIcon,
+  ArrowRight as ArrowRightIcon,
+  CheckCircle as CheckCircleIcon
+} from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 export default function AdminIndexPage() {
@@ -48,21 +48,21 @@ export default function AdminIndexPage() {
       ]
     },
     {
-      title: 'Smart Assignment', 
-      description: 'AI-powered order assignment and optimization',
+      title: 'Order Assignment', 
+      description: 'Unified workflow for automated and manual assignment',
       icon: <SparklesIcon className="h-6 w-6" />,
       color: 'from-purple-500 to-pink-500',
       items: [
         { 
-          href: '/admin/ai-assignments', 
-          label: 'AI Assignment Engine', 
-          description: 'Let AI optimize assignments for fuel efficiency',
+          href: '/admin/unified-assignments', 
+          label: 'Unified Assignment Workflow', 
+          description: 'Auto-assign orders with AI and create routes automatically',
           icon: <SparklesIcon className="h-5 w-5" />
         },
         { 
           href: '/admin/assign', 
           label: 'Manual Assignment', 
-          description: 'Manually assign orders to routes and drivers',
+          description: 'Manually assign specific orders when needed',
           icon: <ClipboardDocumentListIcon className="h-5 w-5" />
         },
       ]
