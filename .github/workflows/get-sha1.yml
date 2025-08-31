@@ -27,13 +27,24 @@ jobs:
         run: echo "API_BASE=https://example.com" >> local.properties
 
       - name: Generate Signing Report
-        working-directory: driver-app
         run: |
           echo "🔑 Generating signing report to get SHA-1 fingerprint..."
-          ./gradlew signingReport
+        
+      - name: Run Gradle Signing Report
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.9
+          build-root-directory: driver-app
+          arguments: "signingReport"
+        env:
+          GRADLE_OPTS: "-Xmx2g"
+          
+      - name: Summary
+        run: |
           echo ""
-          echo "✅ Look for 'SHA1:' in the output above!"
-          echo "📋 Copy the SHA1 value and add it to Firebase Console"
+          echo "✅ Look for 'SHA1:' in the Gradle output above!"
+          echo "📋 The SHA1 fingerprint should be in the format: AA:BB:CC:DD:EE:FF..."
+          echo "🎯 Copy that SHA1 value and add it to Firebase Console"
 
       - name: Also show debug keystore info directly
         run: |
