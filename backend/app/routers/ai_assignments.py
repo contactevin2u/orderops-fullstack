@@ -186,3 +186,104 @@ async def get_pending_orders(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get pending orders: {str(e)}"
         )
+
+
+@router.post("/accept-all")
+async def accept_all_suggestions(
+    current_user: User = Depends(get_current_admin_user),
+    db: Session = Depends(get_session)
+):
+    """Accept all AI suggestions at once - simplified workflow"""
+    try:
+        from app.models.order import Order
+        from app.models.trip import Trip
+        from app.models.driver import Driver
+        from app.services.fcm import notify_order_assigned
+        from app.audit import log_action
+        
+        # Get AI suggestions
+        openai_api_key = os.getenv("OPENAI_API_KEY")
+        ai_service = AIAssignmentService(db, openai_api_key)
+        result = ai_service.suggest_assignments()
+        
+        if not result["suggestions"]:
+            return {
+                "message": "No suggestions available",
+                "assignments": [],
+                "available_drivers": result["available_drivers_count"],
+                "pending_orders": result["pending_orders_count"]
+            }
+        
+        assignments = []
+        failed = []
+        
+        for suggestion in result["suggestions"]:
+            try:
+                order_id = suggestion["order_id"]
+                driver_id = suggestion["driver_id"]
+                
+                # Validate order and driver exist
+                order = db.get(Order, order_id)
+                driver = db.get(Driver, driver_id)
+                
+                if not order or not driver:
+                    failed.append({
+                        "order_id": order_id,
+                        "driver_id": driver_id,
+                        "error": "Order or driver not found"
+                    })
+                    continue
+                
+                # Create or update trip (same logic as manual assignment)
+                trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
+                if trip:
+                    if trip.status in {"DELIVERED", "SUCCESS"}:
+                        failed.append({
+                            "order_id": order_id,
+                            "driver_id": driver_id, 
+                            "error": "Order already delivered"
+                        })
+                        continue
+                    trip.driver_id = driver.id
+                    trip.status = "ASSIGNED"
+                else:
+                    trip = Trip(order_id=order.id, driver_id=driver.id, status="ASSIGNED")
+                    db.add(trip)
+                
+                order.status = "ASSIGNED"
+                
+                assignments.append({
+                    "order_id": order_id,
+                    "driver_id": driver_id,
+                    "driver_name": driver.name,
+                    "order_code": order.code
+                })
+                
+                # Log and notify
+                log_action(db, current_user, "ai.accept_all", f"order_id={order.id},driver_id={driver.id}")
+                notify_order_assigned(db, driver.id, order)
+                
+            except Exception as e:
+                failed.append({
+                    "order_id": suggestion.get("order_id"),
+                    "driver_id": suggestion.get("driver_id"),
+                    "error": str(e)
+                })
+        
+        db.commit()
+        
+        return {
+            "message": f"Successfully assigned {len(assignments)} orders",
+            "assignments": assignments,
+            "failed": failed,
+            "method": result["method"]
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to accept all suggestions: {str(e)}"
+        )

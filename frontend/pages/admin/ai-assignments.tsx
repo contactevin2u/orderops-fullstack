@@ -126,24 +126,26 @@ export default function AIAssignmentsPage() {
     }
   });
 
-  const applyAssignmentMutation = useMutation({
-    mutationFn: async ({ orderId, driverId }: { orderId: number; driverId: number }) => {
-      const response = await fetch('/_api/ai-assignments/apply', {
+  const acceptAllMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch('/_api/ai-assignments/accept-all', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ order_id: orderId, driver_id: driverId })
+        headers: { 'Content-Type': 'application/json' }
       });
-      if (!response.ok) throw new Error('Failed to apply assignment');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to accept assignments: ${response.status} ${errorText}`);
+      }
       return response.json();
     },
     onSuccess: (data) => {
       setSuccessMessage(data.message);
       queryClient.invalidateQueries({ queryKey: ['ai-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['pending-orders'] });
-      setTimeout(() => setSuccessMessage(''), 3000);
+      setTimeout(() => setSuccessMessage(''), 5000);
     },
     onError: (error: any) => {
-      setErrorMessage(error.message || 'Failed to apply assignment');
+      setErrorMessage(error.message || 'Failed to accept all assignments');
     }
   });
 
@@ -209,8 +211,8 @@ export default function AIAssignmentsPage() {
     }
   };
 
-  const handleApplyAssignment = (orderId: number, driverId: number) => {
-    applyAssignmentMutation.mutate({ orderId, driverId });
+  const handleAcceptAll = () => {
+    acceptAllMutation.mutate();
   };
 
   useEffect(() => {
@@ -405,107 +407,85 @@ Notes: Urgent delivery`}
           </div>
         </TabsContent>
 
-        {/* AI Suggestions Tab */}
+        {/* AI Suggestions Tab - SIMPLIFIED */}
         <TabsContent value="ai-suggestions" className="space-y-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h2 className="text-xl font-semibold">AI Assignment Suggestions</h2>
-              <p className="text-gray-600">Review and accept AI-powered assignment recommendations</p>
+          <div className="max-w-2xl mx-auto">
+            <div className="text-center mb-8">
+              <Brain className="h-16 w-16 mx-auto mb-4 text-blue-600" />
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">AI Assignment Engine</h2>
+              <p className="text-gray-600">Let AI automatically assign all pending orders to the best available drivers</p>
             </div>
-            <Button onClick={() => refetchSuggestions()} disabled={loadingSuggestions}>
-              {loadingSuggestions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Refresh Suggestions
-            </Button>
-          </div>
 
-          {loadingSuggestions ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin" />
-            </div>
-          ) : aiSuggestions?.suggestions.length ? (
-            <div className="space-y-6">
-              {/* Summary */}
+            {loadingSuggestions ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="ml-3 text-gray-600">Analyzing assignments...</span>
+              </div>
+            ) : (
               <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-4 mb-4">
-                    <Brain className="h-6 w-6 text-blue-600" />
-                    <div>
-                      <h3 className="font-semibold text-blue-900">AI Analysis Summary</h3>
-                      <p className="text-blue-700 text-sm">Method: {aiSuggestions.method}</p>
+                <CardContent className="p-8 text-center">
+                  {aiSuggestions && (
+                    <div className="grid grid-cols-3 gap-6 mb-6">
+                      <div>
+                        <div className="text-3xl font-bold text-blue-900">{aiSuggestions.available_drivers_count}</div>
+                        <div className="text-sm text-blue-700">Available Drivers</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-blue-900">{aiSuggestions.pending_orders_count}</div>
+                        <div className="text-sm text-blue-700">Pending Orders</div>
+                      </div>
+                      <div>
+                        <div className="text-3xl font-bold text-blue-900">{aiSuggestions.suggestions.length}</div>
+                        <div className="text-sm text-blue-700">Ready to Assign</div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                   
-                  <div className="grid grid-cols-4 gap-4 mb-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-900">{aiSuggestions.scheduled_drivers_count || 0}</div>
-                      <div className="text-sm text-blue-700">Scheduled Today</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-900">{aiSuggestions.available_drivers_count}</div>
-                      <div className="text-sm text-blue-700">Clocked In</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-900">{aiSuggestions.pending_orders_count}</div>
-                      <div className="text-sm text-blue-700">Pending Orders</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-blue-900">{aiSuggestions.suggestions.length}</div>
-                      <div className="text-sm text-blue-700">Suggestions</div>
-                    </div>
+                  <div className="space-y-4">
+                    <Button 
+                      onClick={handleAcceptAll}
+                      disabled={acceptAllMutation.isPending || !aiSuggestions?.suggestions.length}
+                      size="lg"
+                      className="w-full max-w-md h-14 text-lg"
+                    >
+                      {acceptAllMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                          Assigning Orders...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-3 h-5 w-5" />
+                          Accept All Suggestions ({aiSuggestions?.suggestions.length || 0})
+                        </>
+                      )}
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      onClick={() => refetchSuggestions()} 
+                      disabled={loadingSuggestions}
+                    >
+                      {loadingSuggestions && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Refresh Suggestions
+                    </Button>
                   </div>
-                  
-                  {aiSuggestions.ai_reasoning && (
-                    <div className="text-sm text-blue-800 bg-blue-100 p-3 rounded-md">
-                      {aiSuggestions.ai_reasoning}
+
+                  {!aiSuggestions?.suggestions.length && aiSuggestions && (
+                    <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-yellow-800 text-sm">
+                        {aiSuggestions.pending_orders_count === 0 
+                          ? "No pending orders to assign" 
+                          : aiSuggestions.available_drivers_count === 0
+                          ? "No drivers available - schedule drivers first"
+                          : "Unable to generate suggestions - check driver schedules"}
+                      </p>
                     </div>
                   )}
                 </CardContent>
               </Card>
-
-              {/* Suggestions */}
-              <div className="grid gap-4">
-                {aiSuggestions.suggestions.map((suggestion) => (
-                  <Card key={`${suggestion.order_id}-${suggestion.driver_id}`}>
-                    <CardContent className="p-6">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h3 className="font-semibold text-lg">Order #{suggestion.order_id}</h3>
-                          <p className="text-gray-600">Driver: {suggestion.driver_name}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline">{suggestion.distance_km}km away</Badge>
-                          <Badge variant={suggestion.confidence === 'high' ? 'default' : suggestion.confidence === 'medium' ? 'secondary' : 'outline'}>
-                            {suggestion.confidence} confidence
-                          </Badge>
-                        </div>
-                      </div>
-                      
-                      <p className="text-gray-700 mb-4">{suggestion.reasoning}</p>
-                      
-                      <Button 
-                        onClick={() => handleApplyAssignment(suggestion.order_id, suggestion.driver_id)}
-                        disabled={applyAssignmentMutation.isPending}
-                        className="w-full"
-                      >
-                        {applyAssignmentMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        <Check className="mr-2 h-4 w-4" />
-                        Accept Assignment
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-12">
-              <Brain className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No AI Suggestions Available</h3>
-              <p className="text-gray-600 mb-4">Make sure there are pending orders and available drivers</p>
-              <Button onClick={() => refetchSuggestions()}>
-                Try Again
-              </Button>
-            </div>
-          )}
+            )}
+          </div>
         </TabsContent>
 
         {/* Assignments Tab */}
