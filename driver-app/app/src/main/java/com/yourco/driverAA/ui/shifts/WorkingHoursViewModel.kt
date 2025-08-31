@@ -53,7 +53,6 @@ class WorkingHoursViewModel @Inject constructor(
                 }
                 
                 // Calculate summary statistics
-                val now = Calendar.getInstance()
                 val todayStart = Calendar.getInstance().apply {
                     set(Calendar.HOUR_OF_DAY, 0)
                     set(Calendar.MINUTE, 0)
