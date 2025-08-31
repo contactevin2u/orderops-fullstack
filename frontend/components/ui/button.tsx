@@ -2,8 +2,8 @@ import * as React from "react";
 import clsx from "clsx";
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "default" | "secondary" | "ghost";
-  size?: "default" | "icon";
+  variant?: "default" | "secondary" | "ghost" | "outline";
+  size?: "default" | "icon" | "sm";
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -14,10 +14,12 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       default: "bg-primary text-primary-foreground hover:bg-primary/90",
       secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
       ghost: "hover:bg-accent hover:text-accent-foreground",
+      outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
     };
     const sizes: Record<string, string> = {
       default: "h-10 px-4 py-2",
       icon: "h-10 w-10",
+      sm: "h-9 px-3 text-xs",
     };
     return (
       <button
