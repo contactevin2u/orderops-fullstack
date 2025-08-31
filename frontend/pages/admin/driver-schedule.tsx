@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay } from 'date-fns';
+import dayjs from 'dayjs';
+import weekOfYear from 'dayjs/plugin/weekOfYear';
 import { ChevronLeft, ChevronRight, Plus, Calendar, Users } from 'lucide-react';
+
+dayjs.extend(weekOfYear);
 
 interface Driver {
   driver_id: number;
@@ -27,18 +30,18 @@ const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satur
 
 export default function DriverSchedulePage() {
   const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    return startOfWeek(new Date(), { weekStartsOn: 1 }); // Start week on Monday
+    return dayjs().startOf('week').add(1, 'day'); // Start week on Monday
   });
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState(dayjs());
   const [showCreatePattern, setShowCreatePattern] = useState(false);
 
   const queryClient = useQueryClient();
 
   // Fetch weekly schedule
   const { data: weeklySchedule, isLoading: loadingWeekly } = useQuery({
-    queryKey: ['weekly-schedule', format(currentWeekStart, 'yyyy-MM-dd')],
+    queryKey: ['weekly-schedule', currentWeekStart.format('YYYY-MM-DD')],
     queryFn: async () => {
-      const response = await fetch(`/api/driver-schedule/weekly/${format(currentWeekStart, 'yyyy-MM-dd')}`);
+      const response = await fetch(`/api/driver-schedule/weekly/${currentWeekStart.format('YYYY-MM-DD')}`);
       if (!response.ok) throw new Error('Failed to fetch weekly schedule');
       return response.json();
     },
@@ -46,9 +49,9 @@ export default function DriverSchedulePage() {
 
   // Fetch daily drivers
   const { data: dailyDrivers, isLoading: loadingDaily } = useQuery({
-    queryKey: ['daily-drivers', format(selectedDate, 'yyyy-MM-dd')],
+    queryKey: ['daily-drivers', selectedDate.format('YYYY-MM-DD')],
     queryFn: async () => {
-      const response = await fetch(`/api/driver-schedule/drivers/all?target_date=${format(selectedDate, 'yyyy-MM-dd')}`);
+      const response = await fetch(`/api/driver-schedule/drivers/all?target_date=${selectedDate.format('YYYY-MM-DD')}`);
       if (!response.ok) throw new Error('Failed to fetch daily drivers');
       return response.json();
     },
@@ -87,7 +90,7 @@ export default function DriverSchedulePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: data.status,
-          schedule_date: data.schedule_date || format(selectedDate, 'yyyy-MM-dd'),
+          schedule_date: data.schedule_date || selectedDate.format('YYYY-MM-DD'),
         }),
       });
       if (!response.ok) throw new Error('Failed to update status');
@@ -99,12 +102,12 @@ export default function DriverSchedulePage() {
     },
   });
 
-  const weekDates = Array.from({ length: 7 }, (_, i) => addDays(currentWeekStart, i));
+  const weekDates = Array.from({ length: 7 }, (_, i) => currentWeekStart.add(i, 'day'));
 
-  const goToPreviousWeek = () => setCurrentWeekStart(prev => subWeeks(prev, 1));
-  const goToNextWeek = () => setCurrentWeekStart(prev => addWeeks(prev, 1));
+  const goToPreviousWeek = () => setCurrentWeekStart(prev => prev.subtract(1, 'week'));
+  const goToNextWeek = () => setCurrentWeekStart(prev => prev.add(1, 'week'));
 
-  const getScheduledDriversForDate = (date: Date): Array<{
+  const getScheduledDriversForDate = (date: dayjs.Dayjs): Array<{
     driver_id: number;
     driver_name: string;
     schedule_type: string;
@@ -112,7 +115,7 @@ export default function DriverSchedulePage() {
     status: string;
   }> => {
     if (!weeklySchedule?.data?.weekly_schedule) return [];
-    const dateStr = format(date, 'yyyy-MM-dd');
+    const dateStr = date.format('YYYY-MM-DD');
     return weeklySchedule.data.weekly_schedule[dateStr] || [];
   };
 
@@ -155,7 +158,7 @@ export default function DriverSchedulePage() {
         
         <div className="text-center">
           <h2 className="text-xl font-semibold">
-            {format(currentWeekStart, 'MMM dd')} - {format(addDays(currentWeekStart, 6), 'MMM dd, yyyy')}
+            {currentWeekStart.format('MMM DD')} - {currentWeekStart.add(6, 'day').format('MMM DD, YYYY')}
           </h2>
         </div>
 
@@ -171,12 +174,12 @@ export default function DriverSchedulePage() {
       <div className="grid grid-cols-7 gap-4 mb-8">
         {weekDates.map((date, index) => {
           const scheduledDrivers = getScheduledDriversForDate(date);
-          const isSelected = isSameDay(date, selectedDate);
-          const isToday = isSameDay(date, new Date());
+          const isSelected = date.isSame(selectedDate, 'day');
+          const isToday = date.isSame(dayjs(), 'day');
 
           return (
             <div
-              key={date.toISOString()}
+              key={date.valueOf()}
               className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
                 isSelected
                   ? 'border-blue-500 bg-blue-50'
@@ -193,7 +196,7 @@ export default function DriverSchedulePage() {
                 <div className={`text-2xl font-bold ${
                   isToday ? 'text-green-600' : 'text-gray-900'
                 }`}>
-                  {format(date, 'dd')}
+                  {date.format('DD')}
                 </div>
               </div>
 
@@ -228,7 +231,7 @@ export default function DriverSchedulePage() {
           <div className="flex items-center gap-2">
             <Calendar size={20} className="text-gray-600" />
             <h3 className="text-lg font-semibold">
-              {format(selectedDate, 'EEEE, MMMM dd, yyyy')}
+              {selectedDate.format('dddd, MMMM DD, YYYY')}
             </h3>
           </div>
         </div>
