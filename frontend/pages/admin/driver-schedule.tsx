@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import { ChevronLeft, ChevronRight, Calendar, Users, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Plus } from 'lucide-react';
 
 interface Driver {
   driver_id: number;
@@ -27,16 +27,6 @@ export default function DriverSchedulePage() {
     queryFn: async () => {
       const response = await fetch(`/api/driver-schedule/drivers/all?target_date=${selectedDate.format('YYYY-MM-DD')}`);
       if (!response.ok) throw new Error('Failed to fetch daily drivers');
-      return response.json();
-    },
-  });
-
-  // Get all drivers for dropdown
-  const { data: allDrivers } = useQuery({
-    queryKey: ['all-drivers'],
-    queryFn: async () => {
-      const response = await fetch('/api/drivers');
-      if (!response.ok) throw new Error('Failed to fetch drivers');
       return response.json();
     },
   });
@@ -104,174 +94,282 @@ export default function DriverSchedulePage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Driver Schedule</h1>
-            <p className="text-gray-600 mt-2">Manage daily driver schedules</p>
-          </div>
-        </div>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
+      {/* Header */}
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '28px', fontWeight: 'bold', color: '#111827', marginBottom: '8px' }}>
+          Driver Schedule
+        </h1>
+        <p style={{ color: '#6B7280' }}>
+          Manage daily driver schedules
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '32px' }}>
         {/* Month Calendar */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow">
+        <div>
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #E5E7EB' }}>
             {/* Month Navigation */}
-            <div className="flex items-center justify-between p-4 border-b">
+            <div style={{ 
+              display: 'flex', 
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              padding: '16px 24px', 
+              borderBottom: '1px solid #E5E7EB' 
+            }}>
               <button
                 onClick={goToPreviousMonth}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                style={{ 
+                  padding: '8px', 
+                  borderRadius: '6px', 
+                  border: 'none', 
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
               >
                 <ChevronLeft size={20} />
               </button>
               
-              <h2 className="text-xl font-semibold">
+              <h2 style={{ fontSize: '20px', fontWeight: '600', margin: 0 }}>
                 {currentMonth.format('MMMM YYYY')}
               </h2>
 
               <button
                 onClick={goToNextMonth}
-                className="p-2 hover:bg-gray-100 rounded-lg"
+                style={{ 
+                  padding: '8px', 
+                  borderRadius: '6px', 
+                  border: 'none', 
+                  backgroundColor: 'transparent',
+                  cursor: 'pointer'
+                }}
+                onMouseOver={(e) => e.target.style.backgroundColor = '#F3F4F6'}
+                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
               >
                 <ChevronRight size={20} />
               </button>
             </div>
 
             {/* Weekday Headers */}
-            <div className="grid grid-cols-7 gap-0 border-b">
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(7, 1fr)',
+              borderBottom: '1px solid #E5E7EB'
+            }}>
               {WEEKDAYS.map(day => (
-                <div key={day} className="p-3 text-center text-sm font-medium text-gray-600 border-r last:border-r-0">
+                <div 
+                  key={day} 
+                  style={{ 
+                    padding: '12px', 
+                    textAlign: 'center', 
+                    fontSize: '14px', 
+                    fontWeight: '500', 
+                    color: '#6B7280',
+                    borderRight: '1px solid #E5E7EB'
+                  }}
+                >
                   {day}
                 </div>
               ))}
             </div>
 
             {/* Calendar Grid */}
-            <div className="grid grid-cols-7">
-              {calendarDays.map(date => (
-                <div
-                  key={date.valueOf()}
-                  className={`
-                    aspect-square min-h-[100px] p-3 border-r border-b last:border-r-0 
-                    cursor-pointer transition-colors duration-200
-                    ${!isCurrentMonth(date) 
-                      ? 'bg-gray-50 text-gray-400' 
-                      : 'bg-white hover:bg-blue-50'
-                    } 
-                    ${isSelected(date) 
-                      ? 'bg-blue-100 border-blue-400 ring-2 ring-blue-300' 
-                      : ''
-                    } 
-                    ${isToday(date) && !isSelected(date)
-                      ? 'bg-green-50 border-green-300 ring-2 ring-green-200' 
-                      : ''
-                    }
-                  `}
-                  onClick={() => setSelectedDate(date)}
-                >
-                  <div className={`
-                    text-base font-semibold mb-2
-                    ${isToday(date) ? 'text-green-700' : ''}
-                    ${isSelected(date) ? 'text-blue-700' : ''}
-                    ${!isCurrentMonth(date) ? 'text-gray-400' : 'text-gray-900'}
-                  `}>
-                    {date.format('D')}
-                  </div>
-                  
-                  {/* Small indicator for scheduled drivers */}
-                  {isCurrentMonth(date) && (
-                    <div className="flex items-center justify-center">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full opacity-30"></div>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(7, 1fr)'
+            }}>
+              {calendarDays.map(date => {
+                const isCurrentMonthDate = isCurrentMonth(date);
+                const isTodayDate = isToday(date);
+                const isSelectedDate = isSelected(date);
+
+                return (
+                  <div
+                    key={date.valueOf()}
+                    onClick={() => setSelectedDate(date)}
+                    style={{
+                      minHeight: '80px',
+                      padding: '12px',
+                      borderRight: '1px solid #E5E7EB',
+                      borderBottom: '1px solid #E5E7EB',
+                      cursor: 'pointer',
+                      backgroundColor: !isCurrentMonthDate 
+                        ? '#F9FAFB' 
+                        : isSelectedDate 
+                        ? '#EBF8FF' 
+                        : isTodayDate 
+                        ? '#F0FDF4'
+                        : 'white',
+                      color: !isCurrentMonthDate ? '#9CA3AF' : '#111827',
+                      border: isSelectedDate ? '2px solid #3B82F6' : isTodayDate ? '2px solid #10B981' : '1px solid #E5E7EB',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseOver={(e) => {
+                      if (isCurrentMonthDate && !isSelectedDate) {
+                        e.target.style.backgroundColor = '#F3F4F6';
+                      }
+                    }}
+                    onMouseOut={(e) => {
+                      if (isCurrentMonthDate && !isSelectedDate) {
+                        e.target.style.backgroundColor = isTodayDate ? '#F0FDF4' : 'white';
+                      }
+                    }}
+                  >
+                    <div style={{ 
+                      fontSize: '16px', 
+                      fontWeight: '600', 
+                      marginBottom: '4px',
+                      color: isTodayDate ? '#059669' : isSelectedDate ? '#1D4ED8' : 'inherit'
+                    }}>
+                      {date.format('D')}
                     </div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
         {/* Selected Date Details */}
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-sm border">
-            <div className="border-b border-gray-200 px-6 py-4 bg-gray-50">
-              <div className="flex items-center gap-3">
-                <Calendar size={20} className="text-blue-600" />
+        <div>
+          <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', border: '1px solid #E5E7EB' }}>
+            <div style={{ 
+              padding: '16px 24px', 
+              borderBottom: '1px solid #E5E7EB',
+              backgroundColor: '#F9FAFB'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <Calendar size={20} style={{ color: '#3B82F6' }} />
                 <div>
-                  <h3 className="font-semibold text-gray-900">
+                  <h3 style={{ fontSize: '16px', fontWeight: '600', margin: 0, color: '#111827' }}>
                     {selectedDate.format('dddd')}
                   </h3>
-                  <p className="text-sm text-gray-600">
+                  <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>
                     {selectedDate.format('MMMM D, YYYY')}
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="p-6">
+            <div style={{ padding: '24px' }}>
               {loadingDaily ? (
-                <div className="text-center py-8">
-                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                  <p className="mt-3 text-gray-600">Loading drivers...</p>
+                <div style={{ textAlign: 'center', padding: '32px 0' }}>
+                  <div style={{ 
+                    width: '32px', 
+                    height: '32px', 
+                    border: '2px solid #E5E7EB', 
+                    borderTop: '2px solid #3B82F6',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    margin: '0 auto 12px'
+                  }}></div>
+                  <p style={{ color: '#6B7280', margin: 0 }}>Loading drivers...</p>
                 </div>
               ) : (
                 <>
-                  <div className="mb-4 text-sm text-gray-600">
+                  <div style={{ marginBottom: '16px', fontSize: '14px', color: '#6B7280' }}>
                     {dailyDrivers?.data?.scheduled_count || 0} drivers scheduled
                   </div>
 
                   {/* Scheduled Drivers */}
-                  <div className="space-y-3 mb-6">
-                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '12px', height: '12px', backgroundColor: '#10B981', borderRadius: '50%' }}></div>
                       Scheduled ({dailyDrivers?.data?.drivers?.filter((d: Driver) => d.is_scheduled).length || 0})
                     </h4>
-                    {dailyDrivers?.data?.drivers?.filter((d: Driver) => d.is_scheduled).length === 0 ? (
-                      <div className="text-sm text-gray-500 italic">No drivers scheduled</div>
-                    ) : (
-                      dailyDrivers?.data?.drivers?.filter((d: Driver) => d.is_scheduled).map((driver: Driver) => (
-                        <div key={driver.driver_id} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{driver.driver_name}</div>
-                            {driver.phone && <div className="text-sm text-gray-600">{driver.phone}</div>}
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {dailyDrivers?.data?.drivers?.filter((d: Driver) => d.is_scheduled).length === 0 ? (
+                        <div style={{ fontSize: '14px', color: '#9CA3AF', fontStyle: 'italic' }}>No drivers scheduled</div>
+                      ) : (
+                        dailyDrivers?.data?.drivers?.filter((d: Driver) => d.is_scheduled).map((driver: Driver) => (
+                          <div key={driver.driver_id} style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '12px',
+                            backgroundColor: '#ECFDF5',
+                            border: '1px solid #D1FAE5',
+                            borderRadius: '8px'
+                          }}>
+                            <div>
+                              <div style={{ fontWeight: '500', color: '#111827' }}>{driver.driver_name}</div>
+                              {driver.phone && <div style={{ fontSize: '14px', color: '#6B7280' }}>{driver.phone}</div>}
+                            </div>
+                            <button
+                              onClick={() => handleRemoveDriver(driver.driver_id)}
+                              disabled={setScheduleMutation.isPending}
+                              style={{
+                                color: '#DC2626',
+                                backgroundColor: 'transparent',
+                                border: 'none',
+                                padding: '6px 12px',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                fontWeight: '500',
+                                cursor: 'pointer'
+                              }}
+                              onMouseOver={(e) => {
+                                e.target.style.backgroundColor = '#FEF2F2';
+                                e.target.style.color = '#B91C1C';
+                              }}
+                              onMouseOut={(e) => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#DC2626';
+                              }}
+                            >
+                              Remove
+                            </button>
                           </div>
-                          <button
-                            onClick={() => handleRemoveDriver(driver.driver_id)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-1 rounded-md text-sm font-medium transition-colors"
-                            disabled={setScheduleMutation.isPending}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      ))
-                    )}
+                        ))
+                      )}
+                    </div>
                   </div>
 
-                  {/* Available Drivers to Add */}
+                  {/* Available Drivers */}
                   <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                      <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                    <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#374151', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ width: '12px', height: '12px', backgroundColor: '#9CA3AF', borderRadius: '50%' }}></div>
                       Available to Schedule
                     </h4>
-                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
                       {dailyDrivers?.data?.drivers?.filter((d: Driver) => !d.is_scheduled).map((driver: Driver) => (
                         <button
                           key={driver.driver_id}
                           onClick={() => handleAddDriver(driver.driver_id)}
-                          className="w-full text-left p-3 hover:bg-blue-50 hover:border-blue-200 rounded-lg border border-gray-200 transition-colors group"
                           disabled={setScheduleMutation.isPending}
+                          style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            padding: '12px',
+                            backgroundColor: 'white',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '8px',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            width: '100%'
+                          }}
+                          onMouseOver={(e) => {
+                            e.target.style.backgroundColor = '#EBF8FF';
+                            e.target.style.borderColor = '#BFDBFE';
+                          }}
+                          onMouseOut={(e) => {
+                            e.target.style.backgroundColor = 'white';
+                            e.target.style.borderColor = '#E5E7EB';
+                          }}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <Plus size={16} className="text-blue-600 group-hover:text-blue-700" />
-                              <div>
-                                <div className="font-medium text-gray-900">{driver.driver_name}</div>
-                                {driver.phone && <div className="text-sm text-gray-600">{driver.phone}</div>}
-                              </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <Plus size={16} style={{ color: '#3B82F6' }} />
+                            <div>
+                              <div style={{ fontWeight: '500', color: '#111827' }}>{driver.driver_name}</div>
+                              {driver.phone && <div style={{ fontSize: '14px', color: '#6B7280' }}>{driver.phone}</div>}
                             </div>
-                            <span className="text-xs text-blue-600 group-hover:text-blue-700 font-medium">Add</span>
                           </div>
+                          <span style={{ fontSize: '12px', color: '#3B82F6', fontWeight: '500' }}>Add</span>
                         </button>
                       ))}
                     </div>
@@ -282,6 +380,13 @@ export default function DriverSchedulePage() {
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
