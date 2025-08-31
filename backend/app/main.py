@@ -1,8 +1,12 @@
 import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
 from fastapi.staticfiles import StaticFiles
+
+# Load environment variables first
+load_dotenv()
 
 from .core.config import settings, cors_origins_list
 from .routers import auth as auth_router

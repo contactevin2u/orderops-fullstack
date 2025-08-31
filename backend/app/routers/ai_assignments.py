@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.auth.deps import require_roles
-from app.models.user import Role
+from app.auth.firebase import get_current_admin_user
 from app.db import get_session
 from app.models.user import User
 from app.services.ai_assignment_service import AIAssignmentService
@@ -42,7 +41,7 @@ class ApplyAssignmentRequest(BaseModel):
 
 @router.get("/suggestions", response_model=AssignmentSuggestionsResponse)
 async def get_assignment_suggestions(
-    current_user: User = Depends(require_roles(Role.ADMIN)),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
     """Get AI-powered assignment suggestions for pending orders"""
@@ -81,7 +80,7 @@ async def get_assignment_suggestions(
 @router.post("/apply")
 async def apply_assignment(
     request: ApplyAssignmentRequest,
-    current_user: User = Depends(require_roles(Role.ADMIN)),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
     """Apply a suggested assignment (create trip for driver-order pair)"""
@@ -140,7 +139,7 @@ async def apply_assignment(
 
 @router.get("/available-drivers")
 async def get_available_drivers(
-    current_user: User = Depends(require_roles(Role.ADMIN)),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
     """Get all drivers currently clocked in and available for assignment"""
@@ -162,7 +161,7 @@ async def get_available_drivers(
 
 @router.get("/pending-orders")
 async def get_pending_orders(
-    current_user: User = Depends(require_roles(Role.ADMIN)),
+    current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
     """Get all orders pending assignment"""

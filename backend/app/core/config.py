@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     JWT_SECRET: str = Field(env="JWT_SECRET")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     COOKIE_SECURE: bool = True
+    
+    # Firebase
+    FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
+    ADMIN_EMAILS: Optional[str] = None
 
     class Config:
         env_file = ".env"
