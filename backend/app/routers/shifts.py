@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.auth.firebase import get_current_driver
-from app.database import get_db
+from app.db import get_session
 from app.models.driver import Driver
 from app.models.driver_shift import DriverShift
 from app.models.commission_entry import CommissionEntry
@@ -80,7 +80,7 @@ class ShiftSummaryResponse(BaseModel):
 async def clock_in(
     request: ClockInRequest,
     current_driver: Driver = Depends(get_current_driver),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """Clock in driver at specified location"""
     shift_service = ShiftService(db)
@@ -104,7 +104,7 @@ async def clock_in(
 async def clock_out(
     request: ClockOutRequest,
     current_driver: Driver = Depends(get_current_driver),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """Clock out driver at specified location"""
     shift_service = ShiftService(db)
@@ -128,7 +128,7 @@ async def clock_out(
 @router.get("/active", response_model=Optional[ShiftResponse])
 async def get_active_shift(
     current_driver: Driver = Depends(get_current_driver),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """Get current active shift for driver"""
     shift_service = ShiftService(db)
@@ -141,7 +141,7 @@ async def get_shift_history(
     limit: int = 10,
     include_active: bool = True,
     current_driver: Driver = Depends(get_current_driver),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """Get driver's shift history"""
     shift_service = ShiftService(db)
@@ -157,7 +157,7 @@ async def get_shift_history(
 async def get_shift_summary(
     shift_id: int,
     current_driver: Driver = Depends(get_current_driver),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """Get detailed shift summary including commission breakdown"""
     shift_service = ShiftService(db)
@@ -189,7 +189,7 @@ async def get_shift_summary(
 @router.get("/status")
 async def get_shift_status(
     current_driver: Driver = Depends(get_current_driver),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_session)
 ):
     """Get driver's current shift status and basic info"""
     shift_service = ShiftService(db)
