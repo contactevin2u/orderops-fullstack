@@ -391,26 +391,50 @@ def assign_order(
     db: Session = Depends(get_session),
     current_user: User = Depends(require_roles(Role.ADMIN, Role.CASHIER)),
 ):
+    from datetime import date
+    from ..models.driver_route import DriverRoute
+    from sqlalchemy import and_
+    
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
     driver = db.get(Driver, body.driver_id)
     if not driver:
         raise HTTPException(404, "Driver not found")
+    
+    # Get or create daily route using shared utility
+    from ..services.unified_assignment_service import get_or_create_daily_route
+    today = date.today()
+    route, route_created = get_or_create_daily_route(db, driver.id, today)
+    
     trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
     if trip:
         if trip.status in {"DELIVERED", "SUCCESS"}:
             raise HTTPException(400, "Delivered orders cannot be reassigned")
         trip.driver_id = driver.id
+        trip.route_id = route.id
         trip.status = "ASSIGNED"
     else:
-        trip = Trip(order_id=order.id, driver_id=driver.id, status="ASSIGNED")
+        trip = Trip(
+            order_id=order.id, 
+            driver_id=driver.id, 
+            route_id=route.id,
+            status="ASSIGNED"
+        )
         db.add(trip)
+    
+    # Don't change order.status - follow manual pattern
     db.commit()
     db.refresh(trip)
-    log_action(db, current_user, "order.assign_driver", f"order_id={order.id},driver_id={driver.id}")
+    log_action(db, current_user, "order.assign_driver", f"order_id={order.id},driver_id={driver.id},route_id={route.id}")
     notify_order_assigned(db, driver.id, order)
-    return envelope({"order_id": order.id, "driver_id": driver.id, "trip_id": trip.id})
+    return envelope({
+        "order_id": order.id, 
+        "driver_id": driver.id, 
+        "trip_id": trip.id,
+        "route_id": route.id,
+        "route_created": route_created
+    })
 
 
 @router.post("/{order_id}/assign-second-driver", response_model=dict)

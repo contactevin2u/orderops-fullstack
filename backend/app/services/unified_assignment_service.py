@@ -12,6 +12,44 @@ from app.models.trip import Trip
 from app.models.driver_route import DriverRoute
 from app.services.smart_assignment_service import SmartAssignmentService
 
+# Shared route creation utility
+def get_or_create_daily_route(db: Session, driver_id: int, route_date: date) -> Tuple[DriverRoute, bool]:
+    """
+    Shared utility to get or create daily route for a driver.
+    Returns (route, was_created)
+    """
+    # Check if driver already has a route for the given date
+    existing_route = (
+        db.query(DriverRoute)
+        .filter(
+            and_(
+                DriverRoute.driver_id == driver_id,
+                DriverRoute.route_date == route_date
+            )
+        )
+        .one_or_none()
+    )
+    
+    if existing_route:
+        return existing_route, False
+    
+    # Create new daily route
+    driver = db.get(Driver, driver_id)
+    route_name = f"{driver.name or 'Driver'} - {route_date.strftime('%b %d')}"
+    
+    new_route = DriverRoute(
+        driver_id=driver_id,
+        route_date=route_date,
+        name=route_name,
+        notes=f"Auto-created route for {driver.name or f'Driver {driver_id}'}"
+    )
+    
+    db.add(new_route)
+    db.flush()  # Get the ID
+    
+    logger.info(f"Created new route {new_route.id} for driver {driver_id} on {route_date}")
+    return new_route, True
+
 logger = logging.getLogger(__name__)
 
 
@@ -84,12 +122,8 @@ class UnifiedAssignmentService:
         driver_id = suggestion["driver_id"]
         today = date.today()
         
-        # Check if route already exists before creating
-        existing_route = self._get_existing_daily_route(driver_id, today)
-        route_created = existing_route is None
-        
-        # Get or create route for this driver today
-        route = self._get_or_create_daily_route(driver_id, today)
+        # Get or create route using shared utility
+        route, route_created = get_or_create_daily_route(self.db, driver_id, today)
         
         # Create/Update trip
         order = self.db.get(Order, order_id)
@@ -117,7 +151,8 @@ class UnifiedAssignmentService:
             )
             self.db.add(trip)
         
-        order.status = "ASSIGNED"
+        # Don't change order.status - follow manual assignment pattern
+        # Only the trip.status = "ASSIGNED" matters
         
         return {
             "assignment": {
@@ -137,52 +172,6 @@ class UnifiedAssignmentService:
             }
         }
 
-    def _get_existing_daily_route(self, driver_id: int, route_date: date) -> Optional[DriverRoute]:
-        """Check if driver already has a route for the given date"""
-        return (
-            self.db.query(DriverRoute)
-            .filter(
-                and_(
-                    DriverRoute.driver_id == driver_id,
-                    DriverRoute.route_date == route_date
-                )
-            )
-            .one_or_none()
-        )
-
-    def _get_or_create_daily_route(self, driver_id: int, route_date: date) -> DriverRoute:
-        """Get existing route for driver today, or create a new one"""
-        # Check if driver already has a route for today
-        existing_route = (
-            self.db.query(DriverRoute)
-            .filter(
-                and_(
-                    DriverRoute.driver_id == driver_id,
-                    DriverRoute.route_date == route_date
-                )
-            )
-            .one_or_none()
-        )
-        
-        if existing_route:
-            return existing_route
-        
-        # Create new daily route
-        driver = self.db.get(Driver, driver_id)
-        route_name = f"{driver.name or 'Driver'} - {route_date.strftime('%b %d')}"
-        
-        new_route = DriverRoute(
-            driver_id=driver_id,
-            route_date=route_date,
-            name=route_name,
-            notes=f"Auto-created route for {driver.name or f'Driver {driver_id}'}"
-        )
-        
-        self.db.add(new_route)
-        self.db.flush()  # Get the ID
-        
-        logger.info(f"Created new route {new_route.id} for driver {driver_id} on {route_date}")
-        return new_route
 
     def get_on_hold_orders(self) -> List[Dict[str, Any]]:
         """Get orders that are on hold and need customer delivery date input"""
