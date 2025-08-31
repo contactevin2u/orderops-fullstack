@@ -22,7 +22,7 @@ from ..utils.storage import save_pod_image
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
-def _order_to_driver_out(order: Order, status: str, trip: Trip = None) -> dict:
+def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_driver_id: int = None) -> dict:
     # delivery_date may be datetime or date
     dd = None
     if getattr(order, "delivery_date", None):
@@ -62,31 +62,40 @@ def _order_to_driver_out(order: Order, status: str, trip: Trip = None) -> dict:
             "map_url": getattr(cust, "map_url", None),
         }
 
-    # Calculate commission information
+    # Calculate commission information for the specific driver
     commission_info = None
-    if trip and status.lower() == "delivered":
-        # Check if commission already exists for this trip
-        existing_commission = None
+    if trip and status.lower() == "delivered" and current_driver_id:
+        # Find commission record for this specific driver
+        driver_commission = None
         for comm in getattr(trip, "commissions", []):
-            existing_commission = comm
-            break
+            if comm.driver_id == current_driver_id:
+                driver_commission = comm
+                break
         
-        if existing_commission:
+        if driver_commission:
+            # Show actual commission for this driver
+            driver_role = "secondary" if current_driver_id == trip.driver_id_2 else "primary"
             commission_info = {
-                "amount": str(existing_commission.computed_amount),
-                "status": "actualized" if existing_commission.actualized_at else "pending",
-                "scheme": existing_commission.scheme,
-                "rate": str(existing_commission.rate)
+                "amount": str(driver_commission.computed_amount),
+                "status": "actualized" if driver_commission.actualized_at else "pending",
+                "scheme": driver_commission.scheme,
+                "rate": str(driver_commission.rate),
+                "role": driver_role
             }
         else:
-            # Calculate potential commission (basic 10% rate as example)
+            # Calculate potential commission split for this driver
             order_total = getattr(order, "total", Decimal("0")) or Decimal("0")
-            commission_amount = order_total * Decimal("0.10")  # 10% commission
+            total_commission_rate = Decimal("0.10")  # 10% total commission
+            driver_count = len(trip.driver_ids) if hasattr(trip, 'driver_ids') else 1
+            commission_per_driver = (order_total * total_commission_rate) / driver_count
+            
+            driver_role = "secondary" if current_driver_id == trip.driver_id_2 else "primary"
             commission_info = {
-                "amount": str(commission_amount),
+                "amount": str(commission_per_driver),
                 "status": "pending",
-                "scheme": "percentage",
-                "rate": "0.10"
+                "scheme": "percentage_split",
+                "rate": str(total_commission_rate / driver_count),
+                "role": driver_role
             }
 
     return {
@@ -189,7 +198,12 @@ def get_driver_jobs(
             print(f"DEBUG: Order {order.id} - Order status: {order.status}, Trip status: {trip.status}")
     
     return [
-        _order_to_driver_out(order, trips_dict.get(order.id).status.lower() if trips_dict.get(order.id) else order.status.lower(), trips_dict.get(order.id))
+        _order_to_driver_out(
+            order, 
+            trips_dict.get(order.id).status.lower() if trips_dict.get(order.id) else order.status.lower(), 
+            trips_dict.get(order.id),
+            driver.id
+        )
         for order in orders
     ]
 
@@ -223,7 +237,7 @@ def get_driver_job(
     trip = db.query(Trip).filter(Trip.order_id == order.id, Trip.driver_id == driver.id).first()
     trip_status = trip.status.lower() if trip else order.status.lower()
     
-    return _order_to_driver_out(order, trip_status, trip)
+    return _order_to_driver_out(order, trip_status, trip, driver.id)
 
 @router.post("/locations")
 def post_driver_locations(
@@ -275,7 +289,7 @@ def list_assigned_orders(driver=Depends(driver_auth), db: Session = Depends(get_
     ).all()
     out = []
     for trip, order in rows:
-        out.append(_order_to_driver_out(order, trip.status, trip))
+        out.append(_order_to_driver_out(order, trip.status, trip, driver.id))
     return out
 
 
@@ -291,7 +305,7 @@ def get_assigned_order(order_id: int, driver=Depends(driver_auth), db: Session =
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    return _order_to_driver_out(order, trip.status, trip)
+    return _order_to_driver_out(order, trip.status, trip, driver.id)
 
 
 @router.post("/orders/{order_id}/pod-photo", response_model=dict)
@@ -396,7 +410,7 @@ def update_order_status(
     db.add(TripEvent(trip_id=trip.id, status=payload.status))
     order = db.get(Order, order_id)
     db.commit()
-    return _order_to_driver_out(order, trip.status, trip)
+    return _order_to_driver_out(order, trip.status, trip, driver.id)
 
 
 @router.get("/commissions", response_model=list[CommissionMonthOut])

@@ -212,7 +212,7 @@ private fun OrderCard(
                     ) {
                         Column {
                             Text(
-                                text = "Commission",
+                                text = "Commission${commission.role?.let { " ($it)" } ?: ""}",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Medium
                             )

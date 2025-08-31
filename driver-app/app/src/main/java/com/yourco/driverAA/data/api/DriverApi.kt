@@ -67,7 +67,8 @@ data class CommissionDto(
     val amount: String,
     val status: String, // "pending" or "actualized"
     val scheme: String,
-    val rate: String
+    val rate: String,
+    val role: String? = null // "primary" or "secondary"
 )
 
 @Serializable
