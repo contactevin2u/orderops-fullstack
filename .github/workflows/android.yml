@@ -40,6 +40,14 @@ jobs:
         working-directory: driver-app
         run: echo API_BASE=$API_BASE >> local.properties
 
+      - name: Generate Signing Report (to get SHA-1 for Firebase)
+        uses: gradle/gradle-build-action@v3
+        with:
+          gradle-version: 8.9
+          build-root-directory: driver-app
+          arguments: "signingReport"
+        env:
+          GRADLE_OPTS: "-Xmx2g"
 
       - name: (Optional) Materialize Firebase service account
         if: ${{ env.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
