@@ -67,7 +67,7 @@ class ClockInOutViewModel @Inject constructor(
                     isLoading = false,
                     isClocked = response.is_clocked_in,
                     clockInTime = response.clock_in_at?.let { timeFormatter.format(Date(it * 1000)) },
-                    hoursWorked = response.hours_worked,
+                    hoursWorked = response.hours_worked?.toFloat(),
                     isOutstation = response.is_outstation ?: false,
                     currentLocation = response.location,
                     shiftId = response.shift_id

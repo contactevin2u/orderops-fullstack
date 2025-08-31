@@ -91,7 +91,7 @@ class WorkingHoursViewModel @Inject constructor(
                 
                 val monthEarnings = shifts.filter { shift ->
                     shift.clock_in_at >= monthStart.timeInMillis / 1000
-                }.sumOf { shift.outstation_allowance_amount }.toFloat()
+                }.sumOf { it.outstation_allowance_amount }.toFloat()
                 
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
