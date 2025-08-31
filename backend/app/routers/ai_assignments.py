@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.auth.firebase import get_current_admin_user
 from app.db import get_session
 from app.models.user import User
-from app.services.ai_assignment_service import AIAssignmentService
+from app.services.smart_assignment_service import SmartAssignmentService
 
 
 router = APIRouter(prefix="/ai-assignments", tags=["ai-assignments"])
@@ -47,7 +47,7 @@ async def get_assignment_suggestions(
     """Get AI-powered assignment suggestions for pending orders"""
     try:
         openai_api_key = os.getenv("OPENAI_API_KEY")
-        ai_service = AIAssignmentService(db, openai_api_key)
+        ai_service = SmartAssignmentService(db, openai_api_key)
         
         result = ai_service.suggest_assignments()
         
@@ -203,7 +203,7 @@ async def accept_all_suggestions(
         
         # Get AI suggestions
         openai_api_key = os.getenv("OPENAI_API_KEY")
-        ai_service = AIAssignmentService(db, openai_api_key)
+        ai_service = SmartAssignmentService(db, openai_api_key)
         result = ai_service.suggest_assignments()
         
         if not result["suggestions"]:
