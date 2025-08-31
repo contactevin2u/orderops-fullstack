@@ -17,7 +17,7 @@ from app.config.clock_config import HOME_BASE_LAT, HOME_BASE_LNG
 logger = logging.getLogger(__name__)
 
 try:
-    import openai
+    from openai import OpenAI
     OPENAI_AVAILABLE = True
 except ImportError:
     OPENAI_AVAILABLE = False
@@ -28,9 +28,10 @@ class AIAssignmentService:
     def __init__(self, db: Session, openai_api_key: Optional[str] = None):
         self.db = db
         if openai_api_key and OPENAI_AVAILABLE:
-            openai.api_key = openai_api_key
+            self.openai_client = OpenAI(api_key=openai_api_key)
             self.ai_enabled = True
         else:
+            self.openai_client = None
             self.ai_enabled = False
 
     def get_available_drivers(self) -> List[Dict[str, Any]]:
@@ -107,17 +108,19 @@ class AIAssignmentService:
         if not available_drivers:
             return {
                 "suggestions": [],
-                "message": "No drivers currently clocked in",
+                "method": "no_drivers",
                 "available_drivers_count": 0,
-                "pending_orders_count": len(pending_orders)
+                "pending_orders_count": len(pending_orders),
+                "ai_reasoning": "No drivers currently clocked in"
             }
 
         if not pending_orders:
             return {
                 "suggestions": [],
-                "message": "No pending orders to assign",
+                "method": "no_orders",
                 "available_drivers_count": len(available_drivers),
-                "pending_orders_count": 0
+                "pending_orders_count": 0,
+                "ai_reasoning": "No pending orders to assign"
             }
 
         if self.ai_enabled:
@@ -130,7 +133,7 @@ class AIAssignmentService:
         try:
             prompt = self._build_assignment_prompt(drivers, orders)
             
-            response = openai.ChatCompletion.create(
+            response = self.openai_client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {
