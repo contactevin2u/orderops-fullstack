@@ -1,181 +1,262 @@
 import Link from 'next/link';
 import React from 'react';
 import { 
-  Truck as TruckIcon, 
-  Map as MapIcon, 
-  DollarSign as CurrencyDollarIcon, 
-  Sparkles as SparklesIcon, 
-  ClipboardList as ClipboardDocumentListIcon,
-  Users as UserGroupIcon,
-  Calendar as CalendarDaysIcon,
-  ArrowRight as ArrowRightIcon,
-  CheckCircle as CheckCircleIcon
+  Truck, 
+  Map, 
+  DollarSign, 
+  Sparkles, 
+  ClipboardList,
+  Users,
+  Calendar,
+  ArrowRight,
+  Zap,
+  BarChart3,
+  Settings,
+  Clock
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 
 export default function AdminIndexPage() {
-  const sections = [
+  const quickActions = [
     {
-      title: 'Driver Operations',
-      description: 'Manage your delivery workforce and schedules',
-      icon: <TruckIcon className="h-6 w-6" />,
-      color: 'from-blue-500 to-cyan-500',
+      title: 'Auto-Assign Orders',
+      description: 'AI-powered order assignment',
+      href: '/admin/unified-assignments',
+      icon: Sparkles,
+      color: 'bg-gradient-to-br from-purple-500 to-indigo-600',
+      badge: 'AI Powered'
+    },
+    {
+      title: 'Schedule Drivers',
+      description: 'Manage daily operations',
+      href: '/admin/driver-schedule',
+      icon: Calendar,
+      color: 'bg-gradient-to-br from-blue-500 to-cyan-600',
+      badge: 'Today'
+    },
+    {
+      title: 'Driver Management',
+      description: 'Manage your workforce',
+      href: '/admin/drivers',
+      icon: Truck,
+      color: 'bg-gradient-to-br from-emerald-500 to-teal-600',
+      badge: 'Active'
+    },
+    {
+      title: 'Route Planning',
+      description: 'Optimize delivery routes',
+      href: '/admin/routes',
+      icon: Map,
+      color: 'bg-gradient-to-br from-orange-500 to-red-600',
+      badge: 'Live'
+    }
+  ];
+
+  const modules = [
+    {
+      category: 'Operations',
       items: [
-        { 
-          href: '/admin/drivers', 
-          label: 'Driver Management', 
-          description: 'Create accounts and manage driver profiles',
-          icon: <TruckIcon className="h-5 w-5" />
+        {
+          title: 'Driver Management',
+          description: 'Create and manage driver accounts',
+          href: '/admin/drivers',
+          icon: Truck
         },
-        { 
-          href: '/admin/driver-schedule', 
-          label: 'Driver Schedule', 
-          description: 'Schedule drivers for daily operations',
-          icon: <CalendarDaysIcon className="h-5 w-5" />
+        {
+          title: 'Driver Schedule',
+          description: 'Set daily availability patterns',
+          href: '/admin/driver-schedule',
+          icon: Calendar
         },
-        { 
-          href: '/admin/routes', 
-          label: 'Route Planning', 
-          description: 'Create and optimize delivery routes',
-          icon: <MapIcon className="h-5 w-5" />
+        {
+          title: 'Route Planning',
+          description: 'Create optimized delivery routes',
+          href: '/admin/routes',
+          icon: Map
         },
-        { 
-          href: '/admin/driver-commissions', 
-          label: 'Commission Reports', 
+        {
+          title: 'Manual Assignment',
+          description: 'Assign orders to specific drivers',
+          href: '/admin/assign',
+          icon: ClipboardList
+        }
+      ]
+    },
+    {
+      category: 'Analytics',
+      items: [
+        {
+          title: 'Commission Reports',
           description: 'Track driver earnings and performance',
-          icon: <CurrencyDollarIcon className="h-5 w-5" />
+          href: '/admin/driver-commissions',
+          icon: DollarSign
         },
+        {
+          title: 'Performance Analytics',
+          description: 'Monitor delivery metrics',
+          href: '/admin/analytics',
+          icon: BarChart3
+        }
       ]
     },
     {
-      title: 'Order Assignment', 
-      description: 'Unified workflow for automated and manual assignment',
-      icon: <SparklesIcon className="h-6 w-6" />,
-      color: 'from-purple-500 to-pink-500',
+      category: 'Administration',
       items: [
-        { 
-          href: '/admin/unified-assignments', 
-          label: 'Unified Assignment Workflow', 
-          description: 'Auto-assign orders with AI and create routes automatically',
-          icon: <SparklesIcon className="h-5 w-5" />
+        {
+          title: 'User Management',
+          description: 'Manage admin and cashier accounts',
+          href: '/admin/users',
+          icon: Users
         },
-        { 
-          href: '/admin/assign', 
-          label: 'Manual Assignment', 
-          description: 'Manually assign specific orders when needed',
-          icon: <ClipboardDocumentListIcon className="h-5 w-5" />
-        },
-      ]
-    },
-    {
-      title: 'Administration',
-      description: 'System settings and user management',
-      icon: <UserGroupIcon className="h-6 w-6" />,
-      color: 'from-emerald-500 to-teal-500',
-      items: [
-        { 
-          href: '/admin/users', 
-          label: 'User Accounts', 
-          description: 'Create admin and cashier accounts',
-          icon: <UserGroupIcon className="h-5 w-5" />
-        },
+        {
+          title: 'System Settings',
+          description: 'Configure application settings',
+          href: '/admin/settings',
+          icon: Settings
+        }
       ]
     }
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Welcome Header */}
-      <div className="mb-12 text-center">
-        <div className="mx-auto w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mb-6">
-          <TruckIcon className="h-10 w-10 text-white" />
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                OrderOps Dashboard
+              </h1>
+              <p className="mt-2 text-gray-600 dark:text-gray-300">
+                Manage your delivery operations with AI-powered efficiency
+              </p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400">
+                <Clock className="h-4 w-4" />
+                <span>Last updated: {new Date().toLocaleDateString()}</span>
+              </div>
+            </div>
+          </div>
         </div>
-        <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-          Welcome to OrderOps
-        </h1>
-        <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-          Your complete delivery management system. Schedule drivers, assign orders, and optimize routes with AI-powered intelligence.
-        </p>
       </div>
 
-      {/* Feature Sections */}
-      <div className="space-y-12">
-        {sections.map((section) => (
-          <div key={section.title} className="relative">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {/* Section Header */}
-              <div className={`bg-gradient-to-r ${section.color} px-6 py-8 text-white`}>
-                <div className="flex items-center gap-4 mb-3">
-                  {section.icon}
-                  <h2 className="text-2xl font-bold">{section.title}</h2>
-                </div>
-                <p className="text-white/90 text-lg">{section.description}</p>
-              </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Actions */}
+        <div className="mb-12">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  key={index}
+                  href={action.href}
+                  className="group relative overflow-hidden rounded-xl p-6 text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-xl"
+                >
+                  <div className={`absolute inset-0 ${action.color}`} />
+                  <div className="relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <Icon className="h-8 w-8" />
+                      <span className="px-2 py-1 bg-white/20 rounded-full text-xs font-medium">
+                        {action.badge}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">{action.title}</h3>
+                    <p className="text-white/80 text-sm">{action.description}</p>
+                    <ArrowRight className="h-4 w-4 mt-4 transition-transform group-hover:translate-x-1" />
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
 
-              {/* Cards Grid */}
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {section.items.map((item) => (
+        {/* Modules */}
+        <div className="space-y-8">
+          {modules.map((module, moduleIndex) => (
+            <div key={moduleIndex}>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                {module.category}
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {module.items.map((item, itemIndex) => {
+                  const Icon = item.icon;
+                  return (
                     <Link
-                      key={item.href}
+                      key={itemIndex}
                       href={item.href}
-                      className="group relative bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-500 hover:bg-white dark:hover:bg-gray-700 transition-all duration-200 hover:shadow-md"
+                      className="group bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 transition-all duration-200 hover:border-blue-500 dark:hover:border-blue-400 hover:shadow-lg"
                     >
-                      <div className="flex items-start gap-4">
-                        <div className="p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                          {item.icon}
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors">
+                            <Icon className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                          </div>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-2">
-                            {item.label}
+                          <h3 className="text-base font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            {item.title}
                           </h3>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                             {item.description}
                           </p>
                         </div>
-                        <ArrowRightIcon className="h-5 w-5 text-gray-400 group-hover:text-blue-500 transition-colors opacity-0 group-hover:opacity-100 transform translate-x-1 group-hover:translate-x-0" />
+                        <div className="flex-shrink-0">
+                          <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500 transition-all duration-200 group-hover:translate-x-1" />
+                        </div>
                       </div>
                     </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick Start Guide */}
-      <div className="mt-16 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-8 border border-blue-200 dark:border-blue-800">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-blue-500 rounded-lg">
-            <CheckCircleIcon className="h-6 w-6 text-white" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Quick Start Guide
-          </h2>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            { step: '1', title: 'Create Drivers', desc: 'Add driver accounts and profiles' },
-            { step: '2', title: 'Schedule Drivers', desc: 'Set daily driver availability' },
-            { step: '3', title: 'Assign Orders', desc: 'Use AI or manual assignment' },
-            { step: '4', title: 'Track Performance', desc: 'Monitor commissions and routes' }
-          ].map((item, index) => (
-            <div key={index} className="flex items-start gap-4">
-              <div className="w-8 h-8 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
-                {item.step}
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 dark:text-white mb-1">
-                  {item.title}
-                </h3>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
-                  {item.desc}
-                </p>
+                  );
+                })}
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Getting Started */}
+        <div className="mt-12 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-8 border border-blue-200 dark:border-blue-800">
+          <div className="flex items-center space-x-3 mb-6">
+            <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-blue-500">
+              <Zap className="h-4 w-4 text-white" />
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Getting Started
+            </h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              { step: '01', title: 'Add Drivers', desc: 'Create driver accounts and profiles' },
+              { step: '02', title: 'Set Schedules', desc: 'Define daily driver availability' },
+              { step: '03', title: 'Auto-Assign', desc: 'Let AI handle order assignments' },
+              { step: '04', title: 'Monitor Progress', desc: 'Track performance and earnings' }
+            ].map((item, index) => (
+              <div key={index} className="relative">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white text-sm font-bold">
+                      {item.step}
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                      {item.desc}
+                    </p>
+                  </div>
+                </div>
+                {index < 3 && (
+                  <div className="hidden lg:block absolute top-4 left-full w-full h-0.5 bg-blue-200 dark:bg-blue-800 -ml-4 -mr-4" />
+                )}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>

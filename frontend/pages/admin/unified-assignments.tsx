@@ -3,13 +3,21 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { 
-  Sparkles as SparklesIcon, 
-  CheckCircle as CheckCircleIcon, 
-  AlertTriangle as ExclamationTriangleIcon,
-  Truck as TruckIcon,
-  Clock as ClockIcon,
-  MapPin as MapPinIcon,
-  ChevronRight as ChevronRightIcon
+  Sparkles, 
+  CheckCircle, 
+  AlertTriangle,
+  Truck,
+  Clock,
+  MapPin,
+  ChevronRight,
+  Zap,
+  BarChart3,
+  RefreshCw,
+  Activity,
+  TrendingUp,
+  Users,
+  Package,
+  Settings
 } from 'lucide-react';
 
 interface Assignment {
@@ -71,7 +79,7 @@ export default function UnifiedAssignmentsPage() {
   const queryClient = useQueryClient();
 
   // Fetch on-hold orders
-  const { data: onHoldData } = useQuery({
+  const { data: onHoldData, isLoading: onHoldLoading } = useQuery({
     queryKey: ['unified-assignments', 'on-hold'],
     queryFn: async () => {
       const response = await fetch('/_api/unified-assignments/on-hold-orders');
@@ -81,7 +89,7 @@ export default function UnifiedAssignmentsPage() {
   });
 
   // Fetch manual edit summary
-  const { data: editSummary } = useQuery({
+  const { data: editSummary, isLoading: summaryLoading } = useQuery({
     queryKey: ['unified-assignments', 'summary'],
     queryFn: async () => {
       const response = await fetch('/_api/unified-assignments/manual-edit-summary');
@@ -115,249 +123,365 @@ export default function UnifiedAssignmentsPage() {
     }
   };
 
+  const refreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ['unified-assignments'] });
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
-            <SparklesIcon className="h-6 w-6 text-white" />
+      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  Auto Assignment Center
+                </h1>
+                <p className="mt-1 text-gray-600 dark:text-gray-300">
+                  AI-powered order assignment and route optimization
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={refreshData}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </button>
+              <button
+                onClick={handleAutoAssign}
+                disabled={isAssigning}
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                {isAssigning ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Auto-Assign Orders
+                  </>
+                )}
+              </button>
+            </div>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Unified Assignment Workflow
-          </h1>
         </div>
-        <p className="text-gray-600 dark:text-gray-300">
-          Automate order assignment with smart suggestions and route creation. Manual editing available when needed.
-        </p>
       </div>
 
-      {/* Main Auto-Assign Section */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 mb-8">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                Auto-Assignment Engine
-              </h2>
-              <p className="text-gray-600 dark:text-gray-300">
-                Automatically assign all new orders using AI optimization and create delivery routes
-              </p>
-            </div>
-            <button
-              onClick={handleAutoAssign}
-              disabled={isAssigning}
-              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-lg hover:from-blue-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
-            >
-              {isAssigning ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  Assigning...
-                </>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Success/Error Result */}
+        {lastResult && (
+          <div className={`mb-8 rounded-xl border p-6 ${
+            lastResult.success 
+              ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
+              : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
+          }`}>
+            <div className="flex items-start space-x-3">
+              {lastResult.success ? (
+                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
               ) : (
-                <>
-                  <SparklesIcon className="h-5 w-5" />
-                  Auto-Assign All Orders
-                </>
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
               )}
-            </button>
-          </div>
-
-          {/* Last Result */}
-          {lastResult && (
-            <div className={`p-4 rounded-lg border ${lastResult.success 
-              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                {lastResult.success ? (
-                  <CheckCircleIcon className="h-5 w-5 text-green-600 dark:text-green-400" />
-                ) : (
-                  <ExclamationTriangleIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
-                )}
-                <span className={`font-medium ${lastResult.success 
-                  ? 'text-green-800 dark:text-green-200' 
-                  : 'text-red-800 dark:text-red-200'
+              <div className="flex-1">
+                <h3 className={`text-sm font-medium ${
+                  lastResult.success 
+                    ? 'text-green-800 dark:text-green-200' 
+                    : 'text-red-800 dark:text-red-200'
                 }`}>
                   {lastResult.message}
+                </h3>
+                
+                {lastResult.success && (
+                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {lastResult.assigned_count}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                        Orders Assigned
+                      </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        {lastResult.routes_created}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                        Routes Created
+                      </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                        {lastResult.routes.length}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                        Active Routes
+                      </div>
+                    </div>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
+                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                        {lastResult.method === 'openai_optimized' ? 'AI' : 'Distance'}
+                      </div>
+                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
+                        Method Used
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                  <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  On-Hold Orders
+                </h3>
+                <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {onHoldLoading ? '...' : onHoldData?.count || 0}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
+                  <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Active Routes
+                </h3>
+                <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {summaryLoading ? '...' : editSummary?.routes_count || 0}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30">
+                  <Package className="h-5 w-5 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                  Total Orders
+                </h3>
+                <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
+                  {summaryLoading ? '...' : editSummary?.total_orders || 0}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          {/* On-Hold Orders */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Orders Requiring Attention
+                </h3>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                  {onHoldData?.count || 0} pending
                 </span>
               </div>
-              
-              {lastResult.success && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                      {lastResult.assigned_count}
+            </div>
+            <div className="p-6">
+              {onHoldData?.on_hold_orders?.length > 0 ? (
+                <div className="space-y-4">
+                  {onHoldData.on_hold_orders.slice(0, 5).map((order: OnHoldOrder) => (
+                    <div key={order.order_id} className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800">
+                      <div>
+                        <div className="font-medium text-gray-900 dark:text-white">
+                          Order #{order.order_code}
+                        </div>
+                        <div className="text-sm text-gray-600 dark:text-gray-300">
+                          {order.customer_name}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          RM{order.total}
+                        </div>
+                        <div className="text-xs text-amber-600 dark:text-amber-400">
+                          Awaiting customer date
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Orders Assigned</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {lastResult.routes_created}
+                  ))}
+                  {onHoldData.on_hold_orders.length > 5 && (
+                    <div className="text-center py-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        +{onHoldData.on_hold_orders.length - 5} more orders
+                      </span>
                     </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Routes Created</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                      {lastResult.routes.length}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Active Routes</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-gray-600 dark:text-gray-300">
-                      {lastResult.method === 'openai_optimized' ? 'AI' : 'Distance'}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-300">Method Used</div>
-                  </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No orders on hold
+                  </p>
                 </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* On-Hold Orders */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-          <div className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <ClockIcon className="h-5 w-5 text-amber-500" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                On-Hold Orders
-              </h3>
-              <span className="px-2 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-xs rounded-full">
-                {onHoldData?.count || 0}
-              </span>
+          {/* Active Routes */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Today&apos;s Active Routes
+                </h3>
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
+                  {editSummary?.routes_count || 0} routes
+                </span>
+              </div>
             </div>
-            
-            {onHoldData?.on_hold_orders?.length > 0 ? (
-              <div className="space-y-3">
-                {onHoldData.on_hold_orders.slice(0, 5).map((order: OnHoldOrder) => (
-                  <div key={order.order_id} className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        #{order.order_code}
+            <div className="p-6">
+              {editSummary?.routes?.length > 0 ? (
+                <div className="space-y-4">
+                  {editSummary.routes.slice(0, 5).map((route: any) => (
+                    <div key={route.route_id} className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white text-sm font-medium">
+                            {route.driver_name.charAt(0).toUpperCase()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {route.driver_name}
+                          </div>
+                          <div className="text-sm text-gray-600 dark:text-gray-300">
+                            {route.route_name}
+                          </div>
+                        </div>
                       </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-300">
-                        {order.customer_name}
+                      <div className="text-right">
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          {route.orders_count} orders
+                        </div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400">
+                          {route.can_add_secondary_driver ? 'Available' : 'At capacity'}
+                        </div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        RM{order.total}
-                      </div>
-                      <div className="text-xs text-amber-600 dark:text-amber-400">
-                        Needs date input
-                      </div>
+                  ))}
+                  {editSummary.routes.length > 5 && (
+                    <div className="text-center py-2">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        +{editSummary.routes.length - 5} more routes
+                      </span>
                     </div>
-                  </div>
-                ))}
-                {onHoldData.on_hold_orders.length > 5 && (
-                  <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-                    +{onHoldData.on_hold_orders.length - 5} more orders
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                No orders on hold
-              </div>
-            )}
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 dark:text-gray-400">
+                    No active routes today
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Current Routes Summary */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
-          <div className="p-6">
-            <div className="flex items-center gap-2 mb-4">
-              <TruckIcon className="h-5 w-5 text-blue-500" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Today&apos;s Routes
-              </h3>
-              <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs rounded-full">
-                {editSummary?.routes_count || 0}
-              </span>
-            </div>
-            
-            {editSummary?.routes?.length > 0 ? (
-              <div className="space-y-3">
-                {editSummary.routes.slice(0, 5).map((route: any) => (
-                  <div key={route.route_id} className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                    <div>
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {route.driver_name}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-300">
-                        {route.route_name}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium text-gray-900 dark:text-white">
-                        {route.orders_count} orders
-                      </div>
-                      <div className="text-xs text-blue-600 dark:text-blue-400">
-                        {route.can_add_secondary_driver ? 'Can add helper' : 'Full capacity'}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                {editSummary.routes.length > 5 && (
-                  <div className="text-center text-sm text-gray-500 dark:text-gray-400">
-                    +{editSummary.routes.length - 5} more routes
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                No routes created yet
-              </div>
-            )}
+        {/* Quick Actions */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Manual Management
+            </h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+              Access manual tools when automatic assignment needs adjustment
+            </p>
           </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="mt-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Manual Actions (When Needed)
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link
-            href="/admin/routes"
-            className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
-          >
-            <MapPinIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-            <div>
-              <div className="font-medium text-gray-900 dark:text-white">Edit Routes</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Modify existing routes</div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Link
+                href="/admin/routes"
+                className="group flex items-center p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all duration-200"
+              >
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30">
+                  <MapPin className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                </div>
+                <div className="ml-4 flex-1">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    Manage Routes
+                  </h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Edit and optimize delivery routes
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
+              </Link>
+              
+              <Link
+                href="/admin/assign"
+                className="group flex items-center p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all duration-200"
+              >
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30">
+                  <Users className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                </div>
+                <div className="ml-4 flex-1">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    Manual Assignment
+                  </h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Assign specific orders to drivers
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
+              </Link>
+              
+              <Link
+                href="/admin/driver-schedule"
+                className="group flex items-center p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all duration-200"
+              >
+                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30">
+                  <Calendar className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
+                </div>
+                <div className="ml-4 flex-1">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
+                    Driver Scheduling
+                  </h4>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Set driver availability patterns
+                  </p>
+                </div>
+                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
+              </Link>
             </div>
-            <ChevronRightIcon className="h-4 w-4 text-gray-400 ml-auto" />
-          </Link>
-          
-          <Link
-            href="/admin/assign"
-            className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
-          >
-            <TruckIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-            <div>
-              <div className="font-medium text-gray-900 dark:text-white">Manual Assign</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Assign specific orders</div>
-            </div>
-            <ChevronRightIcon className="h-4 w-4 text-gray-400 ml-auto" />
-          </Link>
-          
-          <Link
-            href="/admin/driver-schedule"
-            className="flex items-center gap-3 p-4 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border border-gray-200 dark:border-gray-600"
-          >
-            <ClockIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
-            <div>
-              <div className="font-medium text-gray-900 dark:text-white">Schedule Drivers</div>
-              <div className="text-sm text-gray-600 dark:text-gray-300">Set availability patterns</div>
-            </div>
-            <ChevronRightIcon className="h-4 w-4 text-gray-400 ml-auto" />
-          </Link>
+          </div>
         </div>
       </div>
     </div>

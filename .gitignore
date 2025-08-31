@@ -1,9 +1,16 @@
+# Frontend
 frontend/node_modules/
 frontend/.next/
 frontend/storybook-static/
+frontend/tsconfig.tsbuildinfo
+
+# Backend
+backend/.venv/
 __pycache__/
 *.pyc
 .env*
+
+# Driver App
 /driver-app/.gradle/
 /driver-app/app/build/
 *.apk
@@ -13,3 +20,13 @@ __pycache__/
 *.jks
 *.so
 google-services.json
+
+# Local development files
+*.local.*
+.claude/settings.local.json
+
+# Documentation and reference files (keep local only)
+WHATSAPP_AUTOMATION.md
+CHATDADDY_REFERENCE.md
+IMPLEMENTATION_NOTES.md
+LOCAL_CONFIG.md
