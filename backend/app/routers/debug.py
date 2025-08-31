@@ -220,3 +220,56 @@ def create_test_drivers(count: int = 3, db: Session = Depends(get_session)):
             "error": str(e),
             "traceback": traceback.format_exc()
         })
+
+@router.get("/simple-driver-test")
+def simple_driver_test(db: Session = Depends(get_session)):
+    """Dead simple driver test - bypass all complex logic"""
+    try:
+        # Test 1: Raw driver count
+        total_count = db.execute(text("SELECT COUNT(*) FROM drivers")).scalar()
+        
+        # Test 2: Simple driver query
+        simple_drivers = db.query(Driver).all()
+        
+        # Test 3: Working /drivers endpoint logic
+        drivers_endpoint_logic = db.query(Driver).filter(Driver.is_active == True).limit(1000).all()
+        
+        # Test 4: AI service instantiation
+        from ..services.ai_assignment_service import AIAssignmentService
+        ai_service = AIAssignmentService(db)
+        
+        result = {
+            "raw_driver_count": total_count,
+            "simple_query_count": len(simple_drivers),
+            "drivers_endpoint_count": len(drivers_endpoint_logic),
+            "ai_service_created": True,
+            "sample_drivers": []
+        }
+        
+        # Get sample driver data
+        for driver in simple_drivers[:3]:
+            result["sample_drivers"].append({
+                "id": driver.id,
+                "name": driver.name,
+                "phone": driver.phone,
+                "firebase_uid": driver.firebase_uid,
+                "is_active": driver.is_active
+            })
+        
+        # Test 5: Try AI service methods individually
+        try:
+            available_drivers = ai_service.get_available_drivers()
+            result["ai_available_drivers_count"] = len(available_drivers)
+            result["ai_available_drivers_error"] = None
+        except Exception as e:
+            result["ai_available_drivers_count"] = "ERROR"
+            result["ai_available_drivers_error"] = str(e)
+            
+        return envelope(result)
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })

@@ -123,14 +123,20 @@ def get_all_drivers_with_schedule(
     if target_date is None:
         target_date = date.today()
         
-    schedule_service = DriverScheduleService(db)
-    scheduled_drivers = schedule_service.get_scheduled_drivers_for_date(target_date)
-    
-    # Get all active drivers
+    # Use EXACT same logic as working /drivers endpoint
     from ..models.driver import Driver
-    all_drivers = db.query(Driver).filter(Driver.is_active == True).all()
+    all_drivers = db.query(Driver).filter(Driver.is_active == True).limit(1000).all()
     
-    scheduled_ids = {d["driver_id"] for d in scheduled_drivers}
+    # Try to get existing schedule data (optional)
+    scheduled_drivers = []
+    scheduled_ids = set()
+    try:
+        schedule_service = DriverScheduleService(db)
+        scheduled_drivers = schedule_service.get_scheduled_drivers_for_date(target_date)
+        scheduled_ids = {d["driver_id"] for d in scheduled_drivers}
+    except Exception as e:
+        # If scheduling fails, just show all drivers as available to schedule
+        scheduled_ids = set()
     
     drivers_with_schedule = []
     for driver in all_drivers:
