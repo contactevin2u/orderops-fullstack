@@ -20,6 +20,8 @@ class Driver(Base):
     )
 
     devices = relationship("DriverDevice", back_populates="driver", cascade="all, delete-orphan")
+    shifts = relationship("DriverShift", back_populates="driver")
+    commission_entries = relationship("CommissionEntry", back_populates="driver")
 
 
 class DriverDevice(Base):

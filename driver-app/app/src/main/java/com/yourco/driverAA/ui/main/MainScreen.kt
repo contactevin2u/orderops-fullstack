@@ -5,17 +5,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainScreen(onJobClick: (String) -> Unit) {
+fun MainScreen(
+    onJobClick: (String) -> Unit,
+    onClockInOutClick: () -> Unit
+) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     
-    val tabs = listOf("Active Orders", "Completed Orders", "Commissions")
-    val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star)
+    val tabs = listOf("Active Orders", "Completed Orders", "Commissions", "Clock In/Out")
+    val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star, Icons.Default.AccessTime)
     
     Column(modifier = Modifier.fillMaxSize()) {
         TabRow(selectedTabIndex = selectedTabIndex) {
@@ -33,6 +37,7 @@ fun MainScreen(onJobClick: (String) -> Unit) {
             0 -> ActiveOrdersContent(onJobClick = onJobClick)
             1 -> CompletedOrdersContent(onJobClick = onJobClick)
             2 -> CommissionsContent()
+            3 -> ClockInOutContent(onClockInOutClick = onClockInOutClick)
         }
     }
 }
@@ -50,4 +55,11 @@ private fun CompletedOrdersContent(onJobClick: (String) -> Unit) {
 @Composable
 private fun CommissionsContent() {
     CommissionsList()
+}
+
+@Composable
+private fun ClockInOutContent(onClockInOutClick: () -> Unit) {
+    LaunchedEffect(Unit) {
+        onClockInOutClick()
+    }
 }

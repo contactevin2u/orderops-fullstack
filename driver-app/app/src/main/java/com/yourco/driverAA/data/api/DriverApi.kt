@@ -34,6 +34,21 @@ interface DriverApi {
     
     @GET("drivers/commissions")
     suspend fun getCommissions(): List<CommissionMonthDto>
+    
+    @POST("drivers/shifts/clock-in")
+    suspend fun clockIn(@Body request: ClockInRequest): ShiftResponse
+    
+    @POST("drivers/shifts/clock-out")
+    suspend fun clockOut(@Body request: ClockOutRequest): ShiftResponse
+    
+    @GET("drivers/shifts/status")
+    suspend fun getShiftStatus(): ShiftStatusResponse
+    
+    @GET("drivers/shifts/active")
+    suspend fun getActiveShift(): ShiftResponse?
+    
+    @GET("drivers/shifts/history")
+    suspend fun getShiftHistory(@Query("limit") limit: Int = 10): List<ShiftResponse>
 }
 
 @Serializable
@@ -84,4 +99,51 @@ data class PodUploadResponse(val url: String, val photo_number: Int)
 data class CommissionMonthDto(
     val month: String,
     val total: Double
+)
+
+@Serializable
+data class ClockInRequest(
+    val lat: Double,
+    val lng: Double,
+    val location_name: String? = null
+)
+
+@Serializable
+data class ClockOutRequest(
+    val lat: Double,
+    val lng: Double,
+    val location_name: String? = null,
+    val notes: String? = null
+)
+
+@Serializable
+data class ShiftResponse(
+    val id: Int,
+    val driver_id: Int,
+    val clock_in_at: Long,
+    val clock_in_lat: Double,
+    val clock_in_lng: Double,
+    val clock_in_location_name: String? = null,
+    val clock_out_at: Long? = null,
+    val clock_out_lat: Double? = null,
+    val clock_out_lng: Double? = null,
+    val clock_out_location_name: String? = null,
+    val is_outstation: Boolean,
+    val outstation_distance_km: Double? = null,
+    val outstation_allowance_amount: Double,
+    val total_working_hours: Double? = null,
+    val status: String,
+    val notes: String? = null,
+    val created_at: Long
+)
+
+@Serializable
+data class ShiftStatusResponse(
+    val is_clocked_in: Boolean,
+    val shift_id: Int? = null,
+    val clock_in_at: Long? = null,
+    val hours_worked: Float? = null,
+    val is_outstation: Boolean? = null,
+    val location: String? = null,
+    val message: String
 )

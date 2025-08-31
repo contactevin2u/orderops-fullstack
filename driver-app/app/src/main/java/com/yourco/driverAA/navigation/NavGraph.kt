@@ -12,6 +12,7 @@ import com.yourco.driverAA.data.auth.AuthService
 import com.yourco.driverAA.ui.auth.LoginScreen
 import com.yourco.driverAA.ui.main.MainScreen
 import com.yourco.driverAA.ui.jobdetail.JobDetailScreen
+import com.yourco.driverAA.ui.shifts.ClockInOutScreen
 import com.yourco.driverAA.util.DeepLinks
 
 @Composable
@@ -33,7 +34,13 @@ fun NavGraph() {
             )
         }
         composable("jobs") {
-            MainScreen(onJobClick = { id -> navController.navigate("job/$id") })
+            MainScreen(
+                onJobClick = { id -> navController.navigate("job/$id") },
+                onClockInOutClick = { navController.navigate("clock") }
+            )
+        }
+        composable("clock") {
+            ClockInOutScreen()
         }
         composable(
             route = "job/{jobId}",
