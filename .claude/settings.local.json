@@ -9,7 +9,16 @@
       "Bash(npx tsc:*)",
       "Bash(npm run lint)",
       "Bash(node:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(.venv/Scripts/activate)",
+      "Bash(pip install:*)",
+      "Bash(uvicorn:*)",
+      "Bash(curl:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(alembic revision:*)",
+      "WebFetch(domain:orderops-fullstack.onrender.com)",
+      "WebFetch(domain:www.aalyx.com)"
     ],
     "deny": [],
     "ask": []
