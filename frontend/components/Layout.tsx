@@ -12,6 +12,7 @@ import {
   Wrench,
   Menu,
   Shield,
+  Calendar,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -32,6 +33,7 @@ export const navItems: NavItem[] = [
   { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
   { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
   { href: '/adjustments', label: 'nav.adjustments', Icon: Wrench },
+  { href: '/admin/driver-schedule', label: 'Driver Schedule', Icon: Calendar, requiresAuth: true },
   { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
 ];
 

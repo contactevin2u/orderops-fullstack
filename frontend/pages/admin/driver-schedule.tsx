@@ -1,10 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import dayjs from 'dayjs';
-import weekOfYear from 'dayjs/plugin/weekOfYear';
-import { ChevronLeft, ChevronRight, Plus, Calendar, Users } from 'lucide-react';
-
-dayjs.extend(weekOfYear);
+import { ChevronLeft, ChevronRight, Calendar, Users, Plus } from 'lucide-react';
 
 interface Driver {
   driver_id: number;
@@ -16,38 +13,15 @@ interface Driver {
   status?: string;
 }
 
-interface WeeklySchedule {
-  [date: string]: Array<{
-    driver_id: number;
-    driver_name: string;
-    schedule_type: string;
-    shift_type: string;
-    status: string;
-  }>;
-}
-
-const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function DriverSchedulePage() {
-  const [currentWeekStart, setCurrentWeekStart] = useState(() => {
-    return dayjs().startOf('week').add(1, 'day'); // Start week on Monday
-  });
+  const [currentMonth, setCurrentMonth] = useState(dayjs());
   const [selectedDate, setSelectedDate] = useState(dayjs());
-  const [showCreatePattern, setShowCreatePattern] = useState(false);
 
   const queryClient = useQueryClient();
 
-  // Fetch weekly schedule
-  const { data: weeklySchedule, isLoading: loadingWeekly } = useQuery({
-    queryKey: ['weekly-schedule', currentWeekStart.format('YYYY-MM-DD')],
-    queryFn: async () => {
-      const response = await fetch(`/api/driver-schedule/weekly/${currentWeekStart.format('YYYY-MM-DD')}`);
-      if (!response.ok) throw new Error('Failed to fetch weekly schedule');
-      return response.json();
-    },
-  });
-
-  // Fetch daily drivers
+  // Fetch daily drivers for selected date
   const { data: dailyDrivers, isLoading: loadingDaily } = useQuery({
     queryKey: ['daily-drivers', selectedDate.format('YYYY-MM-DD')],
     queryFn: async () => {
@@ -57,76 +31,76 @@ export default function DriverSchedulePage() {
     },
   });
 
-  // Create weekly pattern mutation
-  const createPatternMutation = useMutation({
+  // Get all drivers for dropdown
+  const { data: allDrivers } = useQuery({
+    queryKey: ['all-drivers'],
+    queryFn: async () => {
+      const response = await fetch('/api/drivers');
+      if (!response.ok) throw new Error('Failed to fetch drivers');
+      return response.json();
+    },
+  });
+
+  // Set daily schedule mutation
+  const setScheduleMutation = useMutation({
     mutationFn: async (data: {
       driver_id: number;
-      weekdays: boolean[];
-      pattern_name?: string;
+      schedule_date: string;
+      is_scheduled: boolean;
     }) => {
-      const response = await fetch('/api/driver-schedule/weekly-pattern', {
+      const response = await fetch('/api/driver-schedule/daily-override', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) throw new Error('Failed to create pattern');
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['weekly-schedule'] });
-      queryClient.invalidateQueries({ queryKey: ['daily-drivers'] });
-    },
-  });
-
-  // Update driver status mutation
-  const updateStatusMutation = useMutation({
-    mutationFn: async (data: {
-      driver_id: number;
-      status: string;
-      schedule_date?: string;
-    }) => {
-      const response = await fetch(`/api/driver-schedule/driver/${data.driver_id}/status`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          status: data.status,
-          schedule_date: data.schedule_date || selectedDate.format('YYYY-MM-DD'),
+          driver_id: data.driver_id,
+          schedule_date: data.schedule_date,
+          is_scheduled: data.is_scheduled,
+          shift_type: 'FULL_DAY'
         }),
       });
-      if (!response.ok) throw new Error('Failed to update status');
+      if (!response.ok) throw new Error('Failed to set schedule');
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['daily-drivers'] });
-      queryClient.invalidateQueries({ queryKey: ['weekly-schedule'] });
     },
   });
 
-  const weekDates = Array.from({ length: 7 }, (_, i) => currentWeekStart.add(i, 'day'));
+  // Generate calendar days
+  const startOfMonth = currentMonth.startOf('month');
+  const endOfMonth = currentMonth.endOf('month');
+  const startOfCalendar = startOfMonth.startOf('week');
+  const endOfCalendar = endOfMonth.endOf('week');
+  
+  const calendarDays = [];
+  let currentDay = startOfCalendar;
+  
+  while (currentDay.isBefore(endOfCalendar) || currentDay.isSame(endOfCalendar, 'day')) {
+    calendarDays.push(currentDay);
+    currentDay = currentDay.add(1, 'day');
+  }
 
-  const goToPreviousWeek = () => setCurrentWeekStart(prev => prev.subtract(1, 'week'));
-  const goToNextWeek = () => setCurrentWeekStart(prev => prev.add(1, 'week'));
+  const goToPreviousMonth = () => setCurrentMonth(prev => prev.subtract(1, 'month'));
+  const goToNextMonth = () => setCurrentMonth(prev => prev.add(1, 'month'));
 
-  const getScheduledDriversForDate = (date: dayjs.Dayjs): Array<{
-    driver_id: number;
-    driver_name: string;
-    schedule_type: string;
-    shift_type: string;
-    status: string;
-  }> => {
-    if (!weeklySchedule?.data?.weekly_schedule) return [];
-    const dateStr = date.format('YYYY-MM-DD');
-    return weeklySchedule.data.weekly_schedule[dateStr] || [];
+  const isCurrentMonth = (date: dayjs.Dayjs) => date.isSame(currentMonth, 'month');
+  const isToday = (date: dayjs.Dayjs) => date.isSame(dayjs(), 'day');
+  const isSelected = (date: dayjs.Dayjs) => date.isSame(selectedDate, 'day');
+
+  const handleAddDriver = (driverId: number) => {
+    setScheduleMutation.mutate({
+      driver_id: driverId,
+      schedule_date: selectedDate.format('YYYY-MM-DD'),
+      is_scheduled: true
+    });
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'SCHEDULED': return 'bg-blue-100 text-blue-800';
-      case 'CONFIRMED': return 'bg-green-100 text-green-800';
-      case 'CALLED_SICK': return 'bg-yellow-100 text-yellow-800';
-      case 'NO_SHOW': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
+  const handleRemoveDriver = (driverId: number) => {
+    setScheduleMutation.mutate({
+      driver_id: driverId,
+      schedule_date: selectedDate.format('YYYY-MM-DD'),
+      is_scheduled: false
+    });
   };
 
   return (
@@ -135,214 +109,147 @@ export default function DriverSchedulePage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Driver Schedule</h1>
-            <p className="text-gray-600 mt-2">Manage driver work schedules and assignments</p>
-          </div>
-          <button
-            onClick={() => setShowCreatePattern(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-          >
-            <Plus size={16} />
-            Create Pattern
-          </button>
-        </div>
-      </div>
-
-      {/* Week Navigation */}
-      <div className="mb-6 flex items-center justify-between bg-white p-4 rounded-lg shadow">
-        <button
-          onClick={goToPreviousWeek}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-        >
-          <ChevronLeft size={20} />
-        </button>
-        
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">
-            {currentWeekStart.format('MMM DD')} - {currentWeekStart.add(6, 'day').format('MMM DD, YYYY')}
-          </h2>
-        </div>
-
-        <button
-          onClick={goToNextWeek}
-          className="p-2 hover:bg-gray-100 rounded-lg"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      {/* Weekly Calendar */}
-      <div className="grid grid-cols-7 gap-4 mb-8">
-        {weekDates.map((date, index) => {
-          const scheduledDrivers = getScheduledDriversForDate(date);
-          const isSelected = date.isSame(selectedDate, 'day');
-          const isToday = date.isSame(dayjs(), 'day');
-
-          return (
-            <div
-              key={date.valueOf()}
-              className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all ${
-                isSelected
-                  ? 'border-blue-500 bg-blue-50'
-                  : isToday
-                  ? 'border-green-500'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-              onClick={() => setSelectedDate(date)}
-            >
-              <div className="text-center mb-3">
-                <div className="text-sm font-medium text-gray-600">
-                  {WEEKDAYS[index]}
-                </div>
-                <div className={`text-2xl font-bold ${
-                  isToday ? 'text-green-600' : 'text-gray-900'
-                }`}>
-                  {date.format('DD')}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                {scheduledDrivers.slice(0, 3).map(driver => (
-                  <div
-                    key={driver.driver_id}
-                    className={`text-xs px-2 py-1 rounded ${getStatusColor(driver.status)}`}
-                  >
-                    {driver.driver_name}
-                  </div>
-                ))}
-                {scheduledDrivers.length > 3 && (
-                  <div className="text-xs text-gray-500">
-                    +{scheduledDrivers.length - 3} more
-                  </div>
-                )}
-                {scheduledDrivers.length === 0 && (
-                  <div className="text-xs text-gray-400 text-center py-2">
-                    No drivers scheduled
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Selected Date Details */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center gap-2">
-            <Calendar size={20} className="text-gray-600" />
-            <h3 className="text-lg font-semibold">
-              {selectedDate.format('dddd, MMMM DD, YYYY')}
-            </h3>
+            <p className="text-gray-600 mt-2">Manage daily driver schedules</p>
           </div>
         </div>
+      </div>
 
-        <div className="p-6">
-          {loadingDaily ? (
-            <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-2 text-gray-600">Loading drivers...</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Month Calendar */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-lg shadow">
+            {/* Month Navigation */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <button
+                onClick={goToPreviousMonth}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              
+              <h2 className="text-xl font-semibold">
+                {currentMonth.format('MMMM YYYY')}
+              </h2>
+
+              <button
+                onClick={goToNextMonth}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <ChevronRight size={20} />
+              </button>
             </div>
-          ) : (
-            <>
-              <div className="mb-4 flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Users size={16} className="text-gray-600" />
-                  <span className="text-sm font-medium">
-                    {dailyDrivers?.data?.scheduled_count || 0} of {dailyDrivers?.data?.total_count || 0} drivers scheduled
-                  </span>
-                </div>
-              </div>
 
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {dailyDrivers?.data?.drivers?.map((driver: Driver) => (
-                  <div
-                    key={driver.driver_id}
-                    className={`border rounded-lg p-4 ${
-                      driver.is_scheduled 
-                        ? 'border-green-200 bg-green-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">
-                        {driver.driver_name}
-                      </h4>
-                      <span className={`text-xs px-2 py-1 rounded ${
-                        driver.is_scheduled 
-                          ? getStatusColor(driver.status || 'SCHEDULED')
-                          : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        {driver.is_scheduled ? (driver.status || 'SCHEDULED') : 'OFF'}
-                      </span>
+            {/* Weekday Headers */}
+            <div className="grid grid-cols-7 gap-0 border-b">
+              {WEEKDAYS.map(day => (
+                <div key={day} className="p-3 text-center text-sm font-medium text-gray-600 border-r last:border-r-0">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="grid grid-cols-7 gap-0">
+              {calendarDays.map(date => (
+                <div
+                  key={date.valueOf()}
+                  className={`min-h-[80px] p-2 border-r border-b last:border-r-0 cursor-pointer hover:bg-gray-50 ${
+                    !isCurrentMonth(date) ? 'bg-gray-50 text-gray-400' : ''
+                  } ${
+                    isSelected(date) ? 'bg-blue-50 border-blue-300' : ''
+                  } ${
+                    isToday(date) ? 'bg-green-50 border-green-300' : ''
+                  }`}
+                  onClick={() => setSelectedDate(date)}
+                >
+                  <div className={`text-sm font-medium mb-1 ${
+                    isToday(date) ? 'text-green-600' : ''
+                  }`}>
+                    {date.format('D')}
+                  </div>
+                  
+                  {/* Show driver count if current month */}
+                  {isCurrentMonth(date) && (
+                    <div className="text-xs text-gray-500">
+                      {/* This would show scheduled driver count - simplified for now */}
                     </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
 
-                    {driver.phone && (
-                      <p className="text-sm text-gray-600 mb-2">{driver.phone}</p>
-                    )}
+        {/* Selected Date Details */}
+        <div className="lg:col-span-1">
+          <div className="bg-white rounded-lg shadow">
+            <div className="border-b border-gray-200 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-gray-600" />
+                <h3 className="font-semibold">
+                  {selectedDate.format('MMM D, YYYY')}
+                </h3>
+              </div>
+            </div>
 
-                    {driver.is_scheduled && (
-                      <div className="flex gap-2 mt-3">
+            <div className="p-4">
+              {loadingDaily ? (
+                <div className="text-center py-4">
+                  <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <p className="mt-2 text-sm text-gray-600">Loading...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4 text-sm text-gray-600">
+                    {dailyDrivers?.data?.scheduled_count || 0} drivers scheduled
+                  </div>
+
+                  {/* Scheduled Drivers */}
+                  <div className="space-y-2 mb-4">
+                    {dailyDrivers?.data?.drivers?.filter((d: Driver) => d.is_scheduled).map((driver: Driver) => (
+                      <div key={driver.driver_id} className="flex items-center justify-between p-2 bg-green-50 rounded border border-green-200">
+                        <div>
+                          <div className="font-medium text-sm">{driver.driver_name}</div>
+                          {driver.phone && <div className="text-xs text-gray-600">{driver.phone}</div>}
+                        </div>
                         <button
-                          onClick={() => updateStatusMutation.mutate({
-                            driver_id: driver.driver_id,
-                            status: 'CONFIRMED'
-                          })}
-                          className="text-xs bg-green-100 hover:bg-green-200 text-green-800 px-2 py-1 rounded"
-                          disabled={updateStatusMutation.isPending}
+                          onClick={() => handleRemoveDriver(driver.driver_id)}
+                          className="text-red-600 hover:text-red-800 text-xs"
+                          disabled={setScheduleMutation.isPending}
                         >
-                          Confirm
-                        </button>
-                        <button
-                          onClick={() => updateStatusMutation.mutate({
-                            driver_id: driver.driver_id,
-                            status: 'CALLED_SICK'
-                          })}
-                          className="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded"
-                          disabled={updateStatusMutation.isPending}
-                        >
-                          Sick
-                        </button>
-                        <button
-                          onClick={() => updateStatusMutation.mutate({
-                            driver_id: driver.driver_id,
-                            status: 'NO_SHOW'
-                          })}
-                          className="text-xs bg-red-100 hover:bg-red-200 text-red-800 px-2 py-1 rounded"
-                          disabled={updateStatusMutation.isPending}
-                        >
-                          No Show
+                          Remove
                         </button>
                       </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-            </>
-          )}
+
+                  {/* Available Drivers to Add */}
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Add Drivers:</h4>
+                    <div className="space-y-1 max-h-40 overflow-y-auto">
+                      {dailyDrivers?.data?.drivers?.filter((d: Driver) => !d.is_scheduled).map((driver: Driver) => (
+                        <button
+                          key={driver.driver_id}
+                          onClick={() => handleAddDriver(driver.driver_id)}
+                          className="w-full text-left p-2 hover:bg-blue-50 rounded text-sm border border-gray-200"
+                          disabled={setScheduleMutation.isPending}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Plus size={14} className="text-blue-600" />
+                            <div>
+                              <div className="font-medium">{driver.driver_name}</div>
+                              {driver.phone && <div className="text-xs text-gray-600">{driver.phone}</div>}
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
-
-      {/* Create Pattern Modal */}
-      {showCreatePattern && <CreatePatternModal />}
-    </div>
-  );
-}
-
-// Simplified CreatePatternModal component
-function CreatePatternModal() {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg p-6 max-w-md w-full">
-        <h3 className="text-lg font-semibold mb-4">Create Weekly Pattern</h3>
-        <p className="text-gray-600 mb-4">
-          Feature coming soon! For now, use the backend API endpoints to create weekly patterns.
-        </p>
-        <button
-          onClick={() => window.location.reload()}
-          className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 px-4 rounded"
-        >
-          Close
-        </button>
       </div>
     </div>
   );
