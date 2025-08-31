@@ -61,7 +61,13 @@ fun NavGraph() {
         composable("jobs") {
             MainScreen(
                 onJobClick = { id -> navController.navigate("job/$id") },
-                onClockInOutClick = { navController.navigate("clock") }
+                onClockInOutClick = { navController.navigate("clock") },
+                onSignOut = {
+                    authService.signOut()
+                    navController.navigate("login") {
+                        popUpTo("jobs") { inclusive = true }
+                    }
+                }
             )
         }
         composable("clock") {

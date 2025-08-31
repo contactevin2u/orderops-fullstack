@@ -6,15 +6,19 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen(
     onJobClick: (String) -> Unit,
-    onClockInOutClick: () -> Unit
+    onClockInOutClick: () -> Unit,
+    onSignOut: () -> Unit = {}
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     
@@ -22,6 +26,22 @@ fun MainScreen(
     val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star, Icons.Default.AccessTime)
     
     Column(modifier = Modifier.fillMaxSize()) {
+        // Top App Bar with Sign Out button
+        TopAppBar(
+            title = { Text("Driver App") },
+            actions = {
+                IconButton(
+                    onClick = onSignOut
+                ) {
+                    Icon(
+                        Icons.Filled.Logout,
+                        contentDescription = "Sign Out",
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        )
+        
         TabRow(selectedTabIndex = selectedTabIndex) {
             tabs.forEachIndexed { index, title ->
                 Tab(
