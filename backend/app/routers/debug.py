@@ -222,6 +222,82 @@ def create_test_drivers(count: int = 3, db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
+@router.get("/order-54-debug")
+def debug_order_54(db: Session = Depends(get_session)):
+    """Debug order 54 specifically"""
+    try:
+        from datetime import date
+        today = date.today()
+        
+        # Get order 54
+        order_54 = db.query(Order).filter(Order.id == 54).first()
+        if not order_54:
+            return envelope({"error": "Order 54 not found"})
+        
+        # Get trip for order 54
+        trip_54 = db.query(Trip).filter(Trip.order_id == 54).first()
+        
+        # Check filtering conditions individually
+        status_check = order_54.status in ["NEW", "PENDING"]
+        date_check = order_54.delivery_date is None or (order_54.delivery_date and order_54.delivery_date.date() == today)
+        assignment_check = trip_54 is None or trip_54.route_id is None
+        
+        # Test the exact query from SmartAssignmentService
+        from sqlalchemy import and_, or_
+        from sqlalchemy.orm import joinedload
+        
+        test_query = (
+            db.query(Order)
+            .options(joinedload(Order.customer))
+            .outerjoin(Trip, Trip.order_id == Order.id)
+            .filter(
+                and_(
+                    Order.id == 54,  # Only order 54
+                    Order.status.in_(["NEW", "PENDING"]),
+                    or_(
+                        Order.delivery_date == today,
+                        Order.delivery_date.is_(None)
+                    ),
+                    or_(Trip.id.is_(None), Trip.route_id.is_(None))
+                )
+            )
+            .all()
+        )
+        
+        return envelope({
+            "order_54": {
+                "id": order_54.id,
+                "code": order_54.code,
+                "status": order_54.status,
+                "delivery_date": order_54.delivery_date.date().isoformat() if order_54.delivery_date else None,
+                "customer_name": order_54.customer.name if order_54.customer else None
+            },
+            "trip_54": {
+                "id": trip_54.id if trip_54 else None,
+                "driver_id": trip_54.driver_id if trip_54 else None,
+                "route_id": trip_54.route_id if trip_54 else None,
+                "status": trip_54.status if trip_54 else None
+            } if trip_54 else None,
+            "filtering_checks": {
+                "status_check": status_check,
+                "date_check": date_check,
+                "assignment_check": assignment_check,
+                "all_pass": status_check and date_check and assignment_check
+            },
+            "query_result": {
+                "found_by_query": len(test_query) > 0,
+                "count": len(test_query)
+            },
+            "today": today.isoformat()
+        })
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
 @router.get("/simple-driver-test")
 def simple_driver_test(db: Session = Depends(get_session)):
     """Dead simple driver test - bypass all complex logic"""

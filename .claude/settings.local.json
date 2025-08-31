@@ -18,7 +18,10 @@
       "Bash(find:*)",
       "Bash(alembic revision:*)",
       "WebFetch(domain:orderops-fullstack.onrender.com)",
-      "WebFetch(domain:www.aalyx.com)"
+      "WebFetch(domain:www.aalyx.com)",
+      "Bash(npm run build:*)",
+      "Bash(git reset:*)",
+      "WebFetch(domain:orderops-api-v1.onrender.com)"
     ],
     "deny": [],
     "ask": []

@@ -83,23 +83,20 @@ class SmartAssignmentService:
         today = date.today()
         
         # Get orders that are:
-        # 1. Status NEW or PENDING (ready for assignment)
-        # 2. For today's delivery (or no specific date)
-        # 3. Not already assigned to a route
+        # 1. For today delivery (or no specific date)
+        # 2. Not already assigned to a route (only care about trip status, not order status)
         orders = (
             self.db.query(Order)
             .options(joinedload(Order.customer))
             .outerjoin(Trip, Trip.order_id == Order.id)
             .filter(
                 and_(
-                    # Only assignable orders
-                    Order.status.in_(["NEW", "PENDING"]),
-                    # Today's deliveries or no specific date
+                    # Today deliveries (or no specific date)
                     or_(
                         Order.delivery_date == today,
                         Order.delivery_date.is_(None)
                     ),
-                    # Not already assigned to a route
+                    # Not already assigned to a route (only care about trip status)
                     or_(Trip.id.is_(None), Trip.route_id.is_(None))
                 )
             )
