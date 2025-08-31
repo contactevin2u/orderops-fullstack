@@ -37,9 +37,20 @@ class AIAssignmentService:
             self.ai_enabled = False
 
     def get_available_drivers(self) -> List[Dict[str, Any]]:
-        """Get all drivers currently clocked in and available for assignment"""
+        """Get scheduled drivers currently clocked in, prioritized for assignment"""
+        from datetime import date
+        
+        # Get drivers who are scheduled for today
+        today = date.today()
+        scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
+        scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
+        
+        # Get active shifts only for scheduled drivers
         active_shifts = self.db.query(DriverShift).filter(
-            DriverShift.status == "ACTIVE"
+            and_(
+                DriverShift.status == "ACTIVE",
+                DriverShift.driver_id.in_(scheduled_driver_ids)  # Only scheduled drivers
+            )
         ).all()
 
         available_drivers = []

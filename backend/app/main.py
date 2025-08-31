@@ -23,6 +23,7 @@ from .routers import (
     routes as routes_router,
     shifts,
     ai_assignments,
+    driver_schedule,
 )
 from .audit import router as audit_router
 
@@ -56,4 +57,5 @@ app.include_router(drivers.router)
 app.include_router(routes_router.router)
 app.include_router(shifts.router)
 app.include_router(ai_assignments.router)
+app.include_router(driver_schedule.router)
 app.include_router(audit_router)
