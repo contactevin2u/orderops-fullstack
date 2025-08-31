@@ -445,7 +445,6 @@ Notes: Urgent delivery`}
                     <Button 
                       onClick={handleAcceptAll}
                       disabled={acceptAllMutation.isPending || !aiSuggestions?.suggestions.length}
-                      size="lg"
                       className="w-full max-w-md h-14 text-lg"
                     >
                       {acceptAllMutation.isPending ? (
