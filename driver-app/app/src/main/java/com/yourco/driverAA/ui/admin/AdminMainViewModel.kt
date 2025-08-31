@@ -157,7 +157,7 @@ class AdminMainViewModel @Inject constructor(
             )
             
             adminRepository.acceptAllAssignments().fold(
-                onSuccess = { response ->
+                onSuccess = { response: com.yourco.driverAA.data.api.AcceptAllResponse ->
                     _uiState.value = _uiState.value.copy(
                         acceptingAllAssignments = false,
                         successMessage = response.message
@@ -171,7 +171,7 @@ class AdminMainViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(successMessage = null)
                     }
                 },
-                onFailure = { error ->
+                onFailure = { error: Throwable ->
                     _uiState.value = _uiState.value.copy(
                         acceptingAllAssignments = false,
                         error = "Failed to accept all assignments: ${error.message}"

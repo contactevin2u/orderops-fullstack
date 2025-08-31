@@ -1,5 +1,6 @@
 package com.yourco.driverAA.data.repository
 
+import com.yourco.driverAA.data.api.AcceptAllResponse
 import com.yourco.driverAA.data.api.ApplyAssignmentRequest
 import com.yourco.driverAA.data.api.AssignmentApplyResponse
 import com.yourco.driverAA.data.api.AssignmentSuggestionsResponse
