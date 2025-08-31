@@ -74,9 +74,31 @@ class AIAssignmentService:
         return available_drivers
 
     def get_pending_orders(self) -> List[Dict[str, Any]]:
-        """Get all orders pending assignment"""
+        """Get all orders needing driver assignment (no trip or unassigned trip)"""
+        from sqlalchemy import exists, or_, and_
+        from app.models.trip import Trip
+        
+        # Find orders that either:
+        # 1. Have no trip at all, OR  
+        # 2. Have a trip but it's not assigned to a driver
         orders = self.db.query(Order).filter(
-            Order.status == "PENDING"
+            or_(
+                # Orders without any trip
+                ~exists().where(Trip.order_id == Order.id),
+                # Orders with unassigned trips
+                exists().where(
+                    and_(
+                        Trip.order_id == Order.id,
+                        or_(
+                            Trip.driver_id.is_(None),
+                            Trip.status.in_(["CREATED", "UNASSIGNED"])
+                        )
+                    )
+                )
+            )
+        ).filter(
+            # Only include orders that are in assignable state
+            Order.status.in_(["NEW", "PENDING"])
         ).all()
 
         pending_orders = []

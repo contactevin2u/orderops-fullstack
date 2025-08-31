@@ -83,20 +83,19 @@ async def apply_assignment(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
-    """Apply a suggested assignment (create trip for driver-order pair)"""
+    """Apply a suggested assignment using existing manual assignment logic"""
     try:
         # Import here to avoid circular imports
         from app.models.order import Order
         from app.models.trip import Trip
         from app.models.driver import Driver
+        from app.services.fcm import notify_order_assigned
+        from app.audit import log_action
         
-        # Validate order exists and is pending
+        # Validate order exists
         order = db.get(Order, request.order_id)
         if not order:
             raise HTTPException(404, "Order not found")
-            
-        if order.status != "PENDING":
-            raise HTTPException(400, f"Order status is {order.status}, expected PENDING")
         
         # Validate driver exists and is clocked in
         driver = db.get(Driver, request.driver_id)
@@ -109,16 +108,24 @@ async def apply_assignment(
         if not any(d["driver_id"] == request.driver_id for d in available_drivers):
             raise HTTPException(400, "Driver is not currently clocked in")
         
-        # Create trip assignment
-        trip = Trip(
-            order_id=request.order_id,
-            driver_id=request.driver_id,
-            status="ASSIGNED"
-        )
+        # Use the same logic as manual assignment (orders.py lines 401-413)
+        trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
+        if trip:
+            if trip.status in {"DELIVERED", "SUCCESS"}:
+                raise HTTPException(400, "Delivered orders cannot be reassigned")
+            trip.driver_id = driver.id
+            trip.status = "ASSIGNED"
+        else:
+            trip = Trip(order_id=order.id, driver_id=driver.id, status="ASSIGNED")
+            db.add(trip)
         
-        db.add(trip)
         order.status = "ASSIGNED"
         db.commit()
+        db.refresh(trip)
+        
+        # Same notifications and logging as manual assignment
+        log_action(db, current_user, "ai.assign_driver", f"order_id={order.id},driver_id={driver.id}")
+        notify_order_assigned(db, driver.id, order)
         
         return {
             "message": f"Order #{order.code or order.id} assigned to {driver.name}",
