@@ -683,29 +683,26 @@ private fun PhotoCaptureButton(
         onClick = onTakePhoto
     ) {
         if (photoFile != null && photoFile.exists()) {
-            // Show photo preview using BitmapFactory
-            try {
-                val bitmap = BitmapFactory.decodeFile(photoFile.absolutePath)
-                if (bitmap != null) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "Photo $photoNumber preview",
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .clip(MaterialTheme.shapes.small),
-                        contentScale = ContentScale.Crop
-                    )
-                } else {
-                    // Fallback if bitmap loading fails
-                    Text(
-                        "📷\nPhoto $photoNumber\nTaken",
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            // Show photo preview using BitmapFactory (load bitmap in remember to avoid recomposition issues)
+            val bitmap = remember(photoFile) {
+                try {
+                    BitmapFactory.decodeFile(photoFile.absolutePath)
+                } catch (e: Exception) {
+                    null
                 }
-            } catch (e: Exception) {
-                // Fallback if any error occurs
+            }
+            
+            if (bitmap != null) {
+                Image(
+                    bitmap = bitmap.asImageBitmap(),
+                    contentDescription = "Photo $photoNumber preview",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(MaterialTheme.shapes.small),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                // Fallback if bitmap loading fails
                 Text(
                     "📷\nPhoto $photoNumber\nTaken",
                     textAlign = TextAlign.Center,
