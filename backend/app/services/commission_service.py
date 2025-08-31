@@ -20,23 +20,16 @@ class CommissionService:
         self,
         trip: Trip,
         driver_id: int,
-        commission_amount: float,
-        driver_role: str,
-        commission_scheme: str,
-        order_value: float,
-        commission_rate: float
+        driver_role: str
     ) -> Optional[CommissionEntry]:
         """
         Create commission entry for a delivery when driver is clocked in
+        Flat rate: RM30 total, RM30 single driver or RM15 each for dual drivers
         
         Args:
             trip: Trip record
             driver_id: Driver ID earning the commission
-            commission_amount: Amount to be earned
             driver_role: "primary" or "secondary"
-            commission_scheme: Commission scheme name
-            order_value: Total order value
-            commission_rate: Commission rate used
         
         Returns:
             CommissionEntry if driver is clocked in, None otherwise
@@ -53,6 +46,11 @@ class CommissionService:
             # Driver not clocked in, no commission entry created
             return None
 
+        # Calculate flat rate commission: RM30 total, split among drivers
+        total_commission = 30.0  # RM30 flat rate
+        driver_count = 2 if trip.driver_id_2 else 1
+        commission_amount = total_commission / driver_count  # RM30 single or RM15 each
+
         # Create commission entry
         entry = CommissionEntry(
             driver_id=driver_id,
@@ -61,12 +59,12 @@ class CommissionService:
             trip_id=trip.id,
             entry_type="DELIVERY",
             amount=commission_amount,
-            description=f"Delivery commission - Order #{trip.order_id}",
+            description=f"Delivery commission - Order #{trip.order_id} ({driver_role} driver)",
             driver_role=driver_role,
             status="EARNED",
-            base_commission_rate=commission_rate,
-            order_value=order_value,
-            commission_scheme=commission_scheme,
+            base_commission_rate=None,  # Not percentage-based
+            order_value=None,  # Not relevant for flat rate
+            commission_scheme="flat_rate",
             earned_at=datetime.now(timezone.utc)
         )
 

@@ -83,18 +83,17 @@ def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_d
                 "role": driver_role
             }
         else:
-            # Calculate potential commission split for this driver
-            order_total = getattr(order, "total", Decimal("0")) or Decimal("0")
-            total_commission_rate = Decimal("0.10")  # 10% total commission
-            driver_count = len(trip.driver_ids) if hasattr(trip, 'driver_ids') else 1
-            commission_per_driver = (order_total * total_commission_rate) / driver_count
+            # Calculate flat rate commission: RM30 total, split among drivers
+            total_commission = Decimal("30.00")  # RM30 flat rate
+            driver_count = 2 if trip.driver_id_2 else 1
+            commission_per_driver = total_commission / driver_count  # RM30 single or RM15 each
             
             driver_role = "secondary" if current_driver_id == trip.driver_id_2 else "primary"
             commission_info = {
                 "amount": str(commission_per_driver),
                 "status": "pending",
-                "scheme": "percentage_split",
-                "rate": str(total_commission_rate / driver_count),
+                "scheme": "flat_rate",
+                "rate": str(commission_per_driver),
                 "role": driver_role
             }
 

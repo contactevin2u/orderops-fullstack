@@ -458,13 +458,8 @@ def mark_success(
     trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
     if not trip or trip.status != "DELIVERED":
         raise HTTPException(400, "Trip not delivered")
-    total = to_decimal(order.total or 0)
-    if total < 500:
-        rate = Decimal("20")
-    elif total < 5000:
-        rate = Decimal("30")
-    else:
-        rate = Decimal("50")
+    # Flat commission rate: RM30 total, split among drivers
+    rate = Decimal("30")
     # Clear existing commissions for this trip
     db.query(Commission).filter_by(trip_id=trip.id).delete()
     
