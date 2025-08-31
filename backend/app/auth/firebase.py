@@ -68,3 +68,12 @@ def driver_auth(
         request.state.user = None
     request.state.driver = driver
     return driver
+
+
+def get_current_driver(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_session),
+) -> Driver:
+    """Get current authenticated driver"""
+    return driver_auth(request, credentials, db)
