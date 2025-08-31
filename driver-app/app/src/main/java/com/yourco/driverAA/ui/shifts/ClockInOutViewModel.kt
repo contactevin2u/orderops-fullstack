@@ -148,7 +148,9 @@ class ClockInOutViewModel @Inject constructor(
                                 notes = notes
                             )
                             
+                            android.util.Log.d("ClockInOutViewModel", "Attempting clock-out with request: $request")
                             val shift = api.clockOut(request)
+                            android.util.Log.d("ClockInOutViewModel", "Clock-out successful: ${shift.id}")
                             
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
@@ -159,11 +161,13 @@ class ClockInOutViewModel @Inject constructor(
                                 shiftId = null
                             )
                         } catch (e: HttpException) {
+                            android.util.Log.e("ClockInOutViewModel", "Clock-out HTTP error", e)
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 error = "Clock-out failed: ${e.message()}"
                             )
                         } catch (e: Exception) {
+                            android.util.Log.e("ClockInOutViewModel", "Clock-out error", e)
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 error = "Clock-out failed: ${e.message}"
@@ -172,6 +176,7 @@ class ClockInOutViewModel @Inject constructor(
                     }
                 }
             } catch (e: Exception) {
+                android.util.Log.e("ClockInOutViewModel", "Location error during clock-out", e)
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     error = "Failed to get location: ${e.message}"
@@ -195,12 +200,19 @@ class ClockInOutViewModel @Inject constructor(
             .setMaxUpdateDelayMillis(30000)
             .build()
 
+        android.util.Log.d("ClockInOutViewModel", "Requesting location...")
         fusedLocationClient.getCurrentLocation(Priority.PRIORITY_HIGH_ACCURACY, null)
             .addOnSuccessListener { location: Location? ->
-                location?.let { onLocationReceived(it) }
-                    ?: throw RuntimeException("Unable to get current location")
+                android.util.Log.d("ClockInOutViewModel", "Location received: $location")
+                if (location != null) {
+                    onLocationReceived(location)
+                } else {
+                    android.util.Log.e("ClockInOutViewModel", "Location is null")
+                    throw RuntimeException("Unable to get current location - GPS returned null")
+                }
             }
             .addOnFailureListener { exception ->
+                android.util.Log.e("ClockInOutViewModel", "Location request failed", exception)
                 throw exception
             }
     }
