@@ -37,7 +37,7 @@ class AIAssignmentService:
             self.ai_enabled = False
 
     def get_available_drivers(self) -> List[Dict[str, Any]]:
-        """Get scheduled drivers currently clocked in, with fallback to all clocked-in drivers"""
+        """Get scheduled drivers with priority for clocked-in drivers"""
         from datetime import date
         
         # Get drivers who are scheduled for today
@@ -45,28 +45,45 @@ class AIAssignmentService:
         scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
         scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
         
-        # Get active shifts - prefer scheduled drivers, but fallback to all if none scheduled
+        # If no scheduled drivers, fallback to all active drivers
+        if not scheduled_driver_ids:
+            # Auto-create schedules if none exist (makes system usable)
+            schedules_created = self.auto_schedule_all_drivers_if_empty()
+            if schedules_created:
+                logger.info("Auto-created availability patterns for all drivers")
+                # Re-fetch scheduled drivers after auto-creation
+                scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
+                scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
+            
+            # Final fallback: use all active drivers if still no schedules
+            if not scheduled_driver_ids:
+                all_active_drivers = self.db.query(Driver).filter(Driver.is_active == True).all()
+                scheduled_driver_ids = {d.id for d in all_active_drivers}
+
+        # Get current active shifts for clock-in status (for priority, not eligibility)
+        active_shifts_dict = {}
         if scheduled_driver_ids:
-            # Get active shifts only for scheduled drivers
             active_shifts = self.db.query(DriverShift).filter(
                 and_(
                     DriverShift.status == "ACTIVE",
                     DriverShift.driver_id.in_(scheduled_driver_ids)
                 )
             ).all()
-        else:
-            # Fallback: if no drivers are scheduled, get ALL active shifts
-            # This prevents the system from being unusable when schedules aren't set up
-            active_shifts = self.db.query(DriverShift).filter(
-                DriverShift.status == "ACTIVE"
-            ).all()
+            active_shifts_dict = {shift.driver_id: shift for shift in active_shifts}
 
+        # Get all scheduled drivers (regardless of clock-in status)
         available_drivers = []
-        for shift in active_shifts:
-            driver = shift.driver
-            if not driver.is_active:
-                continue
-
+        drivers = self.db.query(Driver).filter(
+            and_(
+                Driver.id.in_(scheduled_driver_ids),
+                Driver.is_active == True
+            )
+        ).all()
+        
+        for driver in drivers:
+            active_shift = active_shifts_dict.get(driver.id)
+            is_clocked_in = active_shift is not None
+            
             # Count current active trips
             active_trips_count = self.db.query(Trip).filter(
                 and_(
@@ -75,21 +92,46 @@ class AIAssignmentService:
                 )
             ).count()
 
-            available_drivers.append({
+            # Use home base coordinates if not clocked in
+            from app.config.clock_config import HOME_BASE_LAT, HOME_BASE_LNG
+            
+            driver_data = {
                 "driver_id": driver.id,
-                "driver_name": driver.name,
+                "driver_name": driver.name or "Unknown Driver",
                 "phone": driver.phone,
-                "shift_id": shift.id,
-                "clock_in_location": shift.clock_in_location_name,
-                "clock_in_lat": shift.clock_in_lat,
-                "clock_in_lng": shift.clock_in_lng,
-                "is_outstation": shift.is_outstation,
+                "is_clocked_in": is_clocked_in,
                 "current_active_trips": active_trips_count,
-                "hours_worked": (
-                    datetime.now(timezone.utc) - shift.clock_in_at
-                ).total_seconds() / 3600
-            })
+                "priority": "high" if is_clocked_in else "normal"  # Clocked-in drivers get priority
+            }
+            
+            if is_clocked_in:
+                # Use actual shift location for clocked-in drivers
+                driver_data.update({
+                    "shift_id": active_shift.id,
+                    "clock_in_location": active_shift.clock_in_location_name,
+                    "clock_in_lat": active_shift.clock_in_lat,
+                    "clock_in_lng": active_shift.clock_in_lng,
+                    "is_outstation": active_shift.is_outstation,
+                    "hours_worked": (
+                        datetime.now(timezone.utc) - active_shift.clock_in_at
+                    ).total_seconds() / 3600
+                })
+            else:
+                # Use home base for not-clocked-in drivers
+                driver_data.update({
+                    "shift_id": None,
+                    "clock_in_location": "Home Base (Not Clocked In)",
+                    "clock_in_lat": HOME_BASE_LAT,
+                    "clock_in_lng": HOME_BASE_LNG,
+                    "is_outstation": False,
+                    "hours_worked": 0.0
+                })
+            
+            available_drivers.append(driver_data)
 
+        # Sort by priority: clocked-in drivers first, then by active trips (fewer = higher priority)
+        available_drivers.sort(key=lambda d: (d["priority"] != "high", d["current_active_trips"]))
+        
         return available_drivers
 
     def get_pending_orders(self) -> List[Dict[str, Any]]:
@@ -145,11 +187,6 @@ class AIAssignmentService:
         Returns:
             Dictionary with assignment suggestions and reasoning
         """
-        # Auto-create schedules if none exist (makes system usable)
-        schedules_created = self.auto_schedule_all_drivers_if_empty()
-        if schedules_created:
-            logger.info("Auto-created availability patterns for all drivers")
-        
         available_drivers = self.get_available_drivers()
         pending_orders = self.get_pending_orders()
         
@@ -249,13 +286,14 @@ class AIAssignmentService:
             return self._fallback_suggest_assignments(drivers, orders, scheduled_drivers_count)
 
     def _fallback_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], scheduled_drivers_count: int) -> Dict[str, Any]:
-        """Fallback assignment logic using distance-based optimization"""
+        """Fallback assignment logic using distance-based optimization with priority for clocked-in drivers"""
         suggestions = []
         
-        # Simple distance-based assignment
+        # Simple distance-based assignment with priority consideration
         for order in orders:
             best_driver = None
             min_distance = float('inf')
+            best_priority = "normal"
             
             for driver in drivers:
                 if driver["current_active_trips"] >= 3:  # Skip overloaded drivers
@@ -266,27 +304,41 @@ class AIAssignmentService:
                     order["estimated_lat"], order["estimated_lng"]
                 )
                 
-                if distance < min_distance:
+                # Priority logic: prefer clocked-in drivers for similar distances
+                is_better = False
+                if best_driver is None:
+                    is_better = True
+                elif driver["priority"] == "high" and best_priority == "normal":
+                    # Clocked-in driver beats non-clocked-in driver even if slightly farther
+                    is_better = distance < min_distance + 5  # 5km tolerance for priority
+                elif driver["priority"] == best_priority:
+                    # Same priority level, use distance
+                    is_better = distance < min_distance
+                
+                if is_better:
                     min_distance = distance
                     best_driver = driver
+                    best_priority = driver["priority"]
             
             if best_driver:
+                clocked_in_status = " (clocked in)" if best_driver["is_clocked_in"] else " (not clocked in)"
                 suggestions.append({
                     "order_id": order["order_id"],
                     "driver_id": best_driver["driver_id"],
                     "driver_name": best_driver["driver_name"],
                     "distance_km": round(min_distance, 1),
                     "confidence": "high" if min_distance < 10 else "medium",
-                    "reasoning": f"Closest available driver ({min_distance:.1f}km away)"
+                    "reasoning": f"Best available scheduled driver ({min_distance:.1f}km away{clocked_in_status})"
                 })
 
         return {
             "suggestions": suggestions,
-            "method": "distance_optimized",
+            "method": "priority_distance_optimized",
             "available_drivers_count": len(drivers),
             "pending_orders_count": len(orders),
             "scheduled_drivers_count": scheduled_drivers_count,
-            "total_drivers_count": self.db.query(Driver).filter(Driver.is_active == True).count()
+            "total_drivers_count": self.db.query(Driver).filter(Driver.is_active == True).count(),
+            "clocked_in_drivers": len([d for d in drivers if d["is_clocked_in"]])
         }
 
     def _build_assignment_prompt(self, drivers: List[Dict], orders: List[Dict]) -> str:
@@ -297,10 +349,13 @@ TASK: Suggest optimal driver-order assignments for delivery operations in Kuala 
 AVAILABLE DRIVERS ({len(drivers)}):
 """
         for driver in drivers:
+            clocked_in_str = "✓ Clocked In" if driver['is_clocked_in'] else "○ Not Clocked In"
+            priority_str = "HIGH PRIORITY" if driver['priority'] == 'high' else "Normal"
             prompt += f"""
-- Driver {driver['driver_id']} ({driver['driver_name']})
+- Driver {driver['driver_id']} ({driver['driver_name']}) - {priority_str}
+  Status: {clocked_in_str}
   Location: {driver['clock_in_location']} ({driver['clock_in_lat']}, {driver['clock_in_lng']})
-  Outstation: {driver['is_outstation']}
+  Outstation: {driver.get('is_outstation', False)}
   Active trips: {driver['current_active_trips']}
   Hours worked: {driver['hours_worked']:.1f}h
 """
@@ -322,11 +377,14 @@ PENDING ORDERS ({len(orders)}):
         prompt += """
 
 ASSIGNMENT CRITERIA:
-1. Minimize total travel distance
-2. Balance workload among drivers
-3. Consider driver working hours (avoid overwork)
-4. Prioritize high-value or urgent orders
-5. Group nearby deliveries for efficiency
+1. **PRIORITY**: Prefer clocked-in drivers (HIGH PRIORITY) when distance is similar (within 5km)
+2. Minimize total travel distance
+3. Balance workload among scheduled drivers
+4. Consider driver working hours (avoid overwork for clocked-in drivers)
+5. Prioritize high-value or urgent orders
+6. Group nearby deliveries for efficiency
+
+NOTE: All drivers shown are scheduled for today. Clocked-in drivers get priority but non-clocked-in drivers can still receive assignments.
 
 Provide assignments in JSON format:
 {
