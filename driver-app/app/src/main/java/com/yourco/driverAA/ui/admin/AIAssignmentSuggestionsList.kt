@@ -88,7 +88,7 @@ fun AIAssignmentSuggestionsList(
             }
         } else {
             uiState.aiSuggestions?.let { suggestions ->
-                // Summary card
+                // Simplified AI Engine Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -96,168 +96,102 @@ fun AIAssignmentSuggestionsList(
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        // Header
+                        Icon(
+                            Icons.Filled.Psychology,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        
                         Text(
-                            text = "AI Analysis Summary",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "AI Assignment Engine",
+                            style = MaterialTheme.typography.headlineSmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         
+                        Text(
+                            text = "Let AI automatically assign all pending orders to the best available drivers",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        
+                        // Summary stats
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             InfoChip(
-                                label = "Scheduled Today",
-                                value = "${suggestions.scheduled_drivers_count}",
-                                modifier = Modifier.weight(1f)
-                            )
-                            InfoChip(
-                                label = "Clocked In",
+                                label = "Available Drivers",
                                 value = "${suggestions.available_drivers_count}",
                                 modifier = Modifier.weight(1f)
                             )
                             InfoChip(
-                                label = "Orders",
+                                label = "Pending Orders",
                                 value = "${suggestions.pending_orders_count}",
+                                modifier = Modifier.weight(1f)
+                            )
+                            InfoChip(
+                                label = "Ready to Assign",
+                                value = "${suggestions.suggestions.size}",
                                 modifier = Modifier.weight(1f)
                             )
                         }
                         
-                        suggestions.ai_reasoning?.let { reasoning ->
-                            Text(
-                                text = reasoning,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer
-                            )
+                        // Accept All Button
+                        Button(
+                            onClick = { viewModel.acceptAllAssignments() },
+                            enabled = suggestions.suggestions.isNotEmpty() && !uiState.acceptingAllAssignments,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .height(56.dp)
+                        ) {
+                            if (uiState.acceptingAllAssignments) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Assigning Orders...")
+                            } else {
+                                Icon(Icons.Filled.Check, contentDescription = null)
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text("Accept All Suggestions (${suggestions.suggestions.size})")
+                            }
+                        }
+                        
+                        // Warning when no suggestions
+                        if (suggestions.suggestions.isEmpty()) {
+                            Card(
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.errorContainer
+                                )
+                            ) {
+                                Text(
+                                    text = when {
+                                        suggestions.pending_orders_count == 0 -> "No pending orders to assign"
+                                        suggestions.available_drivers_count == 0 -> "No drivers available - schedule drivers first"
+                                        else -> "Unable to generate suggestions - check driver schedules"
+                                    },
+                                    modifier = Modifier.padding(12.dp),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer
+                                )
+                            }
                         }
                     }
                 }
-                
-                // Suggestions list
-                LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(suggestions.suggestions) { suggestion ->
-                        AIAssignmentSuggestionCard(
-                            suggestion = suggestion,
-                            onAccept = { 
-                                viewModel.applyAssignment(suggestion.order_id, suggestion.driver_id)
-                            },
-                            isLoading = uiState.applyingAssignments.contains(suggestion.order_id)
-                        )
-                    }
-                }
             }
         }
     }
 }
 
-@Composable
-private fun AIAssignmentSuggestionCard(
-    suggestion: AssignmentSuggestion,
-    onAccept: () -> Unit,
-    isLoading: Boolean
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = "Order #${suggestion.order_id}",
-                        style = MaterialTheme.typography.titleMedium
-                    )
-                    Text(
-                        text = "Driver: ${suggestion.driver_name}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    AssistChip(
-                        onClick = { },
-                        label = { Text("${suggestion.distance_km}km") }
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    ConfidenceBadge(suggestion.confidence)
-                }
-            }
-            
-            // Reasoning
-            Text(
-                text = suggestion.reasoning,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-            
-            // Action button
-            Button(
-                onClick = onAccept,
-                enabled = !isLoading,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Applying...")
-                } else {
-                    Icon(Icons.Filled.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Accept Assignment")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ConfidenceBadge(confidence: String) {
-    val colors = when (confidence.lowercase()) {
-        "high" -> CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-        )
-        "medium" -> CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-        )
-        else -> CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-    }
-    
-    Card(
-        colors = colors
-    ) {
-        Text(
-            text = confidence,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.labelSmall
-        )
-    }
-}
 
 @Composable
 private fun InfoChip(

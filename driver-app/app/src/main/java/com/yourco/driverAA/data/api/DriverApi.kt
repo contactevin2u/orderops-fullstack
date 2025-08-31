@@ -60,6 +60,9 @@ interface DriverApi {
     @POST("ai-assignments/apply")
     suspend fun applyAssignment(@Body request: ApplyAssignmentRequest): AssignmentApplyResponse
     
+    @POST("ai-assignments/accept-all")
+    suspend fun acceptAllAssignments(): AcceptAllResponse
+    
     @GET("ai-assignments/available-drivers")
     suspend fun getAvailableDrivers(): AvailableDriversResponse
     
@@ -208,6 +211,29 @@ data class AssignmentApplyResponse(
     val trip_id: Int,
     val order_id: Int,
     val driver_id: Int
+)
+
+@Serializable
+data class AcceptAllResponse(
+    val message: String,
+    val assignments: List<AcceptAllAssignment>,
+    val failed: List<AcceptAllFailure>,
+    val method: String
+)
+
+@Serializable
+data class AcceptAllAssignment(
+    val order_id: Int,
+    val driver_id: Int,
+    val driver_name: String,
+    val order_code: String?
+)
+
+@Serializable
+data class AcceptAllFailure(
+    val order_id: Int?,
+    val driver_id: Int?,
+    val error: String
 )
 
 @Serializable

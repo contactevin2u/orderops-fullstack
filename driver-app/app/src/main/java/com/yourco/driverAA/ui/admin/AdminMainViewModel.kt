@@ -26,6 +26,7 @@ data class AdminUiState(
     // AI Assignments
     val aiSuggestions: AssignmentSuggestionsResponse? = null,
     val applyingAssignments: Set<Int> = emptySet(),
+    val acceptingAllAssignments: Boolean = false,
     
     // Orders and Drivers
     val pendingOrders: List<PendingOrder> = emptyList(),
@@ -142,6 +143,38 @@ class AdminMainViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         applyingAssignments = _uiState.value.applyingAssignments - orderId,
                         error = "Failed to apply assignment: ${error.message}"
+                    )
+                }
+            )
+        }
+    }
+    
+    fun acceptAllAssignments() {
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(
+                acceptingAllAssignments = true,
+                error = null
+            )
+            
+            adminRepository.acceptAllAssignments().fold(
+                onSuccess = { response ->
+                    _uiState.value = _uiState.value.copy(
+                        acceptingAllAssignments = false,
+                        successMessage = response.message
+                    )
+                    // Refresh suggestions and orders
+                    loadAIAssignmentSuggestions()
+                    loadPendingOrders()
+                    // Clear success message
+                    viewModelScope.launch {
+                        kotlinx.coroutines.delay(5000)
+                        _uiState.value = _uiState.value.copy(successMessage = null)
+                    }
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        acceptingAllAssignments = false,
+                        error = "Failed to accept all assignments: ${error.message}"
                     )
                 }
             )

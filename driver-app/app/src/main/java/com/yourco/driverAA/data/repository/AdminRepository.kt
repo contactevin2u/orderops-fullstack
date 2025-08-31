@@ -35,6 +35,15 @@ class AdminRepository @Inject constructor(
         }
     }
     
+    suspend fun acceptAllAssignments(): Result<AcceptAllResponse> {
+        return try {
+            val response = api.acceptAllAssignments()
+            Result.success(response)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
     suspend fun getAvailableDrivers(): Result<AvailableDriversResponse> {
         return try {
             val response = api.getAvailableDrivers()
