@@ -142,7 +142,11 @@ class AIAssignmentService:
         # Find orders that either:
         # 1. Have no trip at all, OR  
         # 2. Have a trip but it's not assigned to a driver
-        orders = self.db.query(Order).filter(
+        from sqlalchemy.orm import joinedload
+        
+        orders = self.db.query(Order).options(
+            joinedload(Order.customer)  # Eagerly load customer to avoid N+1 queries
+        ).filter(
             or_(
                 # Orders without any trip
                 ~exists().where(Trip.order_id == Order.id),
@@ -164,18 +168,25 @@ class AIAssignmentService:
 
         pending_orders = []
         for order in orders:
+            # Get customer information through relationship
+            customer_name = order.customer.name if order.customer else "Unknown Customer"
+            delivery_address = order.customer.address if order.customer else None
+            
             # Calculate approximate coordinates from address if available
-            order_lat, order_lng = self._estimate_coordinates_from_address(order.delivery_address)
+            order_lat, order_lng = self._estimate_coordinates_from_address(delivery_address)
             
             pending_orders.append({
                 "order_id": order.id,
-                "customer_name": order.customer_name,
-                "delivery_address": order.delivery_address,
+                "order_code": order.code,
+                "customer_name": customer_name,
+                "delivery_address": delivery_address or "No address provided",
                 "estimated_lat": order_lat,
                 "estimated_lng": order_lng,
-                "total_value": float(order.total_amount) if order.total_amount else 0,
+                "total_value": float(order.total) if order.total else 0,  # Use 'total' field
                 "priority": self._calculate_order_priority(order),
-                "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None
+                "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
+                "order_type": order.type,
+                "order_status": order.status
             })
 
         return pending_orders
@@ -453,7 +464,7 @@ Provide assignments in JSON format:
     def _calculate_order_priority(self, order: Order) -> str:
         """Calculate order priority based on various factors"""
         # Simple priority calculation for demo
-        if order.total_amount and float(order.total_amount) > 1000:
+        if order.total and float(order.total) > 1000:
             return "high"
         elif order.delivery_date and order.delivery_date.date() == datetime.now().date():
             return "urgent"
