@@ -35,96 +35,108 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">User Management</h1>
-        <p className="text-gray-600">
-          Create admin and cashier accounts for the web application. 
-          For drivers, use the <Link href="/admin/drivers" className="text-blue-600 hover:underline">Drivers section</Link> instead.
-        </p>
-      </div>
-
-      {message && (
-        <div
-          className={`mb-6 p-4 rounded-md ${
-            message.type === 'success'
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}
-          role="alert"
-        >
-          {message.text}
+    <div className="main">
+      <div className="container small-container">
+        <div style={{ marginBottom: 'var(--space-6)' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>User Management</h1>
+          <p style={{ opacity: 0.8 }}>
+            Create admin and cashier accounts for the web application. 
+            For drivers, use the <Link href="/admin/drivers" style={{ color: 'var(--color-primary)', textDecoration: 'underline' }}>Drivers section</Link> instead.
+          </p>
         </div>
-      )}
 
-      <div className="bg-white rounded-lg border p-6">
-        <h2 className="text-lg font-semibold mb-4">Create New User</h2>
-        
-        <form onSubmit={onSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-              Username *
-            </label>
-            <input
-              id="username"
-              type="text"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-              placeholder="Enter username"
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password *
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              placeholder="Enter secure password"
-              minLength={6}
-            />
-          </div>
-          
-          <div>
-            <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-              Role *
-            </label>
-            <select
-              id="role"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-            >
-              <option value="CASHIER">Cashier - Can process payments and view orders</option>
-              <option value="ADMIN">Admin - Full access to all features</option>
-            </select>
-            <p className="mt-1 text-sm text-gray-500">
-              Note: Driver accounts should be created in the Drivers section for mobile app access
-            </p>
-          </div>
-          
-          <button
-            type="submit"
-            className="w-full sm:w-auto btn"
+        {message && (
+          <div
+            style={{
+              marginBottom: 'var(--space-6)',
+              padding: 'var(--space-4)',
+              borderRadius: 'var(--radius-2)',
+              border: '1px solid',
+              ...(message.type === 'success' 
+                ? { background: '#f0fdf4', color: '#15803d', borderColor: '#bbf7d0' }
+                : { background: '#fef2f2', color: '#dc2626', borderColor: '#fecaca' })
+            }}
+            role="alert"
           >
-            Create User
-          </button>
-        </form>
-      </div>
+            {message.text}
+          </div>
+        )}
 
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h3 className="font-medium text-blue-800 mb-2">💡 User Types</h3>
-        <div className="space-y-2 text-sm text-blue-700">
-          <p><strong>Admin:</strong> Full access to all features including user management, driver management, and system settings</p>
-          <p><strong>Cashier:</strong> Access to payment processing, order viewing, and basic operations</p>
-          <p><strong>Driver:</strong> Mobile app access only - create these in the Drivers section</p>
+        <div className="card">
+          <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>Create New User</h2>
+          
+          <form onSubmit={onSubmit} className="stack">
+            <div>
+              <label htmlFor="username" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 'var(--space-1)' }}>
+                Username *
+              </label>
+              <input
+                id="username"
+                type="text"
+                className="input"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                placeholder="Enter username"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="password" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 'var(--space-1)' }}>
+                Password *
+              </label>
+              <input
+                id="password"
+                type="password"
+                className="input"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                placeholder="Enter secure password"
+                minLength={6}
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="role" style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 'var(--space-1)' }}>
+                Role *
+              </label>
+              <select
+                id="role"
+                className="select"
+                value={role}
+                onChange={(e) => setRole(e.target.value)}
+              >
+                <option value="CASHIER">Cashier - Can process payments and view orders</option>
+                <option value="ADMIN">Admin - Full access to all features</option>
+              </select>
+              <p style={{ marginTop: 'var(--space-1)', fontSize: '0.875rem', opacity: 0.7 }}>
+                Note: Driver accounts should be created in the Drivers section for mobile app access
+              </p>
+            </div>
+            
+            <button
+              type="submit"
+              className="btn"
+            >
+              Create User
+            </button>
+          </form>
+        </div>
+
+        <div style={{
+          marginTop: 'var(--space-6)',
+          padding: 'var(--space-4)',
+          background: '#eff6ff',
+          borderRadius: 'var(--radius-2)',
+          border: '1px solid #dbeafe'
+        }}>
+          <h3 style={{ fontWeight: 500, color: '#1e40af', marginBottom: 'var(--space-2)' }}>💡 User Types</h3>
+          <div className="stack" style={{ fontSize: '0.875rem', color: '#1e40af' }}>
+            <p><strong>Admin:</strong> Full access to all features including user management, driver management, and system settings</p>
+            <p><strong>Cashier:</strong> Access to payment processing, order viewing, and basic operations</p>
+            <p><strong>Driver:</strong> Mobile app access only - create these in the Drivers section</p>
+          </div>
         </div>
       </div>
     </div>

@@ -73,134 +73,153 @@ export default function AdminAssignPage() {
   };
 
   return (
-    <div className="container">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Assign Orders</h1>
-      <header className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
-        <div className="flex flex-wrap items-center gap-4 mb-4">
-          <label className="flex items-center gap-2 text-sm">
-            <span className="font-medium text-gray-700">Date:</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => router.push({ pathname: '/admin/assign', query: { date: e.target.value } })}
-              className="input text-sm"
-            />
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={showCompleted}
-              onChange={(e) => setShowCompleted(e.target.checked)}
-              className="rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <span className="text-gray-700">Show completed</span>
-          </label>
-        </div>
-        <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
-          <span className="flex items-center gap-1">
-            <span className="font-medium text-orange-600">{orders.length}</span> Unassigned
-          </span>
-          <span className="text-xs text-gray-500">
-            (No date: {counts.noDate}, Overdue: {counts.overdue})
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="font-medium text-blue-600">{selected.size}</span> Selected
-          </span>
-        </div>
-      </header>
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <table className="table w-full">
-        <caption className="sr-only">Unassigned orders</caption>
-        <thead>
-          <tr>
-            <th>
+    <div className="main">
+      <div className="container">
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-6)' }}>Assign Orders</h1>
+        <header className="card" style={{ marginBottom: 'var(--space-6)' }}>
+          <div className="cluster" style={{ marginBottom: 'var(--space-4)' }}>
+            <label className="cluster" style={{ fontSize: '0.875rem' }}>
+              <span style={{ fontWeight: 500 }}>Date:</span>
               <input
-                ref={selectAllRef}
-                type="checkbox"
-                aria-label="Select all"
-                checked={allSelected}
-                onChange={(e) => toggleAll(e.target.checked)}
+                type="date"
+                value={date}
+                onChange={(e) => router.push({ pathname: '/admin/assign', query: { date: e.target.value } })}
+                className="input"
+                style={{ fontSize: '0.875rem' }}
               />
-            </th>
-            <th>Order#</th>
-            <th>Delivery Date</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {ordersQuery.isLoading && (
+            </label>
+            <label className="cluster" style={{ fontSize: '0.875rem' }}>
+              <input
+                type="checkbox"
+                checked={showCompleted}
+                onChange={(e) => setShowCompleted(e.target.checked)}
+              />
+              <span>Show completed</span>
+            </label>
+          </div>
+          <div className="cluster" style={{ fontSize: '0.875rem' }}>
+            <span className="cluster">
+              <span style={{ fontWeight: 500, color: '#ea580c' }}>{orders.length}</span>
+              <span>Unassigned</span>
+            </span>
+            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+              (No date: {counts.noDate}, Overdue: {counts.overdue})
+            </span>
+            <span className="cluster">
+              <span style={{ fontWeight: 500, color: '#2563eb' }}>{selected.size}</span>
+              <span>Selected</span>
+            </span>
+          </div>
+        </header>
+        <div className="card" style={{ overflow: 'hidden' }}>
+          <table className="table">
+          <caption className="sr-only">Unassigned orders</caption>
+          <thead>
             <tr>
-              <td colSpan={4} role="status">
-                Loading...
-              </td>
+              <th>
+                <input
+                  ref={selectAllRef}
+                  type="checkbox"
+                  aria-label="Select all"
+                  checked={allSelected}
+                  onChange={(e) => toggleAll(e.target.checked)}
+                />
+              </th>
+              <th>Order#</th>
+              <th>Delivery Date</th>
+              <th>Status</th>
             </tr>
-          )}
-          {ordersQuery.isError && (
-            <tr>
-              <td colSpan={4} role="alert">
-                Failed to load
-              </td>
-            </tr>
-          )}
-          {!ordersQuery.isLoading &&
-            visible.map((o: Order) => (
-              <tr key={o.id}>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select order ${o.orderNo}`}
-                    checked={selected.has(o.id)}
-                    onChange={() => toggle(o.id)}
-                  />
+          </thead>
+          <tbody>
+            {ordersQuery.isLoading && (
+              <tr>
+                <td colSpan={4} role="status">
+                  Loading...
                 </td>
-                <td>{o.orderNo}</td>
-                <td>
-                  {o.deliveryDate}{' '}
-                  {getOrderBadges(o, date).map((b) => (
-                    <span key={b} className="ml-2 text-xs text-red-600 bg-red-50 px-2 py-1 rounded">
-                      {b}
-                    </span>
-                  ))}
-                </td>
-                <td>{o.status}</td>
               </tr>
-            ))}
-          {!ordersQuery.isLoading && visible.length === 0 && (
-            <tr>
-              <td colSpan={4} className="text-center py-8 text-gray-500">
-                No orders found
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+            {ordersQuery.isError && (
+              <tr>
+                <td colSpan={4} role="alert">
+                  Failed to load
+                </td>
+              </tr>
+            )}
+            {!ordersQuery.isLoading &&
+              visible.map((o: Order) => (
+                <tr key={o.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select order ${o.orderNo}`}
+                      checked={selected.has(o.id)}
+                      onChange={() => toggle(o.id)}
+                    />
+                  </td>
+                  <td>{o.orderNo}</td>
+                  <td>
+                    {o.deliveryDate}{' '}
+                    {getOrderBadges(o, date).map((b) => (
+                      <span key={b} className="badge" style={{
+                        marginLeft: 'var(--space-2)',
+                        background: '#fef2f2',
+                        color: '#dc2626',
+                        fontSize: '0.75rem'
+                      }}>
+                        {b}
+                      </span>
+                    ))}
+                  </td>
+                  <td>{o.status}</td>
+                </tr>
+              ))}
+            {!ordersQuery.isLoading && visible.length === 0 && (
+              <tr>
+                <td colSpan={4} style={{ textAlign: 'center', padding: 'var(--space-8) 0', opacity: 0.7 }}>
+                  No orders found
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+        </div>
+        <div style={{
+          position: 'sticky',
+          bottom: 0,
+          background: 'var(--color-surface)',
+          padding: 'var(--space-4)',
+          marginTop: 'var(--space-4)',
+          borderTop: '1px solid var(--color-border)',
+          borderRadius: 'var(--radius-4)'
+        }}>
+          <div className="cluster">
+            <button
+              className="btn secondary"
+              onClick={() => setSelected(new Set())}
+              disabled={selected.size === 0}
+            >
+              Clear Selection
+            </button>
+            <button 
+              className="btn" 
+              onClick={() => setShowModal(true)} 
+              disabled={selected.size === 0}
+            >
+              Assign to Route
+            </button>
+          </div>
+        </div>
+        {showModal && (
+          <AssignToRouteModal
+            orderIds={[...selected]}
+            date={date}
+            onClose={() => {
+              setShowModal(false);
+              setSelected(new Set());
+            }}
+          />
+        )}
       </div>
-      <div className="sticky bottom-0 bg-white p-4 mt-4 border-t border-gray-200 flex gap-3 rounded-lg">
-        <button
-          className="btn btn-secondary"
-          onClick={() => setSelected(new Set())}
-          disabled={selected.size === 0}
-        >
-          Clear Selection
-        </button>
-        <button 
-          className="btn btn-primary" 
-          onClick={() => setShowModal(true)} 
-          disabled={selected.size === 0}
-        >
-          Assign to Route
-        </button>
-      </div>
-      {showModal && (
-        <AssignToRouteModal
-          orderIds={[...selected]}
-          date={date}
-          onClose={() => {
-            setShowModal(false);
-            setSelected(new Set());
-          }}
-        />
-      )}
     </div>
   );
 }

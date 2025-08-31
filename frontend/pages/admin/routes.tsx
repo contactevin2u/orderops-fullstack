@@ -40,25 +40,42 @@ export function RouteCard({
       role="button"
       onClick={() => onSelect(route)}
       onKeyDown={onKeyDown}
-      className="card cursor-pointer hover:shadow-lg transition-shadow duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+      className="card cursor-pointer"
+      style={{
+        transition: 'box-shadow 0.2s',
+        outline: 'none'
+      }}
+      onMouseEnter={(e) => {
+        (e.target as HTMLElement).style.boxShadow = 'var(--shadow-lg)';
+      }}
+      onMouseLeave={(e) => {
+        (e.target as HTMLElement).style.boxShadow = '';
+      }}
+      onFocus={(e) => {
+        (e.target as HTMLElement).style.outline = '2px solid var(--color-primary)';
+        (e.target as HTMLElement).style.outlineOffset = '2px';
+      }}
+      onBlur={(e) => {
+        (e.target as HTMLElement).style.outline = 'none';
+      }}
     >
-      <h2 className="text-lg font-semibold text-gray-900 mb-2">{route.name}</h2>
-      <div className="space-y-1 text-sm text-gray-600 mb-4">
-        <div className="flex items-center gap-2">
-          <span className="font-medium">Primary:</span>
-          <span className={driverName ? 'text-gray-900' : 'text-gray-400'}>
+      <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-2)' }}>{route.name}</h2>
+      <div style={{ marginBottom: 'var(--space-4)' }}>
+        <div className="cluster" style={{ fontSize: '0.875rem', marginBottom: 'var(--space-1)' }}>
+          <span style={{ fontWeight: 500 }}>Primary:</span>
+          <span style={{ color: driverName ? 'var(--color-text)' : 'var(--color-border-muted)' }}>
             {driverName || 'Unassigned'}
           </span>
         </div>
         {secondaryDriverName && (
-          <div className="flex items-center gap-2">
-            <span className="font-medium">Secondary:</span>
-            <span className="text-gray-900">{secondaryDriverName}</span>
+          <div className="cluster" style={{ fontSize: '0.875rem', marginBottom: 'var(--space-1)' }}>
+            <span style={{ fontWeight: 500 }}>Secondary:</span>
+            <span>{secondaryDriverName}</span>
           </div>
         )}
-        <div className="flex items-center gap-2">
-          <span className="font-medium">Stops:</span>
-          <span className="text-gray-400">—</span>
+        <div className="cluster" style={{ fontSize: '0.875rem' }}>
+          <span style={{ fontWeight: 500 }}>Stops:</span>
+          <span style={{ color: 'var(--color-border-muted)' }}>—</span>
         </div>
       </div>
       <button
@@ -66,7 +83,8 @@ export function RouteCard({
           e.stopPropagation();
           onEdit(route);
         }}
-        className="btn btn-secondary text-sm px-3 py-1.5 min-h-0"
+        className="btn secondary"
+        style={{ fontSize: '0.875rem', minHeight: 'auto', padding: 'var(--space-2) var(--space-3)' }}
       >
         Edit
       </button>
@@ -131,80 +149,121 @@ export default function AdminRoutesPage() {
   const [editingRoute, setEditingRoute] = React.useState<Route | null>(null);
 
   return (
-    <div className="container">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Routes</h1>
-      <header className="cluster mb-6 p-4 bg-white rounded-lg border border-gray-200">
-        <label className="cluster text-sm">
-          <span className="font-medium text-gray-700">Date:</span>
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => router.push({ pathname: '/admin/routes', query: { date: e.target.value } })}
-            className="input text-sm"
-          />
-        </label>
-        <button onClick={() => setCreating(true)} className="btn btn-primary">
-          Create Route
-        </button>
-        <div className="text-sm text-gray-600 flex flex-wrap gap-4" aria-live="polite">
-          <span className="flex items-center gap-1">
-            <span className="font-medium text-blue-600">{routes.length}</span> Routes
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="font-medium text-orange-600">{unassigned.length}</span> Unassigned
-          </span>
-          <span className="text-xs text-gray-500">
-            (No date: {counts.noDate}, Overdue: {counts.overdue})
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="font-medium text-purple-600">{onHold.length}</span> On Hold
-          </span>
-        </div>
-      </header>
-      <div>
-        {routesQuery.isLoading && (
-          <div className="flex items-center justify-center py-12" role="status">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            <span className="ml-3 text-gray-600">Loading routes...</span>
-          </div>
-        )}
-        {routesQuery.isError && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg" role="alert">
-            Failed to load routes. Please try again.
-          </div>
-        )}
-        {!routesQuery.isLoading && routes.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-lg mb-2">No routes found</div>
-            <p className="text-gray-500 text-sm">Create your first route to get started</p>
-          </div>
-        )}
-        {!routesQuery.isLoading && routes.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {routes.map((r) => (
-              <RouteCard
-                key={r.id}
-                route={r}
-                onSelect={setSelectedRoute}
-                onEdit={setEditingRoute}
-                driverName={driverNameById[r.driverId || '']}
-                secondaryDriverName={driverNameById[r.secondaryDriverId || '']}
+    <div className="main">
+      <div className="container">
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-6)' }}>Routes</h1>
+        <header className="card" style={{ marginBottom: 'var(--space-6)' }}>
+          <div className="cluster">
+            <label className="cluster" style={{ fontSize: '0.875rem' }}>
+              <span style={{ fontWeight: 500 }}>Date:</span>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => router.push({ pathname: '/admin/routes', query: { date: e.target.value } })}
+                className="input"
+                style={{ fontSize: '0.875rem' }}
               />
-            ))}
+            </label>
+            <button onClick={() => setCreating(true)} className="btn">
+              Create Route
+            </button>
+            <div style={{ fontSize: '0.875rem' }} aria-live="polite">
+              <div className="cluster">
+                <span className="cluster">
+                  <span style={{ fontWeight: 500, color: '#2563eb' }}>{routes.length}</span>
+                  <span>Routes</span>
+                </span>
+                <span className="cluster">
+                  <span style={{ fontWeight: 500, color: '#ea580c' }}>{unassigned.length}</span>
+                  <span>Unassigned</span>
+                </span>
+                <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>
+                  (No date: {counts.noDate}, Overdue: {counts.overdue})
+                </span>
+                <span className="cluster">
+                  <span style={{ fontWeight: 500, color: '#9333ea' }}>{onHold.length}</span>
+                  <span>On Hold</span>
+                </span>
+              </div>
+            </div>
           </div>
+        </header>
+        <div>
+          {routesQuery.isLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--space-10) 0' }} role="status">
+              <div style={{
+                width: '2rem',
+                height: '2rem',
+                border: '2px solid var(--color-border)',
+                borderTop: '2px solid var(--color-primary)',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}></div>
+              <span style={{ marginLeft: 'var(--space-3)' }}>Loading routes...</span>
+            </div>
+          )}
+          {routesQuery.isError && (
+            <div
+              style={{
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                color: '#b91c1c',
+                padding: 'var(--space-3) var(--space-4)',
+                borderRadius: 'var(--radius-2)'
+              }}
+              role="alert"
+            >
+              Failed to load routes. Please try again.
+            </div>
+          )}
+          {!routesQuery.isLoading && routes.length === 0 && (
+            <div style={{ textAlign: 'center', padding: 'var(--space-10) 0' }}>
+              <div style={{ color: 'var(--color-border-muted)', fontSize: '1.125rem', marginBottom: 'var(--space-2)' }}>
+                No routes found
+              </div>
+              <p style={{ opacity: 0.7, fontSize: '0.875rem' }}>Create your first route to get started</p>
+            </div>
+          )}
+          {!routesQuery.isLoading && routes.length > 0 && (
+            <div className="grid" style={{
+              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+              gap: 'var(--space-6)'
+            }}>
+              {routes.map((r) => (
+                <RouteCard
+                  key={r.id}
+                  route={r}
+                  onSelect={setSelectedRoute}
+                  onEdit={setEditingRoute}
+                  driverName={driverNameById[r.driverId || '']}
+                  secondaryDriverName={driverNameById[r.secondaryDriverId || '']}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        {selectedRoute && (
+          <RouteDetailDrawer route={selectedRoute} onClose={() => setSelectedRoute(null)} />
+        )}
+        {creating && <RouteFormModal date={date} onClose={() => setCreating(false)} />}
+        {editingRoute && (
+          <RouteFormModal
+            date={date}
+            route={editingRoute}
+            onClose={() => setEditingRoute(null)}
+          />
         )}
       </div>
-      {selectedRoute && (
-        <RouteDetailDrawer route={selectedRoute} onClose={() => setSelectedRoute(null)} />
-      )}
-      {creating && <RouteFormModal date={date} onClose={() => setCreating(false)} />}
-      {editingRoute && (
-        <RouteFormModal
-          date={date}
-          route={editingRoute}
-          onClose={() => setEditingRoute(null)}
-        />
-      )}
+      <style jsx>{`
+        @keyframes spin {
+          from {
+            transform: rotate(0deg);
+          }
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }
