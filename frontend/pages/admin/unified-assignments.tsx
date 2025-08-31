@@ -17,7 +17,8 @@ import {
   TrendingUp,
   Users,
   Package,
-  Settings
+  Settings,
+  Calendar
 } from 'lucide-react';
 
 interface Assignment {

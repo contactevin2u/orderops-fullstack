@@ -220,26 +220,23 @@ export function OrderCard({ order: o, onUpdateCommission, onReleaseCommission }:
     ((method === '' && amount === '') || (!!method && !!amount));
 
   // Auto-save commission when it changes (debounced)
-  const debouncedUpdateCommission = React.useCallback(
-    React.useMemo(
-      () => {
-        let timeoutId: NodeJS.Timeout;
-        return (newCommission: string) => {
-          clearTimeout(timeoutId);
-          timeoutId = setTimeout(async () => {
-            if (newCommission && newCommission !== String(o?.trip?.commission?.computed_amount ?? o?.commission ?? '')) {
-              try {
-                await onUpdateCommission({ orderId: o.id, amount: newCommission });
-              } catch (e: any) {
-                console.error('Failed to update commission:', e);
-              }
+  const debouncedUpdateCommission = React.useMemo(
+    () => {
+      let timeoutId: NodeJS.Timeout;
+      return (newCommission: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(async () => {
+          if (newCommission && newCommission !== String(o?.trip?.commission?.computed_amount ?? o?.commission ?? '')) {
+            try {
+              await onUpdateCommission({ orderId: o.id, amount: newCommission });
+            } catch (e: any) {
+              console.error('Failed to update commission:', e);
             }
-          }, 1000);
-        };
-      },
-      [o.id, onUpdateCommission, o?.trip?.commission?.computed_amount, o?.commission]
-    ),
-    []
+          }
+        }, 1000);
+      };
+    },
+    [o.id, onUpdateCommission, o?.trip?.commission?.computed_amount, o?.commission]
   );
 
   React.useEffect(() => {
