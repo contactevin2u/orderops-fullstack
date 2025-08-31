@@ -84,7 +84,11 @@ class UnifiedAssignmentService:
         driver_id = suggestion["driver_id"]
         today = date.today()
         
-        # Get/Create route for this driver today
+        # Check if route already exists before creating
+        existing_route = self._get_existing_daily_route(driver_id, today)
+        route_created = existing_route is None
+        
+        # Get or create route for this driver today
         route = self._get_or_create_daily_route(driver_id, today)
         
         # Create/Update trip
@@ -95,7 +99,6 @@ class UnifiedAssignmentService:
             raise ValueError(f"Order {order_id} or Driver {driver_id} not found")
         
         trip = self.db.query(Trip).filter_by(order_id=order.id).one_or_none()
-        route_created = False
         
         if trip:
             # Update existing trip
@@ -113,7 +116,6 @@ class UnifiedAssignmentService:
                 status="ASSIGNED"
             )
             self.db.add(trip)
-            route_created = route.id is None  # New route was created
         
         order.status = "ASSIGNED"
         
@@ -134,6 +136,19 @@ class UnifiedAssignmentService:
                 "name": route.name
             }
         }
+
+    def _get_existing_daily_route(self, driver_id: int, route_date: date) -> Optional[DriverRoute]:
+        """Check if driver already has a route for the given date"""
+        return (
+            self.db.query(DriverRoute)
+            .filter(
+                and_(
+                    DriverRoute.driver_id == driver_id,
+                    DriverRoute.route_date == route_date
+                )
+            )
+            .one_or_none()
+        )
 
     def _get_or_create_daily_route(self, driver_id: int, route_date: date) -> DriverRoute:
         """Get existing route for driver today, or create a new one"""
@@ -206,13 +221,9 @@ class UnifiedAssignmentService:
                 order.status = "PENDING"  # Back to pending for assignment
                 order.notes = f"Customer requested delivery on {parsed_date.strftime('%B %d, %Y')}"
                 
-                # If it's for today, try to assign immediately
+                # Just reschedule - don't trigger auto-assignment to avoid recursion
                 if parsed_date == date.today():
-                    try:
-                        auto_result = self.auto_assign_new_orders()
-                        message = f"Order rescheduled for today and auto-assigned"
-                    except:
-                        message = f"Order rescheduled for today, manual assignment may be needed"
+                    message = f"Order rescheduled for today and ready for assignment"
                 else:
                     message = f"Order rescheduled for {parsed_date.strftime('%B %d, %Y')}"
                 

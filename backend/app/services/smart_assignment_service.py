@@ -76,14 +76,33 @@ class SmartAssignmentService:
         return result
 
     def get_pending_orders(self) -> List[Dict[str, Any]]:
-        """Get orders with estimated coordinates"""
+        """Get orders that are ready for assignment with estimated coordinates"""
         from sqlalchemy.orm import joinedload
+        from datetime import date
         
+        today = date.today()
+        
+        # Get orders that are:
+        # 1. Status NEW or PENDING (ready for assignment)
+        # 2. For today's delivery (or no specific date)
+        # 3. Not already assigned to a route
         orders = (
             self.db.query(Order)
             .options(joinedload(Order.customer))
             .outerjoin(Trip, Trip.order_id == Order.id)
-            .filter(or_(Trip.id.is_(None), Trip.route_id.is_(None)))
+            .filter(
+                and_(
+                    # Only assignable orders
+                    Order.status.in_(["NEW", "PENDING"]),
+                    # Today's deliveries or no specific date
+                    or_(
+                        Order.delivery_date == today,
+                        Order.delivery_date.is_(None)
+                    ),
+                    # Not already assigned to a route
+                    or_(Trip.id.is_(None), Trip.route_id.is_(None))
+                )
+            )
             .all()
         )
         
