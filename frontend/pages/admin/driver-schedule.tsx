@@ -126,8 +126,8 @@ export default function DriverSchedulePage() {
                   backgroundColor: 'transparent',
                   cursor: 'pointer'
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#F3F4F6'}
+                onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
               >
                 <ChevronLeft size={20} />
               </button>
@@ -145,8 +145,8 @@ export default function DriverSchedulePage() {
                   backgroundColor: 'transparent',
                   cursor: 'pointer'
                 }}
-                onMouseOver={(e) => e.target.style.backgroundColor = '#F3F4F6'}
-                onMouseOut={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseOver={(e) => (e.target as HTMLElement).style.backgroundColor = '#F3F4F6'}
+                onMouseOut={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
               >
                 <ChevronRight size={20} />
               </button>
@@ -208,12 +208,12 @@ export default function DriverSchedulePage() {
                     }}
                     onMouseOver={(e) => {
                       if (isCurrentMonthDate && !isSelectedDate) {
-                        e.target.style.backgroundColor = '#F3F4F6';
+                        (e.target as HTMLElement).style.backgroundColor = '#F3F4F6';
                       }
                     }}
                     onMouseOut={(e) => {
                       if (isCurrentMonthDate && !isSelectedDate) {
-                        e.target.style.backgroundColor = isTodayDate ? '#F0FDF4' : 'white';
+                        (e.target as HTMLElement).style.backgroundColor = isTodayDate ? '#F0FDF4' : 'white';
                       }
                     }}
                   >
@@ -312,12 +312,12 @@ export default function DriverSchedulePage() {
                                 cursor: 'pointer'
                               }}
                               onMouseOver={(e) => {
-                                e.target.style.backgroundColor = '#FEF2F2';
-                                e.target.style.color = '#B91C1C';
+                                (e.target as HTMLElement).style.backgroundColor = '#FEF2F2';
+                                (e.target as HTMLElement).style.color = '#B91C1C';
                               }}
                               onMouseOut={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.color = '#DC2626';
+                                (e.target as HTMLElement).style.backgroundColor = 'transparent';
+                                (e.target as HTMLElement).style.color = '#DC2626';
                               }}
                             >
                               Remove
@@ -354,12 +354,12 @@ export default function DriverSchedulePage() {
                             width: '100%'
                           }}
                           onMouseOver={(e) => {
-                            e.target.style.backgroundColor = '#EBF8FF';
-                            e.target.style.borderColor = '#BFDBFE';
+                            (e.target as HTMLElement).style.backgroundColor = '#EBF8FF';
+                            (e.target as HTMLElement).style.borderColor = '#BFDBFE';
                           }}
                           onMouseOut={(e) => {
-                            e.target.style.backgroundColor = 'white';
-                            e.target.style.borderColor = '#E5E7EB';
+                            (e.target as HTMLElement).style.backgroundColor = 'white';
+                            (e.target as HTMLElement).style.borderColor = '#E5E7EB';
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
