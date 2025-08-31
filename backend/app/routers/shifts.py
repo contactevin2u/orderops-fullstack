@@ -18,6 +18,12 @@ from app.services.shift_service import ShiftService
 router = APIRouter(prefix="/drivers/shifts", tags=["shifts"])
 
 
+@router.get("/test")
+async def test_shifts_available():
+    """Test if shifts system is available"""
+    return {"message": "Shifts API is available", "status": "ok"}
+
+
 class ClockInRequest(BaseModel):
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lng: float = Field(..., ge=-180, le=180, description="Longitude")
@@ -132,9 +138,8 @@ async def clock_out(
     db: Session = Depends(get_session)
 ):
     """Clock out driver at specified location"""
-    shift_service = ShiftService(db)
-    
     try:
+        shift_service = ShiftService(db)
         shift = shift_service.clock_out(
             driver_id=current_driver.id,
             lat=request.lat,
