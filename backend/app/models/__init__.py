@@ -12,6 +12,7 @@ from .trip import Trip, TripEvent
 from .commission import Commission
 from .driver_shift import DriverShift
 from .commission_entry import CommissionEntry
+from .driver_schedule import DriverSchedule, DriverAvailabilityPattern
 from .user import User, Role
 from .audit_log import AuditLog
 
@@ -32,6 +33,8 @@ __all__ = [
     "Commission",
     "DriverShift",
     "CommissionEntry",
+    "DriverSchedule",
+    "DriverAvailabilityPattern",
     "User",
     "Role",
     "AuditLog",
