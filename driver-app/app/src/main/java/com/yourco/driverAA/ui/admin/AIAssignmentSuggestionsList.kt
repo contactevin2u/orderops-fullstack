@@ -110,12 +110,12 @@ fun AIAssignmentSuggestionsList(
                             horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             InfoChip(
-                                label = "Method",
-                                value = suggestions.method,
+                                label = "Total Drivers",
+                                value = "${suggestions.total_drivers_count}",
                                 modifier = Modifier.weight(1f)
                             )
                             InfoChip(
-                                label = "Drivers",
+                                label = "Clocked In",
                                 value = "${suggestions.available_drivers_count}",
                                 modifier = Modifier.weight(1f)
                             )

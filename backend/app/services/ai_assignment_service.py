@@ -104,14 +104,18 @@ class AIAssignmentService:
         """
         available_drivers = self.get_available_drivers()
         pending_orders = self.get_pending_orders()
+        
+        # Get total number of drivers in system (active drivers)
+        total_drivers_count = self.db.query(Driver).filter(Driver.is_active == True).count()
 
         if not available_drivers:
             return {
                 "suggestions": [],
-                "method": "no_drivers",
+                "method": "drivers_not_clocked_in",
                 "available_drivers_count": 0,
                 "pending_orders_count": len(pending_orders),
-                "ai_reasoning": "No drivers currently clocked in"
+                "total_drivers_count": total_drivers_count,
+                "ai_reasoning": f"No drivers currently clocked in. {total_drivers_count} drivers are registered but haven't started their shifts yet."
             }
 
         if not pending_orders:
@@ -120,15 +124,16 @@ class AIAssignmentService:
                 "method": "no_orders",
                 "available_drivers_count": len(available_drivers),
                 "pending_orders_count": 0,
+                "total_drivers_count": total_drivers_count,
                 "ai_reasoning": "No pending orders to assign"
             }
 
         if self.ai_enabled:
-            return self._ai_suggest_assignments(available_drivers, pending_orders)
+            return self._ai_suggest_assignments(available_drivers, pending_orders, total_drivers_count)
         else:
-            return self._fallback_suggest_assignments(available_drivers, pending_orders)
+            return self._fallback_suggest_assignments(available_drivers, pending_orders, total_drivers_count)
 
-    def _ai_suggest_assignments(self, drivers: List[Dict], orders: List[Dict]) -> Dict[str, Any]:
+    def _ai_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], total_drivers_count: int) -> Dict[str, Any]:
         """Use OpenAI to suggest assignments"""
         try:
             prompt = self._build_assignment_prompt(drivers, orders)
@@ -157,14 +162,15 @@ class AIAssignmentService:
                 "ai_reasoning": ai_response,
                 "method": "ai_optimized",
                 "available_drivers_count": len(drivers),
-                "pending_orders_count": len(orders)
+                "pending_orders_count": len(orders),
+                "total_drivers_count": total_drivers_count
             }
 
         except Exception as e:
             logger.error(f"AI assignment failed: {e}")
-            return self._fallback_suggest_assignments(drivers, orders)
+            return self._fallback_suggest_assignments(drivers, orders, total_drivers_count)
 
-    def _fallback_suggest_assignments(self, drivers: List[Dict], orders: List[Dict]) -> Dict[str, Any]:
+    def _fallback_suggest_assignments(self, drivers: List[Dict], orders: List[Dict], total_drivers_count: int) -> Dict[str, Any]:
         """Fallback assignment logic using distance-based optimization"""
         suggestions = []
         
@@ -200,7 +206,8 @@ class AIAssignmentService:
             "suggestions": suggestions,
             "method": "distance_optimized",
             "available_drivers_count": len(drivers),
-            "pending_orders_count": len(orders)
+            "pending_orders_count": len(orders),
+            "total_drivers_count": total_drivers_count
         }
 
     def _build_assignment_prompt(self, drivers: List[Dict], orders: List[Dict]) -> str:

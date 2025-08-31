@@ -24,6 +24,7 @@ interface AIAssignmentResponse {
   method: string;
   available_drivers_count: number;
   pending_orders_count: number;
+  total_drivers_count?: number;
   ai_reasoning?: string;
 }
 
@@ -433,10 +434,14 @@ Notes: Urgent delivery`}
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-3 gap-4 mb-4">
+                  <div className="grid grid-cols-4 gap-4 mb-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-900">{aiSuggestions.total_drivers_count || 0}</div>
+                      <div className="text-sm text-blue-700">Total Drivers</div>
+                    </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-900">{aiSuggestions.available_drivers_count}</div>
-                      <div className="text-sm text-blue-700">Available Drivers</div>
+                      <div className="text-sm text-blue-700">Clocked In</div>
                     </div>
                     <div className="text-center">
                       <div className="text-2xl font-bold text-blue-900">{aiSuggestions.pending_orders_count}</div>
