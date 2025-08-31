@@ -343,3 +343,19 @@ export async function listDriverOrders(driverId: number, month?: string, limit =
   if (data && typeof data === 'object' && Array.isArray(data.items)) return data.items;
   return [];
 }
+
+// -------- Driver Schedule
+export function getDriversWithSchedule(targetDate?: string) {
+  const sp = new URLSearchParams();
+  if (targetDate) sp.set('target_date', targetDate);
+  return request<any>(`/driver-schedule/drivers/all${sp.toString() ? `?${sp.toString()}` : ''}`);
+}
+
+export function setDailySchedule(data: {
+  driver_id: number;
+  schedule_date: string;
+  is_scheduled: boolean;
+  shift_type?: string;
+}) {
+  return request<any>('/driver-schedule/daily-override', { json: data });
+}
