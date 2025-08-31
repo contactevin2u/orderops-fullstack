@@ -40,25 +40,38 @@ class AIAssignmentService:
         """Get scheduled drivers with priority for clocked-in drivers"""
         from datetime import date
         
-        # Get drivers who are scheduled for today
-        today = date.today()
-        scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
-        scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
-        
-        # If no scheduled drivers, fallback to all active drivers
-        if not scheduled_driver_ids:
-            # Auto-create schedules if none exist (makes system usable)
-            schedules_created = self.auto_schedule_all_drivers_if_empty()
-            if schedules_created:
-                logger.info("Auto-created availability patterns for all drivers")
-                # Re-fetch scheduled drivers after auto-creation
-                scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
-                scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
+        try:
+            # Get drivers who are scheduled for today
+            today = date.today()
+            scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
+            scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
             
-            # Final fallback: use all active drivers if still no schedules
+            # If no scheduled drivers, fallback to all active drivers
             if not scheduled_driver_ids:
-                all_active_drivers = self.db.query(Driver).filter(Driver.is_active == True).all()
-                scheduled_driver_ids = {d.id for d in all_active_drivers}
+                try:
+                    # Auto-create schedules if none exist (makes system usable)
+                    schedules_created = self.auto_schedule_all_drivers_if_empty()
+                    if schedules_created:
+                        logger.info("Auto-created availability patterns for all drivers")
+                        # Re-fetch scheduled drivers after auto-creation
+                        scheduled_drivers = self.schedule_service.get_scheduled_drivers_for_date(today)
+                        scheduled_driver_ids = {d["driver_id"] for d in scheduled_drivers}
+                except Exception as e:
+                    logger.error(f"Failed to auto-create schedules: {e}")
+                    # Continue with fallback
+                
+                # Final fallback: use all active drivers if still no schedules
+                if not scheduled_driver_ids:
+                    logger.info("Using fallback: all active drivers")
+                    all_active_drivers = self.db.query(Driver).filter(Driver.is_active == True).all()
+                    scheduled_driver_ids = {d.id for d in all_active_drivers}
+        
+        except Exception as e:
+            logger.error(f"Error in driver scheduling logic: {e}")
+            # Ultimate fallback: just get all active drivers like the working /drivers endpoint
+            logger.info("Using ultimate fallback: simple driver query like /drivers endpoint")
+            all_active_drivers = self.db.query(Driver).filter(Driver.is_active == True).all()
+            scheduled_driver_ids = {d.id for d in all_active_drivers}
 
         # Get current active shifts for clock-in status (for priority, not eligibility)
         active_shifts_dict = {}
