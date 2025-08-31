@@ -93,7 +93,6 @@ class AIAssignmentService:
             ).count()
 
             # Use home base coordinates if not clocked in
-            from app.config.clock_config import HOME_BASE_LAT, HOME_BASE_LNG
             
             driver_data = {
                 "driver_id": driver.id,
@@ -139,32 +138,24 @@ class AIAssignmentService:
         from sqlalchemy import exists, or_, and_
         from app.models.trip import Trip
         
-        # Find orders that either:
-        # 1. Have no trip at all, OR  
-        # 2. Have a trip but it's not assigned to a driver
+        # Use the SAME logic as the working manual assignment endpoint (/orders?unassigned=true)
+        # This matches orders.py line 147: Trip.id.is_(None) OR Trip.route_id.is_(None)
         from sqlalchemy.orm import joinedload
+        from sqlalchemy import select
         
-        orders = self.db.query(Order).options(
-            joinedload(Order.customer)  # Eagerly load customer to avoid N+1 queries
-        ).filter(
-            or_(
-                # Orders without any trip
-                ~exists().where(Trip.order_id == Order.id),
-                # Orders with unassigned trips
-                exists().where(
-                    and_(
-                        Trip.order_id == Order.id,
-                        or_(
-                            Trip.driver_id.is_(None),
-                            Trip.status.in_(["CREATED", "UNASSIGNED"])
-                        )
-                    )
+        stmt = (
+            select(Order)
+            .options(joinedload(Order.customer))  # Eagerly load customer
+            .join(Trip, Trip.order_id == Order.id, isouter=True)  # LEFT JOIN trips
+            .filter(
+                # Same logic as manual assignment: no trip OR no route assigned  
+                and_(
+                    or_(Trip.id.is_(None), Trip.route_id.is_(None))
                 )
             )
-        ).filter(
-            # Only include orders that are in assignable state
-            Order.status.in_(["NEW", "PENDING"])
-        ).all()
+        )
+        
+        orders = self.db.execute(stmt).scalars().unique().all()
 
         pending_orders = []
         for order in orders:
