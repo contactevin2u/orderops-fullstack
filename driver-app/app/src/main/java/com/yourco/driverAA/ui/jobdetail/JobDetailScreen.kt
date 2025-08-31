@@ -118,6 +118,7 @@ fun JobDetailScreen(
     val job by viewModel.job.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val showOnHoldDialog by viewModel.showOnHoldDialog.collectAsState()
 
     LaunchedEffect(jobId) {
         viewModel.loadJob(jobId)
@@ -155,6 +156,16 @@ fun JobDetailScreen(
                 )
             }
         }
+    }
+    
+    // On-hold dialog
+    if (showOnHoldDialog) {
+        OnHoldDialog(
+            onDismiss = { viewModel.dismissOnHoldDialog() },
+            onResponse = { customerAvailable, deliveryDate -> 
+                viewModel.handleOnHoldResponse(customerAvailable, deliveryDate)
+            }
+        )
     }
 }
 
@@ -793,5 +804,139 @@ private fun CustomerPhoneSection(phone: String) {
                 )
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun OnHoldDialog(
+    onDismiss: () -> Unit,
+    onResponse: (customerAvailable: Boolean, deliveryDate: String?) -> Unit
+) {
+    var selectedDate by remember { mutableStateOf("") }
+    var showDatePicker by remember { mutableStateOf(false) }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Customer Not Available",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Did the customer give you a specific date for delivery?",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                if (selectedDate.isNotEmpty()) {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer
+                        )
+                    ) {
+                        Text(
+                            text = "Selected: $selectedDate",
+                            modifier = Modifier.padding(12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Yes, customer gave specific date
+                Button(
+                    onClick = { showDatePicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(Icons.Default.DateRange, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Yes - Select Date")
+                }
+                
+                // Submit with selected date
+                if (selectedDate.isNotEmpty()) {
+                    Button(
+                        onClick = { onResponse(true, selectedDate) },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.tertiary
+                        )
+                    ) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Confirm Date")
+                    }
+                }
+                
+                // No, customer has no preference
+                OutlinedButton(
+                    onClick = { onResponse(false, null) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("No Specific Date - Tomorrow")
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+    
+    // Simple date picker using AlertDialog
+    if (showDatePicker) {
+        AlertDialog(
+            onDismissRequest = { showDatePicker = false },
+            title = { Text("Select Delivery Date") },
+            text = {
+                Column {
+                    Text("When does customer want delivery?")
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Quick date options
+                    val today = java.time.LocalDate.now()
+                    val options = listOf(
+                        "Today" to today.toString(),
+                        "Tomorrow" to today.plusDays(1).toString(),
+                        "Day After Tomorrow" to today.plusDays(2).toString(),
+                        "Next Week" to today.plusWeeks(1).toString()
+                    )
+                    
+                    options.forEach { (label, dateValue) ->
+                        TextButton(
+                            onClick = {
+                                selectedDate = "$label ($dateValue)"
+                                showDatePicker = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(label, modifier = Modifier.fillMaxWidth())
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

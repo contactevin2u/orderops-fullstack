@@ -27,6 +27,9 @@ interface DriverApi {
     @PATCH("drivers/orders/{id}")
     suspend fun updateOrderStatus(@Path("id") orderId: String, @Body update: OrderStatusUpdateDto): JobDto
     
+    @POST("unified-assignments/handle-on-hold")
+    suspend fun handleOnHoldResponse(@Body request: OnHoldResponseDto): OnHoldResponseResult
+    
     @Multipart
     @POST("drivers/orders/{id}/pod-photo")
     suspend fun uploadPodPhoto(
@@ -296,4 +299,20 @@ data class OrderDto(
     val notes: String?,
     val delivery_date: String?,
     val created_at: String
+)
+
+@Serializable
+data class OnHoldResponseDto(
+    val order_id: Int,
+    val customer_available: Boolean,
+    val delivery_date: String? = null
+)
+
+@Serializable
+data class OnHoldResponseResult(
+    val success: Boolean,
+    val message: String,
+    val order_id: Int,
+    val new_status: String,
+    val new_delivery_date: String?
 )

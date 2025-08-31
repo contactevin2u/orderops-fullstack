@@ -5,6 +5,8 @@ import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.OrderStatusUpdateDto
 import com.yourco.driverAA.data.api.PodUploadResponse
 import com.yourco.driverAA.data.api.CommissionMonthDto
+import com.yourco.driverAA.data.api.OnHoldResponseDto
+import com.yourco.driverAA.data.api.OnHoldResponseResult
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -53,4 +55,11 @@ class JobsRepository @Inject constructor(
     }
     
     suspend fun getCommissions(): List<CommissionMonthDto> = api.getCommissions()
+    
+    suspend fun handleOnHoldResponse(orderId: Int, customerAvailable: Boolean, deliveryDate: String? = null): Result<OnHoldResponseResult> = try {
+        val response = api.handleOnHoldResponse(OnHoldResponseDto(orderId, customerAvailable, deliveryDate))
+        Result.Success(response)
+    } catch (e: Exception) {
+        Result.Error(e)
+    }
 }

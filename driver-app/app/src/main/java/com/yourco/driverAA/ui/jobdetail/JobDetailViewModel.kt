@@ -27,6 +27,9 @@ class JobDetailViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
     
+    private val _showOnHoldDialog = MutableStateFlow(false)
+    val showOnHoldDialog: StateFlow<Boolean> = _showOnHoldDialog.asStateFlow()
+    
     fun loadJob(jobId: String) {
         viewModelScope.launch {
             _loading.value = true
@@ -49,6 +52,12 @@ class JobDetailViewModel @Inject constructor(
     }
     
     fun updateStatus(newStatus: String) {
+        if (newStatus == "ON_HOLD") {
+            // Show dialog to ask about customer availability
+            _showOnHoldDialog.value = true
+            return
+        }
+        
         val currentJob = _job.value ?: return
         
         viewModelScope.launch {
@@ -91,6 +100,38 @@ class JobDetailViewModel @Inject constructor(
                 is Result.Loading -> {
                     // Loading state is already handled above with _loading.value = true
                     // This branch should not be reached in practice
+                }
+            }
+        }
+    }
+    
+    fun dismissOnHoldDialog() {
+        _showOnHoldDialog.value = false
+    }
+    
+    fun handleOnHoldResponse(customerAvailable: Boolean, deliveryDate: String? = null) {
+        val currentJob = _job.value ?: return
+        _showOnHoldDialog.value = false
+        
+        viewModelScope.launch {
+            _loading.value = true
+            _error.value = null
+            
+            when (val result = repository.handleOnHoldResponse(
+                orderId = currentJob.id.toInt(),
+                customerAvailable = customerAvailable,
+                deliveryDate = deliveryDate
+            )) {
+                is Result.Success -> {
+                    // Reload job to get updated status
+                    loadJob(currentJob.id)
+                }
+                is Result.Error -> {
+                    _error.value = result.throwable.message ?: "Failed to handle on-hold response"
+                    _loading.value = false
+                }
+                is Result.Loading -> {
+                    _loading.value = true
                 }
             }
         }
