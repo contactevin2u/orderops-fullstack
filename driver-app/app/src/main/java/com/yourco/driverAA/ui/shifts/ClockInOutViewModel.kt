@@ -155,7 +155,7 @@ class ClockInOutViewModel @Inject constructor(
                                 isClocked = false,
                                 clockInTime = null,
                                 currentLocation = null,
-                                hoursWorked = shift.total_working_hours,
+                                hoursWorked = shift.total_working_hours?.toFloat(),
                                 shiftId = null
                             )
                         } catch (e: HttpException) {
