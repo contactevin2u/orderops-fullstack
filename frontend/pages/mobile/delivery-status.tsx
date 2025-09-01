@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { MapPin, Truck, Clock, CheckCircle, AlertCircle, Edit3, Save, X, Phone } from 'lucide-react';
 import { fetchRoutes, fetchUnassigned, fetchDrivers, updateRoute, type Route, type Order, type Driver } from '@/utils/apiAdapter';
+import { listOrders } from '@/utils/api';
 
 export default function MobileDeliveryStatusPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -27,7 +28,7 @@ export default function MobileDeliveryStatusPage() {
   const allOrdersQuery = useQuery({
     queryKey: ['mobile-all-orders', selectedDate],
     queryFn: async () => {
-      const { items } = await require('@/utils/api').listOrders(undefined, undefined, undefined, 500, { date: selectedDate });
+      const { items } = await listOrders(undefined, undefined, undefined, 500, { date: selectedDate });
       return (items || []).map((item: any) => ({
         id: String(item.id ?? ''),
         orderNo: item.code || item.orderNo || String(item.id ?? ''),

@@ -101,6 +101,7 @@ def list_orders(
         select(
             Order,
             Customer.name.label("customer_name"),
+            Customer.address.label("customer_address"),
             Trip,
             Driver.name.label("driver_name"),
             Commission,
@@ -165,9 +166,10 @@ def list_orders(
     stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
-    for (order, customer_name, trip, driver_name, commission) in rows:
+    for (order, customer_name, customer_address, trip, driver_name, commission) in rows:
         dto = OrderOut.model_validate(order).model_dump()
         dto["customer_name"] = customer_name
+        dto["customer_address"] = customer_address
         if trip:
             trip_dto = {
                 "id": trip.id,
