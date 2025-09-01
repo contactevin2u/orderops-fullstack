@@ -20,6 +20,7 @@ from ..models import (
     Commission,
 )
 from ..auth.deps import require_roles
+from ..auth.firebase import driver_auth
 from ..utils.audit import log_action
 from ..schemas import OrderOut, AssignDriverIn, AssignSecondDriverIn
 from ..services.ordersvc import (

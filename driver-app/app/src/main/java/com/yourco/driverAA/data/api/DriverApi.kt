@@ -27,8 +27,11 @@ interface DriverApi {
     @PATCH("drivers/orders/{id}")
     suspend fun updateOrderStatus(@Path("id") orderId: String, @Body update: OrderStatusUpdateDto): JobDto
     
-    @POST("unified-assignments/handle-on-hold")
-    suspend fun handleOnHoldResponse(@Body request: OnHoldResponseDto): OnHoldResponseResult
+    @PATCH("orders/{id}/driver-update")
+    suspend fun patchOrder(@Path("id") orderId: String, @Body update: OrderPatchDto): OrderDto
+    
+    @POST("orders/{id}/upsell")
+    suspend fun upsellOrder(@Path("id") orderId: String, @Body request: UpsellRequest): UpsellResponse
     
     @Multipart
     @POST("drivers/orders/{id}/pod-photo")
@@ -302,17 +305,30 @@ data class OrderDto(
 )
 
 @Serializable
-data class OnHoldResponseDto(
-    val order_id: Int,
-    val customer_available: Boolean,
+data class OrderPatchDto(
+    val status: String? = null,
     val delivery_date: String? = null
 )
 
+@Serializable 
+data class UpsellItemRequest(
+    val item_id: Int,
+    val upsell_type: String, // "BELI_TERUS" | "ANSURAN"
+    val new_name: String? = null,
+    val new_price: Double, // New total price for the item
+    val installment_months: Int? = null // Only for ANSURAN
+)
+
 @Serializable
-data class OnHoldResponseResult(
+data class UpsellRequest(
+    val items: List<UpsellItemRequest>,
+    val notes: String? = null
+)
+
+@Serializable
+data class UpsellResponse(
     val success: Boolean,
-    val message: String,
     val order_id: Int,
-    val new_status: String,
-    val new_delivery_date: String?
+    val message: String,
+    val new_total: String
 )

@@ -28,6 +28,11 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.BitmapFactory
 import androidx.core.content.ContextCompat
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.background
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.api.JobDto
@@ -119,6 +124,10 @@ fun JobDetailScreen(
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
     val showOnHoldDialog by viewModel.showOnHoldDialog.collectAsState()
+    val showUpsellDialog by viewModel.showUpsellDialog.collectAsState()
+    val selectedUpsellItem by viewModel.selectedUpsellItem.collectAsState()
+    val uploadingPhotos by viewModel.uploadingPhotos.collectAsState()
+    val uploadedPhotos by viewModel.uploadedPhotos.collectAsState()
 
     LaunchedEffect(jobId) {
         viewModel.loadJob(jobId)
@@ -152,7 +161,8 @@ fun JobDetailScreen(
                     job = job!!,
                     onStatusUpdate = viewModel::updateStatus,
                     onUploadPhoto = viewModel::uploadPodPhoto,
-                    onNavigateToActiveOrders = onNavigateToActiveOrders
+                    onNavigateToActiveOrders = onNavigateToActiveOrders,
+                    onUpsellItem = viewModel::showUpsellDialog
                 )
             }
         }
@@ -167,6 +177,17 @@ fun JobDetailScreen(
             }
         )
     }
+    
+    // Upsell dialog
+    if (showUpsellDialog && selectedUpsellItem != null) {
+        UpsellDialog(
+            item = selectedUpsellItem!!,
+            onDismiss = { viewModel.dismissUpsellDialog() },
+            onUpsell = { item, upsellType, newName, newPrice, installmentMonths ->
+                viewModel.upsellItem(item, upsellType, newName, newPrice, installmentMonths)
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -175,7 +196,8 @@ private fun JobDetailContent(
     job: JobDto,
     onStatusUpdate: (String) -> Unit,
     onUploadPhoto: (File, Int) -> Unit,
-    onNavigateToActiveOrders: () -> Unit = {}
+    onNavigateToActiveOrders: () -> Unit = {},
+    onUpsellItem: ((JobItemDto) -> Unit)? = null
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -339,7 +361,10 @@ private fun JobDetailContent(
                 }
                 
                 items(items) { item ->
-                    ItemCard(item = item)
+                    ItemCard(
+                        item = item,
+                        onUpsell = onUpsellItem
+                    )
                 }
             }
         }
@@ -375,7 +400,9 @@ private fun JobDetailContent(
             item {
                 PodPhotosSection(
                     jobId = job.id,
-                    onUploadPhoto = onUploadPhoto
+                    onUploadPhoto = onUploadPhoto,
+                    uploadingPhotos = uploadingPhotos,
+                    uploadedPhotos = uploadedPhotos
                 )
             }
         }
@@ -427,39 +454,62 @@ private fun DetailRow(
 }
 
 @Composable
-private fun ItemCard(item: JobItemDto) {
+private fun ItemCard(
+    item: JobItemDto,
+    onUpsell: ((JobItemDto) -> Unit)? = null
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
         )
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(12.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.name ?: "Unknown Item",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium
+                    )
+                    item.unit_price?.let { price ->
+                        Text(
+                            text = "RM$price seunit",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
                 Text(
-                    text = item.name ?: "Unknown Item",
+                    text = "Kuantiti: ${item.qty ?: 0}",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
-                item.unit_price?.let { price ->
-                    Text(
-                        text = "$$price each",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+            }
+            
+            // Upsell button
+            if (onUpsell != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = { onUpsell(item) },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.primary
                     )
+                ) {
+                    Icon(Icons.Default.Star, contentDescription = null)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Upsell Barang")
                 }
             }
-            Text(
-                text = "Qty: ${item.qty ?: 0}",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium
-            )
         }
     }
 }
@@ -575,10 +625,13 @@ private fun StatusActionButtons(
 @Composable
 private fun PodPhotosSection(
     jobId: String,
-    onUploadPhoto: (File, Int) -> Unit
+    onUploadPhoto: (File, Int) -> Unit,
+    uploadingPhotos: Set<Int>,
+    uploadedPhotos: Set<Int>
 ) {
     val context = LocalContext.current
     var photoFiles by remember { mutableStateOf(mutableMapOf<Int, File?>()) }
+    var selectedPhotoForPreview by remember { mutableStateOf<File?>(null) }
     var hasCameraPermission by remember { 
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
@@ -592,10 +645,14 @@ private fun PodPhotosSection(
         hasCameraPermission = isGranted
     }
     
-    // Create temp file for camera
+    // Create persistent file for camera (stored in app's private storage)
     fun createImageFile(photoNumber: Int): File {
         val fileName = "POD_${jobId}_${photoNumber}_${System.currentTimeMillis()}.jpg"
-        return File(context.cacheDir, fileName)
+        val photosDir = File(context.filesDir, "pod_photos")
+        if (!photosDir.exists()) {
+            photosDir.mkdirs()
+        }
+        return File(photosDir, fileName)
     }
     
     // Camera launcher for each photo slot
@@ -657,6 +714,8 @@ private fun PodPhotosSection(
                     PhotoCaptureButton(
                         photoNumber = photoNumber,
                         photoFile = photoFiles[photoNumber],
+                        isUploading = uploadingPhotos.contains(photoNumber),
+                        isUploaded = uploadedPhotos.contains(photoNumber),
                         onTakePhoto = {
                             if (hasCameraPermission) {
                                 val file = createImageFile(photoNumber)
@@ -674,11 +733,22 @@ private fun PodPhotosSection(
                             } else {
                                 requestCameraPermission.launch(Manifest.permission.CAMERA)
                             }
+                        },
+                        onPreviewPhoto = { file ->
+                            selectedPhotoForPreview = file
                         }
                     )
                 }
             }
         }
+    }
+    
+    // Large photo preview dialog
+    selectedPhotoForPreview?.let { photoFile ->
+        PhotoPreviewDialog(
+            photoFile = photoFile,
+            onDismiss = { selectedPhotoForPreview = null }
+        )
     }
 }
 
@@ -686,12 +756,20 @@ private fun PodPhotosSection(
 private fun PhotoCaptureButton(
     photoNumber: Int,
     photoFile: File?,
-    onTakePhoto: () -> Unit
+    onTakePhoto: () -> Unit,
+    isUploading: Boolean = false,
+    isUploaded: Boolean = false,
+    onPreviewPhoto: ((File) -> Unit)? = null
 ) {
     OutlinedCard(
         modifier = Modifier
-            .size(80.dp),
-        onClick = onTakePhoto
+            .size(100.dp), // Increased size for better preview
+        onClick = if (!isUploading) onTakePhoto else { {} },
+        colors = CardDefaults.outlinedCardColors(
+            containerColor = if (isUploaded) 
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+            else MaterialTheme.colorScheme.surface
+        )
     ) {
         if (photoFile != null && photoFile.exists()) {
             // Show photo preview using BitmapFactory (load bitmap in remember to avoid recomposition issues)
@@ -704,14 +782,64 @@ private fun PhotoCaptureButton(
             }
             
             if (bitmap != null) {
-                Image(
-                    bitmap = bitmap.asImageBitmap(),
-                    contentDescription = "Photo $photoNumber preview",
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .clip(MaterialTheme.shapes.small),
-                    contentScale = ContentScale.Crop
-                )
+                        .then(
+                            if (onPreviewPhoto != null && !isUploading) {
+                                Modifier.clickable { onPreviewPhoto(photoFile) }
+                            } else {
+                                Modifier
+                            }
+                        )
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Photo $photoNumber preview",
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(MaterialTheme.shapes.small),
+                        contentScale = ContentScale.Crop
+                    )
+                    
+                    // Upload status overlay
+                    if (isUploading) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Color.Black.copy(alpha = 0.5f),
+                                    MaterialTheme.shapes.small
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                strokeWidth = 2.dp
+                            )
+                        }
+                    } else if (isUploaded) {
+                        Box(
+                            modifier = Modifier
+                                .padding(4.dp)
+                                .align(Alignment.TopEnd)
+                                .background(
+                                    MaterialTheme.colorScheme.primary,
+                                    CircleShape
+                                )
+                                .size(20.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = "Uploaded",
+                                modifier = Modifier.size(12.dp),
+                                tint = MaterialTheme.colorScheme.onPrimary
+                            )
+                        }
+                    }
+                }
             } else {
                 // Fallback if bitmap loading fails
                 Text(
@@ -938,5 +1066,240 @@ private fun OnHoldDialog(
                 }
             }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UpsellDialog(
+    item: JobItemDto,
+    onDismiss: () -> Unit,
+    onUpsell: (JobItemDto, String, String?, Double, Int?) -> Unit
+) {
+    var selectedUpsellType by remember { mutableStateOf("BELI_TERUS") }
+    var newName by remember { mutableStateOf(item.name ?: "") }
+    var newPriceText by remember { mutableStateOf("") }
+    var installmentMonths by remember { mutableStateOf("12") }
+    
+    // Current item price for reference
+    val currentPrice = (item.unit_price?.let { it.toDoubleOrNull() } ?: 0.0) * (item.qty ?: 1)
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Upsell Barang",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Item info
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "Barang Asal:",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = item.name ?: "Unknown Item",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium
+                        )
+                        Text(
+                            text = "Harga Asal: RM${String.format("%.2f", currentPrice)}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                // Upsell type selection
+                Text(
+                    text = "Pilih Jenis Upsell:",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Medium
+                )
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Beli Terus option
+                    FilterChip(
+                        onClick = { selectedUpsellType = "BELI_TERUS" },
+                        label = { Text("Beli Terus") },
+                        selected = selectedUpsellType == "BELI_TERUS",
+                        modifier = Modifier.weight(1f)
+                    )
+                    
+                    // Ansuran option  
+                    FilterChip(
+                        onClick = { selectedUpsellType = "ANSURAN" },
+                        label = { Text("Ansuran") },
+                        selected = selectedUpsellType == "ANSURAN",
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                
+                // New item name
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("Nama Barang Baru (Opsyenal)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                
+                // New price
+                OutlinedTextField(
+                    value = newPriceText,
+                    onValueChange = { newPriceText = it },
+                    label = { Text("Harga Baru (RM)") },
+                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("cth: 1000") }
+                )
+                
+                // Installment months (only for ANSURAN)
+                if (selectedUpsellType == "ANSURAN") {
+                    OutlinedTextField(
+                        value = installmentMonths,
+                        onValueChange = { installmentMonths = it },
+                        label = { Text("Tempoh Ansuran (Bulan)") },
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                        modifier = Modifier.fillMaxWidth(),
+                        placeholder = { Text("cth: 12") }
+                    )
+                    
+                    // Show monthly calculation
+                    val newPrice = newPriceText.toDoubleOrNull() ?: 0.0
+                    val months = installmentMonths.toIntOrNull() ?: 1
+                    if (newPrice > 0 && months > 0) {
+                        val monthlyAmount = newPrice / months
+                        Text(
+                            text = "Bayaran Bulanan: RM${String.format("%.2f", monthlyAmount)} x $months bulan",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            val newPrice = newPriceText.toDoubleOrNull()
+            val months = if (selectedUpsellType == "ANSURAN") installmentMonths.toIntOrNull() else null
+            val isValid = newPrice != null && newPrice > 0 && 
+                         (selectedUpsellType == "BELI_TERUS" || (months != null && months > 0))
+            
+            Button(
+                onClick = {
+                    if (isValid) {
+                        onUpsell(
+                            item,
+                            selectedUpsellType,
+                            newName.takeIf { it != item.name },
+                            newPrice!!,
+                            months
+                        )
+                    }
+                },
+                enabled = isValid
+            ) {
+                Text("${if (selectedUpsellType == "BELI_TERUS") "Beli Terus" else "Ansuran"} RM${newPrice?.let { String.format("%.2f", it) } ?: "0.00"}")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Batal")
+            }
+        }
+    )
+}
+
+@Composable
+private fun PhotoPreviewDialog(
+    photoFile: File,
+    onDismiss: () -> Unit
+) {
+    val bitmap = remember(photoFile) {
+        try {
+            BitmapFactory.decodeFile(photoFile.absolutePath)
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            shape = MaterialTheme.shapes.large
+        ) {
+            Column {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Photo Preview",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close")
+                    }
+                }
+                
+                // Photo
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Full size photo preview",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 400.dp)
+                            .padding(horizontal = 16.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(200.dp)
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Unable to load photo",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+        }
     }
 }

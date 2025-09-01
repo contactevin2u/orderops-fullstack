@@ -5,7 +5,7 @@ from typing import Tuple
 # Home base location (Batu Caves)
 HOME_BASE_LAT = 3.2379
 HOME_BASE_LNG = 101.6841
-HOME_BASE_RADIUS_KM = 3.0
+HOME_BASE_RADIUS_KM = 100.0  # RM 100 allowance for locations >100km from home base
 
 # Working hours and allowances
 OUTSTATION_ALLOWANCE_AMOUNT = 100.0  # RM 100 for outstation shifts

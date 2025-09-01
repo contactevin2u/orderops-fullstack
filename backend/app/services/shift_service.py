@@ -217,7 +217,7 @@ class ShiftService:
             shift_id=shift.id,
             entry_type="OUTSTATION_ALLOWANCE",
             amount=OUTSTATION_ALLOWANCE_AMOUNT,
-            description=f"Outstation allowance - {shift.outstation_distance_km:.1f}km from Batu Caves",
+            description=f"Outstation allowance - {shift.outstation_distance_km:.1f}km from Batu Caves (>100km)",
             status="EARNED",
             earned_at=shift.clock_in_at
         )

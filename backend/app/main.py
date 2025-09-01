@@ -20,6 +20,7 @@ from .routers import (
     queue,
     reports,
     drivers,
+    driver_orders,
     routes as routes_router,
     shifts,
     driver_schedule,
@@ -29,9 +30,7 @@ from .routers import (
 )
 from .audit import router as audit_router
 
-# Ensure uploads directory exists for static file serving
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# No longer need uploads directory - using Firebase Storage only
 
 app = FastAPI(title="OrderOps Fullstack v1", default_response_class=ORJSONResponse)
 
@@ -44,7 +43,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static/uploads", StaticFiles(directory="uploads"), name="uploads")
+# No static file serving needed - all images served from Firebase Storage
 
 app.include_router(health.router)
 app.include_router(auth_router.router)
@@ -56,6 +55,7 @@ app.include_router(documents.router)
 app.include_router(queue.router)
 app.include_router(reports.router)
 app.include_router(drivers.router)
+app.include_router(driver_orders.router)
 app.include_router(routes_router.router)
 app.include_router(shifts.router)
 app.include_router(driver_schedule.router)

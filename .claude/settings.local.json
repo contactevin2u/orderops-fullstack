@@ -22,7 +22,8 @@
       "Bash(npm run build:*)",
       "Bash(git reset:*)",
       "WebFetch(domain:orderops-api-v1.onrender.com)",
-      "Bash(npx eslint:*)"
+      "Bash(npx eslint:*)",
+      "Bash(.gradlew compileDebugKotlin:*)"
     ],
     "deny": [],
     "ask": []

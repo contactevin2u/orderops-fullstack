@@ -7,11 +7,7 @@ from firebase_admin import storage
 
 MAX_SIDE = 1280
 MAX_BYTES = 5 * 1024 * 1024
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 FIREBASE_STORAGE_BUCKET = os.getenv("FIREBASE_STORAGE_BUCKET")
-
-# Always create uploads directory as fallback
-os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def save_pod_image(file_bytes: bytes) -> str:
@@ -27,29 +23,17 @@ def save_pod_image(file_bytes: bytes) -> str:
     
     name = f"{uuid.uuid4().hex}.jpg"
     
-    # Use Firebase Storage for production
-    if FIREBASE_STORAGE_BUCKET:
-        print(f"DEBUG: Using Firebase Storage bucket: {FIREBASE_STORAGE_BUCKET}")
-        try:
-            bucket = storage.bucket(FIREBASE_STORAGE_BUCKET)
-            blob_path = f"pod-images/{name}"
-            blob = bucket.blob(blob_path)
-            print(f"DEBUG: Uploading to Firebase Storage path: {blob_path}")
-            blob.upload_from_string(processed_bytes, content_type="image/jpeg")
-            blob.make_public()
-            public_url = blob.public_url
-            print(f"DEBUG: Firebase Storage upload successful: {public_url}")
-            return public_url
-        except Exception as e:
-            # Fallback to local storage if Firebase fails
-            print(f"ERROR: Firebase storage failed, falling back to local: {e}")
-            import traceback
-            traceback.print_exc()
-    else:
-        print("DEBUG: FIREBASE_STORAGE_BUCKET not set, using local storage")
+    # ONLY use Firebase Storage - no local fallback to save Render disk space
+    if not FIREBASE_STORAGE_BUCKET:
+        raise ValueError("FIREBASE_STORAGE_BUCKET environment variable is required")
     
-    # Local storage fallback for development or Firebase failure
-    path = os.path.join(UPLOAD_DIR, name)
-    with open(path, "wb") as f:
-        f.write(processed_bytes)
-    return f"/static/uploads/{name}"
+    print(f"DEBUG: Using Firebase Storage bucket: {FIREBASE_STORAGE_BUCKET}")
+    bucket = storage.bucket(FIREBASE_STORAGE_BUCKET)
+    blob_path = f"pod-images/{name}"
+    blob = bucket.blob(blob_path)
+    print(f"DEBUG: Uploading to Firebase Storage path: {blob_path}")
+    blob.upload_from_string(processed_bytes, content_type="image/jpeg")
+    blob.make_public()
+    public_url = blob.public_url
+    print(f"DEBUG: Firebase Storage upload successful: {public_url}")
+    return public_url

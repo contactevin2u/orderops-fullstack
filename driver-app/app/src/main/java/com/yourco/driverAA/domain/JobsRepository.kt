@@ -5,8 +5,10 @@ import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.OrderStatusUpdateDto
 import com.yourco.driverAA.data.api.PodUploadResponse
 import com.yourco.driverAA.data.api.CommissionMonthDto
-import com.yourco.driverAA.data.api.OnHoldResponseDto
-import com.yourco.driverAA.data.api.OnHoldResponseResult
+import com.yourco.driverAA.data.api.OrderPatchDto
+import com.yourco.driverAA.data.api.OrderDto
+import com.yourco.driverAA.data.api.UpsellRequest
+import com.yourco.driverAA.data.api.UpsellResponse
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -56,8 +58,18 @@ class JobsRepository @Inject constructor(
     
     suspend fun getCommissions(): List<CommissionMonthDto> = api.getCommissions()
     
-    suspend fun handleOnHoldResponse(orderId: Int, customerAvailable: Boolean, deliveryDate: String? = null): Result<OnHoldResponseResult> = try {
-        val response = api.handleOnHoldResponse(OnHoldResponseDto(orderId, customerAvailable, deliveryDate))
+    suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> = try {
+        // Update the order via PATCH endpoint
+        api.patchOrder(orderId, OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate))
+        // Return the updated job by refetching it
+        val updatedJob = api.getJob(orderId)
+        Result.Success(updatedJob)
+    } catch (e: Exception) {
+        Result.Error(e)
+    }
+    
+    suspend fun upsellOrder(orderId: String, request: UpsellRequest): Result<UpsellResponse> = try {
+        val response = api.upsellOrder(orderId, request)
         Result.Success(response)
     } catch (e: Exception) {
         Result.Error(e)

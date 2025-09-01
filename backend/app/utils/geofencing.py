@@ -82,11 +82,11 @@ def get_location_description(lat: float, lng: float) -> str:
         lat, lng: Coordinates to describe
     
     Returns:
-        Description string like "2.5km from Batu Caves (Outstation)" or "Within Batu Caves area"
+        Description string like "132.4km from Batu Caves (Outstation)" or "Within 100km of Batu Caves"
     """
     is_outstation, distance = is_outstation_location(lat, lng)
     
     if is_outstation:
-        return f"{distance:.1f}km from Batu Caves (Outstation)"
+        return f"{distance:.1f}km from Batu Caves (Outstation - RM100 allowance)"
     else:
-        return "Within Batu Caves area"
+        return f"{distance:.1f}km from Batu Caves (Within 100km radius)"
