@@ -7,6 +7,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const redirectTo = router.query.redirect as string || '/';
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -23,7 +24,7 @@ export default function LoginPage() {
         setError(msg);
         return;
       }
-      router.replace('/');
+      router.replace(redirectTo);
     } catch (e: any) {
       setError(e.message || 'Login failed');
     }

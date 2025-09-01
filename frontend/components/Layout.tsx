@@ -45,6 +45,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const headerRef = React.useRef<HTMLElement>(null);
   const { data: user, error: userErr } = useSWR('me', getMe, {
     shouldRetryOnError: false,
+    errorRetryCount: 0,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
   });
 
   const pathname = React.useMemo(
@@ -82,6 +85,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+  
+  // Handle authentication redirects
+  React.useEffect(() => {
+    if (userErr && (userErr as any).status === 401) {
+      // Only redirect if we're not already on login/register page
+      if (!pathname.startsWith('/login') && !pathname.startsWith('/register')) {
+        router.replace('/login');
+      }
+    }
+  }, [userErr, pathname, router]);
   React.useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (!mobileOpen) return;
