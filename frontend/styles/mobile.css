@@ -1,0 +1,126 @@
+/* Mobile-only styles for delivery status page */
+
+/* Hide mobile content on desktop */
+@media (min-width: 769px) {
+  .mobile-only {
+    display: none !important;
+  }
+  .desktop-message {
+    display: flex !important;
+  }
+}
+
+/* Show mobile content on mobile */
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block !important;
+  }
+  .desktop-message {
+    display: none !important;
+  }
+  
+  /* Mobile-specific styles */
+  body {
+    font-size: 14px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Prevent zoom on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Touch-friendly buttons */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Card shadows for mobile */
+  .mobile-card {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e5e7eb;
+  }
+  
+  /* Status badges */
+  .status-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 8px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.025em;
+  }
+  
+  .status-delivered {
+    background-color: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+  
+  .status-started {
+    background-color: #dbeafe;
+    color: #1e40af;
+    border: 1px solid #93c5fd;
+  }
+  
+  .status-assigned {
+    background-color: #fef3c7;
+    color: #d97706;
+    border: 1px solid #fed7aa;
+  }
+  
+  .status-default {
+    background-color: #f3f4f6;
+    color: #374151;
+    border: 1px solid #d1d5db;
+  }
+  
+  /* Loading spinner */
+  .mobile-spinner {
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #3b82f6;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  
+  /* Touch feedback */
+  .touch-feedback:active {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(0.98);
+  }
+  
+  /* Safe area padding for newer phones */
+  .mobile-safe-area {
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Landscape orientation adjustments */
+@media (max-width: 768px) and (orientation: landscape) {
+  .mobile-header {
+    padding: 8px 16px;
+  }
+  
+  .mobile-content {
+    padding: 12px 16px;
+  }
+}
