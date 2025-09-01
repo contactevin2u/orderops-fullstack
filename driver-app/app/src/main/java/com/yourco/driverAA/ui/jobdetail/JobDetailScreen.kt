@@ -724,17 +724,22 @@ private fun PodPhotosSection(
                         isUploaded = uploadedPhotos.contains(photoNumber),
                         onTakePhoto = {
                             if (hasCameraPermission) {
-                                val file = createImageFile(photoNumber)
-                                photoFiles[photoNumber] = file
-                                val uri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    file
-                                )
-                                when (photoNumber) {
-                                    1 -> takePicture1.launch(uri)
-                                    2 -> takePicture2.launch(uri)
-                                    3 -> takePicture3.launch(uri)
+                                try {
+                                    val file = createImageFile(photoNumber)
+                                    photoFiles[photoNumber] = file
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        file
+                                    )
+                                    when (photoNumber) {
+                                        1 -> takePicture1.launch(uri)
+                                        2 -> takePicture2.launch(uri)
+                                        3 -> takePicture3.launch(uri)
+                                    }
+                                } catch (e: Exception) {
+                                    android.util.Log.e("PhotoUpload", "Error launching camera for photo $photoNumber", e)
+                                    // Could show a toast or error message here
                                 }
                             } else {
                                 requestCameraPermission.launch(Manifest.permission.CAMERA)
@@ -781,8 +786,14 @@ private fun PhotoCaptureButton(
             // Show photo preview using BitmapFactory (load bitmap in remember to avoid recomposition issues)
             val bitmap = remember(photoFile) {
                 try {
-                    BitmapFactory.decodeFile(photoFile.absolutePath)
+                    if (photoFile.exists() && photoFile.length() > 0) {
+                        BitmapFactory.decodeFile(photoFile.absolutePath)
+                    } else {
+                        android.util.Log.w("PhotoUpload", "Photo file does not exist or is empty: ${photoFile.absolutePath}")
+                        null
+                    }
                 } catch (e: Exception) {
+                    android.util.Log.e("PhotoUpload", "Error loading bitmap from ${photoFile.absolutePath}", e)
                     null
                 }
             }
@@ -1238,8 +1249,14 @@ private fun PhotoPreviewDialog(
 ) {
     val bitmap = remember(photoFile) {
         try {
-            BitmapFactory.decodeFile(photoFile.absolutePath)
+            if (photoFile.exists() && photoFile.length() > 0) {
+                BitmapFactory.decodeFile(photoFile.absolutePath)
+            } else {
+                android.util.Log.w("PhotoUpload", "Preview photo file does not exist or is empty: ${photoFile.absolutePath}")
+                null
+            }
         } catch (e: Exception) {
+            android.util.Log.e("PhotoUpload", "Error loading preview bitmap from ${photoFile.absolutePath}", e)
             null
         }
     }
