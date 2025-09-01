@@ -49,7 +49,8 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
         samesite="lax",
         max_age=max_age,
         path="/",
-        domain=".aalyx.com" if settings.COOKIE_SECURE else None,
+        # Remove hardcoded domain to work with any domain
+        domain=None,
     )
     db.add(AuditLog(user_id=user.id, action="login"))
     db.commit()
