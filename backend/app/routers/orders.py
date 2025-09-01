@@ -53,6 +53,22 @@ def kl_day_bounds(d: datetime | date_cls):
     return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
 
 
+def trigger_auto_assignment(db: Session, order_id: int):
+    """Trigger auto-assignment after order creation"""
+    try:
+        from ..services.assignment_service import AssignmentService
+        
+        service = AssignmentService(db)
+        result = service.auto_assign_all()
+        
+        print(f"Auto-assignment triggered after order {order_id} creation: {result.get('message', 'Unknown result')}")
+        return result
+    except Exception as e:
+        print(f"Auto-assignment failed after order {order_id} creation: {e}")
+        # Don't fail order creation if assignment fails
+        return None
+
+
 def kl_month_bounds(year: int, month: int):
     """Return (start_utc, end_utc) for KL local month."""
     start_local = datetime(year, month, 1, tzinfo=APP_TZ)
@@ -230,6 +246,10 @@ def create_order(
         db.commit()
         db.refresh(order)
         log_action(db, current_user, "order.create", f"order_id={order.id}")
+        
+        # Trigger auto-assignment after order creation
+        trigger_auto_assignment(db, order.id)
+        
         return envelope(OrderOut.model_validate(order))
     except Exception as e:
         db.rollback()
@@ -717,6 +737,9 @@ def create_simple_order(
         
         log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
         
+        # Trigger auto-assignment after order creation
+        trigger_auto_assignment(db, order.id)
+        
         return {
             "id": order.id,
             "code": order.code,
@@ -832,6 +855,9 @@ def create_simple_order(
         
         log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
         
+        # Trigger auto-assignment after order creation
+        trigger_auto_assignment(db, order.id)
+        
         return {
             "id": order.id,
             "code": order.code,
@@ -944,6 +970,9 @@ def create_simple_order(
         db.refresh(order)
         
         log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
+        
+        # Trigger auto-assignment after order creation
+        trigger_auto_assignment(db, order.id)
         
         return {
             "id": order.id,
