@@ -40,7 +40,17 @@ def update_route(route_id: int, payload: RouteUpdateIn, db: Session = Depends(ge
         driver = db.get(Driver, payload.driver_id)
         if not driver:
             raise HTTPException(404, "Driver not found")
+        
+        # Update route driver
+        old_driver_id = route.driver_id
         route.driver_id = driver.id
+        
+        # CRITICAL: Update all trips on this route to new driver
+        trips_updated = db.query(Trip).filter(Trip.route_id == route_id).update(
+            {Trip.driver_id: driver.id}
+        )
+        
+        print(f"Route {route_id}: Changed driver from {old_driver_id} to {driver.id}, updated {trips_updated} trips")
     if payload.route_date is not None:
         route.route_date = dt_date.fromisoformat(payload.route_date)
     if payload.name is not None:
