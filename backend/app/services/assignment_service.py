@@ -131,15 +131,12 @@ class AssignmentService:
         # Get scheduled drivers for today ONLY
         from datetime import datetime, timedelta
         
-        # Try a date range to handle timezone issues
-        yesterday = today - timedelta(days=1)
-        tomorrow = today + timedelta(days=1)
-        
+        # Get scheduled drivers for TODAY ONLY - no date range
         scheduled_drivers = (
             self.db.query(DriverSchedule)
             .filter(
                 and_(
-                    DriverSchedule.schedule_date.between(yesterday, tomorrow),
+                    DriverSchedule.schedule_date == today,
                     DriverSchedule.is_scheduled == True
                 )
             )
