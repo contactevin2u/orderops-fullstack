@@ -164,7 +164,9 @@ fun JobDetailScreen(
                     onStatusUpdate = viewModel::updateStatus,
                     onUploadPhoto = viewModel::uploadPodPhoto,
                     onNavigateToActiveOrders = onNavigateToActiveOrders,
-                    onUpsellItem = viewModel::showUpsellDialog
+                    onUpsellItem = viewModel::showUpsellDialog,
+                    uploadingPhotos = uploadingPhotos,
+                    uploadedPhotos = uploadedPhotos
                 )
             }
         }
@@ -199,7 +201,9 @@ private fun JobDetailContent(
     onStatusUpdate: (String) -> Unit,
     onUploadPhoto: (File, Int) -> Unit,
     onNavigateToActiveOrders: () -> Unit = {},
-    onUpsellItem: ((JobItemDto) -> Unit)? = null
+    onUpsellItem: ((JobItemDto) -> Unit)? = null,
+    uploadingPhotos: Set<Int> = emptySet(),
+    uploadedPhotos: Set<Int> = emptySet()
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
