@@ -95,10 +95,15 @@ class AssignmentService:
             .outerjoin(Trip, Trip.order_id == Order.id)
             .where(
                 and_(
-                    # Backlog mode date filtering (same as orders.py)
+                    # Exclude cancelled/buyback/returned orders and their parents
+                    ~Order.status.in_(["CANCELLED", "RETURNED"]),
+                    Order.type != "BUYBACK",
+                    Order.parent_id.is_(None),  # Exclude child orders (adjustments)
+                    
+                    # Backlog mode date filtering - includes overdue orders
                     or_(
                         Order.delivery_date.is_(None),
-                        Order.delivery_date < end_utc,
+                        Order.delivery_date < end_utc,  # Includes overdue (before today)
                     ),
                     # Unassigned filter (same as orders.py)
                     or_(Trip.id.is_(None), Trip.route_id.is_(None))
@@ -120,7 +125,7 @@ class AssignmentService:
                 "lng": 101.6869
             })
         
-        logger.info(f"Found {len(result)} orders to assign")
+        logger.info(f"Found {len(result)} orders to assign (includes overdue orders, excludes cancelled/buyback/returned)")
         return result
     
     def _get_available_drivers(self) -> List[Dict[str, Any]]:
