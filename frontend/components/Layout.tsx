@@ -182,12 +182,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               return (
                 <React.Fragment key={group.title}>
                   {groupIndex > 0 && <div className="nav-separator" />}
-                  {groupItems.map(({ href, label, Icon }) => (
+                  {groupItems.map(({ href, label, Icon }, itemIndex) => (
                     <Link
                       key={href}
                       href={href}
-                      className={`nav-link ${isActive(href) ? 'active' : ''}`}
+                      className={`nav-link ${isActive(href) ? 'active' : ''} ${itemIndex === 0 ? 'group-first' : ''}`}
                       onClick={() => setMobileOpen(false)}
+                      title={`${group.title}: ${t(label)}`}
                     >
                       <Icon style={{ width: 20, height: 20 }} />
                       <span>{t(label)}</span>
