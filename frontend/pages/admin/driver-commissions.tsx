@@ -158,7 +158,7 @@ export default function DriverCommissionsPage() {
           <div className="stack" style={{ fontSize: '0.875rem', color: '#1e40af' }}>
             <p><strong>1. Order must be DELIVERED</strong> status</p>
             <p><strong>2. Driver must have uploaded POD (Proof of Delivery) photo</strong></p>
-            <p><strong>3. Click "Release Commission" to pay the driver</strong></p>
+            <p><strong>3. Click &quot;Release Commission&quot; to pay the driver</strong></p>
           </div>
         </div>
       </div>

@@ -243,28 +243,6 @@ def create_test_drivers(count: int = 3, db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
-@router.post("/test-auto-assign")
-def test_auto_assign(db: Session = Depends(get_session)):
-    """Test auto-assignment without auth - for debugging only"""
-    try:
-        from ..services.assignment_service import AssignmentService
-        
-        service = AssignmentService(db)
-        result = service.auto_assign_all()
-        
-        return envelope({
-            "assignment_result": result,
-            "success": result.get("success", False),
-            "assigned_count": result.get("total", 0),
-            "message": result.get("message", "")
-        })
-        
-    except Exception as e:
-        import traceback
-        return envelope({
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        })
 
 @router.get("/order-54-debug")
 def debug_order_54(db: Session = Depends(get_session)):
@@ -342,28 +320,6 @@ def debug_order_54(db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
-@router.post("/test-auto-assign")
-def test_auto_assign(db: Session = Depends(get_session)):
-    """Test auto-assignment without auth - for debugging only"""
-    try:
-        from ..services.assignment_service import AssignmentService
-        
-        service = AssignmentService(db)
-        result = service.auto_assign_all()
-        
-        return envelope({
-            "assignment_result": result,
-            "success": result.get("success", False),
-            "assigned_count": result.get("total", 0),
-            "message": result.get("message", "")
-        })
-        
-    except Exception as e:
-        import traceback
-        return envelope({
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        })
 
 @router.get("/simple-driver-test")
 def simple_driver_test(db: Session = Depends(get_session)):
@@ -418,28 +374,6 @@ def simple_driver_test(db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
-@router.post("/test-auto-assign")
-def test_auto_assign(db: Session = Depends(get_session)):
-    """Test auto-assignment without auth - for debugging only"""
-    try:
-        from ..services.assignment_service import AssignmentService
-        
-        service = AssignmentService(db)
-        result = service.auto_assign_all()
-        
-        return envelope({
-            "assignment_result": result,
-            "success": result.get("success", False),
-            "assigned_count": result.get("total", 0),
-            "message": result.get("message", "")
-        })
-        
-    except Exception as e:
-        import traceback
-        return envelope({
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        })
 @router.get("/schedule-debug")  
 def debug_schedule_alignment(db: Session = Depends(get_session)):
     """Debug schedule vs shift alignment issue"""
