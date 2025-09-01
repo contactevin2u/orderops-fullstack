@@ -188,9 +188,7 @@ class AssignmentService:
                 .count()
             )
             
-            # Skip if too busy
-            if active_trips >= 5:
-                continue
+            # No trip limit - let drivers handle as many as needed
             
             # Priority: 1=Scheduled+Clocked, 2=Scheduled only
             priority = 1 if is_clocked_in else 2
