@@ -655,10 +655,18 @@ private fun PodPhotosSection(
     fun createImageFile(photoNumber: Int): File {
         val fileName = "POD_${jobId}_${photoNumber}_${System.currentTimeMillis()}.jpg"
         val photosDir = File(context.filesDir, "pod_photos")
-        if (!photosDir.exists()) {
-            photosDir.mkdirs()
+        
+        // Ensure directory exists with synchronized access
+        synchronized(this) {
+            if (!photosDir.exists()) {
+                val created = photosDir.mkdirs()
+                android.util.Log.d("PhotoUpload", "Created pod_photos directory: $created, path: ${photosDir.absolutePath}")
+            }
         }
-        return File(photosDir, fileName)
+        
+        val file = File(photosDir, fileName)
+        android.util.Log.d("PhotoUpload", "Created image file path: ${file.absolutePath}")
+        return file
     }
     
     // Camera launcher for each photo slot
@@ -727,11 +735,20 @@ private fun PodPhotosSection(
                                 try {
                                     val file = createImageFile(photoNumber)
                                     photoFiles[photoNumber] = file
+                                    
+                                    android.util.Log.d("PhotoUpload", "Attempting to create URI for file: ${file.absolutePath}")
+                                    android.util.Log.d("PhotoUpload", "Package name: ${context.packageName}")
+                                    android.util.Log.d("PhotoUpload", "Application ID: ${context.applicationInfo.packageName}")
+                                    
+                                    val authority = "com.yourco.driverAA.fileprovider"
                                     val uri = FileProvider.getUriForFile(
                                         context,
-                                        "${context.packageName}.fileprovider",
+                                        authority,
                                         file
                                     )
+                                    
+                                    android.util.Log.d("PhotoUpload", "Created URI: $uri")
+                                    
                                     when (photoNumber) {
                                         1 -> takePicture1.launch(uri)
                                         2 -> takePicture2.launch(uri)
@@ -739,7 +756,8 @@ private fun PodPhotosSection(
                                     }
                                 } catch (e: Exception) {
                                     android.util.Log.e("PhotoUpload", "Error launching camera for photo $photoNumber", e)
-                                    // Could show a toast or error message here
+                                    android.util.Log.e("PhotoUpload", "Error details: ${e.message}")
+                                    e.printStackTrace()
                                 }
                             } else {
                                 requestCameraPermission.launch(Manifest.permission.CAMERA)
