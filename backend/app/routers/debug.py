@@ -174,6 +174,29 @@ def get_raw_driver_data(db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
+@router.post("/test-auto-assign")
+def test_auto_assign(db: Session = Depends(get_session)):
+    """Test auto-assignment without auth - for debugging only"""
+    try:
+        from ..services.assignment_service import AssignmentService
+        
+        service = AssignmentService(db)
+        result = service.auto_assign_all()
+        
+        return envelope({
+            "assignment_result": result,
+            "success": result.get("success", False),
+            "assigned_count": result.get("total", 0),
+            "message": result.get("message", "")
+        })
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
 @router.post("/create-test-drivers")
 def create_test_drivers(count: int = 3, db: Session = Depends(get_session)):
     """Create test drivers if none exist - for debugging only"""
@@ -214,6 +237,29 @@ def create_test_drivers(count: int = 3, db: Session = Depends(get_session)):
         
     except Exception as e:
         db.rollback()
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+@router.post("/test-auto-assign")
+def test_auto_assign(db: Session = Depends(get_session)):
+    """Test auto-assignment without auth - for debugging only"""
+    try:
+        from ..services.assignment_service import AssignmentService
+        
+        service = AssignmentService(db)
+        result = service.auto_assign_all()
+        
+        return envelope({
+            "assignment_result": result,
+            "success": result.get("success", False),
+            "assigned_count": result.get("total", 0),
+            "message": result.get("message", "")
+        })
+        
+    except Exception as e:
         import traceback
         return envelope({
             "error": str(e),
@@ -296,6 +342,29 @@ def debug_order_54(db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
+@router.post("/test-auto-assign")
+def test_auto_assign(db: Session = Depends(get_session)):
+    """Test auto-assignment without auth - for debugging only"""
+    try:
+        from ..services.assignment_service import AssignmentService
+        
+        service = AssignmentService(db)
+        result = service.auto_assign_all()
+        
+        return envelope({
+            "assignment_result": result,
+            "success": result.get("success", False),
+            "assigned_count": result.get("total", 0),
+            "message": result.get("message", "")
+        })
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
 @router.get("/simple-driver-test")
 def simple_driver_test(db: Session = Depends(get_session)):
     """Dead simple driver test - bypass all complex logic"""
@@ -341,6 +410,29 @@ def simple_driver_test(db: Session = Depends(get_session)):
             result["assignment_available_drivers_error"] = str(e)
             
         return envelope(result)
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
+@router.post("/test-auto-assign")
+def test_auto_assign(db: Session = Depends(get_session)):
+    """Test auto-assignment without auth - for debugging only"""
+    try:
+        from ..services.assignment_service import AssignmentService
+        
+        service = AssignmentService(db)
+        result = service.auto_assign_all()
+        
+        return envelope({
+            "assignment_result": result,
+            "success": result.get("success", False),
+            "assigned_count": result.get("total", 0),
+            "message": result.get("message", "")
+        })
         
     except Exception as e:
         import traceback
