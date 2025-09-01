@@ -82,7 +82,7 @@ class AssignmentService:
     
     def _get_orders_to_assign(self) -> List[Dict[str, Any]]:
         """Get orders that need assignment - using SAME logic as orders API"""
-        from app.utils.time import kl_day_bounds
+        from app.routers.orders import kl_day_bounds
         from sqlalchemy import select
         
         today = date.today()

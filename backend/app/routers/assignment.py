@@ -42,7 +42,7 @@ def get_assignment_status(
         from ..models.order import Order
         from ..models.trip import Trip
         from ..models.customer import Customer
-        from ..utils.time import kl_day_bounds
+        from .orders import kl_day_bounds
         
         # Use EXACT same query as orders.py with unassigned=true&date=today
         today = date.today()
