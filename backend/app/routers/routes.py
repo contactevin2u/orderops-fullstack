@@ -47,8 +47,16 @@ def update_route(route_id: int, payload: RouteUpdateIn, db: Session = Depends(ge
         
         # CRITICAL: Update all trips on this route to new driver
         trips_updated = db.query(Trip).filter(Trip.route_id == route_id).update(
-            {Trip.driver_id: driver.id}
+            {Trip.driver_id: driver.id},
+            synchronize_session=False
         )
+        
+        # Alternative method if bulk update fails
+        if trips_updated == 0:
+            trips_on_route = db.query(Trip).filter(Trip.route_id == route_id).all()
+            for trip in trips_on_route:
+                trip.driver_id = driver.id
+            trips_updated = len(trips_on_route)
         
         print(f"Route {route_id}: Changed driver from {old_driver_id} to {driver.id}, updated {trips_updated} trips")
     if payload.route_date is not None:
