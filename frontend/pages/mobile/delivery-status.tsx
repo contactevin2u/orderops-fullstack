@@ -23,6 +23,23 @@ export default function MobileDeliveryStatusPage() {
     queryFn: () => fetchUnassigned(selectedDate)
   });
 
+  // Fetch all orders for the selected date to get full order details including addresses
+  const allOrdersQuery = useQuery({
+    queryKey: ['mobile-all-orders', selectedDate],
+    queryFn: async () => {
+      const { items } = await require('@/utils/api').listOrders(undefined, undefined, undefined, 500, { date: selectedDate });
+      return (items || []).map((item: any) => ({
+        id: String(item.id ?? ''),
+        orderNo: item.code || item.orderNo || String(item.id ?? ''),
+        status: item.status || 'UNASSIGNED',
+        deliveryDate: item.delivery_date || item.deliveryDate || '',
+        address: item.address || [item.address1, item.address2].filter(Boolean).join(' ') || item.customer_address || '',
+        routeId: item.route_id?.toString() ?? item.routeId?.toString() ?? (item.trip?.route_id != null ? String(item.trip.route_id) : null),
+        trip: item.trip
+      }));
+    }
+  });
+
   const driversQuery = useQuery({
     queryKey: ['mobile-drivers'],
     queryFn: fetchDrivers
@@ -43,46 +60,33 @@ export default function MobileDeliveryStatusPage() {
 
   const routes = routesQuery.data || [];
   const unassignedOrders = unassignedQuery.data || [];
+  const allOrdersData = allOrdersQuery.data || [];
   const drivers = driversQuery.data || [];
 
-  // Combine all orders from routes and unassigned
-  const allOrders: Order[] = [
-    ...unassignedOrders,
-    ...routes.flatMap(route => 
-      route.stops.map(stop => ({
-        id: stop.orderId,
-        orderNo: stop.orderId,
-        status: 'ASSIGNED',
-        deliveryDate: route.date,
-        address: '',
-        routeId: route.id,
-        routeName: route.name,
-        driverName: drivers.find(d => d.id === route.driverId)?.name
-      }))
-    )
-  ];
+  // Use the comprehensive order data with full addresses
+  const allOrders = allOrdersData;
 
   const getStatusIcon = (order: Order) => {
     if (order.trip?.status === 'DELIVERED') {
-      return <CheckCircle className="w-5 h-5 text-green-600" />;
+      return <CheckCircle style={{ width: '20px', height: '20px', color: '#16a34a' }} />;
     } else if (order.trip?.status === 'STARTED') {
-      return <Truck className="w-5 h-5 text-blue-600" />;
+      return <Truck style={{ width: '20px', height: '20px', color: '#1d4ed8' }} />;
     } else if (order.routeId) {
-      return <Clock className="w-5 h-5 text-yellow-600" />;
+      return <Clock style={{ width: '20px', height: '20px', color: '#ca8a04' }} />;
     } else {
-      return <AlertCircle className="w-5 h-5 text-gray-600" />;
+      return <AlertCircle style={{ width: '20px', height: '20px', color: '#64748b' }} />;
     }
   };
 
   const getStatusColor = (order: Order) => {
     if (order.trip?.status === 'DELIVERED') {
-      return 'bg-green-100 text-green-800 border-green-200';
+      return 'status-delivered';
     } else if (order.trip?.status === 'STARTED') {
-      return 'bg-blue-100 text-blue-800 border-blue-200';
+      return 'status-started';
     } else if (order.routeId) {
-      return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      return 'status-assigned';
     } else {
-      return 'bg-gray-100 text-gray-800 border-gray-200';
+      return 'status-unassigned';
     }
   };
 
@@ -122,35 +126,414 @@ export default function MobileDeliveryStatusPage() {
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <style>{`
+          body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8fafc;
+            color: #1e293b;
+          }
+          
+          .container {
+            min-height: 100vh;
+            background-color: #f8fafc;
+          }
+          
+          .header {
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            border-bottom: 1px solid #e2e8f0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            padding: 16px;
+          }
+          
+          .header-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+          }
+          
+          .header-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e293b;
+            margin: 0;
+          }
+          
+          .header-stats {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: #64748b;
+          }
+          
+          .date-input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            background-color: white;
+            color: #1e293b;
+            font-size: 16px;
+            box-sizing: border-box;
+          }
+          
+          .date-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+          }
+          
+          .content {
+            padding: 16px;
+          }
+          
+          .order-card {
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            margin-bottom: 16px;
+            overflow: hidden;
+          }
+          
+          .order-header {
+            padding: 16px;
+            border-bottom: 1px solid #f1f5f9;
+          }
+          
+          .order-status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 8px;
+          }
+          
+          .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 8px;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid;
+          }
+          
+          .status-delivered {
+            background-color: #f0fdf4;
+            color: #15803d;
+            border-color: #dcfce7;
+          }
+          
+          .status-started {
+            background-color: #eff6ff;
+            color: #1d4ed8;
+            border-color: #dbeafe;
+          }
+          
+          .status-assigned {
+            background-color: #fefce8;
+            color: #ca8a04;
+            border-color: #fef3c7;
+          }
+          
+          .status-unassigned {
+            background-color: #f8fafc;
+            color: #64748b;
+            border-color: #e2e8f0;
+          }
+          
+          .order-info {
+            text-align: right;
+          }
+          
+          .order-number {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e293b;
+            margin: 0;
+          }
+          
+          .order-id {
+            font-size: 12px;
+            color: #64748b;
+            margin: 0;
+          }
+          
+          .address-info {
+            font-size: 14px;
+            color: #64748b;
+            margin: 8px 0;
+          }
+          
+          .address-text {
+            font-weight: 500;
+            color: #1e293b;
+            display: block;
+            margin-bottom: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          
+          .date-text {
+            font-size: 12px;
+            color: #9ca3af;
+          }
+          
+          .route-section {
+            padding: 16px;
+          }
+          
+          .route-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          }
+          
+          .route-info {
+            flex: 1;
+          }
+          
+          .route-label {
+            font-size: 14px;
+            color: #64748b;
+            margin-bottom: 4px;
+          }
+          
+          .route-name {
+            font-weight: 500;
+            color: #1e293b;
+          }
+          
+          .driver-info {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+          }
+          
+          .route-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-top: 8px;
+          }
+          
+          .route-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+          }
+          
+          .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            min-height: 44px;
+            transition: all 0.2s;
+          }
+          
+          .btn:active {
+            transform: scale(0.98);
+          }
+          
+          .btn-save {
+            flex: 1;
+            background-color: #16a34a;
+            color: white;
+          }
+          
+          .btn-save:hover {
+            background-color: #15803d;
+          }
+          
+          .btn-cancel {
+            flex: 1;
+            background-color: #6b7280;
+            color: white;
+          }
+          
+          .btn-cancel:hover {
+            background-color: #4b5563;
+          }
+          
+          .btn-edit {
+            padding: 8px;
+            color: #3b82f6;
+            background-color: transparent;
+            border-radius: 6px;
+          }
+          
+          .btn-edit:hover {
+            background-color: #eff6ff;
+          }
+          
+          .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+          
+          .loading {
+            text-align: center;
+            padding: 48px 0;
+          }
+          
+          .spinner {
+            width: 32px;
+            height: 32px;
+            border: 2px solid #e2e8f0;
+            border-top: 2px solid #3b82f6;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+          }
+          
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+          
+          .empty-state {
+            text-align: center;
+            padding: 48px 0;
+          }
+          
+          .empty-icon {
+            width: 48px;
+            height: 48px;
+            color: #9ca3af;
+            margin: 0 auto 16px;
+          }
+          
+          .error-state {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+          }
+          
+          .error-icon {
+            width: 32px;
+            height: 32px;
+            color: #dc2626;
+            margin: 0 auto 8px;
+          }
+          
+          .error-text {
+            color: #991b1b;
+            font-weight: 500;
+            margin-bottom: 8px;
+          }
+          
+          .error-retry {
+            color: #dc2626;
+            text-decoration: underline;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+          }
+          
+          .trip-info {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f1f5f9;
+            font-size: 12px;
+            color: #64748b;
+          }
+          
+          .trip-info > div {
+            margin-bottom: 4px;
+          }
+          
+          .routes-summary {
+            margin-top: 24px;
+          }
+          
+          .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 12px;
+          }
+          
+          .route-summary-card {
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+            padding: 12px;
+            margin-bottom: 8px;
+          }
+          
+          .route-summary-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          }
+          
+          .route-summary-name {
+            font-weight: 500;
+            color: #1e293b;
+            margin-bottom: 4px;
+          }
+          
+          .route-summary-details {
+            font-size: 14px;
+            color: #64748b;
+          }
+          
+          .route-summary-count {
+            text-align: right;
+          }
+          
+          .order-count {
+            font-size: 14px;
+            font-weight: 500;
+            color: #3b82f6;
+          }
+          
+          .bottom-spacer {
+            height: 80px;
+          }
+          
           @media (min-width: 769px) {
             .mobile-only { display: none !important; }
             .desktop-message { display: flex !important; }
           }
+          
           @media (max-width: 768px) {
             .mobile-only { display: block !important; }
             .desktop-message { display: none !important; }
             body { font-size: 14px; -webkit-user-select: none; user-select: none; }
-            input, select, textarea { font-size: 16px !important; }
-            button { min-height: 44px; min-width: 44px; }
-            .touch-feedback:active { 
-              background-color: rgba(0, 0, 0, 0.05); 
-              transform: scale(0.98); 
-            }
           }
         `}</style>
       </Head>
 
       {/* Desktop message */}
-      <div className="desktop-message hidden min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <Truck className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Mobile Only</h1>
-          <p className="text-gray-600 mb-6">
+      <div className="desktop-message" style={{ display: 'none', minHeight: '100vh', backgroundColor: '#f8fafc', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+        <div style={{ textAlign: 'center', maxWidth: '28rem' }}>
+          <Truck style={{ width: '64px', height: '64px', color: '#3b82f6', margin: '0 auto 16px' }} />
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1e293b', marginBottom: '8px' }}>Mobile Only</h1>
+          <p style={{ color: '#64748b', marginBottom: '24px' }}>
             This delivery status page is optimized for mobile devices. Please access it from your phone or tablet.
           </p>
           <button
             onClick={() => router.push('/admin/routes')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            style={{ backgroundColor: '#3b82f6', color: 'white', padding: '8px 24px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
           >
             Go to Desktop Routes
           </button>
@@ -158,96 +541,95 @@ export default function MobileDeliveryStatusPage() {
       </div>
 
       {/* Mobile interface */}
-      <div className="mobile-only min-h-screen bg-gray-50">
+      <div className="mobile-only container">
         {/* Header */}
-        <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h1 className="text-xl font-bold text-gray-900">Delivery Status</h1>
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <Truck className="w-4 h-4" />
-                <span>{allOrders.length} orders</span>
-              </div>
+        <div className="header">
+          <div className="header-content">
+            <h1 className="header-title">Delivery Status</h1>
+            <div className="header-stats">
+              <Truck style={{ width: '16px', height: '16px' }} />
+              <span>{allOrders.length} orders</span>
             </div>
-            
-            {/* Date selector */}
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-full p-3 border border-gray-200 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
           </div>
+          
+          {/* Date selector */}
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="date-input"
+          />
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-4">
-          {(routesQuery.isLoading || unassignedQuery.isLoading) && (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading orders...</p>
+        <div className="content">
+          {(routesQuery.isLoading || unassignedQuery.isLoading || allOrdersQuery.isLoading) && (
+            <div className="loading">
+              <div className="spinner"></div>
+              <p style={{ color: '#64748b' }}>Loading orders...</p>
             </div>
           )}
 
-          {(routesQuery.isError || unassignedQuery.isError) && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-center">
-              <AlertCircle className="w-8 h-8 text-red-600 mx-auto mb-2" />
-              <p className="text-red-800 font-medium">Failed to load data</p>
+          {(routesQuery.isError || unassignedQuery.isError || allOrdersQuery.isError) && (
+            <div className="error-state">
+              <AlertCircle className="error-icon" />
+              <p className="error-text">Failed to load data</p>
               <button
                 onClick={() => {
                   routesQuery.refetch();
                   unassignedQuery.refetch();
+                  allOrdersQuery.refetch();
                 }}
-                className="mt-2 text-red-600 hover:text-red-800 underline"
+                className="error-retry"
               >
                 Try again
               </button>
             </div>
           )}
 
-          {!routesQuery.isLoading && !unassignedQuery.isLoading && allOrders.length === 0 && (
-            <div className="text-center py-12">
-              <MapPin className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No orders found</h3>
-              <p className="text-gray-600">No orders for {selectedDate}</p>
+          {!routesQuery.isLoading && !unassignedQuery.isLoading && !allOrdersQuery.isLoading && allOrders.length === 0 && (
+            <div className="empty-state">
+              <MapPin className="empty-icon" />
+              <h3 style={{ fontSize: '18px', fontWeight: '500', color: '#1e293b', marginBottom: '8px' }}>No orders found</h3>
+              <p style={{ color: '#64748b' }}>No orders for {selectedDate}</p>
             </div>
           )}
 
           {/* Order cards */}
           {allOrders.map((order: Order) => (
-            <div key={order.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div key={order.id} className="order-card">
               {/* Order header */}
-              <div className="p-4 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center space-x-2">
+              <div className="order-header">
+                <div className="order-status-row">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     {getStatusIcon(order)}
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(order)}`}>
+                    <span className={`status-badge ${getStatusColor(order)}`}>
                       {getStatusText(order)}
                     </span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">#{order.orderNo}</div>
-                    <div className="text-xs text-gray-600">Order {order.id}</div>
+                  <div className="order-info">
+                    <div className="order-number">#{order.orderNo}</div>
+                    <div className="order-id">Order {order.id}</div>
                   </div>
                 </div>
 
-                <div className="text-sm text-gray-600 mb-2">
-                  <div className="font-medium text-gray-900 truncate">{order.address || 'Address not available'}</div>
-                  <div className="text-xs text-gray-500">{order.deliveryDate}</div>
+                <div className="address-info">
+                  <div className="address-text">{order.address || 'Address not available'}</div>
+                  <div className="date-text">{order.deliveryDate}</div>
                 </div>
               </div>
 
               {/* Route assignment */}
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm text-gray-600">Route:</span>{' '}
+              <div className="route-section">
+                <div className="route-content">
+                  <div className="route-info">
+                    <div className="route-label">Route:</div>
                     {editingOrder === order.id ? (
-                      <div className="mt-2">
+                      <div>
                         <select
                           value={newRouteId}
                           onChange={(e) => setNewRouteId(e.target.value)}
-                          className="w-full p-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="route-select"
                         >
                           <option value="">No Route</option>
                           {routes.map((route: Route) => (
@@ -256,34 +638,34 @@ export default function MobileDeliveryStatusPage() {
                             </option>
                           ))}
                         </select>
-                        <div className="flex space-x-2 mt-2">
+                        <div className="route-actions">
                           <button
                             onClick={() => handleSaveRoute(order.id)}
                             disabled={updateRouteMutation.isPending}
-                            className="flex-1 bg-green-600 text-white px-3 py-2 rounded-md text-sm hover:bg-green-700 disabled:opacity-50 flex items-center justify-center space-x-1 touch-feedback"
+                            className="btn btn-save"
                           >
-                            <Save className="w-4 h-4" />
+                            <Save style={{ width: '16px', height: '16px' }} />
                             <span>Save</span>
                           </button>
                           <button
                             onClick={handleCancelEdit}
-                            className="flex-1 bg-gray-500 text-white px-3 py-2 rounded-md text-sm hover:bg-gray-600 flex items-center justify-center space-x-1 touch-feedback"
+                            className="btn btn-cancel"
                           >
-                            <X className="w-4 h-4" />
+                            <X style={{ width: '16px', height: '16px' }} />
                             <span>Cancel</span>
                           </button>
                         </div>
                       </div>
                     ) : (
                       <div>
-                        <span className="font-medium text-gray-900">
+                        <div className="route-name">
                           {order.routeId ? 
                             (routes.find(r => r.id === order.routeId)?.name || 'Unknown route') : 
                             'Not assigned'
                           }
-                        </span>
+                        </div>
                         {order.routeId && (
-                          <div className="text-xs text-gray-600 mt-1">
+                          <div className="driver-info">
                             Driver: {drivers.find(d => d.id === routes.find(r => r.id === order.routeId)?.driverId)?.name || 'No driver'}
                           </div>
                         )}
@@ -297,16 +679,16 @@ export default function MobileDeliveryStatusPage() {
                         setEditingOrder(order.id);
                         setNewRouteId(order.routeId || '');
                       }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors touch-feedback"
+                      className="btn btn-edit"
                     >
-                      <Edit3 className="w-4 h-4" />
+                      <Edit3 style={{ width: '16px', height: '16px' }} />
                     </button>
                   )}
                 </div>
 
                 {/* Time stamps and additional info */}
                 {order.trip && (
-                  <div className="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-600 space-y-1">
+                  <div className="trip-info">
                     {order.trip.started_at && (
                       <div>Started: {new Date(order.trip.started_at).toLocaleString()}</div>
                     )}
@@ -322,20 +704,20 @@ export default function MobileDeliveryStatusPage() {
 
         {/* Route summary section */}
         {routes.length > 0 && (
-          <div className="p-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">Today&apos;s Routes</h2>
-            <div className="space-y-2">
+          <div className="routes-summary">
+            <h2 className="section-title">Today&apos;s Routes</h2>
+            <div>
               {routes.map((route: Route) => (
-                <div key={route.id} className="bg-white rounded-lg border border-gray-200 p-3">
-                  <div className="flex items-center justify-between">
+                <div key={route.id} className="route-summary-card">
+                  <div className="route-summary-content">
                     <div>
-                      <div className="font-medium text-gray-900">{route.name}</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="route-summary-name">{route.name}</div>
+                      <div className="route-summary-details">
                         {drivers.find(d => d.id === route.driverId)?.name || 'No driver'} • {route.stops.length} stops
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-medium text-blue-600">
+                    <div className="route-summary-count">
+                      <div className="order-count">
                         {route.stops.length} orders
                       </div>
                     </div>
@@ -347,7 +729,7 @@ export default function MobileDeliveryStatusPage() {
         )}
 
         {/* Bottom padding for mobile scrolling */}
-        <div className="h-20"></div>
+        <div className="bottom-spacer"></div>
       </div>
     </>
   );
