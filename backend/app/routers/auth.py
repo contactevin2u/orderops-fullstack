@@ -46,8 +46,10 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
         token,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="none",
+        samesite="lax",
         max_age=max_age,
+        path="/",
+        domain=".aalyx.com" if settings.COOKIE_SECURE else None,
     )
     db.add(AuditLog(user_id=user.id, action="login"))
     db.commit()
@@ -96,7 +98,9 @@ def logout(
         "token",
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="none",
+        samesite="lax",
+        path="/",
+        domain=".aalyx.com" if settings.COOKIE_SECURE else None,
     )
     db.add(AuditLog(user_id=current_user.id, action="logout"))
     db.commit()

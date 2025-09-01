@@ -81,26 +81,32 @@ class AssignmentService:
         }
     
     def _get_orders_to_assign(self) -> List[Dict[str, Any]]:
-        """Get orders that need assignment"""
-        today = date.today()
+        """Get orders that need assignment - using SAME logic as orders API"""
+        from app.utils.time import kl_day_bounds
+        from sqlalchemy import select
         
-        orders = (
-            self.db.query(Order)
+        today = date.today()
+        start_utc, end_utc = kl_day_bounds(today)
+        
+        # Use EXACT same query as orders.py with unassigned=true&date=today
+        stmt = (
+            select(Order)
             .options(joinedload(Order.customer))
             .outerjoin(Trip, Trip.order_id == Order.id)
-            .filter(
+            .where(
                 and_(
-                    # Delivery today, before today, or no specific date
+                    # Backlog mode date filtering (same as orders.py)
                     or_(
-                        Order.delivery_date <= today,
-                        Order.delivery_date.is_(None)
+                        Order.delivery_date.is_(None),
+                        Order.delivery_date < end_utc,
                     ),
-                    # No trip or trip not assigned to route
+                    # Unassigned filter (same as orders.py)
                     or_(Trip.id.is_(None), Trip.route_id.is_(None))
                 )
             )
-            .all()
         )
+        
+        orders = self.db.execute(stmt).scalars().unique().all()
         
         result = []
         for order in orders:
