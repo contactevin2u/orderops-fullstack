@@ -25,6 +25,7 @@ from .routers import (
     driver_schedule,
     assignment,
     debug,
+    debug_trace,
 )
 from .audit import router as audit_router
 
@@ -60,4 +61,5 @@ app.include_router(shifts.router)
 app.include_router(driver_schedule.router)
 app.include_router(assignment.router)
 app.include_router(debug.router)
+app.include_router(debug_trace.router)
 app.include_router(audit_router)
