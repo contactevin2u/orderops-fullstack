@@ -440,3 +440,67 @@ def test_auto_assign(db: Session = Depends(get_session)):
             "error": str(e),
             "traceback": traceback.format_exc()
         })
+@router.get("/schedule-debug")  
+def debug_schedule_alignment(db: Session = Depends(get_session)):
+    """Debug schedule vs shift alignment issue"""
+    try:
+        from datetime import date, timedelta
+        from sqlalchemy import and_
+        
+        today = date.today()
+        yesterday = today - timedelta(days=1)
+        tomorrow = today + timedelta(days=1)
+        
+        # Get all schedules around today
+        all_schedules = db.query(DriverSchedule).filter(
+            DriverSchedule.schedule_date.between(yesterday, tomorrow)
+        ).all()
+        
+        # Get active shifts  
+        active_shifts = db.query(DriverShift).filter(DriverShift.status == "ACTIVE").all()
+        
+        # Get all drivers
+        all_drivers = db.query(Driver).filter(Driver.is_active == True).all()
+        
+        schedule_data = []
+        for schedule in all_schedules:
+            schedule_data.append({
+                "driver_id": schedule.driver_id,
+                "schedule_date": schedule.schedule_date.isoformat(),
+                "is_scheduled": schedule.is_scheduled,
+                "status": schedule.status
+            })
+        
+        shift_data = []
+        for shift in active_shifts:
+            shift_data.append({
+                "driver_id": shift.driver_id, 
+                "status": shift.status,
+                "clock_in_at": shift.clock_in_at.isoformat() if shift.clock_in_at else None
+            })
+            
+        driver_data = []
+        for driver in all_drivers:
+            driver_data.append({
+                "id": driver.id,
+                "name": driver.name,
+                "is_active": driver.is_active
+            })
+            
+        return envelope({
+            "today": today.isoformat(),
+            "date_range": f"{yesterday.isoformat()} to {tomorrow.isoformat()}",
+            "schedules_found": len(all_schedules),
+            "schedules": schedule_data,
+            "active_shifts_found": len(active_shifts), 
+            "active_shifts": shift_data,
+            "total_active_drivers": len(all_drivers),
+            "drivers": driver_data
+        })
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
