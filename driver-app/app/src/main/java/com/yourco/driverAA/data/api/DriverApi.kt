@@ -330,5 +330,6 @@ data class UpsellResponse(
     val success: Boolean,
     val order_id: Int,
     val message: String,
-    val new_total: String
+    val new_total: String,
+    val order: OrderDto? = null
 )

@@ -13,6 +13,9 @@ import {
   Menu,
   Shield,
   Calendar,
+  FileText,
+  Smartphone,
+  Truck,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -25,17 +28,52 @@ export type NavItem = {
   requiresAuth?: boolean;
 };
 
-export const navItems: NavItem[] = [
-  { href: '/', label: 'nav.intake', Icon: Inbox },
-  { href: '/orders', label: 'nav.orders', Icon: ClipboardList },
-  { href: '/orders/new', label: 'orders.create', Icon: FilePlus },
-  { href: '/export', label: 'nav.export', Icon: FileDown },
-  { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
-  { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
-  { href: '/adjustments', label: 'nav.adjustments', Icon: Wrench },
-  { href: '/admin/driver-schedule', label: 'Driver Schedule', Icon: Calendar, requiresAuth: true },
-  { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
+export type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
+export const navGroups: NavGroup[] = [
+  {
+    title: 'Core Operations',
+    items: [
+      { href: '/', label: 'nav.intake', Icon: Inbox },
+      { href: '/orders', label: 'nav.orders', Icon: ClipboardList },
+      { href: '/orders/new', label: 'orders.create', Icon: FilePlus },
+      { href: '/quotations/new', label: 'New Quotation', Icon: FileText },
+    ]
+  },
+  {
+    title: 'Mobile & Delivery',
+    items: [
+      { href: '/mobile/delivery-status', label: 'Mobile Status', Icon: Smartphone },
+    ]
+  },
+  {
+    title: 'Financial Operations',
+    items: [
+      { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
+      { href: '/adjustments', label: 'nav.adjustments', Icon: Wrench },
+      { href: '/export', label: 'nav.export', Icon: FileDown },
+    ]
+  },
+  {
+    title: 'Analytics',
+    items: [
+      { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
+    ]
+  },
+  {
+    title: 'Administration',
+    items: [
+      { href: '/admin/driver-schedule', label: 'Driver Schedule', Icon: Calendar, requiresAuth: true },
+      { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
+    ]
+  }
 ];
+
+// Legacy flat array for compatibility
+export const navItems: NavItem[] = navGroups.flatMap(group => group.items);
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -137,17 +175,27 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             className={`nav ${mobileOpen ? 'open' : ''}`}
             aria-label="Primary"
           >
-            {items.map(({ href, label, Icon }) => (
-              <Link
-                key={href}
-                href={href}
-                className={`nav-link ${isActive(href) ? 'active' : ''}`}
-                onClick={() => setMobileOpen(false)}
-              >
-                <Icon style={{ width: 20, height: 20 }} />
-                <span>{t(label)}</span>
-              </Link>
-            ))}
+            {navGroups.map((group, groupIndex) => {
+              const groupItems = group.items.filter(item => !item.requiresAuth || !!user);
+              if (groupItems.length === 0) return null;
+              
+              return (
+                <React.Fragment key={group.title}>
+                  {groupIndex > 0 && <div className="nav-separator" />}
+                  {groupItems.map(({ href, label, Icon }) => (
+                    <Link
+                      key={href}
+                      href={href}
+                      className={`nav-link ${isActive(href) ? 'active' : ''}`}
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <Icon style={{ width: 20, height: 20 }} />
+                      <span>{t(label)}</span>
+                    </Link>
+                  ))}
+                </React.Fragment>
+              );
+            })}
             <LanguageSwitcher />
             {user ? (
               <>

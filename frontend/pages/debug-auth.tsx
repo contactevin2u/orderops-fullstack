@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 export default function AuthDebugPage() {
   const [token, setToken] = useState('');
   const [decodedToken, setDecodedToken] = useState<any>(null);
+  const [browserInfo, setBrowserInfo] = useState<string>('');
 
   const checkToken = async () => {
     try {
@@ -44,6 +45,18 @@ export default function AuthDebugPage() {
     }
   };
 
+  useEffect(() => {
+    // Set browser info on client side only
+    if (typeof window !== 'undefined') {
+      setBrowserInfo(`
+Domain: ${location.hostname}
+Protocol: ${location.protocol}
+User Agent: ${navigator.userAgent}
+Cookies Enabled: ${navigator.cookieEnabled}
+      `);
+    }
+  }, []);
+
   return (
     <div style={{ padding: '20px', fontFamily: 'monospace' }}>
       <h1>Auth Debug Page</h1>
@@ -62,12 +75,7 @@ export default function AuthDebugPage() {
       )}
       
       <h3>Browser Info:</h3>
-      <pre>{`
-Domain: ${location.hostname}
-Protocol: ${location.protocol}
-User Agent: ${navigator.userAgent}
-Cookies Enabled: ${navigator.cookieEnabled}
-      `}</pre>
+      <pre>{browserInfo}</pre>
     </div>
   );
 }
