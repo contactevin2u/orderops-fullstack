@@ -24,6 +24,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.asImageBitmap
 import android.graphics.BitmapFactory
@@ -1163,7 +1165,7 @@ private fun UpsellDialog(
                     value = newPriceText,
                     onValueChange = { newPriceText = it },
                     label = { Text("Harga Baru (RM)") },
-                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     placeholder = { Text("cth: 1000") }
                 )
@@ -1174,7 +1176,7 @@ private fun UpsellDialog(
                         value = installmentMonths,
                         onValueChange = { installmentMonths = it },
                         label = { Text("Tempoh Ansuran (Bulan)") },
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.fillMaxWidth(),
                         placeholder = { Text("cth: 12") }
                     )
