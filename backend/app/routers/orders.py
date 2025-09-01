@@ -37,7 +37,7 @@ from ..services.status_updates import (
     mark_cancelled,
     mark_returned,
 )
-from ..services.documents import invoice_pdf
+from ..services.documents import invoice_pdf, quotation_pdf
 from ..utils.responses import envelope
 from ..utils.normalize import to_decimal
 from ..services.fcm import notify_order_assigned
@@ -276,6 +276,34 @@ def get_invoice_pdf(order_id: int, db: Session = Depends(get_session)):
         content=pdf,
         media_type="application/pdf",
         headers={"Content-Disposition": f'inline; filename="invoice_{order.code}.pdf"'},
+    )
+
+
+class QuotationIn(BaseModel):
+    customer: dict
+    order: dict
+    quote_date: str | None = None
+    valid_until: str | None = None
+
+
+@router.post("/quotation.pdf")
+def generate_quotation_pdf(body: QuotationIn):
+    """Generate a quotation PDF without storing anything."""
+    from datetime import datetime, timedelta
+    
+    # Add current date if not provided
+    quote_data = body.model_dump()
+    if not quote_data.get("quote_date"):
+        quote_data["quote_date"] = datetime.now().strftime("%Y-%m-%d")
+    if not quote_data.get("valid_until"):
+        valid_date = datetime.now() + timedelta(days=30)
+        quote_data["valid_until"] = valid_date.strftime("%Y-%m-%d")
+    
+    pdf = quotation_pdf(quote_data)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": 'inline; filename="quotation.pdf"'},
     )
 
 
