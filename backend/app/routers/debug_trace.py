@@ -133,3 +133,82 @@ def trace_assignment_logic(db: Session = Depends(get_session)):
             "error": str(e),
             "traceback": traceback.format_exc()
         })
+@router.post("/reassign-orders-to-driver/{driver_id}")
+def reassign_orders_for_testing(driver_id: int, db: Session = Depends(get_session)):
+    """Reassign all current orders to a specific driver for testing"""
+    try:
+        from datetime import date
+        from sqlalchemy import and_
+        
+        # Get all trips currently assigned to any driver
+        trips = db.query(Trip).filter(Trip.driver_id.isnot(None)).all()
+        
+        if not trips:
+            return envelope({"message": "No assigned trips found", "reassigned": 0})
+        
+        # Check if target driver exists
+        target_driver = db.query(Driver).filter(Driver.id == driver_id).first()
+        if not target_driver:
+            return envelope({"error": f"Driver {driver_id} not found"})
+        
+        # Get or create today's route for target driver
+        today = date.today()
+        from ..models import DriverRoute
+        
+        route = db.query(DriverRoute).filter(
+            and_(
+                DriverRoute.driver_id == driver_id,
+                DriverRoute.route_date == today
+            )
+        ).first()
+        
+        if not route:
+            route = DriverRoute(
+                driver_id=driver_id,
+                route_date=today,
+                name=f"{target_driver.name or 'Driver'} - {today.strftime('%b %d')} (Test)",
+                notes=f"Test route for {target_driver.name or f'Driver {driver_id}'}"
+            )
+            db.add(route)
+            db.flush()
+        
+        # Update all trips to new driver and route
+        reassigned_orders = []
+        for trip in trips:
+            old_driver_id = trip.driver_id
+            trip.driver_id = driver_id
+            trip.route_id = route.id
+            
+            # Get order details
+            order = db.query(Order).filter(Order.id == trip.order_id).first()
+            reassigned_orders.append({
+                "order_id": trip.order_id,
+                "order_code": order.code if order else None,
+                "from_driver": old_driver_id,
+                "to_driver": driver_id,
+                "route_id": route.id
+            })
+        
+        db.commit()
+        
+        return envelope({
+            "message": f"Reassigned {len(reassigned_orders)} orders to driver {driver_id} ({target_driver.name})",
+            "reassigned_count": len(reassigned_orders),
+            "reassigned_orders": reassigned_orders,
+            "target_driver": {
+                "id": target_driver.id,
+                "name": target_driver.name
+            },
+            "route_created": {
+                "id": route.id,
+                "name": route.name
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        db.rollback()
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
