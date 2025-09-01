@@ -1,24 +1,14 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import Link from 'next/link';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { 
-  Sparkles, 
+  Zap,
   CheckCircle, 
   AlertTriangle,
-  Truck,
-  Clock,
-  MapPin,
-  ChevronRight,
-  Zap,
-  BarChart3,
-  RefreshCw,
-  Activity,
-  TrendingUp,
-  Users,
   Package,
-  Settings,
-  Calendar
+  Users,
+  RefreshCw,
+  Sparkles
 } from 'lucide-react';
 
 interface Assignment {
@@ -29,210 +19,168 @@ interface Assignment {
   order_code: string;
 }
 
-interface Route {
-  id: number;
-  driver_id: number;
-  driver_name: string;
-  route_date: string;
-  name: string;
-}
-
 interface AutoAssignResponse {
   success: boolean;
   message: string;
   assigned_count: number;
-  routes_created: number;
-  assignments: Assignment[];
-  routes: Route[];
-  failed: any[];
-  method: string;
-}
-
-interface OnHoldOrder {
-  order_id: number;
-  order_code: string;
-  customer_name: string;
-  customer_phone?: string;
-  address?: string;
   total: number;
-  created_at?: string;
-  on_hold_reason: string;
+  assigned: Assignment[];
 }
 
-interface ManualEditSummary {
-  date: string;
-  routes_count: number;
-  total_orders: number;
-  routes: Array<{
-    route_id: number;
-    driver_id: number;
-    driver_name: string;
-    route_name: string;
-    orders_count: number;
-    orders: any[];
-    can_add_secondary_driver: boolean;
-  }>;
+interface StatusResponse {
+  orders_to_assign: number;
+  available_drivers: number;
+  orders: any[];
+  drivers: any[];
 }
 
-export default function UnifiedAssignmentsPage() {
-  const [isAssigning, setIsAssigning] = useState(false);
-  const [lastResult, setLastResult] = useState<AutoAssignResponse | null>(null);
+export default function UnifiedAssignments() {
   const queryClient = useQueryClient();
+  const [lastResult, setLastResult] = useState<AutoAssignResponse | null>(null);
 
-  // Fetch on-hold orders
-  const { data: onHoldData, isLoading: onHoldLoading } = useQuery({
-    queryKey: ['unified-assignments', 'on-hold'],
+  // Get current status
+  const { data: status, isLoading: statusLoading } = useQuery({
+    queryKey: ['assignment-status'],
     queryFn: async () => {
-      const response = await fetch('/_api/unified-assignments/on-hold-orders');
-      if (!response.ok) throw new Error('Failed to fetch on-hold orders');
-      return response.json();
-    }
-  });
-
-  // Fetch manual edit summary
-  const { data: editSummary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['unified-assignments', 'summary'],
-    queryFn: async () => {
-      const response = await fetch('/_api/unified-assignments/manual-edit-summary');
-      if (!response.ok) throw new Error('Failed to fetch edit summary');
-      return response.json();
-    }
+      const response = await fetch('/api/assignment/status');
+      if (!response.ok) throw new Error('Failed to get status');
+      const result = await response.json();
+      return result.data as StatusResponse;
+    },
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   // Auto-assign mutation
   const autoAssignMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/_api/unified-assignments/auto-assign', {
+      const response = await fetch('/api/unified-assignments/auto-assign', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
       });
-      if (!response.ok) throw new Error('Auto-assignment failed');
-      return response.json();
+      if (!response.ok) throw new Error('Assignment failed');
+      const result = await response.json();
+      return result.data as AutoAssignResponse;
     },
-    onSuccess: (data: AutoAssignResponse) => {
+    onSuccess: (data) => {
       setLastResult(data);
-      queryClient.invalidateQueries({ queryKey: ['unified-assignments'] });
-    }
+      queryClient.invalidateQueries({ queryKey: ['assignment-status'] });
+    },
   });
 
-  const handleAutoAssign = async () => {
-    setIsAssigning(true);
-    try {
-      await autoAssignMutation.mutateAsync();
-    } finally {
-      setIsAssigning(false);
-    }
-  };
-
-  const refreshData = () => {
-    queryClient.invalidateQueries({ queryKey: ['unified-assignments'] });
+  const handleAutoAssign = () => {
+    autoAssignMutation.mutate();
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center justify-center h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600">
-                <Sparkles className="h-6 w-6 text-white" />
+    <AdminLayout>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Order Assignment</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              Automatically assign orders to scheduled drivers
+            </p>
+          </div>
+        </div>
+
+        {/* Status Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Orders to Assign */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Package className="h-8 w-8 text-blue-600" />
               </div>
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                  Auto Assignment Center
-                </h1>
-                <p className="mt-1 text-gray-600 dark:text-gray-300">
-                  AI-powered order assignment and route optimization
-                </p>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {statusLoading ? '...' : status?.orders_to_assign || 0}
+                </div>
+                <div className="text-sm text-gray-500">Orders Ready for Assignment</div>
               </div>
             </div>
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={refreshData}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
-              </button>
-              <button
-                onClick={handleAutoAssign}
-                disabled={isAssigning}
-                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 text-white font-semibold rounded-lg hover:from-purple-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-              >
-                {isAssigning ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Zap className="h-4 w-4 mr-2" />
-                    Auto-Assign Orders
-                  </>
-                )}
-              </button>
+          </div>
+
+          {/* Available Drivers */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <Users className="h-8 w-8 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-gray-900">
+                  {statusLoading ? '...' : status?.available_drivers || 0}
+                </div>
+                <div className="text-sm text-gray-500">Scheduled Drivers Available</div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Success/Error Result */}
+        {/* Main Assignment Button */}
+        <div className="bg-white rounded-lg shadow p-8 text-center">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-4">
+            <Zap className="h-8 w-8 text-blue-600" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">
+            Auto-Assign Orders
+          </h3>
+          <p className="text-sm text-gray-500 mb-6">
+            Automatically assign all eligible orders to scheduled drivers using AI optimization
+          </p>
+          
+          <button
+            onClick={handleAutoAssign}
+            disabled={autoAssignMutation.isPending || !status?.orders_to_assign || !status?.available_drivers}
+            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {autoAssignMutation.isPending ? (
+              <>
+                <RefreshCw className="animate-spin -ml-1 mr-3 h-5 w-5" />
+                Assigning...
+              </>
+            ) : (
+              <>
+                <Sparkles className="-ml-1 mr-3 h-5 w-5" />
+                Assign All Orders
+              </>
+            )}
+          </button>
+
+          {(!status?.orders_to_assign || !status?.available_drivers) && (
+            <p className="mt-3 text-sm text-gray-400">
+              {!status?.orders_to_assign ? 'No orders to assign' : 'No scheduled drivers available'}
+            </p>
+          )}
+        </div>
+
+        {/* Last Assignment Result */}
         {lastResult && (
-          <div className={`mb-8 rounded-xl border p-6 ${
-            lastResult.success 
-              ? 'bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800' 
-              : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800'
-          }`}>
-            <div className="flex items-start space-x-3">
-              {lastResult.success ? (
-                <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5" />
-              ) : (
-                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
-              )}
-              <div className="flex-1">
-                <h3 className={`text-sm font-medium ${
-                  lastResult.success 
-                    ? 'text-green-800 dark:text-green-200' 
-                    : 'text-red-800 dark:text-red-200'
-                }`}>
-                  {lastResult.message}
+          <div className={`rounded-lg shadow p-6 ${lastResult.success ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                {lastResult.success ? (
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                ) : (
+                  <AlertTriangle className="h-6 w-6 text-red-600" />
+                )}
+              </div>
+              <div className="ml-3">
+                <h3 className={`text-sm font-medium ${lastResult.success ? 'text-green-800' : 'text-red-800'}`}>
+                  Assignment Result
                 </h3>
-                
-                {lastResult.success && (
-                  <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                        {lastResult.assigned_count}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                        Orders Assigned
-                      </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                        {lastResult.routes_created}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                        Routes Created
-                      </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                        {lastResult.routes.length}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                        Active Routes
-                      </div>
-                    </div>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-                        {lastResult.method === 'openai_optimized' ? 'AI' : 'Distance'}
-                      </div>
-                      <div className="text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wide">
-                        Method Used
-                      </div>
+                <div className={`mt-1 text-sm ${lastResult.success ? 'text-green-700' : 'text-red-700'}`}>
+                  {lastResult.message}
+                </div>
+                {lastResult.success && lastResult.assigned && lastResult.assigned.length > 0 && (
+                  <div className="mt-3">
+                    <h4 className="text-sm font-medium text-green-800">Assigned Orders:</h4>
+                    <div className="mt-1 text-sm text-green-700">
+                      {lastResult.assigned.map((assignment, index) => (
+                        <div key={index} className="flex items-center justify-between py-1">
+                          <span>Order {assignment.order_code}</span>
+                          <span>→ {assignment.driver_name}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -241,252 +189,42 @@ export default function UnifiedAssignmentsPage() {
           </div>
         )}
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center">
+        {/* Assignment Error */}
+        {autoAssignMutation.isError && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex">
               <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/30">
-                  <Clock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                </div>
+                <AlertTriangle className="h-5 w-5 text-red-400" />
               </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  On-Hold Orders
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">
+                  Assignment Failed
                 </h3>
-                <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {onHoldLoading ? '...' : onHoldData?.count || 0}
+                <div className="mt-2 text-sm text-red-700">
+                  {autoAssignMutation.error?.message || 'An unknown error occurred'}
                 </div>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/30">
-                  <Truck className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
+        {/* Simple Status Display */}
+        {status && (
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-medium text-gray-900 mb-4">Current Status</h3>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Orders waiting for assignment</span>
+                <span className="font-medium">{status.orders_to_assign}</span>
               </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Active Routes
-                </h3>
-                <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {summaryLoading ? '...' : editSummary?.routes_count || 0}
-                </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-500">Scheduled drivers available</span>
+                <span className="font-medium">{status.available_drivers}</span>
               </div>
             </div>
           </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/30">
-                  <Package className="h-5 w-5 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-              <div className="ml-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-                  Total Orders
-                </h3>
-                <div className="mt-1 text-2xl font-semibold text-gray-900 dark:text-white">
-                  {summaryLoading ? '...' : editSummary?.total_orders || 0}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* On-Hold Orders */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Orders Requiring Attention
-                </h3>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
-                  {onHoldData?.count || 0} pending
-                </span>
-              </div>
-            </div>
-            <div className="p-6">
-              {onHoldData?.on_hold_orders?.length > 0 ? (
-                <div className="space-y-4">
-                  {onHoldData.on_hold_orders.slice(0, 5).map((order: OnHoldOrder) => (
-                    <div key={order.order_id} className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white">
-                          Order #{order.order_code}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-300">
-                          {order.customer_name}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-gray-900 dark:text-white">
-                          RM{order.total}
-                        </div>
-                        <div className="text-xs text-amber-600 dark:text-amber-400">
-                          Awaiting customer date
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {onHoldData.on_hold_orders.length > 5 && (
-                    <div className="text-center py-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        +{onHoldData.on_hold_orders.length - 5} more orders
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">
-                    No orders on hold
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Active Routes */}
-          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Today&apos;s Active Routes
-                </h3>
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200">
-                  {editSummary?.routes_count || 0} routes
-                </span>
-              </div>
-            </div>
-            <div className="p-6">
-              {editSummary?.routes?.length > 0 ? (
-                <div className="space-y-4">
-                  {editSummary.routes.slice(0, 5).map((route: any) => (
-                    <div key={route.route_id} className="flex items-center justify-between p-4 bg-blue-50 dark:bg-blue-900/10 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-center space-x-3">
-                        <div className="flex-shrink-0">
-                          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white text-sm font-medium">
-                            {route.driver_name.charAt(0).toUpperCase()}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {route.driver_name}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-300">
-                            {route.route_name}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-gray-900 dark:text-white">
-                          {route.orders_count} orders
-                        </div>
-                        <div className="text-xs text-blue-600 dark:text-blue-400">
-                          {route.can_add_secondary_driver ? 'Available' : 'At capacity'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {editSummary.routes.length > 5 && (
-                    <div className="text-center py-2">
-                      <span className="text-sm text-gray-500 dark:text-gray-400">
-                        +{editSummary.routes.length - 5} more routes
-                      </span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500 dark:text-gray-400">
-                    No active routes today
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Manual Management
-            </h3>
-            <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              Access manual tools when automatic assignment needs adjustment
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Link
-                href="/admin/routes"
-                className="group flex items-center p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all duration-200"
-              >
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30">
-                  <MapPin className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                </div>
-                <div className="ml-4 flex-1">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                    Manage Routes
-                  </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Edit and optimize delivery routes
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
-              </Link>
-              
-              <Link
-                href="/admin/assign"
-                className="group flex items-center p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all duration-200"
-              >
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30">
-                  <Users className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                </div>
-                <div className="ml-4 flex-1">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                    Manual Assignment
-                  </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Assign specific orders to drivers
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
-              </Link>
-              
-              <Link
-                href="/admin/driver-schedule"
-                className="group flex items-center p-4 rounded-lg border border-gray-200 dark:border-gray-600 hover:border-blue-500 dark:hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all duration-200"
-              >
-                <div className="flex items-center justify-center h-10 w-10 rounded-lg bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30">
-                  <Calendar className="h-5 w-5 text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
-                </div>
-                <div className="ml-4 flex-1">
-                  <h4 className="text-sm font-medium text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400">
-                    Driver Scheduling
-                  </h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    Set driver availability patterns
-                  </p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-blue-500" />
-              </Link>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
-    </div>
+    </AdminLayout>
   );
 }
-
-(UnifiedAssignmentsPage as any).getLayout = (page: any) => <AdminLayout>{page}</AdminLayout>;

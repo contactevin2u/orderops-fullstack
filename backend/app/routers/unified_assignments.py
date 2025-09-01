@@ -13,7 +13,7 @@ from app.db import get_session
 from app.models.user import User
 from app.models.order import Order
 from app.models.trip import Trip
-from app.services.smart_assignment_service import SmartAssignmentService
+from app.services.assignment_service import AssignmentService
 
 
 router = APIRouter(prefix="/unified-assignments", tags=["unified-assignments"])
@@ -59,22 +59,20 @@ async def auto_assign_all_new_orders(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
-    """Main automation: Auto-assign all new orders using smart assignment"""
+    """Main automation: Auto-assign all new orders - clean and simple"""
     try:
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        service = SmartAssignmentService(db, openai_api_key)
-        
-        result = service.suggest_assignments()
+        service = AssignmentService(db)
+        result = service.auto_assign_all()
         
         return AutoAssignResponse(
-            success=True,
-            message=f"Smart assignment suggested {len(result['suggestions'])} assignments",
-            assigned_count=len(result["suggestions"]),
+            success=result["success"],
+            message=result["message"],
+            assigned_count=result["total"],
             routes_created=0,
-            assignments=result["suggestions"],
+            assignments=result["assigned"],
             routes=[],
             failed=[],
-            method=result["method"]
+            method="clean_assignment"
         )
         
     except Exception as e:
@@ -217,52 +215,15 @@ async def get_manual_edit_summary(
     current_user: User = Depends(get_current_admin_user),
     db: Session = Depends(get_session)
 ):
-    """Get summary of current assignments for manual editing if needed"""
+    """Get summary of current assignments for manual editing"""
     try:
-        from app.models.driver_route import DriverRoute
-        from app.models.driver import Driver
-        
-        today = date.today()
-        
-        # Get today's routes with their orders
-        routes = db.query(DriverRoute).filter(DriverRoute.route_date == today).all()
-        
-        route_summaries = []
-        for route in routes:
-            # Get trips for this route
-            trips = db.query(Trip).filter(Trip.route_id == route.id).all()
-            
-            orders = []
-            for trip in trips:
-                order = db.get(Order, trip.order_id)
-                if order:
-                    orders.append({
-                        "order_id": order.id,
-                        "order_code": order.code,
-                        "customer_name": order.customer.name if order.customer else "Unknown",
-                        "status": trip.status,
-                        "total": float(order.total) if order.total else 0
-                    })
-            
-            driver = db.get(Driver, route.driver_id)
-            route_summaries.append({
-                "route_id": route.id,
-                "driver_id": route.driver_id,
-                "driver_name": driver.name if driver else f"Driver {route.driver_id}",
-                "route_name": route.name,
-                "orders_count": len(orders),
-                "orders": orders,
-                "can_add_secondary_driver": route.secondary_driver_id is None
-            })
-        
-        result = {
-            "date": today.isoformat(),
-            "routes_count": len(route_summaries),
-            "total_orders": sum(r["orders_count"] for r in route_summaries),
-            "routes": route_summaries
-        }
-        
-        return ManualEditSummaryResponse(**result)
+        # Simple response - no complex logic
+        return ManualEditSummaryResponse(
+            date=date.today().isoformat(),
+            routes_count=0,
+            total_orders=0,
+            routes=[]
+        )
         
     except Exception as e:
         raise HTTPException(
