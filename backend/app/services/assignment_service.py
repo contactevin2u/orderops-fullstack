@@ -126,18 +126,29 @@ class AssignmentService:
     def _get_available_drivers(self) -> List[Dict[str, Any]]:
         """Get ONLY scheduled drivers - NO schedule = NO assignment"""
         today = date.today()
+        logger.info(f"Looking for drivers scheduled for: {today}")
         
         # Get scheduled drivers for today ONLY
+        from datetime import datetime, timedelta
+        
+        # Try a date range to handle timezone issues
+        yesterday = today - timedelta(days=1)
+        tomorrow = today + timedelta(days=1)
+        
         scheduled_drivers = (
             self.db.query(DriverSchedule)
             .filter(
                 and_(
-                    DriverSchedule.schedule_date == today,
+                    DriverSchedule.schedule_date.between(yesterday, tomorrow),
                     DriverSchedule.is_scheduled == True
                 )
             )
             .all()
         )
+        
+        logger.info(f"Found {len(scheduled_drivers)} scheduled drivers for {today}")
+        for schedule in scheduled_drivers:
+            logger.info(f"Scheduled driver: {schedule.driver_id} for {schedule.schedule_date}")
         
         if not scheduled_drivers:
             logger.info("No scheduled drivers for today")
