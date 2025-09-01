@@ -656,12 +656,10 @@ private fun PodPhotosSection(
         val fileName = "POD_${jobId}_${photoNumber}_${System.currentTimeMillis()}.jpg"
         val photosDir = File(context.filesDir, "pod_photos")
         
-        // Ensure directory exists with synchronized access
-        synchronized(this) {
-            if (!photosDir.exists()) {
-                val created = photosDir.mkdirs()
-                android.util.Log.d("PhotoUpload", "Created pod_photos directory: $created, path: ${photosDir.absolutePath}")
-            }
+        // Ensure directory exists (File.mkdirs() is thread-safe)
+        if (!photosDir.exists()) {
+            val created = photosDir.mkdirs()
+            android.util.Log.d("PhotoUpload", "Created pod_photos directory: $created, path: ${photosDir.absolutePath}")
         }
         
         val file = File(photosDir, fileName)
