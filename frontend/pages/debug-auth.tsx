@@ -29,7 +29,7 @@ export default function AuthDebugPage() {
       setToken(cookieToken);
     } catch (error) {
       console.error('Token check failed:', error);
-      setDecodedToken({ error: error.message });
+      setDecodedToken({ error: error instanceof Error ? error.message : String(error) });
     }
   };
 
