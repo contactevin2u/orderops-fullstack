@@ -31,7 +31,7 @@ export default function MobileDeliveryStatusPage() {
   // Update route assignment
   const updateRouteMutation = useMutation({
     mutationFn: async ({ routeId, driverId }: { routeId: string; driverId: string }) => {
-      return updateRoute(routeId, { driverId });
+      return updateRoute(routeId, { driver_id: parseInt(driverId) });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['mobile-routes', selectedDate] });
