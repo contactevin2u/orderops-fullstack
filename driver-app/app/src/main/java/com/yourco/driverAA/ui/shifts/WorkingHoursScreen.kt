@@ -57,7 +57,7 @@ fun WorkingHoursScreen(
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                     Text(
-                        text = "${uiState.todayHours ?: 0.0}h",
+                        text = "${String.format("%.1f", uiState.todayHours ?: 0.0)}h",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -87,7 +87,7 @@ fun WorkingHoursScreen(
                         tint = MaterialTheme.colorScheme.onSecondaryContainer
                     )
                     Text(
-                        text = "${uiState.weekHours ?: 0.0}h",
+                        text = "${String.format("%.1f", uiState.weekHours ?: 0.0)}h",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -124,7 +124,7 @@ fun WorkingHoursScreen(
                         tint = MaterialTheme.colorScheme.onTertiaryContainer
                     )
                     Text(
-                        text = "${uiState.monthHours ?: 0.0}h",
+                        text = "${String.format("%.1f", uiState.monthHours ?: 0.0)}h",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -154,15 +154,16 @@ fun WorkingHoursScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "RM${uiState.monthEarnings ?: 0.0}",
+                        text = "RM${String.format("%.0f", uiState.monthEarnings ?: 0.0)}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Earnings",
+                        text = "Outstation Allowance",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
