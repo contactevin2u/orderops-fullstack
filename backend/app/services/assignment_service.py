@@ -14,6 +14,7 @@ from app.models.trip import Trip
 from app.models.driver_route import DriverRoute
 from app.models.driver_shift import DriverShift
 from app.models.driver_schedule import DriverSchedule
+from app.models.customer import Customer
 
 logger = logging.getLogger(__name__)
 
@@ -183,19 +184,31 @@ class AssignmentService:
         for driver in drivers:
             is_clocked_in = driver.id in clocked_in_ids
             
-            # Count active trips
-            active_trips = (
+            # Get active trips with locations
+            active_trips_query = (
                 self.db.query(Trip)
+                .join(Order, Trip.order_id == Order.id)
+                .join(Customer, Order.customer_id == Customer.id)
                 .filter(
                     and_(
                         Trip.driver_id == driver.id,
                         Trip.status.in_(["ASSIGNED", "STARTED"])
                     )
                 )
-                .count()
+                .all()
             )
             
-            # No trip limit - let drivers handle as many as needed
+            active_trips_count = len(active_trips_query)
+            
+            # Get existing trip locations for proximity consideration
+            existing_trip_locations = []
+            for trip in active_trips_query:
+                if trip.order and trip.order.customer and trip.order.customer.address:
+                    existing_trip_locations.append({
+                        "order_id": trip.order_id,
+                        "address": trip.order.customer.address,
+                        "status": trip.status
+                    })
             
             # Priority: 1=Scheduled+Clocked, 2=Scheduled only
             priority = 1 if is_clocked_in else 2
@@ -206,8 +219,9 @@ class AssignmentService:
                 "is_clocked_in": is_clocked_in,
                 "is_scheduled": True,  # All are scheduled
                 "priority": priority,
-                "active_trips": active_trips,
-                "lat": 3.1390,  # KL center - replace with actual location later
+                "active_trips": active_trips_count,
+                "existing_trip_locations": existing_trip_locations,
+                "lat": 3.1390,  # KL center - not used for location tracking
                 "lng": 101.6869
             })
         
@@ -234,35 +248,60 @@ class AssignmentService:
         return self._simple_assignments(orders, drivers)
     
     def _openai_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
-        """Use OpenAI for optimal assignments"""
+        """Use OpenAI for optimal assignments with proximity consideration"""
         
-        prompt = f"Assign {len(orders)} delivery orders to {len(drivers)} drivers in Kuala Lumpur to minimize travel time.\n\n"
+        prompt = f"""DELIVERY ASSIGNMENT OPTIMIZATION
+Assign {len(orders)} new delivery orders to {len(drivers)} drivers in Kuala Lumpur/Selangor for optimal routing.
+
+DRIVERS WITH CURRENT ASSIGNMENTS:"""
         
-        prompt += "DRIVERS:\n"
         for d in drivers:
             status = "CLOCKED IN" if d["is_clocked_in"] else "SCHEDULED"
-            prompt += f"- Driver {d['driver_id']}: {d['driver_name']} ({status}, {d['active_trips']} active)\n"
+            prompt += f"\n- Driver {d['driver_id']}: {d['driver_name']} ({status})"
+            
+            existing_locations = d.get('existing_trip_locations', [])
+            if existing_locations:
+                prompt += f" | Current assignments ({len(existing_locations)}):"
+                for loc in existing_locations[:3]:  # Limit to 3 for brevity
+                    prompt += f"\n  • Order {loc['order_id']}: {loc['address'][:50]}{'...' if len(loc['address']) > 50 else ''}"
+                if len(existing_locations) > 3:
+                    prompt += f"\n  • ... and {len(existing_locations) - 3} more"
+            else:
+                prompt += " | No current assignments"
         
-        prompt += "\nORDERS:\n"
+        prompt += f"\n\nNEW ORDERS TO ASSIGN:"
         for o in orders:
-            prompt += f"- Order {o['order_id']}: {o['customer_name']} at {o['address']} (RM{o['total']})\n"
+            prompt += f"\n- Order {o['order_id']}: {o['customer_name']} at {o['address']} (RM{o['total']:.0f})"
         
-        prompt += """\n\nRules:
-1. Prioritize clocked-in drivers
-2. Minimize total travel distance
-3. Balance workload across drivers
+        prompt += f"""\n\nOPTIMIZATION RULES:
+1. PRIORITY: Clocked-in drivers > Scheduled drivers
+2. PROXIMITY: Assign orders near driver's existing assignments to minimize travel
+3. WORKLOAD: Balance total assignments across drivers
+4. EFFICIENCY: Group nearby deliveries to same driver when possible
 
-Return only JSON:
-{"assignments": [{"order_id": 123, "driver_id": 456}]}"""
+Return optimized assignments as JSON schema:
+{{"assignments": [{{"order_id": int, "driver_id": int, "reason": "proximity/workload/priority"}}]}}
+
+Focus on geographic efficiency - drivers with existing assignments in an area should get nearby new orders."""
 
         response = self.openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You optimize delivery assignments for minimum travel time."},
+                {
+                    "role": "system", 
+                    "content": """You are a logistics optimization AI specializing in Malaysian delivery routing. 
+                    You understand Malaysian geography, major roads, and traffic patterns in Kuala Lumpur/Selangor region.
+                    
+                    Your goal: Minimize total driver travel time and distance by intelligently clustering nearby deliveries.
+                    Consider existing driver assignments to create efficient route continuity.
+                    
+                    Always return valid JSON only - no explanations or markdown formatting."""
+                },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=1000,
-            temperature=0.1
+            max_tokens=2000,
+            temperature=0.1,
+            response_format={"type": "json_object"}
         )
 
         ai_response = response.choices[0].message.content
@@ -282,7 +321,7 @@ Return only JSON:
         return self._simple_assignments(orders, drivers)
     
     def _simple_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
-        """Simple priority-based assignment - no round-robin"""
+        """Enhanced assignment with proximity consideration"""
         assignments = []
         
         # Group drivers by priority (already sorted)
@@ -295,23 +334,88 @@ Return only JSON:
             logger.warning("No scheduled drivers available for assignment")
             return []
         
-        # Assign orders to drivers in priority order
+        # Track workload
         driver_workload = {d["driver_id"]: d["active_trips"] for d in all_drivers}
         
         for order in orders:
-            # Find driver with lowest workload in priority order
-            best_driver = min(all_drivers, key=lambda d: (d["priority"], driver_workload[d["driver_id"]]))
+            best_driver = None
+            best_score = float('inf')
             
-            assignments.append({
-                "order_id": order["order_id"],
-                "driver_id": best_driver["driver_id"]
-            })
+            # Evaluate each driver for this order
+            for driver in all_drivers:
+                # Base score from priority and workload
+                priority_score = driver["priority"] * 1000  # High penalty for lower priority
+                workload_score = driver_workload[driver["driver_id"]] * 100
+                
+                # Proximity bonus: check if order is near existing assignments
+                proximity_bonus = 0
+                existing_locations = driver.get('existing_trip_locations', [])
+                if existing_locations:
+                    order_address = order.get('address', '').lower()
+                    for existing_loc in existing_locations:
+                        existing_address = existing_loc.get('address', '').lower()
+                        
+                        # Simple geographic proximity heuristics for Malaysia
+                        if self._addresses_likely_nearby(order_address, existing_address):
+                            proximity_bonus = -500  # Strong bonus for proximity
+                            break
+                        elif self._addresses_same_area(order_address, existing_address):
+                            proximity_bonus = -200  # Moderate bonus for same general area
+                
+                # Calculate final score (lower is better)
+                total_score = priority_score + workload_score + proximity_bonus
+                
+                if total_score < best_score:
+                    best_score = total_score
+                    best_driver = driver
             
-            # Update workload for next assignment
-            driver_workload[best_driver["driver_id"]] += 1
+            if best_driver:
+                assignments.append({
+                    "order_id": order["order_id"],
+                    "driver_id": best_driver["driver_id"]
+                })
+                
+                # Update workload for next assignment
+                driver_workload[best_driver["driver_id"]] += 1
         
-        logger.info(f"Priority assignment created {len(assignments)} assignments")
+        logger.info(f"Enhanced proximity assignment created {len(assignments)} assignments")
         return assignments
+    
+    def _addresses_likely_nearby(self, addr1: str, addr2: str) -> bool:
+        """Check if two addresses are likely nearby (same street/building/area)"""
+        # Extract common Malaysian address patterns
+        addr1_parts = set(addr1.split())
+        addr2_parts = set(addr2.split())
+        
+        # Check for exact street name matches
+        common_words = addr1_parts.intersection(addr2_parts)
+        
+        # Common indicators of nearby addresses
+        nearby_indicators = {
+            'jalan', 'jln', 'lorong', 'taman', 'bandar', 'pju', 'ss', 'usj', 
+            'section', 'seksyen', 'lot', 'no', 'blok', 'block', 'plaza', 'mall'
+        }
+        
+        # If they share specific location identifiers
+        location_matches = len(common_words.intersection(nearby_indicators))
+        word_overlap = len(common_words) / max(len(addr1_parts), len(addr2_parts), 1)
+        
+        return location_matches >= 2 or word_overlap > 0.4
+    
+    def _addresses_same_area(self, addr1: str, addr2: str) -> bool:
+        """Check if addresses are in same general area"""
+        addr1_parts = set(addr1.split())
+        addr2_parts = set(addr2.split())
+        
+        # Major area identifiers
+        area_indicators = {
+            'kuala', 'lumpur', 'kl', 'selangor', 'shah', 'alam', 'petaling', 'jaya', 'pj',
+            'subang', 'klang', 'ampang', 'cheras', 'kepong', 'wangsa', 'maju', 'setapak',
+            'damansara', 'bangsar', 'mont', 'kiara', 'ttdi', 'puchong', 'seri', 'kembangan'
+        }
+        
+        common_areas = addr1_parts.intersection(addr2_parts).intersection(area_indicators)
+        return len(common_areas) > 0
     
     def _apply_assignment(self, order_id: int, driver_id: int) -> Dict[str, Any]:
         """Apply a single assignment - create trip and route if needed"""
