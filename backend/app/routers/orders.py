@@ -402,10 +402,30 @@ def assign_order(
     if not driver:
         raise HTTPException(404, "Driver not found")
     
-    # Get or create daily route using shared utility
-    from ..services.unified_assignment_service import get_or_create_daily_route
+    # Get or create daily route for driver
     today = date.today()
-    route, route_created = get_or_create_daily_route(db, driver.id, today)
+    route = (
+        db.query(DriverRoute)
+        .filter(
+            and_(
+                DriverRoute.driver_id == driver.id,
+                DriverRoute.route_date == today
+            )
+        )
+        .first()
+    )
+    
+    route_created = False
+    if not route:
+        route = DriverRoute(
+            driver_id=driver.id,
+            route_date=today,
+            name=f"{driver.name or 'Driver'} - {today.strftime('%b %d')}",
+            notes=f"Manual assignment route for {driver.name or f'Driver {driver.id}'}"
+        )
+        db.add(route)
+        db.flush()
+        route_created = True
     
     trip = db.query(Trip).filter_by(order_id=order.id).one_or_none()
     if trip:

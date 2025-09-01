@@ -22,7 +22,6 @@ interface Assignment {
 interface AutoAssignResponse {
   success: boolean;
   message: string;
-  assigned_count: number;
   total: number;
   assigned: Assignment[];
 }
@@ -34,7 +33,7 @@ interface StatusResponse {
   drivers: any[];
 }
 
-export default function UnifiedAssignments() {
+export default function Assignments() {
   const queryClient = useQueryClient();
   const [lastResult, setLastResult] = useState<AutoAssignResponse | null>(null);
 
@@ -53,7 +52,7 @@ export default function UnifiedAssignments() {
   // Auto-assign mutation
   const autoAssignMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/unified-assignments/auto-assign', {
+      const response = await fetch('/api/assignment/auto-assign', {
         method: 'POST',
       });
       if (!response.ok) throw new Error('Assignment failed');

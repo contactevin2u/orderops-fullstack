@@ -99,25 +99,23 @@ def test_schedule_service(db: Session = Depends(get_session)):
     except Exception as e:
         return envelope({"error": str(e), "traceback": str(e.__traceback__)})
 
-@router.get("/ai-assignment-test")
-def test_ai_assignment_service(db: Session = Depends(get_session)):
-    """Test AI assignment service"""
+@router.get("/assignment-test")
+def test_assignment_service(db: Session = Depends(get_session)):
+    """Test clean assignment service"""
     try:
-        from ..services.ai_assignment_service import AIAssignmentService
+        from ..services.assignment_service import AssignmentService
         
-        ai_service = AIAssignmentService(db)
+        service = AssignmentService(db)
         
-        # Test getting available drivers
-        available_drivers = ai_service.get_available_drivers()
-        
-        # Test getting pending orders
-        pending_orders = ai_service.get_pending_orders()
+        # Test getting available drivers and orders
+        orders = service._get_orders_to_assign()
+        drivers = service._get_available_drivers()
         
         return envelope({
-            "available_drivers": available_drivers,
-            "available_drivers_count": len(available_drivers),
-            "pending_orders": pending_orders,
-            "pending_orders_count": len(pending_orders)
+            "orders_to_assign": orders,
+            "orders_count": len(orders),
+            "available_drivers": drivers,
+            "drivers_count": len(drivers)
         })
     except Exception as e:
         import traceback
@@ -311,15 +309,15 @@ def simple_driver_test(db: Session = Depends(get_session)):
         # Test 3: Working /drivers endpoint logic
         drivers_endpoint_logic = db.query(Driver).filter(Driver.is_active == True).limit(1000).all()
         
-        # Test 4: AI service instantiation
-        from ..services.ai_assignment_service import AIAssignmentService
-        ai_service = AIAssignmentService(db)
+        # Test 4: Assignment service instantiation
+        from ..services.assignment_service import AssignmentService
+        assignment_service = AssignmentService(db)
         
         result = {
             "raw_driver_count": total_count,
             "simple_query_count": len(simple_drivers),
             "drivers_endpoint_count": len(drivers_endpoint_logic),
-            "ai_service_created": True,
+            "assignment_service_created": True,
             "sample_drivers": []
         }
         
@@ -333,14 +331,14 @@ def simple_driver_test(db: Session = Depends(get_session)):
                 "is_active": driver.is_active
             })
         
-        # Test 5: Try AI service methods individually
+        # Test 5: Try assignment service methods individually
         try:
-            available_drivers = ai_service.get_available_drivers()
-            result["ai_available_drivers_count"] = len(available_drivers)
-            result["ai_available_drivers_error"] = None
+            available_drivers = assignment_service._get_available_drivers()
+            result["assignment_available_drivers_count"] = len(available_drivers)
+            result["assignment_available_drivers_error"] = None
         except Exception as e:
-            result["ai_available_drivers_count"] = "ERROR"
-            result["ai_available_drivers_error"] = str(e)
+            result["assignment_available_drivers_count"] = "ERROR"
+            result["assignment_available_drivers_error"] = str(e)
             
         return envelope(result)
         
