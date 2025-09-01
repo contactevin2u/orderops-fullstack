@@ -132,6 +132,7 @@ class AssignmentService:
         from datetime import datetime, timedelta
         
         # Get scheduled drivers for TODAY ONLY - no date range
+        # DEBUGGING: This should only return drivers 2 and 3 for 2025-09-01
         scheduled_drivers = (
             self.db.query(DriverSchedule)
             .filter(
@@ -142,6 +143,10 @@ class AssignmentService:
             )
             .all()
         )
+        
+        # CRITICAL DEBUG: Log exactly what we found
+        logger.info(f"DEPLOYMENT CHECK: Using exact date filtering for {today}")
+        logger.info(f"DEPLOYMENT CHECK: SQL query should be: schedule_date == '{today}' AND is_scheduled = True")
         
         logger.info(f"Found {len(scheduled_drivers)} scheduled drivers for {today}")
         for schedule in scheduled_drivers:
@@ -203,6 +208,11 @@ class AssignmentService:
         
         # Sort: Scheduled+Clocked first (priority 1), then Scheduled only (priority 2), then by workload
         result.sort(key=lambda d: (d["priority"], d["active_trips"]))
+        
+        # CRITICAL DEBUG: Show exactly what we're returning
+        logger.info(f"DEPLOYMENT CHECK: Final result has {len(result)} drivers")
+        for driver in result:
+            logger.info(f"DEPLOYMENT CHECK: Driver {driver['driver_id']} ({driver['driver_name']}) - Priority: {driver['priority']}")
         
         logger.info(f"Found {len(result)} scheduled drivers (clocked+scheduled: {sum(1 for d in result if d['is_clocked_in'])}, scheduled only: {sum(1 for d in result if not d['is_clocked_in'])})")
         return result
