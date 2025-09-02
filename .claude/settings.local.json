@@ -27,7 +27,8 @@
       "Bash(./gradlew:*)",
       "Bash(dir:*)",
       "Bash(npm install:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(del check_migration.py)"
     ],
     "deny": [],
     "ask": []
