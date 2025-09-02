@@ -36,60 +36,66 @@ def driver_update_order(
     db: Session = Depends(get_session)
 ):
     """Allow drivers to update orders they're assigned to"""
-    # First, verify the driver is assigned to this order
-    trip = (
-        db.query(Trip)
-        .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
-        .one_or_none()
-    )
-    if not trip:
-        raise HTTPException(404, "Order not found or not assigned to you")
+    try:
+        # First, verify the driver is assigned to this order
+        trip = (
+            db.query(Trip)
+            .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
+            .one_or_none()
+        )
+        if not trip:
+            raise HTTPException(404, "Order not found or not assigned to you")
 
-    order = db.get(Order, order_id)
-    if not order:
-        raise HTTPException(404, "Order not found")
+        order = db.get(Order, order_id)
+        if not order:
+            raise HTTPException(404, "Order not found")
 
-    data = body.model_dump(exclude_none=True)
+        data = body.model_dump(exclude_none=True)
+        
+        # Handle ON_HOLD special case: customer requested reschedule
+        if data.get("status") == "ON_HOLD":
+            # Update delivery_date if provided
+            if data.get("delivery_date"):
+                try:
+                    if isinstance(data["delivery_date"], str):
+                        parsed_date = datetime.fromisoformat(data["delivery_date"].replace('Z', '+00:00'))
+                        order.delivery_date = parsed_date
+                except ValueError:
+                    raise HTTPException(400, f"Invalid date format: {data['delivery_date']}")
+            
+            # Make trip available for reassignment while keeping current driver info for audit
+            trip.status = "UNASSIGNED"
+            trip.route_id = None
+            # Keep driver_id for audit trail, assignment service will update when reassigning
+            # Order status remains unchanged - no need to modify order status
+            
+        else:
+            # Only allow drivers to update specific fields for other operations
+            allowed_fields = ["status", "delivery_date", "notes"]
+            
+            for k in allowed_fields:
+                if k in data:
+                    if k == "delivery_date" and data[k]:
+                        try:
+                            # Parse the date string to datetime
+                            if isinstance(data[k], str):
+                                parsed_date = datetime.fromisoformat(data[k].replace('Z', '+00:00'))
+                                setattr(order, k, parsed_date)
+                            else:
+                                setattr(order, k, data[k])
+                        except ValueError:
+                            raise HTTPException(400, f"Invalid date format: {data[k]}")
+                    else:
+                        setattr(order, k, data[k])
     
-    # Handle ON_HOLD special case: customer requested reschedule
-    if data.get("status") == "ON_HOLD":
-        # Update delivery_date if provided
-        if data.get("delivery_date"):
-            try:
-                if isinstance(data["delivery_date"], str):
-                    parsed_date = datetime.fromisoformat(data["delivery_date"].replace('Z', '+00:00'))
-                    order.delivery_date = parsed_date
-            except ValueError:
-                raise HTTPException(400, f"Invalid date format: {data['delivery_date']}")
-        
-        # Make trip unassigned so it can be reassigned later
-        trip.status = "UNASSIGNED"
-        trip.route_id = None
-        trip.driver_id = None
-        # Order status remains unchanged - no need to modify order status
-        
-    else:
-        # Only allow drivers to update specific fields for other operations
-        allowed_fields = ["status", "delivery_date", "notes"]
-        
-        for k in allowed_fields:
-            if k in data:
-                if k == "delivery_date" and data[k]:
-                    try:
-                        # Parse the date string to datetime
-                        if isinstance(data[k], str):
-                            parsed_date = datetime.fromisoformat(data[k].replace('Z', '+00:00'))
-                            setattr(order, k, parsed_date)
-                        else:
-                            setattr(order, k, data[k])
-                    except ValueError:
-                        raise HTTPException(400, f"Invalid date format: {data[k]}")
-                else:
-                    setattr(order, k, data[k])
-    
-    db.commit()
-    db.refresh(order)
-    return envelope(OrderOut.model_validate(order))
+        db.commit()
+        db.refresh(order)
+        return envelope(OrderOut.model_validate(order))
+    except Exception as e:
+        db.rollback()
+        print(f"DEBUG: ON_HOLD error for order {order_id}: {e}")
+        print(f"DEBUG: Request data: {body.model_dump(exclude_none=True)}")
+        raise HTTPException(400, f"Failed to update order: {str(e)}")
 
 
 @router.post("/{order_id}/upsell", response_model=dict)
