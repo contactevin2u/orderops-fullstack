@@ -210,12 +210,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               const hasActiveItem = isGroupActive(group);
               
               return (
-                <div key={group.title} className="nav-dropdown">
+                <div key={group.title} className="nav-group" style={{ position: 'relative' }}>
                   {groupIndex > 0 && <div className="nav-separator" />}
                   <button
-                    className={`nav-dropdown-trigger ${hasActiveItem ? 'active' : ''}`}
+                    className={`nav-link ${hasActiveItem ? 'active' : ''}`}
                     onClick={() => toggleDropdown(group.title)}
                     aria-expanded={isDropdownOpen}
+                    style={{ cursor: 'pointer', background: 'none', border: 'none', width: '100%', justifyContent: 'space-between' }}
                   >
                     <span>{group.title}</span>
                     <ChevronDown 
@@ -228,12 +229,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     />
                   </button>
                   {isDropdownOpen && (
-                    <div className="nav-dropdown-content">
+                    <div className="nav-dropdown-menu">
                       {groupItems.map(({ href, label, Icon }) => (
                         <Link
                           key={href}
                           href={href}
-                          className={`nav-dropdown-item ${isActive(href) ? 'active' : ''}`}
+                          className={`nav-link ${isActive(href) ? 'active' : ''}`}
                           onClick={() => {
                             setMobileOpen(false);
                             setOpenDropdowns(new Set());

@@ -157,40 +157,7 @@ h6 {
   display: none; /* Hidden by default, shown on larger screens */
 }
 
-/* Dropdown Navigation */
-.nav-dropdown {
-  position: relative;
-}
-
-.nav-dropdown-trigger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: inherit;
-  background: none;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.nav-dropdown-trigger:hover,
-.nav-dropdown-trigger:focus-visible {
-  opacity: 0.8;
-  outline: 2px solid var(--color-surface);
-  outline-offset: 2px;
-}
-
-.nav-dropdown-trigger.active {
-  background-color: rgba(255, 255, 255, 0.1);
-  text-decoration: underline;
-}
-
-.nav-dropdown-content {
+.nav-dropdown-menu {
   position: absolute;
   top: 100%;
   left: 0;
@@ -204,25 +171,18 @@ h6 {
   margin-top: 4px;
 }
 
-.nav-dropdown-item {
+.nav-dropdown-menu .nav-link {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  color: inherit;
-  text-decoration: none;
   font-size: 0.875rem;
-  transition: background-color 0.2s ease;
 }
 
-.nav-dropdown-item:hover {
+.nav-dropdown-menu .nav-link:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-.nav-dropdown-item.active {
-  background-color: rgba(255, 255, 255, 0.15);
-  font-weight: 600;
-}
 
 .main {
   flex: 1;
@@ -498,29 +458,22 @@ h6 {
   .nav.open {
     display: flex;
   }
-  .nav-dropdown {
-    width: 100%;
-  }
-  .nav-dropdown-trigger {
-    width: 100%;
-    justify-content: space-between;
-  }
-  .nav-dropdown-content {
-    position: static;
-    width: 100%;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    margin: 4px 0 8px 0;
-    border-radius: 6px;
-  }
-  .nav-dropdown-item {
-    padding: 10px 20px;
-  }
   .nav-group {
     flex-direction: column;
     align-items: flex-start;
     gap: 0;
     width: 100%;
+  }
+  .nav-dropdown-menu {
+    position: static;
+    width: 100%;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    margin: 4px 0 8px 0;
+    box-shadow: none;
+  }
+  .nav-dropdown-menu .nav-link {
+    padding: 10px 20px;
   }
   .nav-group-label {
     display: block; /* Show group labels on mobile too */
