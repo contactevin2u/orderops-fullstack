@@ -3,7 +3,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { MapPin, Truck, Clock, CheckCircle, AlertCircle, Edit3, Save, X, Phone } from 'lucide-react';
-import { fetchRoutes, fetchUnassigned, fetchDrivers, updateRoute, type Route, type Order, type Driver } from '@/utils/apiAdapter';
+import { fetchRoutes, fetchUnassigned, fetchOnHold, fetchDrivers, updateRoute, type Route, type Order, type Driver } from '@/utils/apiAdapter';
+import { getOrderBadges } from '@/utils/orderBadges';
 import { listOrders } from '@/utils/api';
 
 export default function MobileDeliveryStatusPage() {
@@ -22,6 +23,11 @@ export default function MobileDeliveryStatusPage() {
   const unassignedQuery = useQuery({
     queryKey: ['mobile-unassigned', selectedDate], 
     queryFn: () => fetchUnassigned(selectedDate)
+  });
+
+  const onHoldQuery = useQuery({
+    queryKey: ['mobile-onhold', selectedDate],
+    queryFn: () => fetchOnHold(selectedDate)
   });
 
   // Fetch all orders for the selected date to get full order details including addresses
@@ -54,6 +60,7 @@ export default function MobileDeliveryStatusPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['mobile-routes', selectedDate] });
       qc.invalidateQueries({ queryKey: ['mobile-unassigned', selectedDate] });
+      qc.invalidateQueries({ queryKey: ['mobile-onhold', selectedDate] });
       setEditingOrder(null);
       setNewRouteId('');
     }
@@ -61,6 +68,7 @@ export default function MobileDeliveryStatusPage() {
 
   const routes = routesQuery.data || [];
   const unassignedOrders = unassignedQuery.data || [];
+  const onHoldOrders = onHoldQuery.data || [];
   const allOrdersData = allOrdersQuery.data || [];
   const drivers = driversQuery.data || [];
 
@@ -284,6 +292,18 @@ export default function MobileDeliveryStatusPage() {
           .date-text {
             font-size: 12px;
             color: #9ca3af;
+          }
+          
+          .order-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 8px;
+          }
+          
+          .order-badge {
+            display: inline-block;
+            white-space: nowrap;
           }
           
           .route-section {
@@ -548,8 +568,11 @@ export default function MobileDeliveryStatusPage() {
           <div className="header-content">
             <h1 className="header-title">Delivery Status</h1>
             <div className="header-stats">
-              <Truck style={{ width: '16px', height: '16px' }} />
-              <span>{allOrders.length} orders</span>
+              <span style={{ color: '#2563eb', fontWeight: '500' }}>{routes.length} Routes</span>
+              <span>•</span>
+              <span style={{ color: '#ea580c', fontWeight: '500' }}>{unassignedOrders.length} Unassigned</span>
+              <span>•</span>
+              <span style={{ color: '#9333ea', fontWeight: '500' }}>{onHoldOrders.length} On Hold</span>
             </div>
           </div>
           
@@ -564,14 +587,14 @@ export default function MobileDeliveryStatusPage() {
 
         {/* Content */}
         <div className="content">
-          {(routesQuery.isLoading || unassignedQuery.isLoading || allOrdersQuery.isLoading) && (
+          {(routesQuery.isLoading || unassignedQuery.isLoading || onHoldQuery.isLoading || allOrdersQuery.isLoading) && (
             <div className="loading">
               <div className="spinner"></div>
               <p style={{ color: '#64748b' }}>Loading orders...</p>
             </div>
           )}
 
-          {(routesQuery.isError || unassignedQuery.isError || allOrdersQuery.isError) && (
+          {(routesQuery.isError || unassignedQuery.isError || onHoldQuery.isError || allOrdersQuery.isError) && (
             <div className="error-state">
               <AlertCircle className="error-icon" />
               <p className="error-text">Failed to load data</p>
@@ -579,6 +602,7 @@ export default function MobileDeliveryStatusPage() {
                 onClick={() => {
                   routesQuery.refetch();
                   unassignedQuery.refetch();
+                  onHoldQuery.refetch();
                   allOrdersQuery.refetch();
                 }}
                 className="error-retry"
@@ -588,7 +612,7 @@ export default function MobileDeliveryStatusPage() {
             </div>
           )}
 
-          {!routesQuery.isLoading && !unassignedQuery.isLoading && !allOrdersQuery.isLoading && allOrders.length === 0 && (
+          {!routesQuery.isLoading && !unassignedQuery.isLoading && !onHoldQuery.isLoading && !allOrdersQuery.isLoading && allOrders.length === 0 && (
             <div className="empty-state">
               <MapPin className="empty-icon" />
               <h3 style={{ fontSize: '18px', fontWeight: '500', color: '#1e293b', marginBottom: '8px' }}>No orders found</h3>
@@ -618,6 +642,29 @@ export default function MobileDeliveryStatusPage() {
                   <div className="address-text">{order.address || 'Address not available'}</div>
                   <div className="date-text">{order.deliveryDate}</div>
                 </div>
+
+                {/* Order badges */}
+                <div className="order-badges">
+                  {getOrderBadges(order, selectedDate).map((badge, index) => (
+                    <span
+                      key={index}
+                      className="order-badge"
+                      style={{
+                        backgroundColor: badge.startsWith('Overdue') ? '#fef2f2' : '#f8fafc',
+                        color: badge.startsWith('Overdue') ? '#dc2626' : 
+                               badge === 'No date' ? '#ea580c' : '#64748b',
+                        border: `1px solid ${badge.startsWith('Overdue') ? '#fecaca' : 
+                                             badge === 'No date' ? '#fed7aa' : '#e2e8f0'}`,
+                        fontSize: '11px',
+                        padding: '2px 6px',
+                        borderRadius: '12px',
+                        fontWeight: '500'
+                      }}
+                    >
+                      {badge}
+                    </span>
+                  ))}
+                </div>
               </div>
 
               {/* Route assignment */}
@@ -633,11 +680,17 @@ export default function MobileDeliveryStatusPage() {
                           className="route-select"
                         >
                           <option value="">No Route</option>
-                          {routes.map((route: Route) => (
-                            <option key={route.id} value={route.id}>
-                              {route.name} - {drivers.find(d => d.id === route.driverId)?.name || 'No driver'}
-                            </option>
-                          ))}
+                          {routes.map((route: Route) => {
+                            const primaryDriver = drivers.find(d => d.id === route.driverId)?.name || 'No driver';
+                            const secondaryDriver = route.secondaryDriverId ? drivers.find(d => d.id === route.secondaryDriverId)?.name : null;
+                            const driverText = secondaryDriver ? `${primaryDriver} + ${secondaryDriver}` : primaryDriver;
+                            
+                            return (
+                              <option key={route.id} value={route.id}>
+                                {route.name} - {driverText}
+                              </option>
+                            );
+                          })}
                         </select>
                         <div className="route-actions">
                           <button
@@ -667,7 +720,14 @@ export default function MobileDeliveryStatusPage() {
                         </div>
                         {order.routeId && (
                           <div className="driver-info">
-                            Driver: {drivers.find(d => d.id === routes.find(r => r.id === order.routeId)?.driverId)?.name || 'No driver'}
+                            <div>
+                              Primary: {drivers.find(d => d.id === routes.find(r => r.id === order.routeId)?.driverId)?.name || 'No driver'}
+                            </div>
+                            {routes.find(r => r.id === order.routeId)?.secondaryDriverId && (
+                              <div>
+                                Secondary: {drivers.find(d => d.id === routes.find(r => r.id === order.routeId)?.secondaryDriverId)?.name || 'No driver'}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -714,7 +774,12 @@ export default function MobileDeliveryStatusPage() {
                     <div>
                       <div className="route-summary-name">{route.name}</div>
                       <div className="route-summary-details">
-                        {drivers.find(d => d.id === route.driverId)?.name || 'No driver'} • {route.stops.length} stops
+                        {(() => {
+                          const primaryDriver = drivers.find(d => d.id === route.driverId)?.name || 'No driver';
+                          const secondaryDriver = route.secondaryDriverId ? drivers.find(d => d.id === route.secondaryDriverId)?.name : null;
+                          const driverText = secondaryDriver ? `${primaryDriver} + ${secondaryDriver}` : primaryDriver;
+                          return `${driverText} • ${route.stops.length} stops`;
+                        })()}
                       </div>
                     </div>
                     <div className="route-summary-count">
