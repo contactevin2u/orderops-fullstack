@@ -429,6 +429,33 @@ export function listDriverCommissions(driverId: number) {
   return request<any[]>(`/drivers/${driverId}/commissions`);
 }
 
+export function listUpsellRecords(params?: { 
+  limit?: number; 
+  offset?: number; 
+  driver_id?: number; 
+  status?: string; 
+}) {
+  const sp = new URLSearchParams();
+  if (params?.limit) sp.set('limit', String(params.limit));
+  if (params?.offset) sp.set('offset', String(params.offset));
+  if (params?.driver_id) sp.set('driver_id', String(params.driver_id));
+  if (params?.status) sp.set('status', params.status);
+  
+  return request<any>(`/upsells?${sp.toString()}`);
+}
+
+export function releaseUpsellIncentive(upsellId: number) {
+  return request<any>(`/upsells/${upsellId}/release`, { method: 'POST' });
+}
+
+export function getUpsellSummary(params?: { start_date?: string; end_date?: string }) {
+  const sp = new URLSearchParams();
+  if (params?.start_date) sp.set('start_date', params.start_date);
+  if (params?.end_date) sp.set('end_date', params.end_date);
+  
+  return request<any>(`/upsells/summary?${sp.toString()}`);
+}
+
 export async function listDriverOrders(driverId: number, month?: string, limit = 500) {
   const sp = new URLSearchParams({ driver_id: String(driverId), limit: String(limit) });
   if (month) sp.set('month', month);

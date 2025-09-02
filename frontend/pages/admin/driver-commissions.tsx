@@ -1,11 +1,19 @@
 import React from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listDrivers, listDriverOrders, markSuccess, updateCommission } from '@/utils/api';
+import { 
+  listDrivers, 
+  listDriverOrders, 
+  markSuccess, 
+  updateCommission, 
+  listUpsellRecords, 
+  releaseUpsellIncentive 
+} from '@/utils/api';
 
 export default function DriverCommissionsPage() {
   const [driverId, setDriverId] = React.useState<string>('');
   const [month, setMonth] = React.useState<string>(new Date().toISOString().slice(0, 7));
+  const [activeTab, setActiveTab] = React.useState<'commissions' | 'upsells'>('commissions');
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const qc = useQueryClient();
@@ -18,6 +26,12 @@ export default function DriverCommissionsPage() {
   const ordersQuery = useQuery({
     queryKey: ['driver-orders', driverId, month],
     queryFn: () => (driverId ? listDriverOrders(Number(driverId), month) : Promise.resolve([])),
+    enabled: !!driverId,
+  });
+
+  const upsellsQuery = useQuery({
+    queryKey: ['upsell-records', driverId],
+    queryFn: () => (driverId ? listUpsellRecords({ driver_id: Number(driverId) }) : Promise.resolve({ records: [] })),
     enabled: !!driverId,
   });
 
@@ -48,8 +62,22 @@ export default function DriverCommissionsPage() {
     }
   });
 
+  const releaseUpsellMutation = useMutation({
+    mutationFn: releaseUpsellIncentive,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['upsell-records', driverId] });
+      setMessage({ type: 'success', text: 'Upsell incentive released successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: () => {
+      setMessage({ type: 'error', text: 'Failed to release upsell incentive' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  });
+
   const drivers = driversQuery.data || [];
   const orders = ordersQuery.data || [];
+  const upsells = upsellsQuery.data?.records || [];
   const selectedDriver = drivers.find((d: any) => d.id == driverId);
 
   return (
@@ -57,10 +85,10 @@ export default function DriverCommissionsPage() {
       <div className="container">
         <div style={{ marginBottom: 'var(--space-6)' }}>
           <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: 'var(--space-2)' }}>
-            Driver Commissions
+            Driver Earnings
           </h1>
           <p style={{ opacity: 0.8 }}>
-            Review deliveries and release driver commissions
+            Manage delivery commissions and upsell incentives
           </p>
         </div>
 
@@ -120,10 +148,42 @@ export default function DriverCommissionsPage() {
         </div>
 
         {driverId && (
-          <div className="card">
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
-              Orders for {selectedDriver?.name || `Driver ${driverId}`} - {month}
-            </h2>
+          <>
+            {/* Tabs */}
+            <div style={{ marginBottom: 'var(--space-4)' }}>
+              <div style={{ borderBottom: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'flex', gap: 0 }}>
+                  {[
+                    { key: 'commissions', label: 'Delivery Commissions', count: orders.length },
+                    { key: 'upsells', label: 'Upsell Incentives', count: upsells.length }
+                  ].map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key as any)}
+                      style={{
+                        padding: 'var(--space-3) var(--space-4)',
+                        border: 'none',
+                        background: 'transparent',
+                        borderBottom: activeTab === tab.key ? '2px solid #3b82f6' : '2px solid transparent',
+                        color: activeTab === tab.key ? '#3b82f6' : '#6b7280',
+                        fontWeight: activeTab === tab.key ? 600 : 500,
+                        cursor: 'pointer',
+                        fontSize: '0.875rem'
+                      }}
+                    >
+                      {tab.label} ({tab.count})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Commissions Tab */}
+            {activeTab === 'commissions' && (
+              <div className="card">
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
+                  Delivery Commissions - {selectedDriver?.name || `Driver ${driverId}`} - {month}
+                </h2>
             
             {ordersQuery.isLoading && (
               <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
@@ -158,8 +218,50 @@ export default function DriverCommissionsPage() {
                   />
                 ))}
               </div>
+                )}
+              </div>
             )}
-          </div>
+
+            {/* Upsells Tab */}
+            {activeTab === 'upsells' && (
+              <div className="card">
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
+                  Upsell Incentives - {selectedDriver?.name || `Driver ${driverId}`}
+                </h2>
+                
+                {upsellsQuery.isLoading && (
+                  <div style={{ padding: 'var(--space-8)', textAlign: 'center' }}>
+                    Loading upsells...
+                  </div>
+                )}
+
+                {upsellsQuery.isError && (
+                  <div style={{ padding: 'var(--space-8)', textAlign: 'center', color: 'var(--color-error)' }}>
+                    Failed to load upsells
+                  </div>
+                )}
+
+                {!upsellsQuery.isLoading && upsells.length === 0 && (
+                  <div style={{ padding: 'var(--space-8)', textAlign: 'center', opacity: 0.7 }}>
+                    No upsell incentives found for this driver
+                  </div>
+                )}
+
+                {!upsellsQuery.isLoading && upsells.length > 0 && (
+                  <div className="stack">
+                    {upsells.map((upsell: any) => (
+                      <UpsellCard 
+                        key={upsell.id} 
+                        upsell={upsell}
+                        onRelease={() => releaseUpsellMutation.mutate(upsell.id)}
+                        isReleasing={releaseUpsellMutation.isPending}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         <div style={{
@@ -378,6 +480,107 @@ function OrderCard({
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function UpsellCard({ 
+  upsell, 
+  onRelease, 
+  isReleasing 
+}: { 
+  upsell: any; 
+  onRelease: () => void;
+  isReleasing: boolean;
+}) {
+  const isPending = upsell.incentive_status === 'PENDING';
+  const canRelease = isPending && upsell.driver_incentive > 0;
+
+  return (
+    <div style={{
+      padding: 'var(--space-4)',
+      border: '1px solid var(--color-border)',
+      borderRadius: 'var(--radius-2)',
+      background: 'var(--color-background)'
+    }}>
+      {/* Header Row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
+        <div>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-1)', margin: 0 }}>
+            Order #{upsell.order_code}
+          </h3>
+          <div className="cluster" style={{ gap: 'var(--space-2)', fontSize: '0.875rem' }}>
+            <span style={{ 
+              padding: '0.125rem 0.5rem', 
+              borderRadius: 'var(--radius-1)',
+              background: isPending ? '#fef3c7' : '#dcfce7',
+              color: isPending ? '#d97706' : '#15803d'
+            }}>
+              {isPending ? 'Pending' : 'Released'}
+            </span>
+            <span style={{ color: '#6b7280' }}>
+              {new Date(upsell.created_at).toLocaleDateString()}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Upsell Details */}
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', fontSize: '0.875rem' }}>
+          <div>
+            <span style={{ color: '#6b7280' }}>Upsell Amount:</span>
+            <div style={{ fontWeight: 600 }}>RM {Number(upsell.upsell_amount).toFixed(2)}</div>
+          </div>
+          <div>
+            <span style={{ color: '#6b7280' }}>Your Incentive (10%):</span>
+            <div style={{ fontWeight: 600, color: '#10b981' }}>RM {Number(upsell.driver_incentive).toFixed(2)}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Items Upsold */}
+      {upsell.items_upsold && upsell.items_upsold.length > 0 && (
+        <div style={{ marginBottom: 'var(--space-3)' }}>
+          <div style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Items Upsold:</div>
+          <div style={{ fontSize: '0.75rem' }}>
+            {upsell.items_upsold.map((item: any, index: number) => (
+              <div key={index} style={{ marginBottom: 'var(--space-1)' }}>
+                <strong>{item.new_name}</strong> ({item.upsell_type}): 
+                RM {Number(item.original_price).toFixed(2)} → RM {Number(item.new_price).toFixed(2)}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Notes */}
+      {upsell.upsell_notes && (
+        <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.875rem' }}>
+          <span style={{ color: '#6b7280' }}>Notes: </span>
+          {upsell.upsell_notes}
+        </div>
+      )}
+
+      {/* Action Button */}
+      <button
+        onClick={(e) => {
+          e.preventDefault();
+          onRelease();
+        }}
+        disabled={!canRelease || isReleasing}
+        style={{
+          background: canRelease && !isReleasing ? '#10b981' : '#9ca3af',
+          color: 'white',
+          border: 'none',
+          padding: '0.5rem 1rem',
+          borderRadius: 'var(--radius-1)',
+          fontSize: '0.875rem',
+          cursor: canRelease && !isReleasing ? 'pointer' : 'not-allowed'
+        }}
+      >
+        {isReleasing ? 'Releasing...' : canRelease ? 'Release Incentive' : isPending ? 'Pending Review' : 'Already Released'}
+      </button>
     </div>
   );
 }

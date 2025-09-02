@@ -3,6 +3,7 @@ package com.yourco.driverAA.ui.main
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourco.driverAA.data.api.CommissionMonthDto
+import com.yourco.driverAA.data.api.UpsellIncentivesDto
 import com.yourco.driverAA.domain.JobsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,19 +32,29 @@ class CommissionsViewModel @Inject constructor(
     private val _showMonthPicker = MutableStateFlow(false)
     val showMonthPicker: StateFlow<Boolean> = _showMonthPicker.asStateFlow()
     
+    private val _upsellIncentives = MutableStateFlow<UpsellIncentivesDto?>(null)
+    val upsellIncentives: StateFlow<UpsellIncentivesDto?> = _upsellIncentives.asStateFlow()
+    
+    private val _activeTab = MutableStateFlow("commissions") // "commissions" or "upsells"
+    val activeTab: StateFlow<String> = _activeTab.asStateFlow()
+    
     fun loadCommissions() {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
             
             try {
-                val result = repository.getCommissions()
-                _commissions.value = result.sortedByDescending { it.month }
+                val commissionsResult = repository.getCommissions()
+                _commissions.value = commissionsResult.sortedByDescending { it.month }
+                
+                // Also load upsell incentives
+                val upsellsResult = repository.getUpsellIncentives()
+                _upsellIncentives.value = upsellsResult
                 
                 // Set current month if not already selected
-                if (_selectedMonth.value == null && result.isNotEmpty()) {
+                if (_selectedMonth.value == null && commissionsResult.isNotEmpty()) {
                     val currentMonth = getCurrentMonth()
-                    _selectedMonth.value = result.find { it.month == currentMonth }?.month
+                    _selectedMonth.value = commissionsResult.find { it.month == currentMonth }?.month
                 }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load commissions"
@@ -60,6 +71,10 @@ class CommissionsViewModel @Inject constructor(
     
     fun toggleMonthPicker() {
         _showMonthPicker.value = !_showMonthPicker.value
+    }
+    
+    fun setActiveTab(tab: String) {
+        _activeTab.value = tab
     }
     
     private fun getCurrentMonth(): String {
