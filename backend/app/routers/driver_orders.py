@@ -107,148 +107,163 @@ def upsell_order_items(
     db: Session = Depends(get_session)
 ):
     """Allow drivers to upsell items in orders they're assigned to"""
-    # Verify driver is assigned to this order
-    trip = (
-        db.query(Trip)
-        .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
-        .one_or_none()
-    )
-    if not trip:
-        raise HTTPException(404, "Order not found or not assigned to you")
+    try:
+        # Verify driver is assigned to this order
+        trip = (
+            db.query(Trip)
+            .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
+            .one_or_none()
+        )
+        if not trip:
+            raise HTTPException(404, "Order not found or not assigned to you")
 
-    order = db.get(Order, order_id)
-    if not order:
-        raise HTTPException(404, "Order not found")
+        order = db.get(Order, order_id)
+        if not order:
+            raise HTTPException(404, "Order not found")
+        
+        # Check if order is in a valid state for upselling
+        if order.status not in ["NEW", "ACTIVE", "PENDING"]:
+            raise HTTPException(400, f"Cannot upsell order with status: {order.status}")
+        
+        # Store original total before modifications
+        original_total = order.total
+        has_installment_upsells = False
+        upsold_items = []
+        
+        # Process each item upsell
+        for upsell_item in body.items:
+            # Find the item
+            item = next((it for it in order.items if it.id == upsell_item.item_id), None)
+            if not item:
+                raise HTTPException(400, f"Item with ID {upsell_item.item_id} not found in order")
+            
+            # Store original item details for record keeping
+            original_name = item.name
+            original_price = float(item.line_total)
+            
+            # Update item name if provided
+            if upsell_item.new_name:
+                item.name = upsell_item.new_name
+            
+            new_price = Decimal(str(upsell_item.new_price))
+            
+            # Track upsold item details (ensure JSON serializable)
+            upsold_items.append({
+                "item_id": item.id,
+                "original_name": original_name,
+                "new_name": upsell_item.new_name or original_name,
+                "original_price": float(original_price),
+                "new_price": float(new_price),
+                "upsell_type": upsell_item.upsell_type,
+                "installment_months": upsell_item.installment_months if upsell_item.installment_months is not None else 0
+            })
+            
+            if upsell_item.upsell_type == "BELI_TERUS":
+                # Upgrade to outright purchase at new price
+                item.item_type = "OUTRIGHT"
+                item.unit_price = new_price / item.qty  # Calculate unit price
+                item.line_total = new_price
+                
+            elif upsell_item.upsell_type == "ANSURAN":
+                # Convert to installment plan
+                if not upsell_item.installment_months:
+                    raise HTTPException(400, "installment_months required for ANSURAN")
+                
+                item.item_type = "INSTALLMENT"
+                item.unit_price = new_price / item.qty  # Store original unit price
+                item.line_total = Decimal("0")  # Installment items have 0 line_total
+                has_installment_upsells = True
+        
+        # Create or update installment plan if any items were converted
+        if has_installment_upsells:
+            # Get the first installment item for plan details
+            installment_item = next(
+                (upsell for upsell in body.items 
+                 if upsell.upsell_type == "ANSURAN" and upsell.installment_months), 
+                None
+            )
+            
+            if installment_item:
+                # Calculate monthly amount: new_price / months
+                monthly_amount = Decimal(str(installment_item.new_price)) / installment_item.installment_months
+                
+                if not order.plan:
+                    # Create new plan
+                    plan = Plan(
+                        order_id=order.id,
+                        plan_type="INSTALLMENT",
+                        months=installment_item.installment_months,
+                        monthly_amount=monthly_amount,
+                        start_date=datetime.now().date(),
+                        status="ACTIVE"
+                    )
+                    order.plan = plan
+                else:
+                    # Update existing plan
+                    order.plan.plan_type = "INSTALLMENT"
+                    order.plan.months = installment_item.installment_months
+                    order.plan.monthly_amount = monthly_amount
+            
+            # Update order type to include installment
+            if order.type == "OUTRIGHT":
+                order.type = "INSTALLMENT"
+            elif order.type == "RENTAL":
+                order.type = "MIXED"  # Both rental and installment
+            elif order.type != "INSTALLMENT":
+                order.type = "MIXED"
+        
+        # Add upsell notes
+        if body.notes:
+            existing_notes = order.notes or ""
+            upsell_note = f"[UPSELL by {driver.name}] {body.notes}"
+            order.notes = f"{existing_notes}\n{upsell_note}".strip()
+        
+        # Recalculate order financials
+        recompute_financials(order)
+        
+        # Create upsell record and driver incentive
+        new_total = order.total
+        upsell_amount = new_total - original_total
+        
+        if upsell_amount > 0:  # Only create record if there's an actual increase
+            # Calculate 10% driver incentive from upsell amount
+            driver_incentive = upsell_amount * Decimal("0.10")
+            
+            # Serialize upsold_items with error handling
+            try:
+                items_json = json.dumps(upsold_items)
+            except (TypeError, ValueError) as e:
+                print(f"JSON serialization error for upsold_items: {e}")
+                print(f"upsold_items content: {upsold_items}")
+                # Fallback to empty array if serialization fails
+                items_json = json.dumps([])
+            
+            upsell_record = UpsellRecord(
+                order_id=order.id,
+                driver_id=driver.id,
+                trip_id=trip.id,
+                original_total=original_total,
+                new_total=new_total,
+                upsell_amount=upsell_amount,
+                items_data=items_json,
+                upsell_notes=body.notes,
+                driver_incentive=driver_incentive,
+                incentive_status="PENDING"  # Released when trip is completed successfully
+            )
+            db.add(upsell_record)
+        
+        db.commit()
+        db.refresh(order)
     
-    # Check if order is in a valid state for upselling
-    if order.status not in ["NEW", "ACTIVE", "PENDING"]:
-        raise HTTPException(400, f"Cannot upsell order with status: {order.status}")
-    
-    # Store original total before modifications
-    original_total = order.total
-    has_installment_upsells = False
-    upsold_items = []
-    
-    # Process each item upsell
-    for upsell_item in body.items:
-        # Find the item
-        item = next((it for it in order.items if it.id == upsell_item.item_id), None)
-        if not item:
-            raise HTTPException(400, f"Item with ID {upsell_item.item_id} not found in order")
-        
-        # Store original item details for record keeping
-        original_name = item.name
-        original_price = float(item.line_total)
-        
-        # Update item name if provided
-        if upsell_item.new_name:
-            item.name = upsell_item.new_name
-        
-        new_price = Decimal(str(upsell_item.new_price))
-        
-        # Track upsold item details
-        upsold_items.append({
-            "item_id": item.id,
-            "original_name": original_name,
-            "new_name": upsell_item.new_name or original_name,
-            "original_price": original_price,
-            "new_price": float(new_price),
-            "upsell_type": upsell_item.upsell_type,
-            "installment_months": upsell_item.installment_months
+        return envelope({
+            "success": True,
+            "order_id": order.id,
+            "message": f"Successfully upsold {len(body.items)} items",
+            "new_total": str(order.total),
+            "order": OrderOut.model_validate(order)
         })
-        
-        if upsell_item.upsell_type == "BELI_TERUS":
-            # Upgrade to outright purchase at new price
-            item.item_type = "OUTRIGHT"
-            item.unit_price = new_price / item.qty  # Calculate unit price
-            item.line_total = new_price
-            
-        elif upsell_item.upsell_type == "ANSURAN":
-            # Convert to installment plan
-            if not upsell_item.installment_months:
-                raise HTTPException(400, "installment_months required for ANSURAN")
-            
-            item.item_type = "INSTALLMENT"
-            item.unit_price = new_price / item.qty  # Store original unit price
-            item.line_total = Decimal("0")  # Installment items have 0 line_total
-            has_installment_upsells = True
-    
-    # Create or update installment plan if any items were converted
-    if has_installment_upsells:
-        # Get the first installment item for plan details
-        installment_item = next(
-            (upsell for upsell in body.items 
-             if upsell.upsell_type == "ANSURAN" and upsell.installment_months), 
-            None
-        )
-        
-        if installment_item:
-            # Calculate monthly amount: new_price / months
-            monthly_amount = Decimal(str(installment_item.new_price)) / installment_item.installment_months
-            
-            if not order.plan:
-                # Create new plan
-                plan = Plan(
-                    order_id=order.id,
-                    plan_type="INSTALLMENT",
-                    months=installment_item.installment_months,
-                    monthly_amount=monthly_amount,
-                    start_date=datetime.now().date(),
-                    status="ACTIVE"
-                )
-                order.plan = plan
-            else:
-                # Update existing plan
-                order.plan.plan_type = "INSTALLMENT"
-                order.plan.months = installment_item.installment_months
-                order.plan.monthly_amount = monthly_amount
-        
-        # Update order type to include installment
-        if order.type == "OUTRIGHT":
-            order.type = "INSTALLMENT"
-        elif order.type == "RENTAL":
-            order.type = "MIXED"  # Both rental and installment
-        elif order.type != "INSTALLMENT":
-            order.type = "MIXED"
-    
-    # Add upsell notes
-    if body.notes:
-        existing_notes = order.notes or ""
-        upsell_note = f"[UPSELL by {driver.name}] {body.notes}"
-        order.notes = f"{existing_notes}\n{upsell_note}".strip()
-    
-    # Recalculate order financials
-    recompute_financials(order)
-    
-    # Create upsell record and driver incentive
-    new_total = order.total
-    upsell_amount = new_total - original_total
-    
-    if upsell_amount > 0:  # Only create record if there's an actual increase
-        # Calculate 10% driver incentive from upsell amount
-        driver_incentive = upsell_amount * Decimal("0.10")
-        
-        upsell_record = UpsellRecord(
-            order_id=order.id,
-            driver_id=driver.id,
-            trip_id=trip.id,
-            original_total=original_total,
-            new_total=new_total,
-            upsell_amount=upsell_amount,
-            items_data=json.dumps(upsold_items),
-            upsell_notes=body.notes,
-            driver_incentive=driver_incentive,
-            incentive_status="PENDING"  # Released when trip is completed successfully
-        )
-        db.add(upsell_record)
-    
-    db.commit()
-    db.refresh(order)
-    
-    return envelope({
-        "success": True,
-        "order_id": order.id,
-        "message": f"Successfully upsold {len(body.items)} items",
-        "new_total": str(order.total),
-        "order": OrderOut.model_validate(order)
-    })
+    except Exception as e:
+        db.rollback()
+        print(f"DEBUG: Upsell error for order {order_id}: {e}")
+        print(f"DEBUG: Request data: {body.model_dump(exclude_none=True)}")
+        raise HTTPException(400, f"Failed to process upsell: {str(e)}")
