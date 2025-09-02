@@ -51,29 +51,41 @@ def driver_update_order(
 
     data = body.model_dump(exclude_none=True)
     
-    # Only allow drivers to update specific fields
-    allowed_fields = ["status", "delivery_date", "notes"]
-    
-    for k in allowed_fields:
-        if k in data:
-            if k == "delivery_date" and data[k]:
-                try:
-                    # Parse the date string to datetime
-                    if isinstance(data[k], str):
-                        parsed_date = datetime.fromisoformat(data[k].replace('Z', '+00:00'))
-                        setattr(order, k, parsed_date)
-                    else:
-                        setattr(order, k, data[k])
-                except ValueError:
-                    raise HTTPException(400, f"Invalid date format: {data[k]}")
-            else:
-                setattr(order, k, data[k])
-                
-    # If status is being set to ON_HOLD, also update trip status to be unassigned
+    # Handle ON_HOLD special case: customer requested reschedule
     if data.get("status") == "ON_HOLD":
-        # Reset trip to unassigned state
-        trip.status = "ASSIGNED"  # Keep trip assigned but order on hold
-        trip.route_id = None  # Remove from route so it can be reassigned
+        # Update delivery_date if provided
+        if data.get("delivery_date"):
+            try:
+                if isinstance(data["delivery_date"], str):
+                    parsed_date = datetime.fromisoformat(data["delivery_date"].replace('Z', '+00:00'))
+                    order.delivery_date = parsed_date
+            except ValueError:
+                raise HTTPException(400, f"Invalid date format: {data['delivery_date']}")
+        
+        # Make trip unassigned so it can be reassigned later
+        trip.status = "UNASSIGNED"
+        trip.route_id = None
+        trip.driver_id = None
+        # Order status remains unchanged - no need to modify order status
+        
+    else:
+        # Only allow drivers to update specific fields for other operations
+        allowed_fields = ["status", "delivery_date", "notes"]
+        
+        for k in allowed_fields:
+            if k in data:
+                if k == "delivery_date" and data[k]:
+                    try:
+                        # Parse the date string to datetime
+                        if isinstance(data[k], str):
+                            parsed_date = datetime.fromisoformat(data[k].replace('Z', '+00:00'))
+                            setattr(order, k, parsed_date)
+                        else:
+                            setattr(order, k, data[k])
+                    except ValueError:
+                        raise HTTPException(400, f"Invalid date format: {data[k]}")
+                else:
+                    setattr(order, k, data[k])
     
     db.commit()
     db.refresh(order)
