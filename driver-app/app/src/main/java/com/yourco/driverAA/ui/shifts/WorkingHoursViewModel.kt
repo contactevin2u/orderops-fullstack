@@ -48,6 +48,10 @@ class WorkingHoursViewModel @Inject constructor(
                 
                 // Load recent shifts
                 val shifts = api.getShiftHistory(limit = 20)
+                println("DEBUG: Loaded ${shifts.size} shifts")
+                shifts.forEach { shift ->
+                    println("DEBUG: Shift ${shift.id}: outstation=${shift.is_outstation}, allowance=${shift.outstation_allowance_amount}")
+                }
                 val shiftItems = shifts.map { shift ->
                     formatShiftToHistoryItem(shift)
                 }
@@ -92,6 +96,8 @@ class WorkingHoursViewModel @Inject constructor(
                     shift.clock_in_at >= monthStart.timeInMillis / 1000
                 }.sumOf { it.outstation_allowance_amount }.toFloat()
                 
+                println("DEBUG: Month earnings calculated: $monthEarnings from ${shifts.filter { it.clock_in_at >= monthStart.timeInMillis / 1000 }.size} shifts this month")
+                
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     todayHours = todayHours,
@@ -117,7 +123,7 @@ class WorkingHoursViewModel @Inject constructor(
         val clockInDate = Date(shift.clock_in_at * 1000)
         val clockOutDate = shift.clock_out_at?.let { Date(it * 1000) }
         
-        return ShiftHistoryItem(
+        val historyItem = ShiftHistoryItem(
             id = shift.id,
             date = dateFormatter.format(clockInDate),
             clockIn = timeFormatter.format(clockInDate),
@@ -126,5 +132,7 @@ class WorkingHoursViewModel @Inject constructor(
             earnings = String.format("%.0f", shift.outstation_allowance_amount),
             isOutstation = shift.is_outstation
         )
+        println("DEBUG: Formatted shift ${shift.id} -> earnings=${historyItem.earnings}, isOutstation=${historyItem.isOutstation}")
+        return historyItem
     }
 }
