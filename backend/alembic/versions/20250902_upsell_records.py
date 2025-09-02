@@ -1,6 +1,6 @@
 """Add upsell_records table for tracking driver upsell incentives
 
-Revision ID: 20250902_add_upsell_records_table
+Revision ID: 20250902_upsell_records
 Revises: 20250831_schedule_tables
 Create Date: 2025-09-02 12:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '20250902_add_upsell_records_table'
+revision = '20250902_upsell_records'
 down_revision = '20250831_schedule_tables'
 branch_labels = None
 depends_on = None
