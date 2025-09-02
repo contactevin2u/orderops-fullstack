@@ -203,7 +203,7 @@ function OrderCard({
   const currentCommission = trip.commission?.computed_amount || order.commission || 0;
   const podPhotos = trip.pod_photo_urls || (trip.pod_photo_url ? [trip.pod_photo_url] : []);
   const hasPodPhoto = podPhotos.length > 0;
-  const isDelivered = order.status === 'DELIVERED';
+  const isDelivered = trip.status === 'DELIVERED'; // Check trip status, not order status
   const canRelease = isDelivered && hasPodPhoto && currentCommission > 0;
   
   // Initialize commission amount from current commission
@@ -242,7 +242,7 @@ function OrderCard({
               background: isDelivered ? '#dcfce7' : '#fef3c7',
               color: isDelivered ? '#15803d' : '#d97706'
             }}>
-              {order.status}
+              {trip.status || order.status}
             </span>
             {hasPodPhoto && (
               <button
