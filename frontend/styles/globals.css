@@ -27,6 +27,40 @@
   --color-text: #1f2937;
   --color-border: #e5e7eb;
   --color-border-muted: #d1d5db;
+  
+  /* Additional semantic colors */
+  --color-muted: #6b7280;
+  --color-accent: #8b5cf6;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --color-info: #06b6d4;
+  
+  /* Surface variations */
+  --color-surface-hover: #f9fafb;
+  --color-surface-active: #f3f4f6;
+  --color-surface-raised: #ffffff;
+  
+  /* Tailwind-compatible HSL variables */
+  --background: 210 40% 98%; /* --color-bg in HSL */
+  --foreground: 222.2 84% 4.9%; /* --color-text in HSL */
+  --card: 0 0% 100%; /* --color-surface in HSL */
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --primary: 221.2 83.2% 53.3%; /* --color-primary in HSL */
+  --primary-foreground: 210 40% 98%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222.2 84% 4.9%;
+  --destructive: 0 84.2% 60.2%; /* --color-error in HSL */
+  --destructive-foreground: 210 40% 98%;
+  --border: 214.3 31.8% 91.4%; /* --color-border in HSL */
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
 }
 
 *,
@@ -342,6 +376,34 @@ h6 {
   border-radius: 12px;
   background: var(--color-border);
   font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.badge-success {
+  background: var(--color-success);
+  color: white;
+}
+
+.badge-warning {
+  background: var(--color-warning);
+  color: white;
+}
+
+.badge-error {
+  background: var(--color-error);
+  color: white;
+}
+
+.badge-info {
+  background: var(--color-info);
+  color: white;
+}
+
+.badge-muted {
+  background: var(--color-muted);
+  color: white;
 }
 
 .table {
@@ -508,6 +570,14 @@ h6 {
     margin: 4px 0 8px 0;
     box-shadow: none;
   }
+  
+  /* Dark mode mobile dropdown */
+  @media (prefers-color-scheme: dark) {
+    .nav-dropdown-menu {
+      background: rgba(30, 41, 59, 0.8);
+      border: 1px solid var(--color-border);
+    }
+  }
   .nav-dropdown-menu .nav-link {
     padding: 10px 20px;
   }
@@ -610,12 +680,190 @@ form .error {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #1f2937;
-    --color-surface: #374151;
-    --color-text: #f9fafb;
-    --color-border: #4b5563;
-    --color-border-muted: #6b7280;
-    --color-primary: #818cf8;
-    --color-primary-hover: #6366f1;
+    /* Main colors */
+    --color-bg: #0f172a; /* Darker slate background */
+    --color-surface: #1e293b; /* Darker surface */
+    --color-text: #f1f5f9; /* Lighter text */
+    --color-border: #334155; /* Subtle borders */
+    --color-border-muted: #475569; /* Muted borders */
+    --color-primary: #6366f1; /* Indigo primary */
+    --color-primary-hover: #4f46e5; /* Darker indigo hover */
+    
+    /* Additional semantic colors */
+    --color-muted: #64748b; /* Muted text */
+    --color-accent: #8b5cf6; /* Purple accent */
+    --color-success: #10b981; /* Green success */
+    --color-warning: #f59e0b; /* Amber warning */
+    --color-error: #ef4444; /* Red error */
+    --color-info: #06b6d4; /* Cyan info */
+    
+    /* Surface variations */
+    --color-surface-hover: #334155; /* Hover state */
+    --color-surface-active: #475569; /* Active state */
+    --color-surface-raised: #1e293b; /* Raised elements like cards */
+    
+    /* Shadow adjustments for dark mode */
+    --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.4);
+    
+    /* Tailwind-compatible HSL variables for dark mode */
+    --background: 222.2 84% 4.9%; /* --color-bg in HSL (dark) */
+    --foreground: 210 40% 98%; /* --color-text in HSL (dark) */
+    --card: 222.2 84% 4.9%; /* --color-surface in HSL (dark) */
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%; /* --color-primary in HSL (dark) */
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%; /* --color-error in HSL (dark) */
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%; /* --color-border in HSL (dark) */
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+  
+  /* Table hover state in dark mode */
+  .table tbody tr:hover {
+    background: var(--color-surface-hover);
+  }
+  
+  /* Badge improvements */
+  .badge {
+    background: var(--color-surface-active);
+    color: var(--color-text);
+  }
+  
+  /* Modal backdrop enhancement */
+  .modal-backdrop {
+    background: rgba(0, 0, 0, 0.8);
+  }
+  
+  /* Form inputs dark mode */
+  .input,
+  .select,
+  .textarea {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+  
+  .input:focus-visible,
+  .select:focus-visible,
+  .textarea:focus-visible {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  }
+  
+  /* Button improvements */
+  .btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+  
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--color-surface-hover);
+  }
+  
+  /* Header navigation improvements */
+  .header {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-bottom: 1px solid var(--color-border);
+  }
+  
+  /* Navigation dropdown in dark mode */
+  .nav-dropdown-menu {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border);
+  }
+  
+  .nav-dropdown-menu .nav-link:hover {
+    background-color: var(--color-surface-hover);
+  }
+  
+  /* Navigation separator in dark mode */
+  .nav-separator {
+    background-color: rgba(148, 163, 184, 0.3);
+  }
+  
+  /* Better card shadows for dark mode */
+  .card {
+    background: var(--color-surface-raised);
+    border-color: var(--color-border);
+    box-shadow: var(--shadow-md);
+  }
+  
+  /* Table improvements */
+  .table th {
+    background: var(--color-surface-active);
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+  
+  .table td {
+    border-color: var(--color-border);
+  }
+  
+  .table th:first-child,
+  .table td:first-child {
+    background: var(--color-surface-raised);
+    box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Form error states in dark mode */
+  form .error {
+    color: var(--color-error);
+  }
+  
+  /* Navigation link active states */
+  .nav-link.active {
+    color: #a5b4fc; /* Lighter indigo for better contrast */
+  }
+  
+  /* Hr separator in dark mode */
+  .hr {
+    background: var(--color-border);
+  }
+  
+  /* Key-value pairs styling */
+  .kv {
+    color: var(--color-text);
+  }
+  
+  /* Focus states improvements */
+  .btn:focus-visible {
+    outline-color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+  }
+  
+  /* Login card improvements for consistency */
+  .login-card {
+    background: rgba(30, 41, 59, 0.95);
+    border: 1px solid var(--color-border);
+    backdrop-filter: blur(20px);
+  }
+  
+  .login-card input[type='text'],
+  .login-card input[type='password'] {
+    background: var(--color-surface);
+    border-color: var(--color-border);
+    color: var(--color-text);
+  }
+  
+  .login-card input::placeholder {
+    color: var(--color-muted);
+  }
+  
+  /* Modal improvements */
+  .modal {
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-lg);
   }
 }

@@ -28,7 +28,7 @@ interface DriverApi {
     suspend fun updateOrderStatus(@Path("id") orderId: String, @Body update: OrderStatusUpdateDto): JobDto
     
     @PATCH("orders/{id}/driver-update")
-    suspend fun patchOrder(@Path("id") orderId: String, @Body update: OrderPatchDto): OrderDto
+    suspend fun patchOrder(@Path("id") orderId: String, @Body update: OrderPatchDto): ApiResponse<OrderDto>
     
     @POST("orders/{id}/upsell")
     suspend fun upsellOrder(@Path("id") orderId: String, @Body request: UpsellRequest): ApiResponse<UpsellResponse>
@@ -293,15 +293,24 @@ data class CreateOrderRequest(
 @Serializable
 data class OrderDto(
     val id: Int,
-    val code: String?,
-    val customer_name: String?,
-    val customer_phone: String?,
-    val delivery_address: String?,
+    val code: String,
+    val type: String,
     val status: String,
-    val total_amount: Double?,
-    val notes: String?,
-    val delivery_date: String?,
-    val created_at: String
+    val delivery_date: String? = null,
+    val notes: String? = null,
+    val subtotal: String, // Decimal as String
+    val discount: String? = "0",
+    val delivery_fee: String? = "0", 
+    val return_delivery_fee: String? = "0",
+    val penalty_fee: String? = "0",
+    val total: String, // Decimal as String
+    val paid_amount: String,
+    val balance: String,
+    val customer: CustomerDto? = null,
+    val items: List<OrderItemDto> = emptyList(),
+    val payments: List<PaymentDto> = emptyList(),
+    val plan: PlanDto? = null,
+    val trip: TripDto? = null
 )
 
 @Serializable
@@ -328,6 +337,51 @@ data class UpsellRequest(
 @Serializable
 data class ApiResponse<T>(
     val data: T
+)
+
+@Serializable
+data class CustomerDto(
+    val id: Int,
+    val name: String?,
+    val phone: String?,
+    val address: String?
+)
+
+@Serializable
+data class OrderItemDto(
+    val id: Int,
+    val name: String,
+    val qty: Int,
+    val unit_price: String,
+    val line_total: String,
+    val item_type: String? = null
+)
+
+@Serializable
+data class PaymentDto(
+    val id: Int,
+    val amount: String,
+    val date: String,
+    val method: String?,
+    val reference: String?
+)
+
+@Serializable
+data class PlanDto(
+    val id: Int,
+    val plan_type: String,
+    val months: Int,
+    val monthly_amount: String,
+    val start_date: String,
+    val status: String
+)
+
+@Serializable
+data class TripDto(
+    val id: Int,
+    val driver_id: Int,
+    val status: String,
+    val route_id: Int? = null
 )
 
 @Serializable

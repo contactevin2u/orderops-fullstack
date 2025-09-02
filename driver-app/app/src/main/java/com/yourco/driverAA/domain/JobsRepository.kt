@@ -60,9 +60,9 @@ class JobsRepository @Inject constructor(
     suspend fun getCommissions(): List<CommissionMonthDto> = api.getCommissions()
     
     suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> = try {
-        // Update the order via PATCH endpoint
-        api.patchOrder(orderId, OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate))
-        // Return the updated job by refetching it
+        // Update the order via PATCH endpoint and extract from envelope
+        val patchResponse = api.patchOrder(orderId, OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate))
+        // Convert OrderDto to JobDto by refetching (since they have different structures)
         val updatedJob = api.getJob(orderId)
         Result.Success(updatedJob)
     } catch (e: Exception) {

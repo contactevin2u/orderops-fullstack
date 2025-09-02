@@ -130,6 +130,7 @@ fun JobDetailScreen(
     val selectedUpsellItem by viewModel.selectedUpsellItem.collectAsState()
     val uploadingPhotos by viewModel.uploadingPhotos.collectAsState()
     val uploadedPhotos by viewModel.uploadedPhotos.collectAsState()
+    val uploadedPhotoFiles by viewModel.uploadedPhotoFiles.collectAsState()
 
     LaunchedEffect(jobId) {
         viewModel.loadJob(jobId)
@@ -166,7 +167,8 @@ fun JobDetailScreen(
                     onNavigateToActiveOrders = onNavigateToActiveOrders,
                     onUpsellItem = viewModel::showUpsellDialog,
                     uploadingPhotos = uploadingPhotos,
-                    uploadedPhotos = uploadedPhotos
+                    uploadedPhotos = uploadedPhotos,
+                    uploadedPhotoFiles = uploadedPhotoFiles
                 )
             }
         }
@@ -203,7 +205,8 @@ private fun JobDetailContent(
     onNavigateToActiveOrders: () -> Unit = {},
     onUpsellItem: ((JobItemDto) -> Unit)? = null,
     uploadingPhotos: Set<Int> = emptySet(),
-    uploadedPhotos: Set<Int> = emptySet()
+    uploadedPhotos: Set<Int> = emptySet(),
+    uploadedPhotoFiles: Map<Int, File> = emptyMap()
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -408,7 +411,8 @@ private fun JobDetailContent(
                     jobId = job.id,
                     onUploadPhoto = onUploadPhoto,
                     uploadingPhotos = uploadingPhotos,
-                    uploadedPhotos = uploadedPhotos
+                    uploadedPhotos = uploadedPhotos,
+                    uploadedPhotoFiles = uploadedPhotoFiles
                 )
             }
         }
@@ -633,7 +637,8 @@ private fun PodPhotosSection(
     jobId: String,
     onUploadPhoto: (File, Int) -> Unit,
     uploadingPhotos: Set<Int>,
-    uploadedPhotos: Set<Int>
+    uploadedPhotos: Set<Int>,
+    uploadedPhotoFiles: Map<Int, File> = emptyMap()
 ) {
     val context = LocalContext.current
     var photoFiles by remember { mutableStateOf(mutableMapOf<Int, File?>()) }
@@ -725,7 +730,7 @@ private fun PodPhotosSection(
                     val photoNumber = index + 1
                     PhotoCaptureButton(
                         photoNumber = photoNumber,
-                        photoFile = photoFiles[photoNumber],
+                        photoFile = uploadedPhotoFiles[photoNumber] ?: photoFiles[photoNumber],
                         isUploading = uploadingPhotos.contains(photoNumber),
                         isUploaded = uploadedPhotos.contains(photoNumber),
                         onTakePhoto = {

@@ -45,6 +45,10 @@ class JobDetailViewModel @Inject constructor(
     private val _uploadedPhotos = MutableStateFlow<Set<Int>>(emptySet())
     val uploadedPhotos: StateFlow<Set<Int>> = _uploadedPhotos.asStateFlow()
     
+    // Store photo files to persist thumbnails after job reload
+    private val _uploadedPhotoFiles = MutableStateFlow<Map<Int, File>>(emptyMap())
+    val uploadedPhotoFiles: StateFlow<Map<Int, File>> = _uploadedPhotoFiles.asStateFlow()
+    
     fun loadJob(jobId: String) {
         viewModelScope.launch {
             _loading.value = true
@@ -108,6 +112,9 @@ class JobDetailViewModel @Inject constructor(
                     // Mark photo as uploaded and remove from uploading
                     _uploadingPhotos.value = _uploadingPhotos.value - photoNumber
                     _uploadedPhotos.value = _uploadedPhotos.value + photoNumber
+                    
+                    // Store the photo file for persistent thumbnail display
+                    _uploadedPhotoFiles.value = _uploadedPhotoFiles.value + (photoNumber to photoFile)
                     
                     // Reload job to get updated status with PoD photo
                     loadJob(currentJob.id)
