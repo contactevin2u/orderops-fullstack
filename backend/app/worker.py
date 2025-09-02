@@ -14,6 +14,7 @@ from .db import engine
 from .models import Job
 from .services.ordersvc import create_order_from_parsed
 from .services.parser import parse_whatsapp_text
+from .services.assignment_service import AssignmentService
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,16 @@ def process_one(row, sess: Session, max_attempts: int):
                 "order_id": order.id,
                 "order_code": order.code,
                 "parsed": parsed,
+            }
+        elif kind == "AUTO_ASSIGN":
+            # Background AI assignment - no blocking!
+            service = AssignmentService(sess)
+            assignment_result = retry_db(sess, service.auto_assign_all)
+            result = {
+                "success": assignment_result.get("success", False),
+                "assigned_count": assignment_result.get("total", 0),
+                "message": assignment_result.get("message", ""),
+                "assignments": assignment_result.get("assigned", [])
             }
         else:
             result = {"ok": True}
