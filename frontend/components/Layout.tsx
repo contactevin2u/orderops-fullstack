@@ -98,12 +98,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     return pathname === href || pathname.startsWith(`${href}/`);
   };
 
-  const uniqueByHref = (items: NavItem[]) =>
-    Array.from(new Map(items.map((i) => [i.href, i])).values());
-
-  const items = uniqueByHref(navItems).filter(
-    (i) => !i.requiresAuth || !!user
-  );
+  // Remove unused legacy filtering logic - now using navGroups directly
   React.useEffect(() => {
     if (mobileOpen) {
       const first = menuRef.current?.querySelector<HTMLElement>('a,button');
@@ -180,8 +175,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               if (groupItems.length === 0) return null;
               
               return (
-                <React.Fragment key={group.title}>
+                <div key={group.title} className="nav-group">
                   {groupIndex > 0 && <div className="nav-separator" />}
+                  <div className="nav-group-label">{group.title}</div>
                   {groupItems.map(({ href, label, Icon }, itemIndex) => (
                     <Link
                       key={href}
@@ -194,7 +190,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                       <span>{t(label)}</span>
                     </Link>
                   ))}
-                </React.Fragment>
+                </div>
               );
             })}
             <LanguageSwitcher />

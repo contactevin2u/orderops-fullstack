@@ -35,6 +35,11 @@ def quotation_pdf(quotation_data: dict) -> bytes:
     return _reportlab_quotation_pdf(quotation_data)
 
 
+def receipt_pdf(order: Order) -> bytes:
+    """Render a receipt as a PDF using ReportLab with the same template as invoices."""
+    return _reportlab_receipt_pdf(order)
+
+
 # ---------------------------------------------------------------------------
 # Constants (banking & default image URLs)
 # ---------------------------------------------------------------------------
@@ -1082,7 +1087,76 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
 
 
 def _reportlab_quotation_pdf(quotation_data: dict) -> bytes:
-    """Generate a quotation PDF using the same template as invoices."""
+    """Generate a quotation PDF by copying the same template structure as invoices."""
+    # Create a mock order object to reuse invoice generation logic
+    from types import SimpleNamespace
+    
+    # Extract data from quotation_data
+    customer_data = quotation_data.get("customer", {})
+    order_data = quotation_data.get("order", {})
+    
+    # Create mock objects that mirror the Order/Customer structure
+    mock_customer = SimpleNamespace(
+        name=customer_data.get("name", "N/A"),
+        phone=customer_data.get("phone", ""),
+        address=customer_data.get("address", "")
+    )
+    
+    mock_items = []
+    for item_data in order_data.get("items", []):
+        mock_item = SimpleNamespace(
+            name=item_data.get("name", "Item"),
+            item_type=item_data.get("item_type", "OUTRIGHT"),
+            qty=item_data.get("qty", 1),
+            unit_price=item_data.get("unit_price", 0),
+            line_total=item_data.get("line_total", item_data.get("qty", 1) * item_data.get("unit_price", 0)),
+            monthly_amount=item_data.get("monthly_amount", 0)
+        )
+        mock_items.append(mock_item)
+    
+    # Create mock plan if exists
+    plan_data = order_data.get("plan")
+    mock_plan = None
+    if plan_data:
+        mock_plan = SimpleNamespace(
+            plan_type=plan_data.get("plan_type"),
+            months=plan_data.get("months"),
+            monthly_amount=plan_data.get("monthly_amount", 0),
+            start_date=None
+        )
+    
+    # Create mock order
+    charges = order_data.get("charges", {})
+    mock_order = SimpleNamespace(
+        id="QUOTE",
+        code=f"QUOTE-{quotation_data.get('quote_date', '').replace('-', '')}",
+        customer=mock_customer,
+        customer_name=customer_data.get("name", "N/A"),
+        customer_phone=customer_data.get("phone", ""),
+        customer_address=customer_data.get("address", ""),
+        delivery_address=customer_data.get("address", ""),
+        items=mock_items,
+        plan=mock_plan,
+        delivery_fee=charges.get("delivery_fee", 0),
+        return_delivery_fee=charges.get("return_delivery_fee", 0),
+        total=sum(item.line_total for item in mock_items) + charges.get("delivery_fee", 0) + charges.get("return_delivery_fee", 0),
+        subtotal=sum(item.line_total for item in mock_items),
+        notes=order_data.get("notes", ""),
+        type=order_data.get("type", "OUTRIGHT"),
+        delivery_date=order_data.get("delivery_date"),
+        created_at=quotation_data.get("quote_date", ""),
+        company=None  # No company branding override
+    )
+    
+    # Now call the same invoice generation function but modify the output
+    pdf_bytes = _generate_quotation_using_invoice_template(mock_order, quotation_data)
+    
+    logger.info(f"Generated quotation PDF ({len(pdf_bytes)} bytes)")
+    return pdf_bytes
+
+
+def _generate_quotation_using_invoice_template(order, quotation_data: dict) -> bytes:
+    """Generate quotation by reusing invoice template logic but with quotation-specific changes."""
     try:
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
@@ -1095,6 +1169,7 @@ def _reportlab_quotation_pdf(quotation_data: dict) -> bytes:
             TableStyle,
             Image,
             KeepTogether,
+            PageBreak,
         )
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_RIGHT, TA_CENTER
@@ -1106,7 +1181,7 @@ def _reportlab_quotation_pdf(quotation_data: dict) -> bytes:
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
         ) from exc
 
-    # Enhanced theme & helpers
+    # Copy exact same setup from invoice template
     try:
         pdfmetrics.registerFont(TTFont("Inter", "/app/static/fonts/Inter-Regular.ttf"))
         pdfmetrics.registerFont(TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf"))
@@ -1116,7 +1191,7 @@ def _reportlab_quotation_pdf(quotation_data: dict) -> bytes:
         logger.warning(f"Failed to load Inter fonts: {str(e)}, using fallback")
         BASE_FONT, BASE_BOLD = "Helvetica", "Helvetica-Bold"
 
-    # Enhanced color scheme
+    # Enhanced color scheme (same as invoice)
     BRAND_COLOR = "#1E293B"
     ACCENT_COLOR = "#3B82F6"
     SUCCESS_COLOR = "#10B981"
@@ -1140,237 +1215,422 @@ def _reportlab_quotation_pdf(quotation_data: dict) -> bytes:
         except Exception:
             return str(q or 0)
 
-    # Image paths and URLs
+    # Load images (same as invoice)
     LOGO_PATH = getattr(settings, "COMPANY_LOGO_PATH", None)
     LOGO_URL = getattr(settings, "COMPANY_LOGO_URL", None) or DEFAULT_LOGO_URL
-
     logo_reader = _image_reader(LOGO_PATH, LOGO_URL)
 
-    # Build PDF
+    # Same styles as invoice
+    styles = getSampleStyleSheet()
+    styles["Normal"].fontName = BASE_FONT
+    styles["Normal"].fontSize = 10
+    styles["Normal"].leading = 12
+    styles["Title"].fontName = BASE_BOLD
+
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11, textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="Center", parent=styles["Normal"], alignment=TA_CENTER))
+    styles.add(ParagraphStyle(name="Muted", parent=styles["Small"], textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="H1", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=24, leading=28, textColor=BRAND_COLOR))
+    styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=16, leading=20, textColor=DARK_GRAY))
+    styles.add(ParagraphStyle(name="H3", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=12, leading=14, textColor=DARK_GRAY))
+
+    # Document setup (same as invoice)
     buf = BytesIO()
     doc = SimpleDocTemplate(
         buf,
         pagesize=A4,
         leftMargin=20*mm,
         rightMargin=20*mm,
-        topMargin=15*mm,
-        bottomMargin=15*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm,
+        title=f"Quotation {order.code}",
+        author="AA Alive Sdn. Bhd."
     )
-
-    # Enhanced styles
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(
-        name="H1",
-        parent=styles["Heading1"],
-        fontSize=24,
-        spaceAfter=15,
-        textColor=HexColor(BRAND_COLOR),
-        fontName=BASE_BOLD,
-    ))
-    styles.add(ParagraphStyle(
-        name="H2",
-        parent=styles["Heading2"],
-        fontSize=16,
-        spaceAfter=10,
-        spaceBefore=15,
-        textColor=HexColor(DARK_GRAY),
-        fontName=BASE_BOLD,
-    ))
-    styles.add(ParagraphStyle(
-        name="Body",
-        parent=styles["Normal"],
-        fontSize=10,
-        spaceAfter=6,
-        textColor=HexColor(DARK_GRAY),
-        fontName=BASE_FONT,
-    ))
-    styles.add(ParagraphStyle(
-        name="Center",
-        parent=styles["Body"],
-        alignment=TA_CENTER,
-    ))
-    styles.add(ParagraphStyle(
-        name="Right",
-        parent=styles["Body"],
-        alignment=TA_RIGHT,
-    ))
 
     elems = []
 
-    # Header with logo
+    # Header with logo (same as invoice)
     if logo_reader:
         try:
-            elems.append(Image(logo_reader, width=60*mm, height=40*mm, hAlign="LEFT"))
-            elems.append(Spacer(1, 10))
+            elems.append(Image(logo_reader, width=60*mm, height=30*mm, hAlign="LEFT"))
+            elems.append(Spacer(1, 10*mm))
         except Exception as e:
-            logger.warning(f"Failed to add logo: {str(e)}")
+            logger.warning(f"Failed to add logo to quotation: {str(e)}")
 
-    # Title
+    # Title - CHANGED to QUOTATION
     elems.append(Paragraph("QUOTATION", styles["H1"]))
-    elems.append(Spacer(1, 20))
+    elems.append(Spacer(1, 10*mm))
 
-    # Company info
-    company_info = [
-        ["From:", ""],
-        ["AA Alive Sdn. Bhd.", ""],
-        ["Contact: +60 12-345-6789", ""],
-        ["Email: hello@aalyx.com", ""],
+    # Company and customer info (copied from invoice template structure)
+    info_data = [
+        ["From:", "To:", "Quotation Details:"],
+        ["AA Alive Sdn. Bhd.", order.customer_name or "N/A", f"Quote #: {order.code}"],
+        ["Kuala Lumpur, Malaysia", order.customer_phone or "", f"Date: {quotation_data.get('quote_date', 'N/A')}"],
+        ["Phone: +60 12-345-6789", "", f"Valid Until: {quotation_data.get('valid_until', '30 days from date')}"],
+        ["Email: hello@aalyx.com", "", ""],
     ]
     
-    company_table = Table(company_info, colWidths=[40*mm, 130*mm])
-    company_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), BASE_FONT),
+    if order.customer_address:
+        info_data[2][1] = order.customer_address
+
+    info_table = Table(info_data, colWidths=[60*mm, 60*mm, 50*mm])
+    info_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+        ("FONTNAME", (0, 1), (-1, -1), BASE_FONT),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
     ]))
-    elems.append(company_table)
-    elems.append(Spacer(1, 20))
+    elems.append(info_table)
+    elems.append(Spacer(1, 8*mm))
 
-    # Customer info
-    customer = quotation_data.get("customer", {})
-    customer_info = [
-        ["To:", ""],
-        [customer.get("name", "N/A"), ""],
-    ]
-    if customer.get("phone"):
-        customer_info.append([f"Phone: {customer['phone']}", ""])
-    if customer.get("address"):
-        customer_info.append([customer["address"], ""])
+    # Items table (copied from invoice logic)
+    if order.items:
+        # Calculate totals
+        total_before_charges = sum(float(item.line_total or 0) for item in order.items)
+        delivery_fee = float(getattr(order, 'delivery_fee', 0) or 0)
+        return_delivery_fee = float(getattr(order, 'return_delivery_fee', 0) or 0)
+        grand_total = total_before_charges + delivery_fee + return_delivery_fee
+
+        item_data = [["Description", "Type", "Qty", "Unit Price", "Amount"]]
         
-    customer_table = Table(customer_info, colWidths=[40*mm, 130*mm])
-    customer_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), BASE_FONT),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    elems.append(customer_table)
-    elems.append(Spacer(1, 20))
-
-    # Quote details
-    order_data = quotation_data.get("order", {})
-    quote_info = [
-        ["Quotation Date:", quotation_data.get("quote_date", "N/A")],
-        ["Valid Until:", quotation_data.get("valid_until", "30 days from quote date")],
-    ]
-    if order_data.get("delivery_date"):
-        quote_info.append(["Expected Delivery:", order_data["delivery_date"]])
-
-    quote_table = Table(quote_info, colWidths=[50*mm, 120*mm])
-    quote_table.setStyle(TableStyle([
-        ("FONTNAME", (0, 0), (-1, -1), BASE_FONT),
-        ("FONTSIZE", (0, 0), (-1, -1), 10),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
-        ("BACKGROUND", (0, 0), (0, -1), HexColor(LIGHT_GRAY)),
-    ]))
-    elems.append(quote_table)
-    elems.append(Spacer(1, 20))
-
-    # Items table
-    items = order_data.get("items", [])
-    if items:
-        elems.append(Paragraph("Items", styles["H2"]))
-        
-        # Table headers
-        item_data = [["Item", "Type", "Qty", "Unit Price", "Total"]]
-        
-        subtotal = 0
-        for item in items:
-            qty = float(item.get("qty", 0))
-            unit_price = float(item.get("unit_price", 0))
-            line_total = qty * unit_price
-            subtotal += line_total
+        for item in order.items:
+            qty_str = _fmt_qty(getattr(item, 'qty', 0))
+            unit_price = float(getattr(item, 'unit_price', 0) or 0)
+            line_total = float(getattr(item, 'line_total', 0) or 0)
             
             item_data.append([
-                item.get("name", "N/A"),
-                item.get("item_type", "OUTRIGHT"),
-                _fmt_qty(qty),
+                getattr(item, 'name', 'Item') or 'Item',
+                getattr(item, 'item_type', 'OUTRIGHT'),
+                qty_str,
                 money(unit_price),
                 money(line_total),
             ])
 
-        # Add charges if any
-        charges = order_data.get("charges", {})
-        delivery_fee = float(charges.get("delivery_fee", 0))
-        return_delivery_fee = float(charges.get("return_delivery_fee", 0))
-        
+        # Add charges
         if delivery_fee > 0:
-            item_data.append(["Delivery Fee", "FEE", "1", money(delivery_fee), money(delivery_fee)])
-            subtotal += delivery_fee
+            item_data.append(["Delivery Fee", "SERVICE", "1", money(delivery_fee), money(delivery_fee)])
         if return_delivery_fee > 0:
-            item_data.append(["Return Delivery Fee", "FEE", "1", money(return_delivery_fee), money(return_delivery_fee)])
-            subtotal += return_delivery_fee
+            item_data.append(["Return Delivery Fee", "SERVICE", "1", money(return_delivery_fee), money(return_delivery_fee)])
 
-        # Add total row
-        item_data.append(["", "", "", "TOTAL:", money(subtotal)])
+        # Totals
+        item_data.append(["", "", "", "SUBTOTAL:", money(total_before_charges)])
+        if delivery_fee > 0 or return_delivery_fee > 0:
+            item_data.append(["", "", "", "CHARGES:", money(delivery_fee + return_delivery_fee)])
+        item_data.append(["", "", "", "TOTAL:", money(grand_total)])
 
-        # Create table
-        item_table = Table(item_data, colWidths=[70*mm, 30*mm, 20*mm, 25*mm, 25*mm])
+        # Table styling (same as invoice)
+        item_table = Table(item_data, colWidths=[75*mm, 25*mm, 20*mm, 25*mm, 25*mm])
         item_table.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
-            ("FONTNAME", (0, 1), (-1, -2), BASE_FONT),
-            ("FONTNAME", (0, -1), (-1, -1), BASE_BOLD),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+            ("FONTSIZE", (0, 0), (-1, 0), 11),
+            ("FONTNAME", (0, 1), (-1, -4), BASE_FONT),
+            ("FONTNAME", (0, -3), (-1, -1), BASE_BOLD),
+            ("FONTSIZE", (0, 1), (-1, -1), 10),
+            ("GRID", (0, 0), (-1, -4), 0.5, colors.lightgrey),
+            ("LINEABOVE", (0, -3), (-1, -3), 1, colors.black),
+            ("LINEABOVE", (0, -1), (-1, -1), 2, colors.black),
             ("BACKGROUND", (0, 0), (-1, 0), HexColor(ACCENT_COLOR)),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("BACKGROUND", (0, -1), (-1, -1), HexColor(LIGHT_GRAY)),
             ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
         ]))
         elems.append(item_table)
-        elems.append(Spacer(1, 20))
+        elems.append(Spacer(1, 8*mm))
 
-    # Payment plan if applicable
-    plan = order_data.get("plan", {})
-    if plan.get("plan_type"):
-        elems.append(Paragraph("Payment Plan", styles["H2"]))
+    # Payment plan (if applicable)
+    if order.plan and getattr(order.plan, 'plan_type', None):
         plan_info = [
-            ["Plan Type:", plan.get("plan_type", "N/A")],
-            ["Duration:", f"{plan.get('months', 'N/A')} months"],
-            ["Monthly Amount:", money(plan.get("monthly_amount", 0))],
+            ["Payment Plan:", ""],
+            [f"Plan Type: {order.plan.plan_type}", ""],
+            [f"Duration: {getattr(order.plan, 'months', 'N/A')} months", ""],
+            [f"Monthly Amount: {money(getattr(order.plan, 'monthly_amount', 0))}", ""],
         ]
         
-        plan_table = Table(plan_info, colWidths=[50*mm, 120*mm])
+        plan_table = Table(plan_info, colWidths=[90*mm, 80*mm])
         plan_table.setStyle(TableStyle([
-            ("FONTNAME", (0, 0), (-1, -1), BASE_FONT),
+            ("FONTNAME", (0, 0), (0, 0), BASE_BOLD),
+            ("FONTNAME", (0, 1), (-1, -1), BASE_FONT),
             ("FONTSIZE", (0, 0), (-1, -1), 10),
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
-            ("BACKGROUND", (0, 0), (0, -1), HexColor(LIGHT_GRAY)),
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#FFF9E6")),
         ]))
         elems.append(plan_table)
-        elems.append(Spacer(1, 20))
+        elems.append(Spacer(1, 6*mm))
 
     # Notes
-    if order_data.get("notes"):
-        elems.append(Paragraph("Notes", styles["H2"]))
-        elems.append(Paragraph(order_data["notes"], styles["Body"]))
-        elems.append(Spacer(1, 20))
+    if order.notes:
+        elems.append(Paragraph("Notes:", styles["H3"]))
+        elems.append(Paragraph(order.notes, styles["Normal"]))
+        elems.append(Spacer(1, 6*mm))
 
-    # Terms
-    elems.append(Paragraph("Terms & Conditions", styles["H2"]))
+    # Terms & conditions for quotations
+    elems.append(Paragraph("Terms & Conditions:", styles["H3"]))
     terms = [
-        "• This quotation is valid for 30 days from the date issued",
+        "• This quotation is valid for 30 days from the date of issue",
         "• Prices are subject to change without prior notice",
         "• Delivery charges may apply based on location",
         "• Payment terms to be agreed upon order confirmation",
-        "• All sales are subject to our standard terms and conditions",
+        "• All sales are subject to our standard terms and conditions"
     ]
-    for term in terms:
-        elems.append(Paragraph(term, styles["Body"]))
     
-    elems.append(Spacer(1, 30))
+    for term in terms:
+        elems.append(Paragraph(term, styles["Small"]))
+    
+    elems.append(Spacer(1, 10*mm))
     elems.append(Paragraph("Thank you for your interest!", styles["Center"]))
-    elems.append(Paragraph("This is a computer-generated quotation.", styles["Center"]))
+    elems.append(Spacer(1, 5*mm))
+    elems.append(Paragraph("This is a computer-generated quotation.", styles["Muted"]))
 
     # Build PDF
     doc.build(elems)
     pdf_data = buf.getvalue()
     buf.close()
     
-    logger.info(f"Generated quotation PDF ({len(pdf_data)} bytes)")
+    return pdf_data
+
+
+def _reportlab_receipt_pdf(order: Order) -> bytes:
+    """Generate a receipt PDF by copying the invoice template structure but with receipt-specific changes."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            Table,
+            TableStyle,
+            Image,
+            KeepTogether,
+            PageBreak,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.lib.colors import HexColor
+    except ImportError as exc:
+        raise RuntimeError(
+            "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
+        ) from exc
+
+    # Copy exact same setup from invoice template
+    try:
+        pdfmetrics.registerFont(TTFont("Inter", "/app/static/fonts/Inter-Regular.ttf"))
+        pdfmetrics.registerFont(TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf"))
+        BASE_FONT, BASE_BOLD = "Inter", "Inter-Bold"
+        logger.info("Successfully loaded Inter fonts")
+    except Exception as e:
+        logger.warning(f"Failed to load Inter fonts: {str(e)}, using fallback")
+        BASE_FONT, BASE_BOLD = "Helvetica", "Helvetica-Bold"
+
+    # Enhanced color scheme (same as invoice)
+    BRAND_COLOR = getattr(getattr(order, "company", None), "brand_color", "#1E293B") or "#1E293B"
+    ACCENT_COLOR = getattr(getattr(order, "company", None), "accent_color", "#3B82F6") or "#3B82F6"
+    SUCCESS_COLOR = "#10B981"
+    LIGHT_GRAY = "#F8FAFC"
+    MEDIUM_GRAY = "#64748B"
+    DARK_GRAY = "#334155"
+    
+    CURRENCY = getattr(settings, "CURRENCY_PREFIX", "RM") or "RM"
+
+    def money(x):
+        try:
+            return f"{CURRENCY}{float(x or 0):,.2f}"
+        except Exception:
+            return f"{CURRENCY}0.00"
+
+    def _fmt_qty(q):
+        try:
+            qf = float(q or 0)
+            s = f"{qf:.2f}".rstrip("0").rstrip(".")
+            return s if s else "0"
+        except Exception:
+            return str(q or 0)
+
+    # Load images (same as invoice)
+    LOGO_PATH = getattr(settings, "COMPANY_LOGO_PATH", None)
+    LOGO_URL = getattr(settings, "COMPANY_LOGO_URL", None) or DEFAULT_LOGO_URL
+    logo_reader = _image_reader(LOGO_PATH, LOGO_URL)
+
+    # Same styles as invoice
+    styles = getSampleStyleSheet()
+    styles["Normal"].fontName = BASE_FONT
+    styles["Normal"].fontSize = 10
+    styles["Normal"].leading = 12
+    styles["Title"].fontName = BASE_BOLD
+
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11, textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="Center", parent=styles["Normal"], alignment=TA_CENTER))
+    styles.add(ParagraphStyle(name="Muted", parent=styles["Small"], textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="H1", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=24, leading=28, textColor=BRAND_COLOR))
+    styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=16, leading=20, textColor=DARK_GRAY))
+    styles.add(ParagraphStyle(name="H3", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=12, leading=14, textColor=DARK_GRAY))
+
+    # Document setup (same as invoice)
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=20*mm,
+        rightMargin=20*mm,
+        topMargin=20*mm,
+        bottomMargin=20*mm,
+        title=f"Receipt {order.code}",
+        author="AA Alive Sdn. Bhd."
+    )
+
+    elems = []
+
+    # Header with logo (same as invoice)
+    if logo_reader:
+        try:
+            elems.append(Image(logo_reader, width=60*mm, height=30*mm, hAlign="LEFT"))
+            elems.append(Spacer(1, 10*mm))
+        except Exception as e:
+            logger.warning(f"Failed to add logo to receipt: {str(e)}")
+
+    # Title - CHANGED to RECEIPT
+    elems.append(Paragraph("RECEIPT", styles["H1"]))
+    elems.append(Spacer(1, 10*mm))
+
+    # Company and customer info (copied from invoice template structure)
+    info_data = [
+        ["From:", "To:", "Receipt Details:"],
+        ["AA Alive Sdn. Bhd.", getattr(order, 'customer_name', None) or getattr(order.customer, 'name', 'N/A'), f"Receipt #: {order.code}"],
+        ["Kuala Lumpur, Malaysia", getattr(order, 'customer_phone', None) or getattr(order.customer, 'phone', ''), f"Date: {order.created_at.strftime('%Y-%m-%d') if hasattr(order.created_at, 'strftime') else str(order.created_at)}"],
+        ["Phone: +60 12-345-6789", "", f"Order #: {order.code}"],
+        ["Email: hello@aalyx.com", "", "PAID"],
+    ]
+    
+    customer_address = getattr(order, 'delivery_address', None) or getattr(order, 'customer_address', None)
+    if hasattr(order, 'customer') and hasattr(order.customer, 'address'):
+        customer_address = order.customer.address
+    if customer_address:
+        info_data[2][1] = customer_address
+
+    info_table = Table(info_data, colWidths=[60*mm, 60*mm, 50*mm])
+    info_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+        ("FONTNAME", (0, 1), (-1, -1), BASE_FONT),
+        ("FONTNAME", (2, -1), (2, -1), BASE_BOLD),  # Make PAID bold
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("TEXTCOLOR", (2, -1), (2, -1), HexColor(SUCCESS_COLOR)),  # Make PAID green
+    ]))
+    elems.append(info_table)
+    elems.append(Spacer(1, 8*mm))
+
+    # Items table (copied from invoice logic)
+    if hasattr(order, 'items') and order.items:
+        # Calculate totals
+        total_before_charges = sum(float(getattr(item, 'line_total', 0) or 0) for item in order.items)
+        delivery_fee = float(getattr(order, 'delivery_fee', 0) or 0)
+        return_delivery_fee = float(getattr(order, 'return_delivery_fee', 0) or 0)
+        grand_total = total_before_charges + delivery_fee + return_delivery_fee
+
+        item_data = [["Description", "Type", "Qty", "Unit Price", "Amount"]]
+        
+        for item in order.items:
+            qty_str = _fmt_qty(getattr(item, 'qty', 0))
+            unit_price = float(getattr(item, 'unit_price', 0) or 0)
+            line_total = float(getattr(item, 'line_total', 0) or 0)
+            
+            item_data.append([
+                getattr(item, 'name', 'Item') or 'Item',
+                getattr(item, 'item_type', 'OUTRIGHT'),
+                qty_str,
+                money(unit_price),
+                money(line_total),
+            ])
+
+        # Add charges
+        if delivery_fee > 0:
+            item_data.append(["Delivery Fee", "SERVICE", "1", money(delivery_fee), money(delivery_fee)])
+        if return_delivery_fee > 0:
+            item_data.append(["Return Delivery Fee", "SERVICE", "1", money(return_delivery_fee), money(return_delivery_fee)])
+
+        # Totals
+        item_data.append(["", "", "", "SUBTOTAL:", money(total_before_charges)])
+        if delivery_fee > 0 or return_delivery_fee > 0:
+            item_data.append(["", "", "", "CHARGES:", money(delivery_fee + return_delivery_fee)])
+        item_data.append(["", "", "", "TOTAL PAID:", money(grand_total)])
+
+        # Table styling (same as invoice)
+        item_table = Table(item_data, colWidths=[75*mm, 25*mm, 20*mm, 25*mm, 25*mm])
+        item_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+            ("FONTSIZE", (0, 0), (-1, 0), 11),
+            ("FONTNAME", (0, 1), (-1, -4), BASE_FONT),
+            ("FONTNAME", (0, -3), (-1, -1), BASE_BOLD),
+            ("FONTSIZE", (0, 1), (-1, -1), 10),
+            ("GRID", (0, 0), (-1, -4), 0.5, colors.lightgrey),
+            ("LINEABOVE", (0, -3), (-1, -3), 1, colors.black),
+            ("LINEABOVE", (0, -1), (-1, -1), 2, colors.black),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor(ACCENT_COLOR)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BACKGROUND", (0, -1), (-1, -1), HexColor("#E8F5E8")),  # Light green for paid
+            ("TEXTCOLOR", (0, -1), (-1, -1), HexColor(SUCCESS_COLOR)),  # Green text for paid
+            ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        elems.append(item_table)
+        elems.append(Spacer(1, 8*mm))
+
+    # Payment information
+    elems.append(Paragraph("Payment Information:", styles["H3"]))
+    payment_info = [
+        ["Payment Status:", "PAID IN FULL"],
+        ["Payment Method:", "Cash/Bank Transfer"],
+        ["Transaction Date:", order.created_at.strftime('%Y-%m-%d %H:%M') if hasattr(order.created_at, 'strftime') else str(order.created_at)],
+    ]
+    
+    payment_table = Table(payment_info, colWidths=[50*mm, 120*mm])
+    payment_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), BASE_FONT),
+        ("FONTNAME", (1, 0), (1, 0), BASE_BOLD),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.lightgrey),
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F0F9FF")),
+        ("TEXTCOLOR", (1, 0), (1, 0), HexColor(SUCCESS_COLOR)),
+    ]))
+    elems.append(payment_table)
+    elems.append(Spacer(1, 8*mm))
+
+    # Notes
+    if hasattr(order, 'notes') and order.notes:
+        elems.append(Paragraph("Notes:", styles["H3"]))
+        elems.append(Paragraph(order.notes, styles["Normal"]))
+        elems.append(Spacer(1, 6*mm))
+
+    # Receipt footer
+    elems.append(Spacer(1, 10*mm))
+    elems.append(Paragraph("Thank you for your business!", styles["Center"]))
+    elems.append(Spacer(1, 5*mm))
+    elems.append(Paragraph("This is a computer-generated receipt.", styles["Muted"]))
+    elems.append(Spacer(1, 5*mm))
+    elems.append(Paragraph("Please retain this receipt for your records.", styles["Muted"]))
+
+    # Build PDF
+    doc.build(elems)
+    pdf_data = buf.getvalue()
+    buf.close()
+    
+    logger.info(f"Generated receipt PDF ({len(pdf_data)} bytes)")
     return pdf_data
