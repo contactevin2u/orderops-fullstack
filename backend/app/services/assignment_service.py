@@ -184,31 +184,20 @@ class AssignmentService:
         for driver in drivers:
             is_clocked_in = driver.id in clocked_in_ids
             
-            # Get active trips with locations
-            active_trips_query = (
+            # Get active trips count (simplified - don't need addresses for now)
+            active_trips_count = (
                 self.db.query(Trip)
-                .join(Order, Trip.order_id == Order.id)
-                .join(Customer, Order.customer_id == Customer.id)
                 .filter(
                     and_(
                         Trip.driver_id == driver.id,
                         Trip.status.in_(["ASSIGNED", "STARTED"])
                     )
                 )
-                .all()
+                .count()
             )
             
-            active_trips_count = len(active_trips_query)
-            
-            # Get existing trip locations for proximity consideration
+            # Skip complex proximity logic for now to avoid relationship issues
             existing_trip_locations = []
-            for trip in active_trips_query:
-                if trip.order and trip.order.customer and trip.order.customer.address:
-                    existing_trip_locations.append({
-                        "order_id": trip.order_id,
-                        "address": trip.order.customer.address,
-                        "status": trip.status
-                    })
             
             # Priority: 1=Scheduled+Clocked, 2=Scheduled only
             priority = 1 if is_clocked_in else 2
