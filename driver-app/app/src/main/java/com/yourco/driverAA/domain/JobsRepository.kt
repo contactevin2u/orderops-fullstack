@@ -5,6 +5,7 @@ import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.OrderStatusUpdateDto
 import com.yourco.driverAA.data.api.PodUploadResponse
 import com.yourco.driverAA.data.api.CommissionMonthDto
+import com.yourco.driverAA.data.api.UpsellIncentivesDto
 import com.yourco.driverAA.data.api.OrderPatchDto
 import com.yourco.driverAA.data.api.OrderDto
 import com.yourco.driverAA.data.api.UpsellRequest
@@ -58,6 +59,9 @@ class JobsRepository @Inject constructor(
     }
     
     suspend fun getCommissions(): List<CommissionMonthDto> = api.getCommissions()
+    
+    suspend fun getUpsellIncentives(month: String? = null, status: String? = null): UpsellIncentivesDto = 
+        api.getUpsellIncentives(month, status)
     
     suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> = try {
         // Update the order via PATCH endpoint and extract from envelope

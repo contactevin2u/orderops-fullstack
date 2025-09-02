@@ -44,6 +44,12 @@ interface DriverApi {
     @GET("drivers/commissions")
     suspend fun getCommissions(): List<CommissionMonthDto>
     
+    @GET("drivers/upsell-incentives")
+    suspend fun getUpsellIncentives(
+        @Query("month") month: String? = null,
+        @Query("status") status: String? = null
+    ): UpsellIncentivesDto
+    
     @POST("drivers/shifts/clock-in")
     suspend fun clockIn(@Body request: ClockInRequest): ShiftResponse
     
@@ -134,6 +140,44 @@ data class PodUploadResponse(val url: String, val photo_number: Int)
 data class CommissionMonthDto(
     val month: String,
     val total: Double
+)
+
+@Serializable
+data class UpsellItemDto(
+    val item_id: Int,
+    val original_name: String,
+    val new_name: String,
+    val original_price: Double,
+    val new_price: Double,
+    val upsell_type: String,
+    val installment_months: Int? = null
+)
+
+@Serializable
+data class UpsellIncentiveDto(
+    val id: Int,
+    val order_id: Int,
+    val order_code: String,
+    val upsell_amount: Double,
+    val driver_incentive: Double,
+    val status: String, // PENDING, RELEASED
+    val items_upsold: List<UpsellItemDto>,
+    val notes: String? = null,
+    val created_at: String,
+    val released_at: String? = null
+)
+
+@Serializable
+data class UpsellSummaryDto(
+    val total_pending: Double,
+    val total_released: Double,
+    val total_records: Int
+)
+
+@Serializable
+data class UpsellIncentivesDto(
+    val incentives: List<UpsellIncentiveDto>,
+    val summary: UpsellSummaryDto
 )
 
 @Serializable

@@ -9,7 +9,7 @@ import datetime as dt
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
@@ -511,6 +511,75 @@ def my_detailed_commissions(
         "total_released": total_released,
         "orders_count": len(orders_data),
         "orders": orders_data
+    }
+
+
+@router.get("/upsell-incentives", response_model=dict)
+def my_upsell_incentives(
+    month: str | None = None,  # Format: YYYY-MM
+    status: str | None = None,  # PENDING, RELEASED
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    """Get driver's upsell incentives"""
+    
+    query = (
+        db.query(UpsellRecord)
+        .filter(UpsellRecord.driver_id == driver.id)
+        .options(joinedload(UpsellRecord.order))
+        .order_by(UpsellRecord.created_at.desc())
+    )
+    
+    # Filter by month if provided
+    if month:
+        month_expr = (
+            func.strftime("%Y-%m", UpsellRecord.created_at)
+            if db.bind.dialect.name == "sqlite"
+            else func.to_char(UpsellRecord.created_at, "YYYY-MM")
+        )
+        query = query.filter(month_expr == month)
+    
+    # Filter by status if provided  
+    if status:
+        query = query.filter(UpsellRecord.incentive_status == status.upper())
+    
+    upsell_records = query.all()
+    
+    # Format response
+    incentives = []
+    total_pending = 0
+    total_released = 0
+    
+    for record in upsell_records:
+        import json
+        items_data = json.loads(record.items_data) if record.items_data else []
+        
+        incentive_data = {
+            "id": record.id,
+            "order_id": record.order_id,
+            "order_code": record.order.code,
+            "upsell_amount": float(record.upsell_amount),
+            "driver_incentive": float(record.driver_incentive),
+            "status": record.incentive_status,
+            "items_upsold": items_data,
+            "notes": record.upsell_notes,
+            "created_at": record.created_at.isoformat(),
+            "released_at": record.released_at.isoformat() if record.released_at else None
+        }
+        incentives.append(incentive_data)
+        
+        if record.incentive_status == "PENDING":
+            total_pending += float(record.driver_incentive)
+        elif record.incentive_status == "RELEASED":
+            total_released += float(record.driver_incentive)
+    
+    return {
+        "incentives": incentives,
+        "summary": {
+            "total_pending": total_pending,
+            "total_released": total_released,
+            "total_records": len(incentives)
+        }
     }
 
 

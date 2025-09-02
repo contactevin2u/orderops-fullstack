@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException
@@ -6,7 +7,7 @@ from pydantic import BaseModel
 
 from ..auth.firebase import driver_auth
 from ..db import get_session
-from ..models import Order, Trip, OrderItem, Plan
+from ..models import Order, Trip, OrderItem, Plan, UpsellRecord
 from ..routers.orders import OrderPatch
 from ..schemas import OrderOut
 from ..utils.responses import envelope
@@ -123,7 +124,10 @@ def upsell_order_items(
     if order.status not in ["NEW", "ACTIVE", "PENDING"]:
         raise HTTPException(400, f"Cannot upsell order with status: {order.status}")
     
+    # Store original total before modifications
+    original_total = order.total
     has_installment_upsells = False
+    upsold_items = []
     
     # Process each item upsell
     for upsell_item in body.items:
@@ -132,11 +136,26 @@ def upsell_order_items(
         if not item:
             raise HTTPException(400, f"Item with ID {upsell_item.item_id} not found in order")
         
+        # Store original item details for record keeping
+        original_name = item.name
+        original_price = float(item.line_total)
+        
         # Update item name if provided
         if upsell_item.new_name:
             item.name = upsell_item.new_name
         
         new_price = Decimal(str(upsell_item.new_price))
+        
+        # Track upsold item details
+        upsold_items.append({
+            "item_id": item.id,
+            "original_name": original_name,
+            "new_name": upsell_item.new_name or original_name,
+            "original_price": original_price,
+            "new_price": float(new_price),
+            "upsell_type": upsell_item.upsell_type,
+            "installment_months": upsell_item.installment_months
+        })
         
         if upsell_item.upsell_type == "BELI_TERUS":
             # Upgrade to outright purchase at new price
@@ -200,6 +219,28 @@ def upsell_order_items(
     
     # Recalculate order financials
     recompute_financials(order)
+    
+    # Create upsell record and driver incentive
+    new_total = order.total
+    upsell_amount = new_total - original_total
+    
+    if upsell_amount > 0:  # Only create record if there's an actual increase
+        # Calculate 10% driver incentive from upsell amount
+        driver_incentive = upsell_amount * Decimal("0.10")
+        
+        upsell_record = UpsellRecord(
+            order_id=order.id,
+            driver_id=driver.id,
+            trip_id=trip.id,
+            original_total=original_total,
+            new_total=new_total,
+            upsell_amount=upsell_amount,
+            items_data=json.dumps(upsold_items),
+            upsell_notes=body.notes,
+            driver_incentive=driver_incentive,
+            incentive_status="PENDING"  # Released when trip is completed successfully
+        )
+        db.add(upsell_record)
     
     db.commit()
     db.refresh(order)

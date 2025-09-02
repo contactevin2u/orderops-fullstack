@@ -15,6 +15,7 @@ from .commission_entry import CommissionEntry
 from .driver_schedule import DriverSchedule, DriverAvailabilityPattern
 from .user import User, Role
 from .audit_log import AuditLog
+from .upsell_record import UpsellRecord
 
 __all__ = [
     "Base",
@@ -38,4 +39,5 @@ __all__ = [
     "User",
     "Role",
     "AuditLog",
+    "UpsellRecord",
 ]
