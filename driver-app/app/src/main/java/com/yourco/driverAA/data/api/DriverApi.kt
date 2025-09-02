@@ -31,7 +31,7 @@ interface DriverApi {
     suspend fun patchOrder(@Path("id") orderId: String, @Body update: OrderPatchDto): OrderDto
     
     @POST("orders/{id}/upsell")
-    suspend fun upsellOrder(@Path("id") orderId: String, @Body request: UpsellRequest): UpsellResponse
+    suspend fun upsellOrder(@Path("id") orderId: String, @Body request: UpsellRequest): ApiResponse<UpsellResponse>
     
     @Multipart
     @POST("drivers/orders/{id}/pod-photo")
@@ -323,6 +323,11 @@ data class UpsellItemRequest(
 data class UpsellRequest(
     val items: List<UpsellItemRequest>,
     val notes: String? = null
+)
+
+@Serializable
+data class ApiResponse<T>(
+    val data: T
 )
 
 @Serializable

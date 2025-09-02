@@ -35,6 +35,11 @@
   box-sizing: border-box;
 }
 
+html {
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow-y: auto; /* Allow vertical scroll */
+}
+
 body {
   min-height: 100vh;
   margin: 0;
@@ -45,6 +50,8 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  overflow-y: auto; /* Allow vertical scroll */
 }
 
 h1,
@@ -60,6 +67,7 @@ h6 {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow: visible; /* Ensure no clipping at layout level */
 }
 
 .header {
@@ -70,6 +78,7 @@ h6 {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   z-index: 1000;
   overflow: visible; /* Allow dropdown to break out */
+  contain: none; /* Disable containment */
 }
 
 .header-inner {
@@ -81,6 +90,7 @@ h6 {
   gap: 16px;
   padding: var(--space-3) var(--space-6);
   overflow: visible; /* Allow dropdown to break out */
+  contain: none; /* Disable containment */
 }
 
 .nav {
@@ -88,6 +98,7 @@ h6 {
   align-items: center;
   gap: 24px;
   overflow: visible; /* Allow dropdown to break out */
+  contain: none; /* Disable containment */
 }
 
 .nav-link {
@@ -148,6 +159,21 @@ h6 {
   display: flex;
   align-items: center;
   gap: 4px;
+  position: static; /* Ensure proper stacking context */
+}
+
+.nav-group-dropdown {
+  position: relative;
+  /* Create a new stacking context for the dropdown */
+  z-index: 1;
+}
+
+.nav-group-button {
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  justify-content: space-between;
 }
 
 .nav-group-label {
@@ -162,7 +188,7 @@ h6 {
 
 .nav-dropdown-menu {
   position: absolute;
-  top: 100%;
+  top: calc(100% + 4px); /* Position just below the button with some margin */
   left: 0;
   min-width: 200px;
   background: var(--color-primary);
@@ -171,7 +197,14 @@ h6 {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 8px 0;
   z-index: 9999; /* Higher z-index to appear above everything */
-  margin-top: 4px;
+  /* Ensure it breaks out of flex containers */
+  transform: translateZ(0); /* Force hardware acceleration and new layer */
+  /* Prevent clipping by parent containers */
+  clip-path: none;
+  contain: none;
+  /* Ensure it appears outside of header bounds */
+  max-height: none;
+  height: auto;
 }
 
 .nav-dropdown-menu .nav-link {
@@ -411,7 +444,7 @@ h6 {
     width: auto;
     padding: 0;
     gap: 24px;
-    overflow-x: auto;
+    overflow: visible; /* Changed from overflow-x: auto */
     flex-wrap: nowrap;
     margin-left: auto;
     flex: 1;

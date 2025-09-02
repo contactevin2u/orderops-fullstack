@@ -9,6 +9,7 @@ import com.yourco.driverAA.data.api.OrderPatchDto
 import com.yourco.driverAA.data.api.OrderDto
 import com.yourco.driverAA.data.api.UpsellRequest
 import com.yourco.driverAA.data.api.UpsellResponse
+import com.yourco.driverAA.data.api.ApiResponse
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -70,7 +71,7 @@ class JobsRepository @Inject constructor(
     
     suspend fun upsellOrder(orderId: String, request: UpsellRequest): Result<UpsellResponse> = try {
         val response = api.upsellOrder(orderId, request)
-        Result.Success(response)
+        Result.Success(response.data)
     } catch (e: Exception) {
         Result.error(e, "submit_report")
     }

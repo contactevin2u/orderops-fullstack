@@ -210,14 +210,13 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               const hasActiveItem = isGroupActive(group);
               
               return (
-                <div key={group.title} className="nav-group" style={{ position: 'static' }}>
+                <div key={group.title} className="nav-group">
                   {groupIndex > 0 && <div className="nav-separator" />}
-                  <div style={{ position: 'relative' }}>
+                  <div className="nav-group-dropdown">
                     <button
-                      className={`nav-link ${hasActiveItem ? 'active' : ''}`}
+                      className={`nav-link nav-group-button ${hasActiveItem ? 'active' : ''}`}
                       onClick={() => toggleDropdown(group.title)}
                       aria-expanded={isDropdownOpen}
-                      style={{ cursor: 'pointer', background: 'none', border: 'none', width: '100%', justifyContent: 'space-between' }}
                     >
                       <span>{group.title}</span>
                       <ChevronDown 
