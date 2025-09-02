@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.orm import Session, joinedload
 from decimal import Decimal
 import datetime as dt
@@ -9,7 +9,7 @@ import datetime as dt
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
@@ -423,8 +423,17 @@ def my_commissions(
         else func.to_char(Commission.created_at, "YYYY-MM")
     )
     stmt = (
-        select(month_expr.label("month"), func.sum(Commission.computed_amount).label("total"))
-        .where(Commission.driver_id == driver.id)
+        select(
+            month_expr.label("month"), 
+            func.sum(Commission.computed_amount).label("total"),
+            func.count(Commission.id).label("commission_count")
+        )
+        .where(
+            and_(
+                Commission.driver_id == driver.id,
+                Commission.actualized_at.isnot(None)  # Only count released commissions
+            )
+        )
         .group_by("month")
         .order_by("month")
     )
@@ -433,6 +442,76 @@ def my_commissions(
         {"month": row.month, "total": float(row.total or 0)}
         for row in rows
     ]
+
+
+@router.get("/commissions/detailed", response_model=dict)
+def my_detailed_commissions(
+    month: str | None = None,  # Format: YYYY-MM
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session),
+):
+    """Get detailed commission info with orders for a specific month"""
+    
+    # Default to current month if not specified
+    if not month:
+        current_date = dt.datetime.now()
+        month = f"{current_date.year}-{current_date.month:02d}"
+    
+    # Query commissions with order details for the specified month
+    month_expr = (
+        func.strftime("%Y-%m", Commission.created_at)
+        if db.bind.dialect.name == "sqlite"
+        else func.to_char(Commission.created_at, "YYYY-MM")
+    )
+    
+    commissions = (
+        db.query(Commission)
+        .join(Trip)
+        .join(Order)
+        .join(Customer, Order.customer_id == Customer.id)
+        .filter(
+            and_(
+                Commission.driver_id == driver.id,
+                Commission.actualized_at.isnot(None),  # Only released commissions
+                month_expr == month
+            )
+        )
+        .options(
+            joinedload(Commission.trip).joinedload(Trip.order).joinedload(Order.customer)
+        )
+        .all()
+    )
+    
+    # Group by order and calculate totals
+    orders_data = []
+    total_released = 0
+    
+    for commission in commissions:
+        trip = commission.trip
+        order = trip.order
+        
+        # Check if this is a secondary driver (commission split scenario)
+        is_secondary = trip.driver_id_2 and commission.driver_id == trip.driver_id_2
+        
+        orders_data.append({
+            "order_id": order.id,
+            "order_code": order.code,
+            "customer_name": order.customer.name,
+            "commission_amount": float(commission.computed_amount),
+            "driver_role": "secondary" if is_secondary else "primary",
+            "has_secondary_driver": bool(trip.driver_id_2),
+            "released_at": commission.actualized_at.isoformat() if commission.actualized_at else None,
+            "order_total": float(order.total)
+        })
+        
+        total_released += float(commission.computed_amount)
+    
+    return {
+        "month": month,
+        "total_released": total_released,
+        "orders_count": len(orders_data),
+        "orders": orders_data
+    }
 
 
 @router.get(
