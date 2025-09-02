@@ -658,12 +658,12 @@ private fun OrderDetailCard(order: JobDto) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = order.orderNo,
+                    text = order.code ?: "Unknown Order",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = order.status,
+                    text = order.status ?: "Unknown",
                     style = MaterialTheme.typography.labelSmall,
                     color = when (order.status) {
                         "DELIVERED" -> MaterialTheme.colorScheme.primary
@@ -686,19 +686,19 @@ private fun OrderDetailCard(order: JobDto) {
             Spacer(modifier = Modifier.height(8.dp))
             
             // Customer info
-            order.customer?.let { customer ->
+            order.customer_name?.let { customerName ->
                 Text(
-                    text = customer.name ?: "Unknown Customer",
+                    text = customerName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium
                 )
-                customer.phone?.let { phone ->
-                    Text(
-                        text = phone,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            }
+            order.customer_phone?.let { phone ->
+                Text(
+                    text = phone,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             
             Spacer(modifier = Modifier.height(8.dp))
@@ -724,7 +724,7 @@ private fun OrderDetailCard(order: JobDto) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "RM ${DecimalFormat("#,##0.00").format(order.total)}",
+                        text = "RM ${order.total ?: "0.00"}",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
                     )
@@ -737,7 +737,7 @@ private fun OrderDetailCard(order: JobDto) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = order.deliveryDate ?: "Not set",
+                        text = order.delivery_date ?: "Not set",
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
