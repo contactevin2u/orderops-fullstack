@@ -146,7 +146,7 @@ class JobDetailViewModel @Inject constructor(
             // Calculate delivery date: if customer not available, use tomorrow; otherwise use provided date
             val finalDeliveryDate = if (!customerAvailable) {
                 val tomorrow = java.time.LocalDate.now().plusDays(1)
-                tomorrow.toString()
+                "${tomorrow}T00:00:00+00:00"  // Convert to ISO datetime format with timezone
             } else {
                 deliveryDate
             }
@@ -194,10 +194,23 @@ class JobDetailViewModel @Inject constructor(
             _loading.value = true
             _error.value = null
             
+            // Safely convert item.id to integer
+            val itemId = try {
+                item.id?.toInt() ?: run {
+                    _error.value = "Invalid item ID"
+                    _loading.value = false
+                    return@launch
+                }
+            } catch (e: NumberFormatException) {
+                _error.value = "Invalid item ID format"
+                _loading.value = false
+                return@launch
+            }
+            
             val upsellRequest = UpsellRequest(
                 items = listOf(
                     UpsellItemRequest(
-                        item_id = item.id?.toInt() ?: return@launch,
+                        item_id = itemId,
                         upsell_type = upsellType,
                         new_name = newName,
                         new_price = newPrice,
