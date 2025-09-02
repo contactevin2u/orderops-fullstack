@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourco.driverAA.data.api.CommissionMonthDto
 import com.yourco.driverAA.data.api.UpsellIncentivesDto
+import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.domain.JobsRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -37,6 +38,12 @@ class CommissionsViewModel @Inject constructor(
     
     private val _activeTab = MutableStateFlow("commissions") // "commissions" or "upsells"
     val activeTab: StateFlow<String> = _activeTab.asStateFlow()
+    
+    private val _detailedOrders = MutableStateFlow<List<JobDto>>(emptyList())
+    val detailedOrders: StateFlow<List<JobDto>> = _detailedOrders.asStateFlow()
+    
+    private val _showDetailedOrders = MutableStateFlow(false)
+    val showDetailedOrders: StateFlow<Boolean> = _showDetailedOrders.asStateFlow()
     
     fun loadCommissions() {
         viewModelScope.launch {
@@ -75,6 +82,28 @@ class CommissionsViewModel @Inject constructor(
     
     fun setActiveTab(tab: String) {
         _activeTab.value = tab
+    }
+    
+    fun loadDetailedOrders(month: String) {
+        viewModelScope.launch {
+            _isLoading.value = true
+            _error.value = null
+            
+            try {
+                val orders = repository.getDriverOrders(month)
+                _detailedOrders.value = orders
+                _showDetailedOrders.value = true
+            } catch (e: Exception) {
+                _error.value = e.message ?: "Failed to load detailed orders"
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+    
+    fun hideDetailedOrders() {
+        _showDetailedOrders.value = false
+        _detailedOrders.value = emptyList()
     }
     
     private fun getCurrentMonth(): String {

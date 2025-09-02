@@ -27,6 +27,8 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
     val showMonthPicker by viewModel.showMonthPicker.collectAsState()
     val upsellIncentives by viewModel.upsellIncentives.collectAsState()
     val activeTab by viewModel.activeTab.collectAsState()
+    val detailedOrders by viewModel.detailedOrders.collectAsState()
+    val showDetailedOrders by viewModel.showDetailedOrders.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadCommissions()
@@ -133,7 +135,10 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
                                 total = 0.0
                             )
                             
-                            CurrentMonthCard(commission = currentMonthCommission)
+                            CurrentMonthCard(
+                                commission = currentMonthCommission,
+                                onViewDetails = { month -> viewModel.loadDetailedOrders(month) }
+                            )
                         }
                         
                         if (showMonthPicker) {
@@ -180,7 +185,10 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun CurrentMonthCard(commission: CommissionMonthDto) {
+private fun CurrentMonthCard(
+    commission: CommissionMonthDto,
+    onViewDetails: (String) -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
@@ -229,7 +237,10 @@ private fun CurrentMonthCard(commission: CommissionMonthDto) {
                 Text(
                     text = "View detailed orders →",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
+                    modifier = Modifier.clickable { 
+                        onViewDetails(commission.month) 
+                    }
                 )
             }
         }

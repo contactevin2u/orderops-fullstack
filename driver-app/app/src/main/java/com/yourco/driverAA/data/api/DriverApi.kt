@@ -41,6 +41,9 @@ interface DriverApi {
         @Query("photo_number") photoNumber: Int = 1
     ): PodUploadResponse
     
+    @GET("drivers/orders")
+    suspend fun getDriverOrders(@Query("month") month: String? = null): List<JobDto>
+    
     @GET("drivers/commissions")
     suspend fun getCommissions(): List<CommissionMonthDto>
     

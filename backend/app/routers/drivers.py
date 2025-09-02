@@ -282,10 +282,33 @@ def register_device(
 
 
 @router.get("/orders", response_model=list[DriverOrderOut])
-def list_assigned_orders(driver=Depends(driver_auth), db: Session = Depends(get_session)):
-    rows = db.execute(
-        select(Trip, Order).join(Order, Trip.order_id == Order.id).where(Trip.driver_id == driver.id)
-    ).all()
+def list_assigned_orders(
+    month: str | None = None,  # YYYY-MM format
+    driver=Depends(driver_auth), 
+    db: Session = Depends(get_session)
+):
+    """List orders assigned to driver, optionally filtered by month"""
+    query = (
+        select(Trip, Order)
+        .join(Order, Trip.order_id == Order.id)
+        .where(Trip.driver_id == driver.id)
+    )
+    
+    # Add month filter if provided
+    if month:
+        try:
+            year, month_num = map(int, month.split('-'))
+            # Filter by delivery_date within the specified month
+            from sqlalchemy import extract, and_
+            query = query.where(and_(
+                extract('year', Order.delivery_date) == year,
+                extract('month', Order.delivery_date) == month_num
+            ))
+        except (ValueError, AttributeError):
+            # Invalid month format, ignore filter
+            pass
+    
+    rows = db.execute(query).all()
     out = []
     for trip, order in rows:
         out.append(_order_to_driver_out(order, trip.status, trip, driver.id))

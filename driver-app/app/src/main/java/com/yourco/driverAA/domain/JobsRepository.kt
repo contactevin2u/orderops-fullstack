@@ -63,6 +63,9 @@ class JobsRepository @Inject constructor(
     suspend fun getUpsellIncentives(month: String? = null, status: String? = null): UpsellIncentivesDto = 
         api.getUpsellIncentives(month, status)
     
+    suspend fun getDriverOrders(month: String? = null): List<JobDto> = 
+        api.getDriverOrders(month)
+    
     suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> = try {
         // Update the order via PATCH endpoint and extract from envelope
         val patchResponse = api.patchOrder(orderId, OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate))
