@@ -218,11 +218,35 @@ def debug_scheduled_drivers_query(db: Session = Depends(get_session)):
             )
         ).all()
         
-        # Step 2: Test the exact assignment service query
+        # Step 2: Test the exact assignment service query step by step
         from ..services.assignment_service import AssignmentService
         service = AssignmentService(db)
-        available_drivers = service._get_available_drivers()
         
+        # Step 3: Try assignment service methods step by step to isolate the error
+        assignment_debug = {}
+        try:
+            assignment_debug["service_created"] = True
+            orders_to_assign = service._get_orders_to_assign()
+            assignment_debug["orders_to_assign_count"] = len(orders_to_assign)
+            assignment_debug["get_orders_success"] = True
+        except Exception as e:
+            assignment_debug["get_orders_error"] = str(e)
+            assignment_debug["get_orders_success"] = False
+            
+        try:
+            if assignment_debug.get("get_orders_success"):
+                available_drivers = service._get_available_drivers()
+                assignment_debug["available_drivers_count"] = len(available_drivers)
+                assignment_debug["available_drivers"] = available_drivers
+                assignment_debug["get_drivers_success"] = True
+            else:
+                assignment_debug["get_drivers_skipped"] = "orders query failed"
+        except Exception as e:
+            assignment_debug["get_drivers_error"] = str(e)
+            assignment_debug["get_drivers_success"] = False
+            import traceback
+            assignment_debug["get_drivers_traceback"] = traceback.format_exc()
+
         return envelope({
             "debug_date": today.isoformat(),
             "raw_counts": {
@@ -238,10 +262,7 @@ def debug_scheduled_drivers_query(db: Session = Depends(get_session)):
                     "status": s.status
                 } for s in todays_schedules
             ],
-            "assignment_service_result": {
-                "available_drivers_count": len(available_drivers),
-                "drivers": available_drivers
-            }
+            "assignment_debug": assignment_debug
         })
         
     except Exception as e:
