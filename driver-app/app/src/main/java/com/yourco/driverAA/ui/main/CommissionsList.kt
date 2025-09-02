@@ -1,5 +1,6 @@
 package com.yourco.driverAA.ui.main
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +20,8 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
     val commissions by viewModel.commissions.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    val selectedMonth by viewModel.selectedMonth.collectAsState()
+    val showMonthPicker by viewModel.showMonthPicker.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.loadCommissions()
@@ -59,46 +62,49 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
             }
             else -> {
                 LazyColumn(
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
-                        Text(
-                            text = "Monthly Commissions",
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 16.dp)
-                        )
-                    }
-                    
-                    items(commissions) { commission ->
-                        CommissionMonthCard(commission = commission)
+                        // Header with month selector
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Commissions",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                            OutlinedButton(
+                                onClick = { viewModel.toggleMonthPicker() }
+                            ) {
+                                Text(
+                                    text = if (selectedMonth == null) "This Month" else selectedMonth!!,
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+                        }
                     }
                     
                     item {
-                        val totalCommission = commissions.sumOf { it.total }
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.primaryContainer
-                            )
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Total Earned",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "RM ${DecimalFormat("#,##0.00").format(totalCommission)}",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                        // Current month summary card
+                        val currentMonthCommission = commissions.find { 
+                            selectedMonth == null || it.month == selectedMonth 
+                        } ?: CommissionMonthDto(
+                            month = selectedMonth ?: getCurrentMonth(),
+                            total = 0.0
+                        )
+                        
+                        CurrentMonthCard(commission = currentMonthCommission)
+                    }
+                    
+                    if (showMonthPicker) {
+                        items(commissions) { commission ->
+                            if (selectedMonth != commission.month) {
+                                PreviousMonthCard(
+                                    commission = commission,
+                                    onClick = { viewModel.selectMonth(commission.month) }
                                 )
                             }
                         }
@@ -110,9 +116,71 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
 }
 
 @Composable
-private fun CommissionMonthCard(commission: CommissionMonthDto) {
+private fun CurrentMonthCard(commission: CommissionMonthDto) {
     Card(
         modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Released Commission",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        text = commission.month,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+                Text(
+                    text = "RM ${DecimalFormat("#,##0.00").format(commission.total)}",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Commission breakdown info
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "View detailed orders →",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviousMonthCard(
+    commission: CommissionMonthDto,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -129,7 +197,7 @@ private fun CommissionMonthCard(commission: CommissionMonthDto) {
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "Monthly commission",
+                    text = "Previous month",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -138,9 +206,13 @@ private fun CommissionMonthCard(commission: CommissionMonthDto) {
                 text = "RM ${DecimalFormat("#,##0.00").format(commission.total)}",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.End
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }
+}
+
+private fun getCurrentMonth(): String {
+    val currentDate = java.time.LocalDate.now()
+    return "${currentDate.year}-${currentDate.monthValue.toString().padStart(2, '0')}"
 }

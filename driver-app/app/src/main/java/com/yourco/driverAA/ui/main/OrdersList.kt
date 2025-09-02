@@ -282,57 +282,7 @@ private fun OrderCard(
                 }
             }
             
-            // Commission info for completed orders
-            job.commission?.let { commission ->
-                Spacer(modifier = Modifier.height(8.dp))
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (commission.status == "pending") 
-                            MaterialTheme.colorScheme.secondaryContainer 
-                        else MaterialTheme.colorScheme.primaryContainer
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = when {
-                                    commission.role == "primary" -> "Commission (tunggu payment confirm)"
-                                    commission.role == "secondary" -> "Commission Secondary (tunggu payment confirm)"
-                                    else -> "Commission (tunggu payment confirm)"
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "RM ${commission.amount}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        AssistChip(
-                            onClick = { },
-                            label = { 
-                                Text(
-                                    text = if (commission.status == "pending") "Payment Belum Confirm" else "Commission Confirmed",
-                                    style = MaterialTheme.typography.labelSmall
-                                ) 
-                            },
-                            colors = AssistChipDefaults.assistChipColors(
-                                labelColor = if (commission.status == "pending")
-                                    MaterialTheme.colorScheme.onSecondaryContainer
-                                else MaterialTheme.colorScheme.onPrimaryContainer
-                            )
-                        )
-                    }
-                }
-            }
+            // Commission info removed - view commissions in dedicated tab
         }
     }
 }

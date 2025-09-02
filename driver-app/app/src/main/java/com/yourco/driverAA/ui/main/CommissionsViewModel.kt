@@ -25,6 +25,12 @@ class CommissionsViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
     
+    private val _selectedMonth = MutableStateFlow<String?>(null)
+    val selectedMonth: StateFlow<String?> = _selectedMonth.asStateFlow()
+    
+    private val _showMonthPicker = MutableStateFlow(false)
+    val showMonthPicker: StateFlow<Boolean> = _showMonthPicker.asStateFlow()
+    
     fun loadCommissions() {
         viewModelScope.launch {
             _isLoading.value = true
@@ -32,12 +38,32 @@ class CommissionsViewModel @Inject constructor(
             
             try {
                 val result = repository.getCommissions()
-                _commissions.value = result
+                _commissions.value = result.sortedByDescending { it.month }
+                
+                // Set current month if not already selected
+                if (_selectedMonth.value == null && result.isNotEmpty()) {
+                    val currentMonth = getCurrentMonth()
+                    _selectedMonth.value = result.find { it.month == currentMonth }?.month
+                }
             } catch (e: Exception) {
                 _error.value = e.message ?: "Failed to load commissions"
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+    
+    fun selectMonth(month: String) {
+        _selectedMonth.value = month
+        _showMonthPicker.value = false
+    }
+    
+    fun toggleMonthPicker() {
+        _showMonthPicker.value = !_showMonthPicker.value
+    }
+    
+    private fun getCurrentMonth(): String {
+        val currentDate = java.time.LocalDate.now()
+        return "${currentDate.year}-${currentDate.monthValue.toString().padStart(2, '0')}"
     }
 }
