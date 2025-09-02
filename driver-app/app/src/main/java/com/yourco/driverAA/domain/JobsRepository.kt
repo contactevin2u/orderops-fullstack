@@ -29,7 +29,7 @@ class JobsRepository @Inject constructor(
             val jobs = api.getJobs(statusFilter)
             emit(Result.Success(jobs))
         } catch (e: Exception) {
-            emit(Result.Error(e))
+            emit(Result.error<List<JobDto>>(e, "load_jobs"))
         }
     }
     
@@ -37,14 +37,14 @@ class JobsRepository @Inject constructor(
         val job = api.getJob(id)
         Result.Success(job)
     } catch (e: Exception) {
-        Result.Error(e)
+        Result.error(e, "load_jobs")
     }
     
     suspend fun updateOrderStatus(orderId: String, status: String): Result<JobDto> = try {
         val updatedJob = api.updateOrderStatus(orderId, OrderStatusUpdateDto(status))
         Result.Success(updatedJob)
     } catch (e: Exception) {
-        Result.Error(e)
+        Result.error(e, "update_status")
     }
     
     suspend fun uploadPodPhoto(orderId: String, photoFile: File, photoNumber: Int = 1): Result<PodUploadResponse> = try {
@@ -53,7 +53,7 @@ class JobsRepository @Inject constructor(
         val response = api.uploadPodPhoto(orderId, part, photoNumber)
         Result.Success(response)
     } catch (e: Exception) {
-        Result.Error(e)
+        Result.error(e, "upload_photo")
     }
     
     suspend fun getCommissions(): List<CommissionMonthDto> = api.getCommissions()
@@ -65,13 +65,13 @@ class JobsRepository @Inject constructor(
         val updatedJob = api.getJob(orderId)
         Result.Success(updatedJob)
     } catch (e: Exception) {
-        Result.Error(e)
+        Result.error(e, "update_status")
     }
     
     suspend fun upsellOrder(orderId: String, request: UpsellRequest): Result<UpsellResponse> = try {
         val response = api.upsellOrder(orderId, request)
         Result.Success(response)
     } catch (e: Exception) {
-        Result.Error(e)
+        Result.error(e, "submit_report")
     }
 }

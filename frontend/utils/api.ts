@@ -14,6 +14,66 @@ function pathJoin(p: string) {
   return `${API_BASE}${p.startsWith("/") ? p : `/${p}`}`;
 }
 
+// Enhanced error messages for better user experience
+function getUserFriendlyErrorMessage(status: number, path: string, serverMessage?: string): string {
+  // Network/connectivity errors
+  if (status === 0 || !status) {
+    return "Unable to connect to server. Please check your internet connection and try again.";
+  }
+  
+  // Authentication errors
+  if (status === 401) {
+    return "Your session has expired. Please sign in again to continue.";
+  }
+  
+  if (status === 403) {
+    return "You don't have permission to perform this action. Please contact your administrator.";
+  }
+  
+  // Not found errors
+  if (status === 404) {
+    if (path.includes('/orders/')) return "Order not found. It may have been deleted or moved.";
+    if (path.includes('/drivers/')) return "Driver not found. They may have been removed from the system.";
+    if (path.includes('/payments/')) return "Payment record not found.";
+    return "The requested item could not be found.";
+  }
+  
+  // Validation errors
+  if (status === 400) {
+    if (serverMessage) {
+      // Make server validation messages more user-friendly
+      if (serverMessage.includes('required')) return "Please fill in all required fields and try again.";
+      if (serverMessage.includes('invalid')) return "Please check your input and correct any errors.";
+      if (serverMessage.includes('duplicate')) return "This item already exists. Please use a different value.";
+      return serverMessage;
+    }
+    return "There was an error with your request. Please check your input and try again.";
+  }
+  
+  // Conflict errors
+  if (status === 409) {
+    return "This action conflicts with existing data. Please refresh and try again.";
+  }
+  
+  // Unprocessable entity
+  if (status === 422) {
+    return "The information provided is not valid. Please review and correct your input.";
+  }
+  
+  // Rate limiting
+  if (status === 429) {
+    return "Too many requests. Please wait a moment and try again.";
+  }
+  
+  // Server errors
+  if (status >= 500) {
+    return "The server encountered an error. Please try again in a few moments or contact support if the problem persists.";
+  }
+  
+  // Fallback for any other status codes
+  return serverMessage || `An unexpected error occurred (${status}). Please try again.`;
+}
+
 async function request<T = any>(
   path: string,
   init?: RequestInit & { json?: any; idempotencyKey?: string }
@@ -27,20 +87,28 @@ async function request<T = any>(
       if (cookie) hdrs = { ...hdrs, Cookie: cookie };
     } catch {}
   }
-  const res = await fetch(pathJoin(path), {
-    method: json ? "POST" : (rest.method || "GET"),
-    headers: {
-      Accept: "application/json",
-      ...(json ? { "Content-Type": "application/json" } : {}),
-      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      ...hdrs,
-    },
-    body: json ? JSON.stringify(json) : rest.body,
-    credentials: 'include',
-    ...rest,
-  }).catch((e: any) => {
-    throw new Error(`Network error calling ${path}: ${e?.message || "failed to fetch"}`);
-  });
+  
+  let res: Response;
+  try {
+    res = await fetch(pathJoin(path), {
+      method: json ? "POST" : (rest.method || "GET"),
+      headers: {
+        Accept: "application/json",
+        ...(json ? { "Content-Type": "application/json" } : {}),
+        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        ...hdrs,
+      },
+      body: json ? JSON.stringify(json) : rest.body,
+      credentials: 'include',
+      ...rest,
+    });
+  } catch (e: any) {
+    // Network errors (no internet, server down, etc.)
+    const networkError = new Error("Unable to connect to server. Please check your internet connection and try again.");
+    (networkError as any).status = 0;
+    (networkError as any).isNetworkError = true;
+    throw networkError;
+  }
 
   const text = await res.text();
   const isJSON = res.headers.get("content-type")?.includes("application/json");
@@ -51,13 +119,16 @@ async function request<T = any>(
       : payload;
 
   if (!res.ok) {
-    const msg =
+    const serverMessage = 
       (isJSON && (unwrapped?.detail || unwrapped?.message)) ||
       (typeof unwrapped === "string" && unwrapped) ||
       res.statusText;
-    const err: any = new Error(msg || `HTTP ${res.status}`);
+    
+    const userFriendlyMessage = getUserFriendlyErrorMessage(res.status, path, serverMessage);
+    const err: any = new Error(userFriendlyMessage);
     err.status = res.status;
     err.data = unwrapped;
+    err.originalMessage = serverMessage;
     throw err;
   }
   return unwrapped as T;
@@ -146,7 +217,7 @@ export async function createOrderFromParsed(parsed: any) {
   const order = payload?.order;
 
   if (!customer || !order) {
-    throw new Error("Parsed payload missing {customer, order}. Please re-parse or edit JSON.");
+    throw new Error("Unable to create order: Missing customer or order information. Please check the parsed data and try again.");
   }
 
   try {
@@ -155,7 +226,12 @@ export async function createOrderFromParsed(parsed: any) {
   } catch (e: any) {
     // Fallback: some backends accept { parsed: { customer, order } }
     if (e?.status === 422 || e?.status === 400) {
-      return request<any>("/orders", { json: { parsed: { customer, order } } });
+      try {
+        return await request<any>("/orders", { json: { parsed: { customer, order } } });
+      } catch (fallbackError: any) {
+        // If both attempts fail, throw a user-friendly error
+        throw new Error("Unable to create order. Please check that all required information is provided and try again.");
+      }
     }
     throw e;
   }
@@ -272,11 +348,29 @@ export async function exportPayments(
 ) {
   const sp = new URLSearchParams({ start, end });
   if (opts?.mark) sp.set("mark", "true");
-  const res = await fetch(pathJoin(`/export/cash.xlsx?${sp.toString()}`), {
-    credentials: "include",
-  });
-  if (!res.ok) throw new Error(`Export failed: ${res.status}`);
-  return res.blob();
+  
+  try {
+    const res = await fetch(pathJoin(`/export/cash.xlsx?${sp.toString()}`), {
+      credentials: "include",
+    });
+    
+    if (!res.ok) {
+      if (res.status === 404) {
+        throw new Error("No payments found for the selected date range.");
+      } else if (res.status === 403) {
+        throw new Error("You don't have permission to export payment data. Please contact your administrator.");
+      } else if (res.status >= 500) {
+        throw new Error("Export service is temporarily unavailable. Please try again in a few moments.");
+      } else {
+        throw new Error("Unable to export payments. Please check your date range and try again.");
+      }
+    }
+    
+    return res.blob();
+  } catch (e: any) {
+    if (e.message) throw e; // Re-throw our custom errors
+    throw new Error("Unable to connect to export service. Please check your internet connection and try again.");
+  }
 }
 
 // -------- Reports

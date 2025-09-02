@@ -256,13 +256,31 @@ def create_order(
         return envelope(OrderOut.model_validate(order))
     except Exception as e:
         db.rollback()
-        raise HTTPException(400, f"Create failed: {e}")
+        error_msg = str(e)
+        if "required" in error_msg.lower():
+            raise HTTPException(
+                status_code=400, 
+                detail="Missing required information. Please check that all required fields are filled in."
+            )
+        elif "duplicate" in error_msg.lower():
+            raise HTTPException(
+                status_code=409, 
+                detail="This order already exists. Please check if it was created already."
+            )
+        else:
+            raise HTTPException(
+                status_code=400, 
+                detail="Unable to create order. Please check your information and try again."
+            )
 
 @router.get("/{order_id}", response_model=dict)
 def get_order(order_id: int, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Order #{order_id} not found. It may have been deleted or moved."
+        )
     return envelope(OrderOut.model_validate(order))
 
 
@@ -270,13 +288,22 @@ def get_order(order_id: int, db: Session = Depends(get_session)):
 def get_invoice_pdf(order_id: int, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:
-        raise HTTPException(404, "Order not found")
-    pdf = invoice_pdf(order)
-    return Response(
-        content=pdf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="invoice_{order.code}.pdf"'},
-    )
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Cannot generate invoice: Order #{order_id} not found."
+        )
+    try:
+        pdf = invoice_pdf(order)
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="invoice_{order.code}.pdf"'},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate invoice PDF. Please try again in a moment."
+        )
 
 
 class QuotationIn(BaseModel):

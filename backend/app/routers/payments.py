@@ -39,7 +39,10 @@ def add_payment(
 ):
     order = db.get(Order, body.order_id)
     if not order:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Cannot add payment: Order #{body.order_id} not found."
+        )
     if idempotency_key:
         existing = db.query(Payment).filter_by(idempotency_key=idempotency_key).one_or_none()
         if existing:
@@ -70,9 +73,12 @@ class VoidIn(BaseModel):
 def void_payment(payment_id: int, body: VoidIn, db: Session = Depends(get_session)):
     p = db.get(Payment, payment_id)
     if not p:
-        raise HTTPException(404, "Payment not found")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Cannot void payment: Payment #{payment_id} not found."
+        )
     if p.status == "VOIDED":
-        return {"ok": True, "status": "VOIDED"}
+        return {"ok": True, "status": "VOIDED", "message": "Payment was already voided."}
     p.status = "VOIDED"
     p.void_reason = body.reason or ""
     order = db.get(Order, p.order_id)
@@ -86,15 +92,27 @@ def void_payment(payment_id: int, body: VoidIn, db: Session = Depends(get_sessio
 def get_payment_receipt_pdf(payment_id: int, db: Session = Depends(get_session)):
     payment = db.get(Payment, payment_id)
     if not payment:
-        raise HTTPException(404, "Payment not found")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Cannot generate receipt: Payment #{payment_id} not found."
+        )
     
     order = db.get(Order, payment.order_id)
     if not order:
-        raise HTTPException(404, "Order not found")
+        raise HTTPException(
+            status_code=404, 
+            detail="Cannot generate receipt: Associated order not found."
+        )
     
-    pdf = receipt_pdf(order, payment)
-    return Response(
-        content=pdf,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="receipt_{payment.id}.pdf"'},
-    )
+    try:
+        pdf = receipt_pdf(order, payment)
+        return Response(
+            content=pdf,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'inline; filename="receipt_{payment.id}.pdf"'},
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail="Unable to generate receipt PDF. Please try again in a moment."
+        )

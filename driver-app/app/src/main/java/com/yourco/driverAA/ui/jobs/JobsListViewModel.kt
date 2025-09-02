@@ -24,6 +24,12 @@ class JobsListViewModel @Inject constructor(
     
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
+    
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+    
+    private val _showRetryButton = MutableStateFlow(false)
+    val showRetryButton: StateFlow<Boolean> = _showRetryButton.asStateFlow()
 
     init {
         loadJobs()
@@ -33,17 +39,39 @@ class JobsListViewModel @Inject constructor(
         viewModelScope.launch {
             repo.getJobs().collect { result ->
                 when (result) {
-                    is Result.Loading -> _loading.value = true
+                    is Result.Loading -> {
+                        _loading.value = true
+                        _errorMessage.value = null
+                        _showRetryButton.value = false
+                    }
                     is Result.Success -> {
                         _loading.value = false
                         _jobs.value = result.data
+                        _errorMessage.value = null
+                        _showRetryButton.value = false
                     }
                     is Result.Error -> {
                         _loading.value = false
-                        // Handle error appropriately
+                        _errorMessage.value = result.userMessage
+                        _showRetryButton.value = result.isRecoverable
+                        
+                        // Handle authentication errors
+                        if (result.requiresReauth) {
+                            // TODO: Navigate to login screen or show re-login dialog
+                        }
                     }
                 }
             }
         }
+    }
+    
+    fun clearError() {
+        _errorMessage.value = null
+        _showRetryButton.value = false
+    }
+    
+    fun retryLoadJobs() {
+        clearError()
+        loadJobs()
     }
 }

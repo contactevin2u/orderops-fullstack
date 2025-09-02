@@ -69,6 +69,7 @@ h6 {
   color: var(--color-surface);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   z-index: 1000;
+  overflow: visible; /* Allow dropdown to break out */
 }
 
 .header-inner {
@@ -79,12 +80,14 @@ h6 {
   justify-content: space-between;
   gap: 16px;
   padding: var(--space-3) var(--space-6);
+  overflow: visible; /* Allow dropdown to break out */
 }
 
 .nav {
   display: flex;
   align-items: center;
   gap: 24px;
+  overflow: visible; /* Allow dropdown to break out */
 }
 
 .nav-link {
@@ -167,7 +170,7 @@ h6 {
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   padding: 8px 0;
-  z-index: 1000;
+  z-index: 9999; /* Higher z-index to appear above everything */
   margin-top: 4px;
 }
 
