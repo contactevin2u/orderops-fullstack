@@ -255,13 +255,18 @@ def upsell_order_items(
         db.commit()
         db.refresh(order)
     
-        return envelope({
+        response_data = {
             "success": True,
             "order_id": order.id,
             "message": f"Successfully upsold {len(body.items)} items",
-            "new_total": str(order.total),
-            "order": OrderOut.model_validate(order)
-        })
+            "new_total": str(order.total),  # Driver app expects string
+            "order": None  # Driver app expects this field even if null
+        }
+        
+        # Debug log the response
+        print(f"DEBUG: Upsell response data: {response_data}")
+        
+        return envelope(response_data)
     except Exception as e:
         db.rollback()
         print(f"DEBUG: Upsell error for order {order_id}: {e}")
