@@ -42,6 +42,7 @@ class Trip(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
+    order = relationship("Order", back_populates="trip")
     commissions = relationship("Commission", back_populates="trip")
 
     @property

@@ -36,3 +36,4 @@ class Order(Base):
     plan = relationship("Plan", uselist=False, cascade="all, delete-orphan")
     payments = relationship("Payment", cascade="all, delete-orphan")
     parent = relationship("Order", remote_side=[id], backref="adjustments")
+    trip = relationship("Trip", back_populates="order", uselist=False)
