@@ -501,14 +501,63 @@ export default function OrderDetailPage(){
           </Card>
 
             <Card>
-              <h3 className="m-0">Delivery</h3>
+              <h3 className="m-0">Delivery & Commission</h3>
               {order.trip?.status === "DELIVERED" && (
-                <button className="btn" onClick={onSuccess} disabled={busy}>Mark Success</button>
+                <button className="btn mb-2" onClick={onSuccess} disabled={busy}>Mark Success</button>
               )}
-              {order.trip?.commission && (
-                <div className="mt-2">
-                  <input className="input" type="number" min="0" step="0.01" placeholder="Commission" value={commission} onChange={e=>setCommission(e.target.value)} />
-                  <button className="btn mt-1" onClick={saveCommission} disabled={busy}>Save Commission</button>
+              
+              {order.trip && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Driver Commission (RM)</label>
+                    <input 
+                      className="input" 
+                      type="number" 
+                      min="0" 
+                      step="0.01" 
+                      placeholder="Enter commission amount" 
+                      value={commission} 
+                      onChange={e=>setCommission(e.target.value)} 
+                    />
+                    <button className="btn mt-2 w-full" onClick={saveCommission} disabled={busy || !commission}>
+                      {order.trip?.commission ? 'Update Commission' : 'Set Commission'}
+                    </button>
+                  </div>
+                  
+                  {order.trip?.commission && (
+                    <div className="bg-gray-50 p-3 rounded text-sm">
+                      <div><strong>Current:</strong> RM {order.trip.commission.computed_amount}</div>
+                      <div><strong>Scheme:</strong> {order.trip.commission.scheme}</div>
+                      <div><strong>Status:</strong> {order.trip.commission.actualized_at ? 'Released' : 'Pending'}</div>
+                      {order.trip.commission.actualized_at && (
+                        <div><strong>Released:</strong> {new Date(order.trip.commission.actualized_at).toLocaleDateString()}</div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {order.trip.pod_photo_urls && order.trip.pod_photo_urls.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Proof of Delivery Photos</label>
+                      <div className="flex flex-wrap gap-2">
+                        {order.trip.pod_photo_urls.map((url: string, index: number) => (
+                          <img
+                            key={index}
+                            src={url}
+                            alt={`POD Photo ${index + 1}`}
+                            className="w-20 h-20 object-cover rounded border cursor-pointer hover:opacity-75"
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Click photos to view full size</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {!order.trip && (
+                <div className="text-gray-500 text-sm">
+                  No trip assigned yet. Commission can be set after driver assignment.
                 </div>
               )}
             </Card>
