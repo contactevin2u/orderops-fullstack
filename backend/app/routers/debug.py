@@ -197,6 +197,60 @@ def test_auto_assign(db: Session = Depends(get_session)):
             "traceback": traceback.format_exc()
         })
 
+@router.get("/debug-scheduled-drivers-query")
+def debug_scheduled_drivers_query(db: Session = Depends(get_session)):
+    """Debug the exact query used in assignment service"""
+    try:
+        from datetime import date
+        from sqlalchemy import and_
+        
+        today = date.today()
+        
+        # Step 1: Check raw scheduled drivers table
+        all_schedules = db.query(DriverSchedule).all()
+        todays_schedules = db.query(DriverSchedule).filter(
+            DriverSchedule.schedule_date == today
+        ).all()
+        todays_scheduled = db.query(DriverSchedule).filter(
+            and_(
+                DriverSchedule.schedule_date == today,
+                DriverSchedule.is_scheduled == True
+            )
+        ).all()
+        
+        # Step 2: Test the exact assignment service query
+        from ..services.assignment_service import AssignmentService
+        service = AssignmentService(db)
+        available_drivers = service._get_available_drivers()
+        
+        return envelope({
+            "debug_date": today.isoformat(),
+            "raw_counts": {
+                "all_schedules_in_db": len(all_schedules),
+                "schedules_for_today": len(todays_schedules), 
+                "scheduled_true_for_today": len(todays_scheduled)
+            },
+            "schedule_details": [
+                {
+                    "driver_id": s.driver_id,
+                    "schedule_date": s.schedule_date.isoformat(),
+                    "is_scheduled": s.is_scheduled,
+                    "status": s.status
+                } for s in todays_schedules
+            ],
+            "assignment_service_result": {
+                "available_drivers_count": len(available_drivers),
+                "drivers": available_drivers
+            }
+        })
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
+
 @router.post("/create-test-drivers")
 def create_test_drivers(count: int = 3, db: Session = Depends(get_session)):
     """Create test drivers if none exist - for debugging only"""
