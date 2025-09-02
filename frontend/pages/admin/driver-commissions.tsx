@@ -1,8 +1,7 @@
 import React from 'react';
-import Link from 'next/link';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { listDrivers, listDriverOrders, markSuccess } from '@/utils/api';
+import { listDrivers, listDriverOrders, markSuccess, updateCommission } from '@/utils/api';
 
 export default function DriverCommissionsPage() {
   const [driverId, setDriverId] = React.useState<string>('');
@@ -31,6 +30,20 @@ export default function DriverCommissionsPage() {
     },
     onError: () => {
       setMessage({ type: 'error', text: 'Failed to release commission' });
+      setTimeout(() => setMessage(null), 3000);
+    }
+  });
+
+  const updateCommissionMutation = useMutation({
+    mutationFn: ({ orderId, amount }: { orderId: number; amount: number }) => 
+      updateCommission(orderId, amount),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['driver-orders', driverId, month] });
+      setMessage({ type: 'success', text: 'Commission updated successfully' });
+      setTimeout(() => setMessage(null), 3000);
+    },
+    onError: () => {
+      setMessage({ type: 'error', text: 'Failed to update commission' });
       setTimeout(() => setMessage(null), 3000);
     }
   });
@@ -138,6 +151,10 @@ export default function DriverCommissionsPage() {
                     order={order}
                     onRelease={() => releaseCommissionMutation.mutate(order.id)}
                     isReleasing={releaseCommissionMutation.isPending}
+                    onUpdateCommission={(amount: number) => 
+                      updateCommissionMutation.mutate({ orderId: order.id, amount })
+                    }
+                    isUpdatingCommission={updateCommissionMutation.isPending}
                   />
                 ))}
               </div>
@@ -166,18 +183,44 @@ export default function DriverCommissionsPage() {
   );
 }
 
-function OrderCard({ order, onRelease, isReleasing }: { 
+function OrderCard({ 
+  order, 
+  onRelease, 
+  isReleasing,
+  onUpdateCommission,
+  isUpdatingCommission
+}: { 
   order: any; 
   onRelease: () => void;
   isReleasing: boolean;
+  onUpdateCommission: (amount: number) => void;
+  isUpdatingCommission: boolean;
 }) {
   const [showPodPhotos, setShowPodPhotos] = React.useState(false);
+  const [commissionAmount, setCommissionAmount] = React.useState('');
+  
   const trip = order.trip || {};
-  const commission = trip.commission?.computed_amount || order.commission || 0;
+  const currentCommission = trip.commission?.computed_amount || order.commission || 0;
   const podPhotos = trip.pod_photo_urls || (trip.pod_photo_url ? [trip.pod_photo_url] : []);
   const hasPodPhoto = podPhotos.length > 0;
   const isDelivered = order.status === 'DELIVERED';
-  const canRelease = isDelivered && hasPodPhoto && commission > 0;
+  const canRelease = isDelivered && hasPodPhoto && currentCommission > 0;
+  
+  // Initialize commission amount from current commission
+  React.useEffect(() => {
+    if (currentCommission > 0) {
+      setCommissionAmount(currentCommission.toString());
+    } else {
+      setCommissionAmount('30'); // Default commission amount
+    }
+  }, [currentCommission]);
+
+  const handleCommissionChange = () => {
+    const amount = Number(commissionAmount);
+    if (amount > 0) {
+      onUpdateCommission(amount);
+    }
+  };
 
   return (
     <div style={{
@@ -186,9 +229,10 @@ function OrderCard({ order, onRelease, isReleasing }: {
       borderRadius: 'var(--radius-2)',
       background: 'var(--color-background)'
     }}>
-      <div className="cluster" style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      {/* Header Row */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
         <div>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-1)' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-1)', margin: 0 }}>
             Order #{order.code || order.id}
           </h3>
           <div className="cluster" style={{ gap: 'var(--space-2)', fontSize: '0.875rem' }}>
@@ -218,66 +262,79 @@ function OrderCard({ order, onRelease, isReleasing }: {
             )}
           </div>
         </div>
-        
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.875rem', opacity: 0.7 }}>Commission</div>
-          <div style={{ fontSize: '1.25rem', fontWeight: 600 }}>
-            RM {commission}
-          </div>
-        </div>
       </div>
 
-      <div style={{ marginTop: 'var(--space-4)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div className="cluster" style={{ gap: 'var(--space-4)', fontSize: '0.875rem' }}>
-          <span style={{ color: isDelivered ? '#15803d' : '#6b7280' }}>
-            {isDelivered ? '✅' : '⏳'} Delivered
-          </span>
-          <span style={{ color: hasPodPhoto ? '#15803d' : '#d97706' }}>
-            {hasPodPhoto ? '✅' : '⚠️'} POD Photo
-          </span>
-          <span style={{ color: commission > 0 ? '#15803d' : '#6b7280' }}>
-            {commission > 0 ? '✅' : '⏳'} Commission Set
-          </span>
-        </div>
-        
-        <div className="cluster" style={{ gap: 'var(--space-2)' }}>
-          <Link href={`/orders/${order.id}`}>
-            <button 
-              className="btn"
-              style={{
-                background: '#f3f4f6',
-                color: '#374151',
-                border: '1px solid #d1d5db',
-                padding: '0.5rem 1rem',
-                borderRadius: 'var(--radius-2)',
-                fontSize: '0.875rem',
-                cursor: 'pointer'
+      {/* Commission Input Row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flex: 1 }}>
+          <label style={{ fontSize: '0.875rem', fontWeight: 500, minWidth: '80px' }}>
+            Commission:
+          </label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <span style={{ fontSize: '0.875rem' }}>RM</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={commissionAmount}
+              onChange={(e) => setCommissionAmount(e.target.value)}
+              onBlur={handleCommissionChange}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleCommissionChange();
+                }
               }}
-            >
-              Edit
-            </button>
-          </Link>
-          
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              onRelease();
-            }}
-            disabled={!canRelease || isReleasing}
-            style={{
-              background: canRelease && !isReleasing ? '#10b981' : '#9ca3af',
-              color: 'white',
-              border: 'none',
-              padding: '0.5rem 1rem',
-              borderRadius: 'var(--radius-2)',
-              fontSize: '0.875rem',
-              cursor: canRelease && !isReleasing ? 'pointer' : 'not-allowed',
-              fontWeight: '500'
-            }}
-          >
-            {isReleasing ? 'Releasing...' : 'Release Commission'}
-          </button>
+              style={{
+                width: '80px',
+                padding: '0.25rem 0.5rem',
+                border: '1px solid #d1d5db',
+                borderRadius: 'var(--radius-1)',
+                fontSize: '0.875rem'
+              }}
+              disabled={isUpdatingCommission}
+            />
+            {isUpdatingCommission && <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Saving...</span>}
+          </div>
         </div>
+
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            onRelease();
+          }}
+          disabled={!canRelease || isReleasing}
+          style={{
+            background: canRelease && !isReleasing ? '#10b981' : '#9ca3af',
+            color: 'white',
+            border: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: 'var(--radius-2)',
+            fontSize: '0.875rem',
+            cursor: canRelease && !isReleasing ? 'pointer' : 'not-allowed',
+            fontWeight: '500',
+            minWidth: '120px'
+          }}
+        >
+          {isReleasing ? 'Releasing...' : 'Release Commission'}
+        </button>
+      </div>
+
+      {/* Status Indicators */}
+      <div style={{ display: 'flex', gap: 'var(--space-3)', fontSize: '0.875rem' }}>
+        <span style={{ color: isDelivered ? '#15803d' : '#6b7280' }}>
+          {isDelivered ? '✅' : '⏳'} Delivered
+        </span>
+        <span style={{ color: hasPodPhoto ? '#15803d' : '#d97706' }}>
+          {hasPodPhoto ? '✅' : '⚠️'} POD Photo
+        </span>
+        <span style={{ color: currentCommission > 0 ? '#15803d' : '#6b7280' }}>
+          {currentCommission > 0 ? '✅' : '⏳'} Commission Set
+        </span>
+        {trip.commission?.actualized_at && (
+          <span style={{ color: '#15803d' }}>
+            ✅ Released
+          </span>
+        )}
       </div>
 
       {showPodPhotos && podPhotos.length > 0 && (
