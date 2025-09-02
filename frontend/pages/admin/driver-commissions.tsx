@@ -171,9 +171,11 @@ function OrderCard({ order, onRelease, isReleasing }: {
   onRelease: () => void;
   isReleasing: boolean;
 }) {
+  const [showPodPhotos, setShowPodPhotos] = React.useState(false);
   const trip = order.trip || {};
   const commission = trip.commission?.computed_amount || order.commission || 0;
-  const hasPodPhoto = !!(trip.pod_photo_urls?.length || trip.pod_photo_url);
+  const podPhotos = trip.pod_photo_urls || (trip.pod_photo_url ? [trip.pod_photo_url] : []);
+  const hasPodPhoto = podPhotos.length > 0;
   const isDelivered = order.status === 'DELIVERED';
   const canRelease = isDelivered && hasPodPhoto && commission > 0;
 
@@ -199,14 +201,20 @@ function OrderCard({ order, onRelease, isReleasing }: {
               {order.status}
             </span>
             {hasPodPhoto && (
-              <span style={{ 
-                padding: '0.125rem 0.5rem', 
-                borderRadius: 'var(--radius-1)',
-                background: '#dcfce7',
-                color: '#15803d'
-              }}>
-                📸 POD Available
-              </span>
+              <button
+                onClick={() => setShowPodPhotos(!showPodPhotos)}
+                style={{ 
+                  padding: '0.125rem 0.5rem', 
+                  borderRadius: 'var(--radius-1)',
+                  background: '#dcfce7',
+                  color: '#15803d',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                📸 {showPodPhotos ? 'Hide' : 'View'} POD ({podPhotos.length})
+              </button>
             )}
           </div>
         </div>
@@ -232,20 +240,87 @@ function OrderCard({ order, onRelease, isReleasing }: {
           </span>
         </div>
         
-        <button
-          onClick={onRelease}
-          disabled={!canRelease || isReleasing}
-          className="btn"
-          style={{
-            ...(canRelease && !isReleasing ? {} : { 
-              opacity: 0.5, 
-              cursor: 'not-allowed' 
-            })
-          }}
-        >
-          {isReleasing ? 'Releasing...' : 'Release Commission'}
-        </button>
+        <div className="cluster" style={{ gap: 'var(--space-2)' }}>
+          <Link href={`/orders/${order.id}`}>
+            <button 
+              className="btn"
+              style={{
+                background: '#f3f4f6',
+                color: '#374151',
+                border: '1px solid #d1d5db',
+                padding: '0.5rem 1rem',
+                borderRadius: 'var(--radius-2)',
+                fontSize: '0.875rem',
+                cursor: 'pointer'
+              }}
+            >
+              Edit
+            </button>
+          </Link>
+          
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              onRelease();
+            }}
+            disabled={!canRelease || isReleasing}
+            style={{
+              background: canRelease && !isReleasing ? '#10b981' : '#9ca3af',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: 'var(--radius-2)',
+              fontSize: '0.875rem',
+              cursor: canRelease && !isReleasing ? 'pointer' : 'not-allowed',
+              fontWeight: '500'
+            }}
+          >
+            {isReleasing ? 'Releasing...' : 'Release Commission'}
+          </button>
+        </div>
       </div>
+
+      {showPodPhotos && podPhotos.length > 0 && (
+        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: '#f9fafb', borderRadius: 'var(--radius-2)' }}>
+          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
+            Proof of Delivery Photos
+          </h4>
+          <div className="cluster" style={{ gap: 'var(--space-2)' }}>
+            {podPhotos.map((url: string, index: number) => (
+              <div key={index} style={{ position: 'relative' }}>
+                <img
+                  src={url}
+                  alt={`POD Photo ${index + 1}`}
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    objectFit: 'cover',
+                    borderRadius: 'var(--radius-2)',
+                    border: '1px solid #d1d5db',
+                    cursor: 'pointer'
+                  }}
+                  onClick={() => window.open(url, '_blank')}
+                />
+                <div style={{
+                  position: 'absolute',
+                  top: '4px',
+                  right: '4px',
+                  background: 'rgba(0,0,0,0.7)',
+                  color: 'white',
+                  fontSize: '0.75rem',
+                  padding: '2px 6px',
+                  borderRadius: '12px'
+                }}>
+                  {index + 1}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 'var(--space-2)' }}>
+            Click on any photo to view full size
+          </p>
+        </div>
+      )}
     </div>
   );
 }
