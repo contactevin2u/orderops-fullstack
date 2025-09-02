@@ -13,6 +13,8 @@ from ..utils.normalize import to_decimal
 from ..services.status_updates import recompute_financials
 from ..auth.deps import require_roles
 from ..utils.audit import log_action
+from ..services.documents import receipt_pdf
+from fastapi import Response
 
 router = APIRouter(
     prefix="/payments",
@@ -79,3 +81,20 @@ def void_payment(payment_id: int, body: VoidIn, db: Session = Depends(get_sessio
     db.commit()
     db.refresh(order)
     return {"ok": True, "status": "VOIDED", "order_balance": float(order.balance)}
+
+@router.get("/{payment_id}/receipt.pdf")
+def get_payment_receipt_pdf(payment_id: int, db: Session = Depends(get_session)):
+    payment = db.get(Payment, payment_id)
+    if not payment:
+        raise HTTPException(404, "Payment not found")
+    
+    order = db.get(Order, payment.order_id)
+    if not order:
+        raise HTTPException(404, "Order not found")
+    
+    pdf = receipt_pdf(order, payment)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="receipt_{payment.id}.pdf"'},
+    )

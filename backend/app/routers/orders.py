@@ -716,76 +716,6 @@ def return_order(
     return envelope(OrderOut.model_validate(order))
 
 
-class SimpleOrderIn(BaseModel):
-    customer_name: str
-    customer_phone: str | None = None
-    delivery_address: str
-    notes: str | None = None
-    total_amount: float
-    delivery_date: str | None = None
-
-
-@router.post("/simple", response_model=dict, status_code=201)
-def create_simple_order(
-    body: SimpleOrderIn,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(require_roles(Role.ADMIN)),
-):
-    """Create a simple order for admin use (from message parsing)"""
-    try:
-        # Create customer first
-        customer = Customer(
-            name=body.customer_name,
-            phone=body.customer_phone or "",
-            address=body.delivery_address
-        )
-        db.add(customer)
-        db.flush()  # Get customer ID
-        
-        # Parse delivery date if provided
-        delivery_date = None
-        if body.delivery_date:
-            try:
-                delivery_date = datetime.fromisoformat(body.delivery_date.replace('Z', '+00:00'))
-            except:
-                delivery_date = None
-        
-        # Create order
-        order = Order(
-            customer_id=customer.id,
-            customer_name=body.customer_name,
-            customer_phone=body.customer_phone,
-            delivery_address=body.delivery_address,
-            notes=body.notes,
-            total_amount=Decimal(str(body.total_amount)),
-            delivery_date=delivery_date,
-            status="PENDING",
-            created_at=datetime.now(timezone.utc)
-        )
-        db.add(order)
-        db.commit()
-        db.refresh(order)
-        
-        log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
-        
-        # Trigger auto-assignment after order creation
-        trigger_auto_assignment(db, order.id)
-        
-        return {
-            "id": order.id,
-            "code": order.code,
-            "customer_name": order.customer_name,
-            "customer_phone": order.customer_phone,
-            "delivery_address": order.delivery_address,
-            "status": order.status,
-            "total_amount": float(order.total_amount) if order.total_amount else 0,
-            "notes": order.notes,
-            "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
-            "created_at": order.created_at.isoformat()
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(400, f"Create failed: {e}")
 
 
 class DiscountIn(BaseModel):
@@ -834,78 +764,6 @@ def buyback_order(
     return envelope(OrderOut.model_validate(order))
 
 
-class SimpleOrderIn(BaseModel):
-    customer_name: str
-    customer_phone: str | None = None
-    delivery_address: str
-    notes: str | None = None
-    total_amount: float
-    delivery_date: str | None = None
-
-
-@router.post("/simple", response_model=dict, status_code=201)
-def create_simple_order(
-    body: SimpleOrderIn,
-    db: Session = Depends(get_session),
-    current_user: User = Depends(require_roles(Role.ADMIN)),
-):
-    """Create a simple order for admin use (from message parsing)"""
-    try:
-        # Create customer first
-        customer = Customer(
-            name=body.customer_name,
-            phone=body.customer_phone or "",
-            address=body.delivery_address
-        )
-        db.add(customer)
-        db.flush()  # Get customer ID
-        
-        # Parse delivery date if provided
-        delivery_date = None
-        if body.delivery_date:
-            try:
-                delivery_date = datetime.fromisoformat(body.delivery_date.replace('Z', '+00:00'))
-            except:
-                delivery_date = None
-        
-        # Create order
-        order = Order(
-            customer_id=customer.id,
-            customer_name=body.customer_name,
-            customer_phone=body.customer_phone,
-            delivery_address=body.delivery_address,
-            notes=body.notes,
-            total_amount=Decimal(str(body.total_amount)),
-            delivery_date=delivery_date,
-            status="PENDING",
-            created_at=datetime.now(timezone.utc)
-        )
-        db.add(order)
-        db.commit()
-        db.refresh(order)
-        
-        log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
-        
-        # Trigger auto-assignment after order creation
-        trigger_auto_assignment(db, order.id)
-        
-        return {
-            "id": order.id,
-            "code": order.code,
-            "customer_name": order.customer_name,
-            "customer_phone": order.customer_phone,
-            "delivery_address": order.delivery_address,
-            "status": order.status,
-            "total_amount": float(order.total_amount) if order.total_amount else 0,
-            "notes": order.notes,
-            "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
-            "created_at": order.created_at.isoformat()
-        }
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(400, f"Create failed: {e}")
-
-
 class CancelInstallmentIn(BaseModel):
     penalty: Decimal | None = None
     return_delivery_fee: Decimal | None = None
@@ -948,6 +806,9 @@ def cancel_installment_order(
         db.rollback()
         raise HTTPException(400, str(e))
     return envelope(OrderOut.model_validate(order))
+
+
+
 
 
 class SimpleOrderIn(BaseModel):

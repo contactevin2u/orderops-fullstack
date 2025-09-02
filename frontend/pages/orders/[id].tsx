@@ -470,7 +470,7 @@ export default function OrderDetailPage(){
 
             <div className="hr" />
             <table className="table">
-              <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref</th><th>Status</th><th></th></tr></thead>
+              <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Ref</th><th>Status</th><th>Actions</th></tr></thead>
               <tbody>
                 {(order.payments||[]).map((p:any)=>(
                   <tr key={p.id}>
@@ -479,7 +479,20 @@ export default function OrderDetailPage(){
                     <td>{p.method||"-"}</td>
                     <td>{p.reference||"-"}</td>
                     <td><span className="badge">{p.status}</span></td>
-                    <td>{p.status!=="VOIDED" && <button className="btn secondary" onClick={()=>onVoidPayment(p.id)} disabled={busy}>Void</button>}</td>
+                    <td className="cluster">
+                      <button 
+                        className="btn secondary" 
+                        onClick={()=>window.open(`/_api/payments/${p.id}/receipt.pdf`, '_blank')}
+                        disabled={busy}
+                      >
+                        Receipt
+                      </button>
+                      {p.status!=="VOIDED" && 
+                        <button className="btn secondary" onClick={()=>onVoidPayment(p.id)} disabled={busy}>
+                          Void
+                        </button>
+                      }
+                    </td>
                   </tr>
                 ))}
                 {(!order.payments || order.payments.length===0) && <tr><td colSpan={6} className="opacity-70">No payments</td></tr>}

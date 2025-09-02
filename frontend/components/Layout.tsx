@@ -16,6 +16,7 @@ import {
   FileText,
   Smartphone,
   Truck,
+  ChevronDown,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -79,6 +80,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [openDropdowns, setOpenDropdowns] = React.useState<Set<string>>(new Set());
   const menuRef = React.useRef<HTMLElement>(null);
   const headerRef = React.useRef<HTMLElement>(null);
   const { data: user, error: userErr } = useSWR('me', getMe, {
@@ -96,6 +98,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const isActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname === href || pathname.startsWith(`${href}/`);
+  };
+
+  const toggleDropdown = (groupTitle: string) => {
+    setOpenDropdowns(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupTitle)) {
+        newSet.delete(groupTitle);
+      } else {
+        newSet.add(groupTitle);
+      }
+      return newSet;
+    });
+  };
+
+  const isGroupActive = (group: NavGroup) => {
+    return group.items.some(item => isActive(item.href));
   };
 
   // Remove unused legacy filtering logic - now using navGroups directly
@@ -130,8 +148,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }, [userErr, pathname, router]);
   React.useEffect(() => {
     function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        setMobileOpen(false);
+        setOpenDropdowns(new Set());
+      }
       if (!mobileOpen) return;
-      if (e.key === 'Escape') setMobileOpen(false);
       if (e.key === 'Tab') {
         const items = menuRef.current?.querySelectorAll<HTMLElement>('a,button');
         if (!items || items.length === 0) return;
@@ -149,6 +170,17 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
   }, [mobileOpen]);
+
+  // Close dropdowns when clicking outside
+  React.useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (!menuRef.current?.contains(e.target as Node)) {
+        setOpenDropdowns(new Set());
+      }
+    }
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
   return (
     <div className="layout">
       <header ref={headerRef} className="header">
@@ -174,25 +206,50 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               const groupItems = group.items.filter(item => !item.requiresAuth || !!user);
               if (groupItems.length === 0) return null;
               
+              const isDropdownOpen = openDropdowns.has(group.title);
+              const hasActiveItem = isGroupActive(group);
+              
               return (
-                <div key={group.title} className="nav-group">
+                <div key={group.title} className="nav-dropdown">
                   {groupIndex > 0 && <div className="nav-separator" />}
-                  <div className="nav-group-label">{group.title}</div>
-                  {groupItems.map(({ href, label, Icon }, itemIndex) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      className={`nav-link ${isActive(href) ? 'active' : ''} ${itemIndex === 0 ? 'group-first' : ''}`}
-                      onClick={() => setMobileOpen(false)}
-                      title={`${group.title}: ${t(label)}`}
-                    >
-                      <Icon style={{ width: 20, height: 20 }} />
-                      <span>{t(label)}</span>
-                    </Link>
-                  ))}
+                  <button
+                    className={`nav-dropdown-trigger ${hasActiveItem ? 'active' : ''}`}
+                    onClick={() => toggleDropdown(group.title)}
+                    aria-expanded={isDropdownOpen}
+                  >
+                    <span>{group.title}</span>
+                    <ChevronDown 
+                      style={{ 
+                        width: 16, 
+                        height: 16, 
+                        transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                        transition: 'transform 0.2s ease'
+                      }} 
+                    />
+                  </button>
+                  {isDropdownOpen && (
+                    <div className="nav-dropdown-content">
+                      {groupItems.map(({ href, label, Icon }) => (
+                        <Link
+                          key={href}
+                          href={href}
+                          className={`nav-dropdown-item ${isActive(href) ? 'active' : ''}`}
+                          onClick={() => {
+                            setMobileOpen(false);
+                            setOpenDropdowns(new Set());
+                          }}
+                          title={t(label)}
+                        >
+                          <Icon style={{ width: 18, height: 18 }} />
+                          <span>{t(label)}</span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}
+            <div className="nav-separator" />
             <LanguageSwitcher />
             {user ? (
               <>

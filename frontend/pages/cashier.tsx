@@ -213,6 +213,14 @@ export default function CashierPage() {
               <button className="btn" type="submit" disabled={!amount}>
                 Submit
               </button>
+              {lastPaymentId.current && (
+                <button 
+                  className="btn secondary" 
+                  onClick={() => window.open(`/_api/payments/${lastPaymentId.current}/receipt.pdf`, '_blank')}
+                >
+                  Last Payment Receipt
+                </button>
+              )}
             </form>
           ) : (
             <div>Select an order to record payment.</div>
