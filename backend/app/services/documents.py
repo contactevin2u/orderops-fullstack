@@ -31,13 +31,13 @@ def invoice_pdf(order: Order) -> bytes:
 
 
 def quotation_pdf(quotation_data: dict) -> bytes:
-    """Render a quotation as a PDF using ReportLab with the same template as invoices."""
+    """Render a quotation as a PDF using ReportLab with the same enhanced template as invoices."""
     return _reportlab_quotation_pdf(quotation_data)
 
 
-def receipt_pdf(order: Order) -> bytes:
-    """Render a receipt as a PDF using ReportLab with the same template as invoices."""
-    return _reportlab_receipt_pdf(order)
+def receipt_pdf(order: Order, payment: Payment = None) -> bytes:
+    """Render a receipt as a PDF using ReportLab with the same enhanced template as invoices."""
+    return _reportlab_receipt_pdf(order, payment)
 
 
 # ---------------------------------------------------------------------------
@@ -859,99 +859,390 @@ def _reportlab_invoice_pdf(order: Order) -> bytes:
 # Enhanced Receipt Generation
 # ---------------------------------------------------------------------------
 
-def receipt_pdf(order: Order, payment: Payment) -> bytes:
-    """Generate an enhanced receipt PDF."""
+def receipt_pdf(order: Order, payment: Payment = None) -> bytes:
+    """Generate an enhanced receipt PDF using the same styling as invoices."""
     try:
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            Table,
+            TableStyle,
+            Image,
+            KeepTogether,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.lib.colors import HexColor
     except ImportError as exc:
         raise RuntimeError(
             "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
         ) from exc
 
-    CURRENCY = getattr(settings, "CURRENCY_PREFIX", "RM") or "RM"
+    # --- Same enhanced theme & helpers as invoice -----------------------------
+    try:
+        pdfmetrics.registerFont(TTFont("Inter", "/app/static/fonts/Inter-Regular.ttf"))
+        pdfmetrics.registerFont(TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf"))
+        BASE_FONT, BASE_BOLD = "Inter", "Inter-Bold"
+        logger.info("Successfully loaded Inter fonts for receipt")
+    except Exception as e:
+        logger.warning(f"Failed to load Inter fonts for receipt: {str(e)}, using fallback")
+        BASE_FONT, BASE_BOLD = "Helvetica", "Helvetica-Bold"
+
+    # Enhanced color scheme (same as invoice)
+    BRAND_COLOR = getattr(getattr(order, "company", None), "brand_color", "#1E293B") or "#1E293B"
+    ACCENT_COLOR = getattr(getattr(order, "company", None), "accent_color", "#3B82F6") or "#3B82F6"
+    SUCCESS_COLOR = "#10B981"
+    LIGHT_GRAY = "#F8FAFC"
+    MEDIUM_GRAY = "#64748B"
+    DARK_GRAY = "#334155"
     
+    CURRENCY = getattr(settings, "CURRENCY_PREFIX", "RM") or "RM"
+
     def money(x):
         try:
             return f"{CURRENCY}{float(x or 0):,.2f}"
         except Exception:
             return f"{CURRENCY}0.00"
 
-    def format_date(d):
+    def _fmt_qty(q):
         try:
-            return getattr(d, "strftime")("%d %B %Y")
+            qf = float(q or 0)
+            s = f"{qf:.2f}".rstrip("0").rstrip(".")
+            return s if s else "0"
         except Exception:
-            return str(d or "")
+            return str(q or 0)
 
+    # Load images (same as invoice)
+    LOGO_PATH = getattr(settings, "COMPANY_LOGO_PATH", None)
+    LOGO_URL = getattr(settings, "COMPANY_LOGO_URL", None) or DEFAULT_LOGO_URL
+    logo_reader = _image_reader(LOGO_PATH, LOGO_URL)
+
+    # --- Enhanced styles (same as invoice) ------------------------------------
+    styles = getSampleStyleSheet()
+    styles["Normal"].fontName = BASE_FONT
+    styles["Normal"].fontSize = 10
+    styles["Normal"].leading = 12
+    styles["Title"].fontName = BASE_BOLD
+
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11, textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="Center", parent=styles["Normal"], alignment=TA_CENTER))
+    styles.add(ParagraphStyle(name="Muted", parent=styles["Small"], textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="H1", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=24, leading=28, textColor=BRAND_COLOR))
+    styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=16, leading=20, textColor=DARK_GRAY))
+    styles.add(ParagraphStyle(name="H3", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=12, leading=14, textColor=DARK_GRAY))
+    styles.add(ParagraphStyle(name="Wrap", parent=styles["Normal"], wordWrap="CJK"))
+    styles.add(ParagraphStyle(name="WrapBold", parent=styles["Wrap"], fontName=BASE_BOLD))
+    styles.add(ParagraphStyle(name="Highlight", parent=styles["Normal"], fontName=BASE_BOLD, textColor=SUCCESS_COLOR))
+
+    # --- Enhanced document setup (same as invoice) ----------------------------
     buf = BytesIO()
-    c = canvas.Canvas(buf, pagesize=A4)
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=25 * mm,
+        rightMargin=25 * mm,
+        topMargin=30 * mm,
+        bottomMargin=25 * mm,
+    )
+    FRAME_W = doc.width
+    PAGE_WIDTH = A4[0]
+    PAGE_HEIGHT = A4[1]
+
+    company_name = getattr(settings, "COMPANY_NAME", "Your Company Name")
+
+    def _draw_enhanced_watermark(c, d):
+        """Enhanced diagonal watermark."""
+        watermark_text = "PAYMENT RECEIVED"
+        
+        c.saveState()
+        try:
+            center_x = d.leftMargin + d.width / 2.0
+            center_y = d.bottomMargin + d.height / 2.0
+            
+            c.translate(center_x, center_y)
+            c.rotate(45)
+            c.setFillColorRGB(0.9, 0.9, 0.9)
+            
+            try:
+                c.setFillAlpha(0.1)
+            except:
+                pass
+            
+            font_size = 80
+            c.setFont(BASE_BOLD, font_size)
+            text_width = c.stringWidth(watermark_text, BASE_BOLD, font_size)
+            c.drawString(-text_width / 2.0, -font_size / 2.0, watermark_text)
+            
+        except Exception as e:
+            logger.error(f"Error drawing receipt watermark: {str(e)}")
+        finally:
+            c.restoreState()
+
+    def _draw_enhanced_header(c, d):
+        """Enhanced header (same as invoice)."""
+        c.saveState()
+        try:
+            header_height = 22 * mm
+            header_y = PAGE_HEIGHT - header_height
+            
+            c.setFillColor(HexColor(SUCCESS_COLOR))  # Green for receipt
+            c.rect(0, header_y, PAGE_WIDTH, header_height, fill=1, stroke=0)
+            
+            c.setFillColor(HexColor(ACCENT_COLOR))
+            c.rect(0, header_y, PAGE_WIDTH, 2, fill=1, stroke=0)
+            
+            # Logo positioning (same as invoice)
+            if logo_reader:
+                try:
+                    logo_margin = 8
+                    logo_x = logo_margin
+                    logo_max_height = header_height - 8
+                    logo_max_width = 60
+                    
+                    orig_width, orig_height = logo_reader.getSize()
+                    
+                    if orig_height > 0 and orig_width > 0:
+                        height_scale = logo_max_height / orig_height
+                        width_scale = logo_max_width / orig_width
+                        scale = min(height_scale, width_scale, 1.0)
+                        
+                        final_width = orig_width * scale
+                        final_height = orig_height * scale
+                        logo_y = header_y + (header_height - final_height) / 2
+                        
+                        c.drawImage(
+                            logo_reader,
+                            logo_x,
+                            logo_y,
+                            width=final_width,
+                            height=final_height,
+                            preserveAspectRatio=True,
+                            mask="auto"
+                        )
+                        
+                except Exception as e:
+                    logger.error(f"Error drawing logo in receipt: {str(e)}")
+            
+            # Company name in header
+            c.setFillColor(colors.white)
+            c.setFont(BASE_BOLD, 12)
+            company_name_y = header_y + header_height/2 + 3
+            c.drawRightString(PAGE_WIDTH - 15, company_name_y, company_name)
+            
+            company_phone = getattr(settings, "COMPANY_PHONE", "")
+            if company_phone:
+                c.setFont(BASE_FONT, 9)
+                c.setFillColor(HexColor("#E2E8F0"))
+                c.drawRightString(PAGE_WIDTH - 15, company_name_y - 10, company_phone)
+            
+        except Exception as e:
+            logger.error(f"Error drawing receipt header: {str(e)}")
+        finally:
+            c.restoreState()
+
+    def _draw_footer(c, d):
+        """Enhanced footer (same as invoice)."""
+        c.saveState()
+        try:
+            c.setStrokeColor(HexColor(MEDIUM_GRAY))
+            c.setLineWidth(0.5)
+            c.line(d.leftMargin, 20 * mm, PAGE_WIDTH - d.rightMargin, 20 * mm)
+            
+            c.setFont(BASE_FONT, 9)
+            c.setFillColor(HexColor(MEDIUM_GRAY))
+            c.drawRightString(PAGE_WIDTH - d.rightMargin, 15 * mm, f"Page {d.page}")
+            
+            company_email = getattr(settings, "COMPANY_EMAIL", "")
+            if company_email:
+                c.drawString(d.leftMargin, 15 * mm, company_email)
+                
+        except Exception as e:
+            logger.error(f"Error drawing receipt footer: {str(e)}")
+        finally:
+            c.restoreState()
+
+    def _page_decoration(c, d):
+        """Combined page decoration function."""
+        _draw_enhanced_watermark(c, d)
+        _draw_enhanced_header(c, d)
+        _draw_footer(c, d)
+
+    elems = []
+
+    # --- Enhanced title section -----------------------------------------------
+    receipt_code = getattr(order, "code", "") or ""
+    receipt_date = getattr(payment, "date", None) or getattr(order, "created_at", None)
+
+    elems.append(Spacer(1, 5))
     
-    # Enhanced receipt styling
-    x_margin, y_start = 25, 260
-    c.setFont("Helvetica-Bold", 18)
-    c.setFillColor(HexColor("#1E293B"))
+    # Title with enhanced styling
+    title_para = Paragraph(f"PAYMENT RECEIPT <font color='{SUCCESS_COLOR}'>{receipt_code}</font>", styles["H1"])
+    elems.append(title_para)
     
-    # Title
-    receipt_title = f"PAYMENT RECEIPT"
-    c.drawString(x_margin * mm, y_start * mm, receipt_title)
+    # Date and status information
+    date_info = f"<b>Receipt Date:</b> {getattr(receipt_date, 'strftime', lambda *_: 'N/A')('%d %B %Y')}"
+    date_info += f" &nbsp;&nbsp;|&nbsp;&nbsp; <b><font color='{SUCCESS_COLOR}'>PAYMENT RECEIVED</font></b>"
     
-    y_start -= 8
-    c.setFont("Helvetica", 10)
-    c.setFillColor(HexColor("#64748B"))
-    c.drawString(x_margin * mm, y_start * mm, f"Receipt for Invoice: {getattr(order, 'code', 'N/A')}")
-    
-    y_start -= 15
-    c.setFillColor(HexColor("#000000"))
-    c.setFont("Helvetica-Bold", 12)
+    elems.append(Paragraph(date_info, styles["Normal"]))
+    elems.append(Spacer(1, 15))
+
+    # --- Enhanced address blocks (same structure as invoice) ------------------
+    def create_address_block(label, name=None, address=None, email=None, phone=None):
+        content = [f"<b><font color='{DARK_GRAY}'>{label}</font></b>"]
+        if name: 
+            content.append(f"<b>{name}</b>")
+        if address: 
+            content.append(address)
+        if email: 
+            content.append(f"<font color='{ACCENT_COLOR}'>{email}</font>")
+        if phone: 
+            content.append(phone)
+        return Paragraph("<br/>".join(content), styles["Wrap"])
 
     # Company information
-    info_lines = [
-        ("Company:", getattr(settings, "COMPANY_NAME", "")),
-        ("Address:", getattr(settings, "COMPANY_ADDRESS", "")),
-        ("Phone:", getattr(settings, "COMPANY_PHONE", "")),
-        ("Email:", getattr(settings, "COMPANY_EMAIL", "")),
-        ("", ""),  # Spacer
-        ("Customer:", getattr(getattr(order, 'customer', None) or type('X',(),{})(), 'name', 'N/A')),
-        ("Payment Date:", format_date(getattr(payment, 'date', None))),
-        ("Payment Method:", getattr(payment, 'method', 'N/A')),
-        ("Reference:", getattr(payment, 'reference', 'N/A')),
-        ("Amount Paid:", money(getattr(payment, 'amount', 0))),
-        ("Status:", getattr(payment, 'status', 'N/A')),
-        ("", ""),  # Spacer
-        ("Banking Details:", ""),
-        ("Beneficiary:", BENEFICIARY_NAME),
-        ("Bank:", BANK_NAME),
-        ("Account No.:", BANK_ACCOUNT_NO),
+    company_addr = getattr(settings, "COMPANY_ADDRESS", "") or ""
+    company_email = getattr(settings, "COMPANY_EMAIL", "") or ""
+    company_phone = getattr(settings, "COMPANY_PHONE", "") or ""
+    from_block = create_address_block("FROM", company_name, company_addr, company_email, company_phone)
+
+    # Customer information
+    cust = getattr(order, "customer", None) or type("Customer", (), {})()
+    bill_name = getattr(cust, "name", "") or ""
+    bill_addr = getattr(cust, "address", None) or ""
+    bill_email = getattr(cust, "email", None) or ""
+    bill_phone = getattr(cust, "phone", None) or ""
+    bill_block = create_address_block("PAID BY", bill_name, bill_addr, bill_email, bill_phone)
+
+    # Create address table
+    from reportlab.lib.units import mm as _mm
+    addr_data = [[from_block, bill_block]]
+    addr_cols = _fit_colwidths([90 * _mm, 90 * _mm], FRAME_W)
+
+    addr_table = Table(addr_data, colWidths=addr_cols)
+    addr_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#E8F5E8")),  # Light green background
+        ("BOX", (0, 0), (-1, -1), 1, HexColor(SUCCESS_COLOR)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(SUCCESS_COLOR)),
+    ]))
+    
+    elems.extend([addr_table, Spacer(1, 20)])
+
+    # --- Payment Details Table ------------------------------------------------
+    payment_details = []
+    
+    if payment:
+        payment_details = [
+            ["Payment Details", ""],
+            ["Amount Paid:", money(getattr(payment, "amount", 0))],
+            ["Payment Method:", getattr(payment, "method", "N/A")],
+            ["Reference:", getattr(payment, "reference", "N/A") or "N/A"],
+            ["Transaction Date:", getattr(payment.date, 'strftime', lambda *_: 'N/A')('%d %B %Y %H:%M') if hasattr(payment, 'date') and payment.date else 'N/A'],
+        ]
+    else:
+        total_paid = getattr(order, "paid_amount", None) or getattr(order, "total", 0)
+        payment_details = [
+            ["Payment Details", ""],
+            ["Amount Paid:", money(total_paid)],
+            ["Payment Status:", "PAID IN FULL"],
+            ["Order Total:", money(getattr(order, "total", 0))],
+        ]
+
+    payment_table = Table(payment_details, colWidths=_fit_colwidths([70 * _mm, 50 * _mm], FRAME_W), hAlign="RIGHT")
+    payment_table.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+        ("FONTNAME", (0, 1), (-1, -1), BASE_FONT),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor(SUCCESS_COLOR)),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("BACKGROUND", (0, 1), (-1, -1), HexColor("#F0F9FF")),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor(SUCCESS_COLOR)),
+    ]))
+    elems.extend([payment_table, Spacer(1, 20)])
+
+    # --- Banking Information (same as invoice) --------------------------------
+    elems.append(Paragraph("Banking Details", styles["H2"]))
+    elems.append(Spacer(1, 8))
+    
+    bank_info = [
+        f"<b>Beneficiary:</b> {BENEFICIARY_NAME}",
+        f"<b>Bank:</b> {BANK_NAME}",
+        f"<b>Account No:</b> {BANK_ACCOUNT_NO}",
+        "",
+        "<font color='{}'>For future reference and verification.</font>".format(MEDIUM_GRAY)
     ]
     
-    for label, value in info_lines:
-        if label:
-            c.setFont("Helvetica-Bold", 10)
-            c.drawString(x_margin * mm, y_start * mm, label)
-            c.setFont("Helvetica", 10)
-            c.drawString((x_margin + 40) * mm, y_start * mm, str(value))
-        y_start -= 6
-        
-        if y_start < 50:  # New page if needed
-            c.showPage()
-            y_start = 260
+    bank_para = Paragraph("<br/>".join(bank_info), styles["Normal"])
 
-    # Footer
-    y_start -= 10
-    c.setFont("Helvetica", 8)
-    c.setFillColor(HexColor("#64748B"))
-    c.drawString(x_margin * mm, y_start * mm, f"Generated on: {format_date(getattr(payment, 'created_at', None))}")
+    bank_table = Table([[bank_para]], colWidths=[FRAME_W])
+    bank_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor(LIGHT_GRAY)),
+        ("BOX", (0, 0), (-1, -1), 1, HexColor(MEDIUM_GRAY)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 15),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 15),
+        ("TOPPADDING", (0, 0), (-1, -1), 12),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
     
-    c.showPage()
-    c.save()
-    
-    pdf_data = buf.getvalue()
-    buf.close()
-    
-    logger.info(f"Generated receipt PDF ({len(pdf_data)} bytes)")
-    return pdf_data
+    elems.extend([bank_table, Spacer(1, 25)])
+
+    # --- Receipt Footer -------------------------------------------------------
+    elems.append(Paragraph("Thank you for your payment!", styles["Center"]))
+    elems.append(Spacer(1, 5))
+    elems.append(Paragraph("This is a computer-generated receipt. No signature is required.", styles["Center"]))
+    elems.append(Spacer(1, 5))
+    elems.append(Paragraph("Please retain this receipt for your records.", styles["Muted"]))
+
+    # --- Build the PDF with enhanced settings ---------------------------------
+    try:
+        def _enhanced_canvasmaker(*args, **kwargs):
+            """Enhanced canvas maker with compression and metadata."""
+            from reportlab.pdfgen.canvas import Canvas
+            kwargs["pageCompression"] = 1
+            canvas = Canvas(*args, **kwargs)
+            
+            canvas.setTitle(f"Receipt {receipt_code}")
+            canvas.setAuthor(company_name)
+            canvas.setSubject(f"Payment Receipt for {getattr(getattr(order, 'customer', None), 'name', 'Customer')}")
+            canvas.setCreator("AA Alive Receipt System")
+            
+            return canvas
+
+        doc.build(
+            elems, 
+            onFirstPage=_page_decoration, 
+            onLaterPages=_page_decoration, 
+            canvasmaker=_enhanced_canvasmaker
+        )
+        
+        pdf_data = buf.getvalue()
+        buf.close()
+        
+        logger.info(f"Successfully generated Receipt PDF ({len(pdf_data)} bytes)")
+        return pdf_data
+        
+    except Exception as e:
+        logger.error(f"Error building receipt PDF: {str(e)}")
+        buf.close()
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -1087,75 +1378,472 @@ def installment_agreement_pdf(order: Order, plan: Plan) -> bytes:
 
 
 def _reportlab_quotation_pdf(quotation_data: dict) -> bytes:
-    """Generate a quotation PDF by copying the same template structure as invoices."""
-    # Create a mock order object to reuse invoice generation logic
-    from types import SimpleNamespace
+    """Generate an enhanced quotation PDF using the same styling as invoices."""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.units import mm
+        from reportlab.lib import colors
+        from reportlab.platypus import (
+            SimpleDocTemplate,
+            Paragraph,
+            Spacer,
+            Table,
+            TableStyle,
+            Image,
+            KeepTogether,
+        )
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.enums import TA_RIGHT, TA_CENTER
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.lib.colors import HexColor
+    except ImportError as exc:
+        raise RuntimeError(
+            "ReportLab is required to generate PDF documents. Install it with 'pip install reportlab'.",
+        ) from exc
+
+    # --- Same enhanced theme & helpers as invoice -----------------------------
+    try:
+        pdfmetrics.registerFont(TTFont("Inter", "/app/static/fonts/Inter-Regular.ttf"))
+        pdfmetrics.registerFont(TTFont("Inter-Bold", "/app/static/fonts/Inter-Bold.ttf"))
+        BASE_FONT, BASE_BOLD = "Inter", "Inter-Bold"
+        logger.info("Successfully loaded Inter fonts for quotation")
+    except Exception as e:
+        logger.warning(f"Failed to load Inter fonts for quotation: {str(e)}, using fallback")
+        BASE_FONT, BASE_BOLD = "Helvetica", "Helvetica-Bold"
+
+    # Enhanced color scheme (same as invoice)
+    BRAND_COLOR = "#1E293B"
+    ACCENT_COLOR = "#3B82F6" 
+    QUOTE_COLOR = "#8B5CF6"  # Purple for quotations
+    LIGHT_GRAY = "#F8FAFC"
+    MEDIUM_GRAY = "#64748B"
+    DARK_GRAY = "#334155"
     
-    # Extract data from quotation_data
+    CURRENCY = getattr(settings, "CURRENCY_PREFIX", "RM") or "RM"
+
+    def money(x):
+        try:
+            return f"{CURRENCY}{float(x or 0):,.2f}"
+        except Exception:
+            return f"{CURRENCY}0.00"
+
+    def _fmt_qty(q):
+        try:
+            qf = float(q or 0)
+            s = f"{qf:.2f}".rstrip("0").rstrip(".")
+            return s if s else "0"
+        except Exception:
+            return str(q or 0)
+
+    # Load images (same as invoice)
+    LOGO_PATH = getattr(settings, "COMPANY_LOGO_PATH", None)
+    LOGO_URL = getattr(settings, "COMPANY_LOGO_URL", None) or DEFAULT_LOGO_URL
+    logo_reader = _image_reader(LOGO_PATH, LOGO_URL)
+
+    # --- Enhanced styles (same as invoice) ------------------------------------
+    styles = getSampleStyleSheet()
+    styles["Normal"].fontName = BASE_FONT
+    styles["Normal"].fontSize = 10
+    styles["Normal"].leading = 12
+    styles["Title"].fontName = BASE_BOLD
+
+    styles.add(ParagraphStyle(name="Small", parent=styles["Normal"], fontSize=9, leading=11, textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="Right", parent=styles["Normal"], alignment=TA_RIGHT))
+    styles.add(ParagraphStyle(name="Center", parent=styles["Normal"], alignment=TA_CENTER))
+    styles.add(ParagraphStyle(name="Muted", parent=styles["Small"], textColor=MEDIUM_GRAY))
+    styles.add(ParagraphStyle(name="H1", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=24, leading=28, textColor=BRAND_COLOR))
+    styles.add(ParagraphStyle(name="H2", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=16, leading=20, textColor=DARK_GRAY))
+    styles.add(ParagraphStyle(name="H3", parent=styles["Normal"], fontName=BASE_BOLD, fontSize=12, leading=14, textColor=DARK_GRAY))
+    styles.add(ParagraphStyle(name="Wrap", parent=styles["Normal"], wordWrap="CJK"))
+    styles.add(ParagraphStyle(name="WrapBold", parent=styles["Wrap"], fontName=BASE_BOLD))
+    styles.add(ParagraphStyle(name="Highlight", parent=styles["Normal"], fontName=BASE_BOLD, textColor=QUOTE_COLOR))
+
+    # --- Enhanced document setup (same as invoice) ----------------------------
+    buf = BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        leftMargin=25 * mm,
+        rightMargin=25 * mm,
+        topMargin=30 * mm,
+        bottomMargin=25 * mm,
+    )
+    FRAME_W = doc.width
+    PAGE_WIDTH = A4[0]
+    PAGE_HEIGHT = A4[1]
+
+    company_name = getattr(settings, "COMPANY_NAME", "Your Company Name")
+
+    def _draw_enhanced_watermark(c, d):
+        """Enhanced diagonal watermark."""
+        watermark_text = "QUOTATION"
+        
+        c.saveState()
+        try:
+            center_x = d.leftMargin + d.width / 2.0
+            center_y = d.bottomMargin + d.height / 2.0
+            
+            c.translate(center_x, center_y)
+            c.rotate(45)
+            c.setFillColorRGB(0.9, 0.9, 0.9)
+            
+            try:
+                c.setFillAlpha(0.1)
+            except:
+                pass
+            
+            font_size = 80
+            c.setFont(BASE_BOLD, font_size)
+            text_width = c.stringWidth(watermark_text, BASE_BOLD, font_size)
+            c.drawString(-text_width / 2.0, -font_size / 2.0, watermark_text)
+            
+        except Exception as e:
+            logger.error(f"Error drawing quotation watermark: {str(e)}")
+        finally:
+            c.restoreState()
+
+    def _draw_enhanced_header(c, d):
+        """Enhanced header (same as invoice but purple theme)."""
+        c.saveState()
+        try:
+            header_height = 22 * mm
+            header_y = PAGE_HEIGHT - header_height
+            
+            c.setFillColor(HexColor(QUOTE_COLOR))  # Purple for quotation
+            c.rect(0, header_y, PAGE_WIDTH, header_height, fill=1, stroke=0)
+            
+            c.setFillColor(HexColor(ACCENT_COLOR))
+            c.rect(0, header_y, PAGE_WIDTH, 2, fill=1, stroke=0)
+            
+            # Logo positioning (same as invoice)
+            if logo_reader:
+                try:
+                    logo_margin = 8
+                    logo_x = logo_margin
+                    logo_max_height = header_height - 8
+                    logo_max_width = 60
+                    
+                    orig_width, orig_height = logo_reader.getSize()
+                    
+                    if orig_height > 0 and orig_width > 0:
+                        height_scale = logo_max_height / orig_height
+                        width_scale = logo_max_width / orig_width
+                        scale = min(height_scale, width_scale, 1.0)
+                        
+                        final_width = orig_width * scale
+                        final_height = orig_height * scale
+                        logo_y = header_y + (header_height - final_height) / 2
+                        
+                        c.drawImage(
+                            logo_reader,
+                            logo_x,
+                            logo_y,
+                            width=final_width,
+                            height=final_height,
+                            preserveAspectRatio=True,
+                            mask="auto"
+                        )
+                        
+                except Exception as e:
+                    logger.error(f"Error drawing logo in quotation: {str(e)}")
+            
+            # Company name in header
+            c.setFillColor(colors.white)
+            c.setFont(BASE_BOLD, 12)
+            company_name_y = header_y + header_height/2 + 3
+            c.drawRightString(PAGE_WIDTH - 15, company_name_y, company_name)
+            
+            company_phone = getattr(settings, "COMPANY_PHONE", "")
+            if company_phone:
+                c.setFont(BASE_FONT, 9)
+                c.setFillColor(HexColor("#E2E8F0"))
+                c.drawRightString(PAGE_WIDTH - 15, company_name_y - 10, company_phone)
+            
+        except Exception as e:
+            logger.error(f"Error drawing quotation header: {str(e)}")
+        finally:
+            c.restoreState()
+
+    def _draw_footer(c, d):
+        """Enhanced footer (same as invoice)."""
+        c.saveState()
+        try:
+            c.setStrokeColor(HexColor(MEDIUM_GRAY))
+            c.setLineWidth(0.5)
+            c.line(d.leftMargin, 20 * mm, PAGE_WIDTH - d.rightMargin, 20 * mm)
+            
+            c.setFont(BASE_FONT, 9)
+            c.setFillColor(HexColor(MEDIUM_GRAY))
+            c.drawRightString(PAGE_WIDTH - d.rightMargin, 15 * mm, f"Page {d.page}")
+            
+            company_email = getattr(settings, "COMPANY_EMAIL", "")
+            if company_email:
+                c.drawString(d.leftMargin, 15 * mm, company_email)
+                
+        except Exception as e:
+            logger.error(f"Error drawing quotation footer: {str(e)}")
+        finally:
+            c.restoreState()
+
+    def _page_decoration(c, d):
+        """Combined page decoration function."""
+        _draw_enhanced_watermark(c, d)
+        _draw_enhanced_header(c, d)
+        _draw_footer(c, d)
+
+    elems = []
+
+    # --- Enhanced title section -----------------------------------------------
+    quote_data = quotation_data.get("order", {})
     customer_data = quotation_data.get("customer", {})
-    order_data = quotation_data.get("order", {})
+    quote_code = f"QUO-{quotation_data.get('quote_date', '').replace('-', '')}" 
+    quote_date = quotation_data.get("quote_date", "")
+    valid_until = quotation_data.get("valid_until", "30 days from date")
+
+    elems.append(Spacer(1, 5))
     
-    # Create mock objects that mirror the Order/Customer structure
-    mock_customer = SimpleNamespace(
-        name=customer_data.get("name", "N/A"),
-        phone=customer_data.get("phone", ""),
-        address=customer_data.get("address", "")
-    )
+    # Title with enhanced styling
+    title_para = Paragraph(f"QUOTATION <font color='{QUOTE_COLOR}'>{quote_code}</font>", styles["H1"])
+    elems.append(title_para)
     
-    mock_items = []
-    for item_data in order_data.get("items", []):
-        mock_item = SimpleNamespace(
-            name=item_data.get("name", "Item"),
-            item_type=item_data.get("item_type", "OUTRIGHT"),
-            qty=item_data.get("qty", 1),
-            unit_price=item_data.get("unit_price", 0),
-            line_total=item_data.get("line_total", item_data.get("qty", 1) * item_data.get("unit_price", 0)),
-            monthly_amount=item_data.get("monthly_amount", 0)
-        )
-        mock_items.append(mock_item)
+    # Date and validity information
+    date_info = f"<b>Quote Date:</b> {quote_date}"
+    date_info += f" &nbsp;&nbsp;|&nbsp;&nbsp; <b>Valid Until:</b> {valid_until}"
     
-    # Create mock plan if exists
-    plan_data = order_data.get("plan")
-    mock_plan = None
+    elems.append(Paragraph(date_info, styles["Normal"]))
+    elems.append(Spacer(1, 15))
+
+    # --- Enhanced address blocks (same structure as invoice) ------------------
+    def create_address_block(label, name=None, address=None, email=None, phone=None):
+        content = [f"<b><font color='{DARK_GRAY}'>{label}</font></b>"]
+        if name: 
+            content.append(f"<b>{name}</b>")
+        if address: 
+            content.append(address)
+        if email: 
+            content.append(f"<font color='{ACCENT_COLOR}'>{email}</font>")
+        if phone: 
+            content.append(phone)
+        return Paragraph("<br/>".join(content), styles["Wrap"])
+
+    # Company information
+    company_addr = getattr(settings, "COMPANY_ADDRESS", "") or ""
+    company_email = getattr(settings, "COMPANY_EMAIL", "") or ""
+    company_phone = getattr(settings, "COMPANY_PHONE", "") or ""
+    from_block = create_address_block("FROM", company_name, company_addr, company_email, company_phone)
+
+    # Customer information
+    customer_name = customer_data.get("name", "N/A")
+    customer_phone = customer_data.get("phone", "")
+    customer_addr = customer_data.get("address", "")
+    customer_email = customer_data.get("email", "")
+    to_block = create_address_block("TO", customer_name, customer_addr, customer_email, customer_phone)
+
+    # Create address table
+    from reportlab.lib.units import mm as _mm
+    addr_data = [[from_block, to_block]]
+    addr_cols = _fit_colwidths([90 * _mm, 90 * _mm], FRAME_W)
+
+    addr_table = Table(addr_data, colWidths=addr_cols)
+    addr_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F3F4F6")),  # Light purple background
+        ("BOX", (0, 0), (-1, -1), 1, HexColor(QUOTE_COLOR)),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("TOPPADDING", (0, 0), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 10),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#E2E8F0")),
+    ]))
+    
+    elems.extend([addr_table, Spacer(1, 20)])
+
+    # --- Enhanced items table -------------------------------------------------
+    items_data = quote_data.get("items", [])
+    if items_data:
+        header_row = ["DESCRIPTION", "TYPE", "QTY", "UNIT PRICE", "AMOUNT"]
+        table_data = [header_row]
+        
+        subtotal = 0
+        for item in items_data:
+            name = item.get("name", "Item")
+            item_type = item.get("item_type", "OUTRIGHT")
+            qty = item.get("qty", 1)
+            unit_price = float(item.get("unit_price", 0))
+            line_total = float(item.get("line_total", qty * unit_price))
+            subtotal += line_total
+            
+            table_data.append([
+                name,
+                item_type,
+                _fmt_qty(qty),
+                money(unit_price),
+                money(line_total),
+            ])
+
+        # Add charges if any
+        charges = quote_data.get("charges", {})
+        delivery_fee = float(charges.get("delivery_fee", 0))
+        return_delivery_fee = float(charges.get("return_delivery_fee", 0))
+        
+        if delivery_fee > 0:
+            table_data.append(["Delivery Fee", "SERVICE", "1", money(delivery_fee), money(delivery_fee)])
+            subtotal += delivery_fee
+            
+        if return_delivery_fee > 0:
+            table_data.append(["Return Delivery Fee", "SERVICE", "1", money(return_delivery_fee), money(return_delivery_fee)])
+            subtotal += return_delivery_fee
+
+        # Enhanced column widths
+        items_cols = _fit_colwidths([
+            80 * _mm,  # Description
+            25 * _mm,  # Type
+            20 * _mm,  # Quantity
+            25 * _mm,  # Unit Price
+            28 * _mm,  # Amount
+        ], FRAME_W)
+
+        items_table = Table(table_data, colWidths=items_cols, repeatRows=1)
+        items_table.setStyle(TableStyle([
+            # Header styling
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor(QUOTE_COLOR)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+            ("FONTSIZE", (0, 0), (-1, 0), 10),
+            ("ALIGN", (0, 0), (-1, 0), "CENTER"),
+            
+            # Data rows styling
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, HexColor("#F8FAFC")]),
+            ("FONTNAME", (0, 1), (-1, -1), BASE_FONT),
+            ("FONTSIZE", (0, 1), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, HexColor("#E2E8F0")),
+            
+            # Alignment
+            ("ALIGN", (2, 1), (-1, -1), "RIGHT"),  # Numeric columns
+            ("ALIGN", (0, 1), (1, -1), "LEFT"),    # Description and Type
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            
+            # Padding
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        
+        elems.extend([items_table, Spacer(1, 20)])
+
+        # Total section
+        total_data = [[Paragraph("ESTIMATED TOTAL", styles["Highlight"]), Paragraph(money(subtotal), styles["Right"])]]
+        total_table = Table(total_data, colWidths=_fit_colwidths([70 * _mm, 50 * _mm], FRAME_W), hAlign="RIGHT")
+        total_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), HexColor("#F3F4F6")),
+            ("LINEABOVE", (0, 0), (-1, 0), 2, HexColor(QUOTE_COLOR)),
+            ("LINEBELOW", (0, 0), (-1, 0), 2, HexColor(QUOTE_COLOR)),
+            ("ALIGN", (1, 0), (-1, -1), "RIGHT"),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ]))
+        elems.extend([total_table, Spacer(1, 20)])
+
+    # --- Payment plan information (if applicable) -----------------------------
+    plan_data = quote_data.get("plan")
     if plan_data:
-        mock_plan = SimpleNamespace(
-            plan_type=plan_data.get("plan_type"),
-            months=plan_data.get("months"),
-            monthly_amount=plan_data.get("monthly_amount", 0),
-            start_date=None
+        elems.append(Paragraph("Payment Plan", styles["H2"]))
+        elems.append(Spacer(1, 8))
+        
+        plan_details = [
+            ["Plan Details", ""],
+            ["Plan Type:", plan_data.get("plan_type", "N/A")],
+            ["Duration:", f"{plan_data.get('months', 'N/A')} months"],
+            ["Monthly Amount:", money(plan_data.get("monthly_amount", 0))],
+        ]
+        
+        plan_table = Table(plan_details, colWidths=_fit_colwidths([70 * _mm, 50 * _mm], FRAME_W))
+        plan_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, 0), BASE_BOLD),
+            ("FONTNAME", (0, 1), (-1, -1), BASE_FONT),
+            ("FONTSIZE", (0, 0), (-1, -1), 10),
+            ("BACKGROUND", (0, 0), (-1, 0), HexColor(QUOTE_COLOR)),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("BACKGROUND", (0, 1), (-1, -1), HexColor("#FFF9E6")),
+            ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 8),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("GRID", (0, 0), (-1, -1), 0.5, HexColor(QUOTE_COLOR)),
+        ]))
+        elems.extend([plan_table, Spacer(1, 20)])
+
+    # --- Notes section --------------------------------------------------------
+    notes = quote_data.get("notes")
+    if notes:
+        elems.append(Paragraph("Notes", styles["H2"]))
+        elems.append(Spacer(1, 6))
+        elems.append(Paragraph(notes, styles["Normal"]))
+        elems.append(Spacer(1, 15))
+
+    # --- Terms & conditions for quotations -----------------------------------
+    elems.append(Paragraph("Terms & Conditions", styles["H2"]))
+    elems.append(Spacer(1, 8))
+    
+    terms = [
+        "• This quotation is valid for 30 days from the date of issue",
+        "• Prices are subject to change without prior notice", 
+        "• Delivery charges may apply based on location",
+        "• Payment terms will be confirmed upon order acceptance",
+        "• All sales are subject to our standard terms and conditions",
+        "• This quotation does not constitute a binding contract until accepted"
+    ]
+    
+    for term in terms:
+        elems.append(Paragraph(term, styles["Small"]))
+    
+    elems.append(Spacer(1, 15))
+
+    # --- Quotation Footer -----------------------------------------------------
+    elems.append(Paragraph("Thank you for your interest in our services!", styles["Center"]))
+    elems.append(Spacer(1, 5))
+    elems.append(Paragraph("This is a computer-generated quotation. No signature is required.", styles["Center"]))
+    elems.append(Spacer(1, 5))
+    elems.append(Paragraph("Please contact us to confirm your order or for any clarifications.", styles["Muted"]))
+
+    # --- Build the PDF with enhanced settings ---------------------------------
+    try:
+        def _enhanced_canvasmaker(*args, **kwargs):
+            """Enhanced canvas maker with compression and metadata."""
+            from reportlab.pdfgen.canvas import Canvas
+            kwargs["pageCompression"] = 1
+            canvas = Canvas(*args, **kwargs)
+            
+            canvas.setTitle(f"Quotation {quote_code}")
+            canvas.setAuthor(company_name)
+            canvas.setSubject(f"Quotation for {customer_name}")
+            canvas.setCreator("AA Alive Quotation System")
+            
+            return canvas
+
+        doc.build(
+            elems, 
+            onFirstPage=_page_decoration, 
+            onLaterPages=_page_decoration, 
+            canvasmaker=_enhanced_canvasmaker
         )
-    
-    # Create mock order
-    charges = order_data.get("charges", {})
-    mock_order = SimpleNamespace(
-        id="QUOTE",
-        code=f"QUOTE-{quotation_data.get('quote_date', '').replace('-', '')}",
-        customer=mock_customer,
-        customer_name=customer_data.get("name", "N/A"),
-        customer_phone=customer_data.get("phone", ""),
-        customer_address=customer_data.get("address", ""),
-        delivery_address=customer_data.get("address", ""),
-        items=mock_items,
-        plan=mock_plan,
-        delivery_fee=charges.get("delivery_fee", 0),
-        return_delivery_fee=charges.get("return_delivery_fee", 0),
-        total=sum(item.line_total for item in mock_items) + charges.get("delivery_fee", 0) + charges.get("return_delivery_fee", 0),
-        subtotal=sum(item.line_total for item in mock_items),
-        notes=order_data.get("notes", ""),
-        type=order_data.get("type", "OUTRIGHT"),
-        delivery_date=order_data.get("delivery_date"),
-        created_at=quotation_data.get("quote_date", ""),
-        company=None  # No company branding override
-    )
-    
-    # Now call the same invoice generation function but modify the output
-    pdf_bytes = _generate_quotation_using_invoice_template(mock_order, quotation_data)
-    
-    logger.info(f"Generated quotation PDF ({len(pdf_bytes)} bytes)")
-    return pdf_bytes
-
-
-def _generate_quotation_using_invoice_template(order, quotation_data: dict) -> bytes:
+        
+        pdf_data = buf.getvalue()
+        buf.close()
+        
+        logger.info(f"Successfully generated Quotation PDF ({len(pdf_data)} bytes)")
+        return pdf_data
+        
+    except Exception as e:
+        logger.error(f"Error building quotation PDF: {str(e)}")
+        buf.close()
+        raise
     """Generate quotation by reusing invoice template logic but with quotation-specific changes."""
     try:
         from reportlab.lib.pagesizes import A4
