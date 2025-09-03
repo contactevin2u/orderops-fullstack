@@ -29,7 +29,8 @@ android {
         if (localProps.exists()) {
             props.load(localProps.inputStream())
         }
-        val apiBase = props.getProperty("API_BASE") ?: System.getenv("API_BASE") ?: ""
+        val apiBase = props.getProperty("API_BASE") ?: System.getenv("API_BASE") ?: "http://14.192.215.70"
+        println("DEBUG: Setting API_BASE to: $apiBase")
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
 

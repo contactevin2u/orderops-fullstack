@@ -37,6 +37,11 @@ jobs:
     - name: Create local.properties
       run: |
         echo "API_BASE=${{ secrets.API_BASE }}" > driver-app/local.properties
+        echo "DEBUG: API_BASE secret length: ${#API_BASE}"
+        echo "DEBUG: Created local.properties:"
+        cat driver-app/local.properties
+      env:
+        API_BASE: ${{ secrets.API_BASE }}
     
     - name: Create google-services.json
       run: |
