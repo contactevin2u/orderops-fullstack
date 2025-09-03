@@ -28,6 +28,7 @@ from .routers import (
     debug,
     debug_trace,
     upsells,
+    admin_master,
 )
 from .audit import router as audit_router
 
@@ -64,4 +65,5 @@ app.include_router(assignment.router)
 app.include_router(debug.router)
 app.include_router(debug_trace.router)
 app.include_router(upsells.router)
+app.include_router(admin_master.router)
 app.include_router(audit_router)
