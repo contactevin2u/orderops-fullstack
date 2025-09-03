@@ -41,7 +41,7 @@ Add these secrets:
 4. **KEY_PASSWORD**
    - The key password (usually same as keystore password)
 
-5. **API_BASE_URL**
+5. **API_BASE**
    - Your production API base URL (e.g., "https://api.yourcompany.com")
 
 6. **GOOGLE_SERVICES_JSON**
