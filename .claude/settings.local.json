@@ -28,7 +28,8 @@
       "Bash(dir:*)",
       "Bash(npm install:*)",
       "Bash(npm run dev:*)",
-      "Bash(del check_migration.py)"
+      "Bash(del check_migration.py)",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": []
