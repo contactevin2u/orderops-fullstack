@@ -30,7 +30,8 @@
       "Bash(npm run dev:*)",
       "Bash(del check_migration.py)",
       "Bash(git tag:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(source:*)"
     ],
     "deny": [],
     "ask": []

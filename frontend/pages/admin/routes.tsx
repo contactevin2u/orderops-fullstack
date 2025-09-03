@@ -75,7 +75,7 @@ export function RouteCard({
         )}
         <div className="cluster" style={{ fontSize: '0.875rem' }}>
           <span style={{ fontWeight: 500 }}>Stops:</span>
-          <span style={{ color: 'var(--color-border-muted)' }}>—</span>
+          <span style={{ color: 'var(--color-border-muted)' }}>{route.stops.length}</span>
         </div>
       </div>
       <button

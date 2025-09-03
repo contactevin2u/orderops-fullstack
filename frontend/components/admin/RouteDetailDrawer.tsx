@@ -145,11 +145,33 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
   }, [onClose]);
 
   const [selected, setSelected] = React.useState<string[]>([]);
+  const [viewMode, setViewMode] = React.useState<'list' | 'clusters'>('list');
+  
   const toggle = (id: string, checked: boolean) => {
     setSelected((prev) => {
       if (checked) return [...prev, id];
       return prev.filter((x) => x !== id);
     });
+  };
+
+  const groupOrdersByArea = (orders: Order[]) => {
+    const groups: Record<string, Order[]> = {};
+    orders.forEach(order => {
+      const address = order.customerAddress || order.address || 'No address';
+      const area = extractArea(address);
+      if (!groups[area]) groups[area] = [];
+      groups[area].push(order);
+    });
+    return Object.entries(groups).sort(([, a], [, b]) => b.length - a.length);
+  };
+
+  const extractArea = (address: string) => {
+    if (address === 'No address') return 'No address';
+    const parts = address.split(',').map(p => p.trim());
+    if (parts.length >= 2) {
+      return parts[parts.length - 2] || parts[parts.length - 1];
+    }
+    return parts[0] || 'Unknown area';
   };
 
   const handleAddSelected = () => {
@@ -172,24 +194,34 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
       <h3>Stops</h3>
       <table className="table">
         <thead>
-          <tr><th>Seq</th><th>Order</th><th>Status</th><th></th></tr>
+          <tr><th>Seq</th><th>Order</th><th>Address</th><th>Status</th><th></th></tr>
         </thead>
         <tbody>
           {assignedQuery.isLoading && (
             <tr>
-              <td colSpan={4} role="status">Loading...</td>
+              <td colSpan={5} role="status">Loading...</td>
             </tr>
           )}
           {assignedQuery.isError && (
             <tr>
-              <td colSpan={4} role="alert">Failed to load</td>
+              <td colSpan={5} role="alert">Failed to load</td>
             </tr>
           )}
           {!assignedQuery.isLoading &&
             (assignedQuery.data || []).map((o: Order, idx: number) => (
               <tr key={o.id}>
                 <td>{idx + 1}</td>
-                <td>{o.orderNo}</td>
+                <td>
+                  <div style={{ fontSize: '0.9em', fontWeight: 500 }}>{o.orderNo}</div>
+                  {o.customerName && (
+                    <div style={{ fontSize: '0.8em', color: 'var(--color-border-muted)' }}>
+                      {o.customerName}
+                    </div>
+                  )}
+                </td>
+                <td style={{ fontSize: '0.8em', maxWidth: '120px', wordWrap: 'break-word' }}>
+                  {o.customerAddress || o.address || 'No address'}
+                </td>
                 <td>{o.status}</td>
                 <td>
                   <button onClick={() => removeMutation.mutate(o.id)}>Remove</button>
@@ -197,39 +229,124 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
               </tr>
             ))}
           {!assignedQuery.isLoading && (assignedQuery.data?.length || 0) === 0 && (
-            <tr><td colSpan={4} style={{ opacity: 0.6 }}>No stops</td></tr>
+            <tr><td colSpan={5} style={{ opacity: 0.6 }}>No stops</td></tr>
           )}
         </tbody>
       </table>
       {unassigned && unassigned.length > 0 && (
         <div style={{ marginTop: 24 }}>
-          <h3>Add from Unassigned</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <h3 style={{ margin: 0 }}>Add from Unassigned</h3>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setViewMode(viewMode === 'list' ? 'clusters' : 'list')}
+                style={{ fontSize: '0.8em', padding: '4px 8px', background: 'var(--color-border)', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                {viewMode === 'list' ? '📍 Cluster' : '📋 List'}
+              </button>
+            </div>
+          </div>
           <button
             onClick={handleAddSelected}
             disabled={selected.length === 0}
-            style={{ marginBottom: 8 }}
+            style={{ marginBottom: 12 }}
           >
-            Add Selected
+            Add Selected ({selected.length})
           </button>
-          <ul>
-            {unassigned.map((o: Order) => (
-              <li key={o.id} style={{ marginBottom: 4 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <input
-                    type="checkbox"
-                    checked={selected.includes(o.id)}
-                    onChange={(e) => toggle(o.id, e.target.checked)}
-                  />
-                  <span>{o.orderNo}</span>
-                  {getOrderBadges(o, route.date).map((b) => (
-                    <span key={b} style={{ marginLeft: 4, fontSize: '0.8em', color: '#c00' }}>
-                      {b}
+          {viewMode === 'list' ? (
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {unassigned.map((o: Order) => (
+                <li key={o.id} style={{ marginBottom: 8, padding: 8, border: '1px solid var(--color-border)', borderRadius: '4px' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(o.id)}
+                      onChange={(e) => toggle(o.id, e.target.checked)}
+                      style={{ marginTop: 2 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '0.9em', fontWeight: 500, marginBottom: 2 }}>
+                        {o.orderNo}
+                        {o.customerName && (
+                          <span style={{ marginLeft: 8, fontSize: '0.8em', fontWeight: 'normal', color: 'var(--color-border-muted)' }}>
+                            {o.customerName}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.8em', color: 'var(--color-text)', marginBottom: 4, wordWrap: 'break-word' }}>
+                        📍 {o.customerAddress || o.address || 'No address'}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                        {getOrderBadges(o, route.date).map((b) => (
+                          <span key={b} style={{ fontSize: '0.7em', background: '#fee', color: '#c00', padding: '2px 6px', borderRadius: '12px' }}>
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div>
+              {groupOrdersByArea(unassigned).map(([area, orders]) => (
+                <div key={area} style={{ marginBottom: 16, border: '1px solid var(--color-border)', borderRadius: '6px', overflow: 'hidden' }}>
+                  <div style={{ 
+                    background: 'var(--color-bg-secondary)', 
+                    padding: '8px 12px', 
+                    fontSize: '0.9em', 
+                    fontWeight: 500,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                  }}>
+                    <span>📍 {area}</span>
+                    <span style={{ fontSize: '0.8em', color: 'var(--color-border-muted)' }}>
+                      {orders.length} order{orders.length !== 1 ? 's' : ''}
                     </span>
-                  ))}
-                </label>
-              </li>
-            ))}
-          </ul>
+                  </div>
+                  <div style={{ padding: '4px' }}>
+                    {orders.map((o: Order) => (
+                      <label key={o.id} style={{ 
+                        display: 'flex', 
+                        alignItems: 'flex-start', 
+                        gap: 8, 
+                        cursor: 'pointer',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        margin: '2px 0'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(o.id)}
+                          onChange={(e) => toggle(o.id, e.target.checked)}
+                          style={{ marginTop: 2 }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: '0.85em', marginBottom: 2 }}>
+                            <span style={{ fontWeight: 500 }}>{o.orderNo}</span>
+                            {o.customerName && (
+                              <span style={{ marginLeft: 8, color: 'var(--color-border-muted)' }}>
+                                {o.customerName}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
+                            {getOrderBadges(o, route.date).map((b) => (
+                              <span key={b} style={{ fontSize: '0.65em', background: '#fee', color: '#c00', padding: '1px 4px', borderRadius: '8px' }}>
+                                {b}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
