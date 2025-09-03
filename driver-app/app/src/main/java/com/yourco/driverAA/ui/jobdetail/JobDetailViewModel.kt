@@ -8,6 +8,9 @@ import com.yourco.driverAA.data.api.UpsellRequest
 import com.yourco.driverAA.data.api.UpsellItemRequest
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.util.Result
+import com.yourco.driverAA.util.OrderStateValidator
+import com.yourco.driverAA.util.ValidationResult
+import com.yourco.driverAA.util.MalayErrorMessages
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -49,10 +52,22 @@ class JobDetailViewModel @Inject constructor(
     private val _uploadedPhotoFiles = MutableStateFlow<Map<Int, File>>(emptyMap())
     val uploadedPhotoFiles: StateFlow<Map<Int, File>> = _uploadedPhotoFiles.asStateFlow()
     
+    // Store all driver jobs for validation
+    private val _allJobs = MutableStateFlow<List<JobDto>>(emptyList())
+    val allJobs: StateFlow<List<JobDto>> = _allJobs.asStateFlow()
+    
+    // Success message for positive feedback
+    private val _successMessage = MutableStateFlow<String?>(null)
+    val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
+    
     fun loadJob(jobId: String) {
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
+            _successMessage.value = null
+            
+            // Load all driver jobs for validation
+            loadAllJobs()
             
             when (val result = repository.getJob(jobId)) {
                 is Result.Success -> {
@@ -60,7 +75,7 @@ class JobDetailViewModel @Inject constructor(
                     _loading.value = false
                 }
                 is Result.Error -> {
-                    _error.value = result.throwable.message ?: "Failed to load job"
+                    _error.value = MalayErrorMessages.getErrorMessage(result.throwable)
                     _loading.value = false
                 }
                 is Result.Loading -> {
@@ -70,26 +85,67 @@ class JobDetailViewModel @Inject constructor(
         }
     }
     
+    private fun loadAllJobs() {
+        viewModelScope.launch {
+            repository.getJobs("active").collect { result ->
+                when (result) {
+                    is Result.Success -> {
+                        _allJobs.value = result.data
+                    }
+                    is Result.Error -> {
+                        // Don't show error for background job loading
+                    }
+                    is Result.Loading -> {
+                        // Loading handled by main job loading
+                    }
+                }
+            }
+        }
+    }
+    
     fun updateStatus(newStatus: String) {
+        val currentJob = _job.value ?: return
+        val allJobsList = _allJobs.value
+        
+        // Validate the status change
+        val validation = OrderStateValidator.validateStatusChange(allJobsList, currentJob.id, newStatus)
+        
+        if (validation.isError) {
+            _error.value = validation.message
+            return
+        }
+        
         if (newStatus == "ON_HOLD") {
             // Show dialog to ask about customer availability
             _showOnHoldDialog.value = true
             return
         }
         
-        val currentJob = _job.value ?: return
+        // Special validation for DELIVERED status - check PoD photos
+        if (newStatus == "DELIVERED") {
+            val hasUploadedPhotos = _uploadedPhotos.value.isNotEmpty()
+            if (!hasUploadedPhotos) {
+                _error.value = "Sila muat naik gambar Proof of Delivery (PoD) sebelum menandakan sebagai dihantar"
+                return
+            }
+        }
         
         viewModelScope.launch {
             _loading.value = true
             _error.value = null
+            _successMessage.value = null
             
             when (val result = repository.updateOrderStatus(currentJob.id, newStatus)) {
                 is Result.Success -> {
                     _job.value = result.data
+                    _successMessage.value = validation.message
                     _loading.value = false
+                    
+                    // Reload all jobs to update validation state
+                    loadAllJobs()
                 }
                 is Result.Error -> {
-                    _error.value = result.throwable.message ?: "Failed to update status"
+                    _error.value = MalayErrorMessages.getErrorMessage(result.throwable)
                     _loading.value = false
                 }
                 is Result.Loading -> {
@@ -122,7 +178,7 @@ class JobDetailViewModel @Inject constructor(
                 is Result.Error -> {
                     // Remove from uploading on error
                     _uploadingPhotos.value = _uploadingPhotos.value - photoNumber
-                    _error.value = result.throwable.message ?: "Failed to upload photo $photoNumber"
+                    _error.value = "Muat naik gambar $photoNumber gagal. ${MalayErrorMessages.getErrorMessage(result.throwable)}"
                 }
                 is Result.Loading -> {
                     // Loading state is handled by _uploadingPhotos
@@ -160,7 +216,7 @@ class JobDetailViewModel @Inject constructor(
                     loadJob(currentJob.id)
                 }
                 is Result.Error -> {
-                    _error.value = result.throwable.message ?: "Failed to handle on-hold response"
+                    _error.value = "Gagal mengemaskini status tangguh. ${MalayErrorMessages.getErrorMessage(result.throwable)}"
                     _loading.value = false
                 }
                 is Result.Loading -> {
@@ -197,12 +253,12 @@ class JobDetailViewModel @Inject constructor(
             // Safely convert item.id to integer
             val itemId = try {
                 item.id?.toInt() ?: run {
-                    _error.value = "Invalid item ID"
+                    _error.value = "ID item tidak sah"
                     _loading.value = false
                     return@launch
                 }
             } catch (e: NumberFormatException) {
-                _error.value = "Invalid item ID format"
+                _error.value = "Format ID item tidak sah"
                 _loading.value = false
                 return@launch
             }
@@ -226,7 +282,7 @@ class JobDetailViewModel @Inject constructor(
                     loadJob(currentJob.id)
                 }
                 is Result.Error -> {
-                    _error.value = result.throwable.message ?: "Failed to upsell item"
+                    _error.value = "Gagal menambah item. ${MalayErrorMessages.getErrorMessage(result.throwable)}"
                     _loading.value = false
                 }
                 is Result.Loading -> {
@@ -234,5 +290,56 @@ class JobDetailViewModel @Inject constructor(
                 }
             }
         }
+    }
+    
+    // Helper functions for UI
+    fun getStatusDisplayText(status: String?): String {
+        return OrderStateValidator.getStatusDisplayText(status)
+    }
+    
+    fun getActionButtonText(targetStatus: String): String {
+        val currentStatus = _job.value?.status
+        return OrderStateValidator.getActionButtonText(currentStatus, targetStatus)
+    }
+    
+    fun getOrderStateMessage(): String {
+        val currentJob = _job.value ?: return ""
+        return OrderStateValidator.getOrderStateMessage(currentJob)
+    }
+    
+    fun canPerformAction(targetStatus: String): Boolean {
+        val currentJob = _job.value ?: return false
+        val allJobsList = _allJobs.value
+        val validation = OrderStateValidator.validateStatusChange(allJobsList, currentJob.id, targetStatus)
+        return validation.isSuccess
+    }
+    
+    fun getValidationMessage(targetStatus: String): String {
+        val currentJob = _job.value ?: return ""
+        val allJobsList = _allJobs.value
+        val validation = OrderStateValidator.validateStatusChange(allJobsList, currentJob.id, targetStatus)
+        return validation.message
+    }
+    
+    fun clearMessages() {
+        _error.value = null
+        _successMessage.value = null
+    }
+    
+    fun isOrderInTransit(): Boolean {
+        return _job.value?.status == "STARTED"
+    }
+    
+    fun isOrderCompleted(): Boolean {
+        val status = _job.value?.status
+        return status == "DELIVERED" || status == "CANCELLED"
+    }
+    
+    fun hasInTransitOrders(): Boolean {
+        return _allJobs.value.any { it.status == "STARTED" }
+    }
+    
+    fun getInTransitOrderCode(): String? {
+        return _allJobs.value.find { it.status == "STARTED" }?.code
     }
 }
