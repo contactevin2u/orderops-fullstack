@@ -1,0 +1,84 @@
+name: Android Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    - name: Cache Gradle dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+    
+    - name: Decode Keystore
+      run: |
+        echo "${{ secrets.KEYSTORE_FILE }}" | base64 -d > driver-app/keystore.jks
+    
+    - name: Create local.properties
+      run: |
+        echo "API_BASE=${{ secrets.API_BASE_URL }}" > driver-app/local.properties
+    
+    - name: Create google-services.json
+      run: |
+        echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > driver-app/app/google-services.json
+    
+    - name: Grant execute permission to gradlew
+      run: chmod +x driver-app/gradlew
+    
+    - name: Build Release AAB
+      run: |
+        cd driver-app
+        ./gradlew bundleRelease --stacktrace
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        API_BASE: ${{ secrets.API_BASE_URL }}
+    
+    - name: Upload Release AAB
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-aab
+        path: driver-app/app/build/outputs/bundle/release/app-release.aab
+    
+    - name: Upload Release APK (for testing)
+      run: |
+        cd driver-app
+        ./gradlew assembleRelease
+      env:
+        KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        API_BASE: ${{ secrets.API_BASE_URL }}
+    
+    - name: Upload Release APK Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: release-apk
+        path: driver-app/app/build/outputs/apk/release/app-release.apk
+    
+    - name: Clean up sensitive files
+      if: always()
+      run: |
+        rm -f driver-app/keystore.jks
+        rm -f driver-app/app/google-services.json
