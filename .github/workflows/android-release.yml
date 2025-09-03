@@ -42,8 +42,11 @@ jobs:
       run: |
         echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > driver-app/app/google-services.json
     
-    - name: Grant execute permission to gradlew
-      run: chmod +x driver-app/gradlew
+    - name: Fix Gradle Wrapper
+      run: |
+        rm -f driver-app/gradle/wrapper/gradle-wrapper.jar
+        curl -L -o driver-app/gradle/wrapper/gradle-wrapper.jar https://github.com/gradle/gradle/raw/v8.9.0/gradle/wrapper/gradle-wrapper.jar
+        chmod +x driver-app/gradlew
     
     - name: Build Release AAB
       run: |
