@@ -67,10 +67,16 @@ class JobsRepository @Inject constructor(
         api.getDriverOrders(month)
     
     suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> = try {
+        android.util.Log.i("JobsRepository", "Putting order $orderId on hold with delivery_date: $deliveryDate")
+        
         // Update the order via PATCH endpoint and extract from envelope
         val patchResponse = api.patchOrder(orderId, OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate))
+        android.util.Log.i("JobsRepository", "PATCH response: ${patchResponse}")
+        
         // Convert OrderDto to JobDto by refetching (since they have different structures)
         val updatedJob = api.getJob(orderId)
+        android.util.Log.i("JobsRepository", "Updated job status: ${updatedJob.status}")
+        
         Result.Success(updatedJob)
     } catch (e: Exception) {
         Result.error(e, "update_status")

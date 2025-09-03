@@ -37,6 +37,9 @@ def driver_update_order(
     db: Session = Depends(get_session)
 ):
     """Allow drivers to update orders they're assigned to"""
+    print(f"DEBUG: Driver {driver.id} updating order {order_id}")
+    print(f"DEBUG: Request body: {body.model_dump(exclude_none=True)}")
+    
     try:
         # First, verify the driver is assigned to this order
         trip = (
@@ -45,6 +48,7 @@ def driver_update_order(
             .one_or_none()
         )
         if not trip:
+            print(f"DEBUG: No trip found for driver {driver.id} and order {order_id}")
             raise HTTPException(404, "Order not found or not assigned to you")
 
         order = db.get(Order, order_id)
@@ -55,20 +59,27 @@ def driver_update_order(
         
         # Handle ON_HOLD special case: customer requested reschedule
         if data.get("status") == "ON_HOLD":
+            print(f"DEBUG: Processing ON_HOLD for order {order_id}")
+            
             # Update delivery_date if provided
             if data.get("delivery_date"):
                 try:
                     if isinstance(data["delivery_date"], str):
                         parsed_date = datetime.fromisoformat(data["delivery_date"].replace('Z', '+00:00'))
                         order.delivery_date = parsed_date
+                        print(f"DEBUG: Updated delivery_date to {parsed_date}")
                 except ValueError:
                     raise HTTPException(400, f"Invalid date format: {data['delivery_date']}")
             
             # Make trip available for reassignment while keeping current driver info for audit
+            print(f"DEBUG: Setting trip status from {trip.status} to UNASSIGNED")
             trip.status = "UNASSIGNED"
             trip.route_id = None
+            
+            # Set order status to ON_HOLD
+            print(f"DEBUG: Setting order status from {order.status} to ON_HOLD")
+            order.status = "ON_HOLD"
             # Keep driver_id for audit trail, assignment service will update when reassigning
-            # Order status remains unchanged - no need to modify order status
             
         else:
             # Only allow drivers to update specific fields for other operations
@@ -91,6 +102,7 @@ def driver_update_order(
     
         db.commit()
         db.refresh(order)
+        print(f"DEBUG: Successfully updated order {order_id}. Final status: {order.status}")
         return envelope(OrderOut.model_validate(order))
     except Exception as e:
         db.rollback()
