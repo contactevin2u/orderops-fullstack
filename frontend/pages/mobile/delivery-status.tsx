@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
@@ -22,10 +22,31 @@ export default function MobileDeliveryStatusPage() {
   const [showUnassigned, setShowUnassigned] = useState(false);
   const [showDriverSelector, setShowDriverSelector] = useState(false);
   const [selectedOrders, setSelectedOrders] = useState<Set<string>>(new Set());
+  const [showDesktopRedirect, setShowDesktopRedirect] = useState(false);
   const router = useRouter();
   const qc = useQueryClient();
   
   const today = new Date().toISOString().slice(0, 10);
+
+  // Check if user is on desktop and show redirect prompt
+  useEffect(() => {
+    const checkDevice = () => {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isSmallScreen = window.innerWidth < 768;
+      
+      if (!isMobile && !isSmallScreen) {
+        setShowDesktopRedirect(true);
+      }
+    };
+
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
+
+  const handleGoToAdmin = () => {
+    router.push('/admin/routes');
+  };
 
   // Fetch today's data
   const routesQuery = useQuery({
@@ -892,6 +913,31 @@ export default function MobileDeliveryStatusPage() {
             ))
           )}
         </div>
+
+        {/* Desktop Redirect Modal */}
+        {showDesktopRedirect && (
+          <div className="desktop-redirect-overlay">
+            <div className="desktop-redirect-modal">
+              <div className="redirect-icon">🖥️</div>
+              <h2>Desktop Version Available</h2>
+              <p>
+                This page is optimized for mobile devices. For the best desktop experience, 
+                please use the full admin interface.
+              </p>
+              <div className="redirect-actions">
+                <button className="btn-admin" onClick={handleGoToAdmin}>
+                  Go to Admin Routes
+                </button>
+                <button 
+                  className="btn-continue" 
+                  onClick={() => setShowDesktopRedirect(false)}
+                >
+                  Continue Here
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       <style jsx>{`
@@ -1037,6 +1083,84 @@ export default function MobileDeliveryStatusPage() {
           color: #64748b;
         }
         
+        .desktop-redirect-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          padding: 2rem;
+        }
+        
+        .desktop-redirect-modal {
+          background: white;
+          border-radius: 16px;
+          padding: 2rem;
+          max-width: 400px;
+          text-align: center;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .redirect-icon {
+          font-size: 3rem;
+          margin-bottom: 1rem;
+        }
+        
+        .desktop-redirect-modal h2 {
+          font-size: 1.5rem;
+          font-weight: 600;
+          color: #1e293b;
+          margin: 0 0 1rem 0;
+        }
+        
+        .desktop-redirect-modal p {
+          color: #64748b;
+          line-height: 1.6;
+          margin: 0 0 2rem 0;
+        }
+        
+        .redirect-actions {
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+        }
+        
+        .btn-admin {
+          background: #3b82f6;
+          color: white;
+          border: none;
+          padding: 0.75rem 1.5rem;
+          border-radius: 8px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.2s ease;
+        }
+        
+        .btn-admin:hover {
+          background: #2563eb;
+        }
+        
+        .btn-continue {
+          background: none;
+          color: #64748b;
+          border: 1px solid #e2e8f0;
+          padding: 0.75rem 1.5rem;
+          border-radius: 8px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        
+        .btn-continue:hover {
+          background: #f8fafc;
+          border-color: #cbd5e1;
+        }
+        
         @media (max-width: 380px) {
           .stats-row {
             padding: 0.75rem;
@@ -1053,6 +1177,14 @@ export default function MobileDeliveryStatusPage() {
           
           .header {
             padding: 1.5rem 0.75rem 1.25rem;
+          }
+          
+          .desktop-redirect-overlay {
+            padding: 1rem;
+          }
+          
+          .desktop-redirect-modal {
+            padding: 1.5rem;
           }
         }
       `}</style>
