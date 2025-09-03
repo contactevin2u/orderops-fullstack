@@ -71,15 +71,12 @@ def driver_update_order(
                 except ValueError:
                     raise HTTPException(400, f"Invalid date format: {data['delivery_date']}")
             
-            # Make trip available for reassignment while keeping current driver info for audit
-            print(f"DEBUG: Setting trip status from {trip.status} to UNASSIGNED")
-            trip.status = "UNASSIGNED"
-            trip.route_id = None
-            
-            # Set order status to ON_HOLD
-            print(f"DEBUG: Setting order status from {order.status} to ON_HOLD")
-            order.status = "ON_HOLD"
-            # Keep driver_id for audit trail, assignment service will update when reassigning
+            # Make trip unassigned for reassignment but keep driver for continued access  
+            print(f"DEBUG: Unassigning trip from route - clearing route_id but keeping driver for continued access")
+            trip.status = "ASSIGNED"  # Keep standard status - unassigned logic only checks route_id
+            trip.route_id = None  # This makes it appear in unassigned backlog
+            # Keep driver_id so driver can still interact with the order until it's reassigned
+            # Order status remains unchanged - this is about trip reassignment, not order lifecycle
             
         else:
             # Only allow drivers to update specific fields for other operations

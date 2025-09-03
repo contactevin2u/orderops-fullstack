@@ -107,12 +107,15 @@ class JobDetailViewModel @Inject constructor(
         val currentJob = _job.value ?: return
         val allJobsList = _allJobs.value
         
-        // Validate the status change
-        val validation = OrderStateValidator.validateStatusChange(allJobsList, currentJob.id, newStatus)
-        
-        if (validation.isError) {
-            _error.value = validation.message
-            return
+        // Only validate critical blocking issues (like multiple in-transit orders)
+        if (newStatus == "IN_TRANSIT") {
+            val inTransitJobs = allJobsList.filter { it.status == "IN_TRANSIT" && it.id != currentJob.id }
+            if (inTransitJobs.isNotEmpty()) {
+                val inTransitJob = inTransitJobs.first()
+                _error.value = "Anda mempunyai pesanan dalam perjalanan (#${inTransitJob.code}). " +
+                    "Sila selesaikan pesanan tersebut dahulu sebelum memulakan pesanan baru."
+                return
+            }
         }
         
         if (newStatus == "ON_HOLD") {
@@ -121,14 +124,7 @@ class JobDetailViewModel @Inject constructor(
             return
         }
         
-        // Special validation for DELIVERED status - check PoD photos
-        if (newStatus == "DELIVERED") {
-            val hasUploadedPhotos = _uploadedPhotos.value.isNotEmpty()
-            if (!hasUploadedPhotos) {
-                _error.value = "Sila muat naik gambar Proof of Delivery (PoD) sebelum menandakan sebagai dihantar"
-                return
-            }
-        }
+        // Remove client-side PoD validation - let backend handle it with proper server-side checks
         
         viewModelScope.launch {
             _loading.value = true
@@ -138,7 +134,7 @@ class JobDetailViewModel @Inject constructor(
             when (val result = repository.updateOrderStatus(currentJob.id, newStatus)) {
                 is Result.Success -> {
                     _job.value = result.data
-                    _successMessage.value = validation.message
+                    _successMessage.value = getSuccessMessage(newStatus)
                     _loading.value = false
                     
                     // Reload all jobs to update validation state
@@ -309,16 +305,32 @@ class JobDetailViewModel @Inject constructor(
     
     fun canPerformAction(targetStatus: String): Boolean {
         val currentJob = _job.value ?: return false
-        val allJobsList = _allJobs.value
-        val validation = OrderStateValidator.validateStatusChange(allJobsList, currentJob.id, targetStatus)
-        return validation.isSuccess
+        val currentStatus = currentJob.status
+        
+        // Basic validation - most transitions are allowed, backend will handle detailed validation
+        return when (targetStatus) {
+            "IN_TRANSIT" -> {
+                // Only block if there's another in-transit order
+                val allJobsList = _allJobs.value
+                val inTransitJobs = allJobsList.filter { it.status == "IN_TRANSIT" && it.id != currentJob.id }
+                inTransitJobs.isEmpty() && currentStatus in listOf("ASSIGNED", "ON_HOLD")
+            }
+            "DELIVERED" -> currentStatus == "IN_TRANSIT"
+            "ON_HOLD" -> currentStatus in listOf("ASSIGNED", "IN_TRANSIT")
+            "CANCELLED" -> currentStatus in listOf("ASSIGNED", "ON_HOLD")
+            else -> true
+        }
     }
     
     fun getValidationMessage(targetStatus: String): String {
-        val currentJob = _job.value ?: return ""
-        val allJobsList = _allJobs.value
-        val validation = OrderStateValidator.validateStatusChange(allJobsList, currentJob.id, targetStatus)
-        return validation.message
+        // Return simple status-based messages, let backend handle complex validation
+        return when (targetStatus) {
+            "IN_TRANSIT" -> "Mula pesanan"
+            "DELIVERED" -> "Tandakan sebagai dihantar"
+            "ON_HOLD" -> "Tangguhkan pesanan"
+            "CANCELLED" -> "Batalkan pesanan"
+            else -> "Kemaskini status"
+        }
     }
     
     fun clearMessages() {
@@ -327,7 +339,7 @@ class JobDetailViewModel @Inject constructor(
     }
     
     fun isOrderInTransit(): Boolean {
-        return _job.value?.status == "STARTED"
+        return _job.value?.status == "IN_TRANSIT"
     }
     
     fun isOrderCompleted(): Boolean {
@@ -336,10 +348,19 @@ class JobDetailViewModel @Inject constructor(
     }
     
     fun hasInTransitOrders(): Boolean {
-        return _allJobs.value.any { it.status == "STARTED" }
+        return _allJobs.value.any { it.status == "IN_TRANSIT" }
     }
     
     fun getInTransitOrderCode(): String? {
-        return _allJobs.value.find { it.status == "STARTED" }?.code
+        return _allJobs.value.find { it.status == "IN_TRANSIT" }?.code
+    }
+    
+    private fun getSuccessMessage(status: String): String {
+        return when (status) {
+            "IN_TRANSIT" -> "Pesanan berjaya dimulakan"
+            "DELIVERED" -> "Pesanan berjaya dihantar"
+            "CANCELLED" -> "Pesanan dibatalkan"
+            else -> "Status berjaya dikemaskini"
+        }
     }
 }

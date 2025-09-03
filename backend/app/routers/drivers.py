@@ -428,7 +428,11 @@ def update_order_status(
             raise HTTPException(400, "At least one Proof of Delivery photo is required before marking order as delivered. Please take photos of the delivered items first.")
         trip.delivered_at = now
     elif payload.status == "ON_HOLD":
+        # Driver pausing their own delivery - keep assignment but change status
+        print(f"DEBUG: ON_HOLD - Driver {driver.id} pausing their own delivery for trip {trip.id}")
+        # Keep driver_id and route_id - this is just a temporary pause by the same driver
         pass
+    
     db.add(TripEvent(trip_id=trip.id, status=payload.status))
     order = db.get(Order, order_id)
     db.commit()
