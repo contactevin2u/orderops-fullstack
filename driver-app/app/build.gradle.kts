@@ -37,11 +37,17 @@ android {
     signingConfigs {
         create("release") {
             val keystoreFile = rootProject.file("keystore.jks")
-            if (keystoreFile.exists()) {
+            val keystorePassword = System.getenv("KEYSTORE_PASSWORD")
+            val keyAlias = System.getenv("KEY_ALIAS") 
+            val keyPassword = System.getenv("KEY_PASSWORD")
+            
+            if (keystoreFile.exists() && keystorePassword != null && keyAlias != null && keyPassword != null) {
                 storeFile = keystoreFile
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("KEY_ALIAS")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                storePassword = keystorePassword
+                this.keyAlias = keyAlias
+                this.keyPassword = keyPassword
+            } else {
+                println("WARNING: Release signing not configured - keystore file or environment variables missing")
             }
         }
     }
@@ -51,7 +57,14 @@ android {
             isMinifyEnabled = false  // Temporarily disable for debugging
             isShrinkResources = false  // Temporarily disable for debugging  
             isDebuggable = false
-            // signingConfig = signingConfigs.getByName("release")  // DISABLED FOR TESTING
+            
+            // Only apply signing if keystore is configured
+            val releaseSigningConfig = signingConfigs.getByName("release")
+            if (releaseSigningConfig.storeFile != null) {
+                signingConfig = releaseSigningConfig
+            } else {
+                println("WARNING: Using debug signing for release build - keystore not configured")
+            }
             
             // Disable crashlytics mapping upload to save memory
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
