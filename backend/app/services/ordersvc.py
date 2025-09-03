@@ -313,7 +313,7 @@ def recompute_financials(order: Order) -> None:
     paid = _sum_posted_payments(order)
 
     order.subtotal = subtotal
-    order.total = q2(subtotal - discount + delivery + return_delivery + penalty)
+    order.total = total  # Use the correctly computed total from _apply_charges_and_totals
     order.paid_amount = paid
     order.balance = q2(order.total - paid)
 
