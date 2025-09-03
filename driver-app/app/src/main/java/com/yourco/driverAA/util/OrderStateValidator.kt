@@ -151,8 +151,8 @@ object OrderStateValidator {
  * Result of validation with success/error state and message
  */
 sealed class ValidationResult {
-    data class Success(val message: String) : ValidationResult()
-    data class Error(val message: String) : ValidationResult()
+    data class Success(override val message: String) : ValidationResult()
+    data class Error(override val message: String) : ValidationResult()
     
     companion object {
         fun success(message: String) = Success(message)
@@ -161,10 +161,7 @@ sealed class ValidationResult {
     
     val isSuccess: Boolean get() = this is Success
     val isError: Boolean get() = this is Error
-    val message: String get() = when (this) {
-        is Success -> message
-        is Error -> message
-    }
+    abstract val message: String
 }
 
 /**
