@@ -21,6 +21,19 @@ class App : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // === COMPREHENSIVE RUNTIME DEBUG INFO ===
+        Log.i("App", "=== APP STARTUP DEBUG INFO ===")
+        Log.i("App", "BuildConfig.DEBUG: ${BuildConfig.DEBUG}")
+        Log.i("App", "BuildConfig.BUILD_TYPE: ${BuildConfig.BUILD_TYPE}")
+        Log.i("App", "BuildConfig.APPLICATION_ID: ${BuildConfig.APPLICATION_ID}")
+        Log.i("App", "BuildConfig.VERSION_NAME: ${BuildConfig.VERSION_NAME}")
+        Log.i("App", "BuildConfig.VERSION_CODE: ${BuildConfig.VERSION_CODE}")
+        Log.i("App", "BuildConfig.API_BASE: '${BuildConfig.API_BASE}'")
+        Log.i("App", "Package name: ${packageName}")
+        Log.i("App", "Build fingerprint: ${android.os.Build.FINGERPRINT}")
+        Log.i("App", "=== END STARTUP DEBUG INFO ===")
+        
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
@@ -40,6 +53,8 @@ class App : Application(), Configuration.Provider {
         Notifications.createJobsChannel(this)
         // schedule periodic upload (15m) on app start
         WorkScheduling.scheduleUpload(this)
+        
+        Log.i("App", "App onCreate() completed successfully")
     }
 
     override val workManagerConfiguration: Configuration

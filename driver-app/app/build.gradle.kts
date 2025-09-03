@@ -51,7 +51,7 @@ android {
             isMinifyEnabled = false  // Temporarily disable for debugging
             isShrinkResources = false  // Temporarily disable for debugging  
             isDebuggable = false
-            signingConfig = signingConfigs.getByName("release")
+            // signingConfig = signingConfigs.getByName("release")  // DISABLED FOR TESTING
             
             // Disable crashlytics mapping upload to save memory
             configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
@@ -86,6 +86,22 @@ android {
         kotlinCompilerExtensionVersion = "1.5.15"
     }
     packaging.resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+    
+    // AAB-specific configuration
+    bundle {
+        language {
+            // Disable language splits - include all languages in base APK
+            enableSplit = false
+        }
+        density {
+            // Disable density splits for debugging
+            enableSplit = false
+        }
+        abi {
+            // Disable ABI splits for debugging  
+            enableSplit = false
+        }
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
