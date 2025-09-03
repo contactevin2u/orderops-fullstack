@@ -14,6 +14,8 @@ export type Order = {
   status: string;
   deliveryDate: string;
   address: string;
+  customerName?: string;
+  customerAddress?: string;
   lat?: number;
   lng?: number;
   timeWindowStart?: string;
@@ -49,13 +51,15 @@ function mapOrder(o: any): Order {
   return {
     id: String(o.id ?? ''),
     orderNo: o.code || o.orderNo || String(o.id ?? ''),
-    status: o.status || 'UNASSIGNED',
+    status: o.trip?.status || o.status || 'UNASSIGNED', // Use trip status first, then order status
     deliveryDate: o.delivery_date || o.deliveryDate || '',
     address:
       o.address ||
       [o.address1, o.address2].filter(Boolean).join(' ') ||
       o.customer_address ||
       '',
+    customerName: o.customer_name || o.customerName || '', // Add customer name
+    customerAddress: o.customer_address || o.customerAddress || '', // Add customer address  
     lat: o.lat ?? o.latitude ?? o.location?.lat,
     lng: o.lng ?? o.longitude ?? o.location?.lng,
     timeWindowStart: o.time_window_start || o.timeWindowStart || o.window_start,

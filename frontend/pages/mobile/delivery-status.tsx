@@ -168,9 +168,11 @@ export default function MobileDeliveryStatusPage() {
   const getOrderStatusColor = (status: string) => {
     switch (status) {
       case 'DELIVERED': return '#10b981';
-      case 'STARTED': return '#f59e0b';
+      case 'IN_TRANSIT': return '#f59e0b';
+      case 'STARTED': return '#f59e0b'; // Keep for backward compatibility
       case 'ON_HOLD': return '#8b5cf6';
       case 'CANCELLED': return '#ef4444';
+      case 'ASSIGNED': return '#6b7280';
       default: return '#6b7280';
     }
   };
@@ -254,7 +256,7 @@ export default function MobileDeliveryStatusPage() {
             </div>
             <div className="stat-item">
               <Truck size={16} />
-              <span>{routeOrders.filter(o => o.status === 'STARTED').length} In Transit</span>
+              <span>{routeOrders.filter(o => o.status === 'IN_TRANSIT' || o.status === 'STARTED').length} In Transit</span>
             </div>
           </div>
 
@@ -317,8 +319,8 @@ export default function MobileDeliveryStatusPage() {
                     <div className="order-details">
                       <div className="customer-info">
                         <strong>Customer Details:</strong><br />
-                        Name: Unknown Customer<br />
-                        Address: {order.address || 'No address'}
+                        Name: {order.customerName || 'Unknown Customer'}<br />
+                        Address: {order.customerAddress || order.address || 'No address'}
                       </div>
                       
                       {getOrderBadges(order, today).length > 0 && (
@@ -364,7 +366,7 @@ export default function MobileDeliveryStatusPage() {
                       </div>
                       <div className="order-content">
                         <span className="order-code">#{order.orderNo}</span>
-                        <span className="order-address">{order.address}</span>
+                        <span className="order-address">{order.customerAddress || order.address}</span>
                         {getOrderBadges(order, today).length > 0 && (
                           <div className="order-badges">
                             {getOrderBadges(order, today).map((badge, i) => (
