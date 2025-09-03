@@ -170,7 +170,7 @@ export default function Master88321() {
             
             <button
               onClick={() => handleOperation('orders', deleteAllOrdersMutation.mutate)}
-              disabled={deleteAllOrdersMutation.isLoading}
+              disabled={deleteAllOrdersMutation.isPending}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -180,11 +180,11 @@ export default function Master88321() {
                 borderRadius: '4px',
                 color: 'white',
                 fontSize: '1rem',
-                cursor: deleteAllOrdersMutation.isLoading ? 'not-allowed' : 'pointer',
-                opacity: deleteAllOrdersMutation.isLoading ? 0.5 : 1
+                cursor: deleteAllOrdersMutation.isPending ? 'not-allowed' : 'pointer',
+                opacity: deleteAllOrdersMutation.isPending ? 0.5 : 1
               }}
             >
-              {deleteAllOrdersMutation.isLoading ? 'Deleting...' : 'Delete All Orders'}
+              {deleteAllOrdersMutation.isPending ? 'Deleting...' : 'Delete All Orders'}
             </button>
           </div>
 
@@ -225,7 +225,7 @@ export default function Master88321() {
             
             <button
               onClick={() => handleOperation('drivers', deleteAllDriversMutation.mutate)}
-              disabled={deleteAllDriversMutation.isLoading}
+              disabled={deleteAllDriversMutation.isPending}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -235,11 +235,11 @@ export default function Master88321() {
                 borderRadius: '4px',
                 color: 'white',
                 fontSize: '1rem',
-                cursor: deleteAllDriversMutation.isLoading ? 'not-allowed' : 'pointer',
-                opacity: deleteAllDriversMutation.isLoading ? 0.5 : 1
+                cursor: deleteAllDriversMutation.isPending ? 'not-allowed' : 'pointer',
+                opacity: deleteAllDriversMutation.isPending ? 0.5 : 1
               }}
             >
-              {deleteAllDriversMutation.isLoading ? 'Deleting...' : 'Delete All Drivers'}
+              {deleteAllDriversMutation.isPending ? 'Deleting...' : 'Delete All Drivers'}
             </button>
           </div>
 
@@ -280,7 +280,7 @@ export default function Master88321() {
             
             <button
               onClick={() => handleOperation('routes', deleteAllRoutesMutation.mutate)}
-              disabled={deleteAllRoutesMutation.isLoading}
+              disabled={deleteAllRoutesMutation.isPending}
               style={{
                 width: '100%',
                 padding: '0.75rem',
@@ -290,11 +290,11 @@ export default function Master88321() {
                 borderRadius: '4px',
                 color: 'white',
                 fontSize: '1rem',
-                cursor: deleteAllRoutesMutation.isLoading ? 'not-allowed' : 'pointer',
-                opacity: deleteAllRoutesMutation.isLoading ? 0.5 : 1
+                cursor: deleteAllRoutesMutation.isPending ? 'not-allowed' : 'pointer',
+                opacity: deleteAllRoutesMutation.isPending ? 0.5 : 1
               }}
             >
-              {deleteAllRoutesMutation.isLoading ? 'Deleting...' : 'Delete All Routes'}
+              {deleteAllRoutesMutation.isPending ? 'Deleting...' : 'Delete All Routes'}
             </button>
           </div>
 
@@ -339,7 +339,7 @@ export default function Master88321() {
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               <button
                 onClick={() => handleOperation('nuclear', resetDatabaseMutation.mutate)}
-                disabled={resetDatabaseMutation.isLoading}
+                disabled={resetDatabaseMutation.isPending}
                 style={{
                   padding: '1rem 2rem',
                   background: activeOperation === 'nuclear' && confirmationText === 'DELETE ALL DATA' 
@@ -349,12 +349,12 @@ export default function Master88321() {
                   color: 'white',
                   fontSize: '1.125rem',
                   fontWeight: 'bold',
-                  cursor: resetDatabaseMutation.isLoading ? 'not-allowed' : 'pointer',
-                  opacity: resetDatabaseMutation.isLoading ? 0.5 : 1,
+                  cursor: resetDatabaseMutation.isPending ? 'not-allowed' : 'pointer',
+                  opacity: resetDatabaseMutation.isPending ? 0.5 : 1,
                   minWidth: '200px'
                 }}
               >
-                {resetDatabaseMutation.isLoading ? 'RESETTING...' : 'RESET EVERYTHING'}
+                {resetDatabaseMutation.isPending ? 'RESETTING...' : 'RESET EVERYTHING'}
               </button>
             </div>
           </div>
