@@ -35,3 +35,46 @@
 # OkHttp
 -dontwarn okhttp3.**
 -dontwarn okio.**
+
+# Hilt
+-keep class dagger.hilt.** { *; }
+-keep class javax.inject.** { *; }
+-keep class * extends dagger.hilt.android.HiltAndroidApp
+-keepclasseswithmembers class * {
+    @dagger.hilt.android.AndroidEntryPoint <methods>;
+}
+
+# Data classes and API models
+-keep class com.yourco.driverAA.data.** { *; }
+-keep class com.yourco.driverAA.models.** { *; }
+-keep class com.yourco.driverAA.api.** { *; }
+
+# ViewModels
+-keep class * extends androidx.lifecycle.ViewModel { *; }
+-keep class com.yourco.driverAA.ui.** { *; }
+
+# Room Database
+-keep class * extends androidx.room.RoomDatabase
+-keep @androidx.room.Entity class *
+-keep @androidx.room.Dao class *
+
+# Compose
+-keep class androidx.compose.** { *; }
+-dontwarn androidx.compose.**
+
+# Coroutines
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
+
+# Location services
+-keep class com.google.android.gms.location.** { *; }
+-keep class android.location.** { *; }
+
+# Keep all classes that might be referenced by name
+-keepnames class com.yourco.driverAA.** { *; }
+
+# Debug logging (remove in production)
+-assumenosideeffects class android.util.Log {
+    public static *** d(...);
+    public static *** v(...);
+}

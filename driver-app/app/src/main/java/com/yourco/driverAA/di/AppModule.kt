@@ -36,8 +36,15 @@ object AppModule {
         val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .build()
+        // Log API base for debugging
+        val apiBase = BuildConfig.API_BASE.ifEmpty { 
+            android.util.Log.e("AppModule", "API_BASE is empty! Using fallback URL")
+            "https://api.example.com/" 
+        }
+        android.util.Log.i("AppModule", "Using API base: $apiBase")
+        
         val retrofit = Retrofit.Builder()
-            .baseUrl(BuildConfig.API_BASE.ifEmpty { "https://api.example.com/" })
+            .baseUrl(apiBase)
             .client(client)
             .addConverterFactory(json.asConverterFactory(contentType))
             .build()
