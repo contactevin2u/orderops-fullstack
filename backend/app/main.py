@@ -19,6 +19,7 @@ from .routers import (
     documents,
     queue,
     reports,
+    driver,
     drivers,
     driver_orders,
     routes as routes_router,
@@ -56,6 +57,7 @@ app.include_router(export.router)
 app.include_router(documents.router)
 app.include_router(queue.router)
 app.include_router(reports.router)
+app.include_router(driver.router)
 app.include_router(drivers.router)
 app.include_router(driver_orders.router)
 app.include_router(routes_router.router)
