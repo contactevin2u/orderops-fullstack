@@ -31,29 +31,36 @@ class DriverFirebaseMessagingService : FirebaseMessagingService() {
     }
 
     override fun onNewToken(token: String) {
+        android.util.Log.i("FCM", "New FCM token received: ${token.take(20)}...")
         val client = OkHttpClient()
         val body = """{"token":"$token"}""".toRequestBody("application/json".toMediaType())
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val idToken = authService.getIdToken()
+                
+                if (idToken == null) {
+                    android.util.Log.w("FCM", "No ID token available - driver not logged in yet. Skipping token upload.")
+                    return@launch
+                }
+                
+                android.util.Log.i("FCM", "Uploading FCM token with authentication...")
+                
                 val requestBuilder = Request.Builder()
                     .url("${BuildConfig.API_BASE.trimEnd('/')}/driver/push-tokens")
                     .post(body)
-                
-                // Add authorization header if token is available
-                if (idToken != null) {
-                    requestBuilder.header("Authorization", "Bearer $idToken")
-                }
+                    .header("Authorization", "Bearer $idToken")
                 
                 val req = requestBuilder.build()
                 client.newCall(req).execute().use { response ->
-                    if (!response.isSuccessful) {
-                        // Log error but don't crash
-                        android.util.Log.w("FCM", "Failed to upload token: ${'$'}{response.code}")
+                    when (response.code) {
+                        200 -> android.util.Log.i("FCM", "Token uploaded successfully")
+                        403 -> android.util.Log.w("FCM", "Authentication failed (403) - driver may need to re-login")
+                        401 -> android.util.Log.w("FCM", "Unauthorized (401) - invalid or expired token")
+                        else -> android.util.Log.w("FCM", "Failed to upload token: ${response.code} - ${response.message}")
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.w("FCM", "Error uploading token", e)
+                android.util.Log.w("FCM", "Error uploading token: ${e.message}", e)
             }
         }
     }
