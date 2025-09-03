@@ -13,7 +13,8 @@ import {
 export default function DriverCommissionsPage() {
   const [driverId, setDriverId] = React.useState<string>('');
   const [month, setMonth] = React.useState<string>(new Date().toISOString().slice(0, 7));
-  const [activeTab, setActiveTab] = React.useState<'commissions' | 'upsells'>('commissions');
+  const [activeTab, setActiveTab] = React.useState<'pending' | 'past-week' | 'previous' | 'upsells'>('pending');
+  const [timeFilter, setTimeFilter] = React.useState<'current' | 'week' | 'month'>('current');
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const qc = useQueryClient();
@@ -152,9 +153,15 @@ export default function DriverCommissionsPage() {
             {/* Tabs */}
             <div style={{ marginBottom: 'var(--space-4)' }}>
               <div style={{ borderBottom: '1px solid #e5e7eb' }}>
-                <div style={{ display: 'flex', gap: 0 }}>
+                <div style={{ display: 'flex', gap: 0, flexWrap: 'wrap' }}>
                   {[
-                    { key: 'commissions', label: 'Delivery Commissions', count: orders.length },
+                    { key: 'pending', label: 'Pending Verification', count: orders.filter((o: any) => !o.trip?.commission?.actualized_at).length },
+                    { key: 'past-week', label: 'Past Week', count: orders.filter((o: any) => {
+                      const weekAgo = new Date();
+                      weekAgo.setDate(weekAgo.getDate() - 7);
+                      return new Date(o.created_at) >= weekAgo;
+                    }).length },
+                    { key: 'previous', label: 'Previous Orders', count: orders.filter((o: any) => o.trip?.commission?.actualized_at).length },
                     { key: 'upsells', label: 'Upsell Incentives', count: upsells.length }
                   ].map(tab => (
                     <button
@@ -168,7 +175,8 @@ export default function DriverCommissionsPage() {
                         color: activeTab === tab.key ? '#3b82f6' : '#6b7280',
                         fontWeight: activeTab === tab.key ? 600 : 500,
                         cursor: 'pointer',
-                        fontSize: '0.875rem'
+                        fontSize: '0.875rem',
+                        whiteSpace: 'nowrap'
                       }}
                     >
                       {tab.label} ({tab.count})
@@ -178,11 +186,11 @@ export default function DriverCommissionsPage() {
               </div>
             </div>
 
-            {/* Commissions Tab */}
-            {activeTab === 'commissions' && (
+            {/* Pending Verification Tab */}
+            {activeTab === 'pending' && (
               <div className="card">
                 <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
-                  Delivery Commissions - {selectedDriver?.name || `Driver ${driverId}`} - {month}
+                  Pending Commission Verification - {selectedDriver?.name || `Driver ${driverId}`}
                 </h2>
             
             {ordersQuery.isLoading && (
@@ -205,7 +213,7 @@ export default function DriverCommissionsPage() {
 
             {!ordersQuery.isLoading && orders.length > 0 && (
               <div className="stack">
-                {orders.map((order: any) => (
+                {orders.filter((order: any) => !order.trip?.commission?.actualized_at).map((order: any) => (
                   <OrderCard 
                     key={order.id} 
                     order={order}
@@ -215,9 +223,68 @@ export default function DriverCommissionsPage() {
                       updateCommissionMutation.mutate({ orderId: order.id, amount })
                     }
                     isUpdatingCommission={updateCommissionMutation.isPending}
+                    showFullVerification={true}
                   />
                 ))}
               </div>
+                )}
+              </div>
+            )}
+
+            {/* Past Week Tab */}
+            {activeTab === 'past-week' && (
+              <div className="card">
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
+                  Past Week Orders - {selectedDriver?.name || `Driver ${driverId}`}
+                </h2>
+
+                {!ordersQuery.isLoading && (
+                  <div className="stack">
+                    {orders.filter((order: any) => {
+                      const weekAgo = new Date();
+                      weekAgo.setDate(weekAgo.getDate() - 7);
+                      return new Date(order.created_at) >= weekAgo;
+                    }).map((order: any) => (
+                      <OrderCard 
+                        key={order.id} 
+                        order={order}
+                        onRelease={() => releaseCommissionMutation.mutate(order.id)}
+                        isReleasing={releaseCommissionMutation.isPending}
+                        onUpdateCommission={(amount: number) => 
+                          updateCommissionMutation.mutate({ orderId: order.id, amount })
+                        }
+                        isUpdatingCommission={updateCommissionMutation.isPending}
+                        showFullVerification={true}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Previous Orders Tab */}
+            {activeTab === 'previous' && (
+              <div className="card">
+                <h2 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: 'var(--space-4)' }}>
+                  Previously Released - {selectedDriver?.name || `Driver ${driverId}`} - {month}
+                </h2>
+
+                {!ordersQuery.isLoading && (
+                  <div className="stack">
+                    {orders.filter((order: any) => order.trip?.commission?.actualized_at).map((order: any) => (
+                      <OrderCard 
+                        key={order.id} 
+                        order={order}
+                        onRelease={() => releaseCommissionMutation.mutate(order.id)}
+                        isReleasing={releaseCommissionMutation.isPending}
+                        onUpdateCommission={(amount: number) => 
+                          updateCommissionMutation.mutate({ orderId: order.id, amount })
+                        }
+                        isUpdatingCommission={updateCommissionMutation.isPending}
+                        readOnly={true}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             )}
@@ -272,12 +339,18 @@ export default function DriverCommissionsPage() {
           border: '1px solid #dbeafe'
         }}>
           <h3 style={{ fontWeight: 500, color: '#1e40af', marginBottom: 'var(--space-2)' }}>
-            💡 Commission Process
+            💡 Updated Commission Verification Process
           </h3>
           <div className="stack" style={{ fontSize: '0.875rem', color: '#1e40af' }}>
-            <p><strong>1. Order must be DELIVERED</strong> status</p>
-            <p><strong>2. Driver must have uploaded POD (Proof of Delivery) photo</strong></p>
-            <p><strong>3. Click &quot;Release Commission&quot; to pay the driver</strong></p>
+            <p><strong>1. POD Available & Correct</strong> - Verify delivery proof photos are uploaded and valid</p>
+            <p><strong>2. Order Delivered</strong> - Confirm order status is DELIVERED</p>
+            <p><strong>3. Initial Payment Collected</strong> - Ensure customer payment was received</p>
+            <p><strong>4. Check for Upsells</strong> - Review any additional items sold (affects commission)</p>
+            <p><strong>5. Enter Commission & Release</strong> - Set amount and release payment to driver</p>
+            <p style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2)', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-1)' }}>
+              <strong>Note:</strong> All verification steps must be completed before commission can be released. 
+              Commission is released immediately when entered (if all conditions are met).
+            </p>
           </div>
         </div>
       </div>
@@ -290,13 +363,17 @@ function OrderCard({
   onRelease, 
   isReleasing,
   onUpdateCommission,
-  isUpdatingCommission
+  isUpdatingCommission,
+  showFullVerification = false,
+  readOnly = false
 }: { 
   order: any; 
   onRelease: () => void;
   isReleasing: boolean;
   onUpdateCommission: (amount: number) => void;
   isUpdatingCommission: boolean;
+  showFullVerification?: boolean;
+  readOnly?: boolean;
 }) {
   const [showPodPhotos, setShowPodPhotos] = React.useState(false);
   const [commissionAmount, setCommissionAmount] = React.useState('');
@@ -306,7 +383,12 @@ function OrderCard({
   const podPhotos = trip.pod_photo_urls || (trip.pod_photo_url ? [trip.pod_photo_url] : []);
   const hasPodPhoto = podPhotos.length > 0;
   const isDelivered = trip.status === 'DELIVERED'; // Check trip status, not order status
-  const canRelease = isDelivered && hasPodPhoto && currentCommission > 0;
+  const paymentCollected = order.payment_status === 'PAID' || order.total_paid > 0; // Check if initial payment collected
+  const hasUpsells = (order.upsell_amount || 0) > 0; // Check for upsells
+  const isReleased = trip.commission?.actualized_at; // Check if already released
+  
+  // Full verification requires all 4 steps
+  const canRelease = isDelivered && hasPodPhoto && paymentCollected && currentCommission > 0 && !isReleased;
   
   // Initialize commission amount from current commission
   React.useEffect(() => {
@@ -391,50 +473,94 @@ function OrderCard({
                 padding: '0.25rem 0.5rem',
                 border: '1px solid #d1d5db',
                 borderRadius: 'var(--radius-1)',
-                fontSize: '0.875rem'
+                fontSize: '0.875rem',
+                background: readOnly ? '#f9fafb' : 'white'
               }}
-              disabled={isUpdatingCommission}
+              disabled={isUpdatingCommission || readOnly}
+              readOnly={readOnly}
             />
             {isUpdatingCommission && <span style={{ fontSize: '0.75rem', color: '#6b7280' }}>Saving...</span>}
           </div>
         </div>
 
-        <button
-          onClick={(e) => {
-            e.preventDefault();
-            onRelease();
-          }}
-          disabled={!canRelease || isReleasing}
-          style={{
-            background: canRelease && !isReleasing ? '#10b981' : '#9ca3af',
-            color: 'white',
-            border: 'none',
-            padding: '0.5rem 1rem',
-            borderRadius: 'var(--radius-2)',
-            fontSize: '0.875rem',
-            cursor: canRelease && !isReleasing ? 'pointer' : 'not-allowed',
-            fontWeight: '500',
-            minWidth: '120px'
-          }}
-        >
-          {isReleasing ? 'Releasing...' : 'Release Commission'}
-        </button>
+        {!readOnly && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              if (canRelease) {
+                const confirmed = window.confirm(
+                  `Release commission of RM ${currentCommission.toFixed(2)} to driver?\n\nThis action cannot be undone.`
+                );
+                if (confirmed) {
+                  onRelease();
+                }
+              }
+            }}
+            disabled={!canRelease || isReleasing}
+            style={{
+              background: canRelease && !isReleasing ? '#10b981' : '#9ca3af',
+              color: 'white',
+              border: 'none',
+              padding: '0.5rem 1rem',
+              borderRadius: 'var(--radius-2)',
+              fontSize: '0.875rem',
+              cursor: canRelease && !isReleasing ? 'pointer' : 'not-allowed',
+              fontWeight: '500',
+              minWidth: '140px'
+            }}
+            title={!canRelease ? 'Complete all verification steps to release commission' : 'Release commission to driver'}
+          >
+            {isReleasing ? 'Releasing...' : isReleased ? 'Already Released' : 'Enter & Release'}
+          </button>
+        )}
       </div>
 
+      {/* Verification Steps */}
+      {showFullVerification && (
+        <div style={{ 
+          marginBottom: 'var(--space-3)', 
+          padding: 'var(--space-3)', 
+          background: '#f8fafc', 
+          borderRadius: 'var(--radius-1)',
+          border: '1px solid #e2e8f0'
+        }}>
+          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
+            Commission Verification Checklist
+          </h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', fontSize: '0.875rem' }}>
+            <span style={{ color: isDelivered ? '#15803d' : '#dc2626' }}>
+              {isDelivered ? '✅' : '❌'} 1. Order Delivered
+            </span>
+            <span style={{ color: hasPodPhoto ? '#15803d' : '#dc2626' }}>
+              {hasPodPhoto ? '✅' : '❌'} 2. POD Available & Correct
+            </span>
+            <span style={{ color: paymentCollected ? '#15803d' : '#dc2626' }}>
+              {paymentCollected ? '✅' : '❌'} 3. Initial Payment Collected
+            </span>
+            <span style={{ color: hasUpsells ? '#f59e0b' : '#6b7280' }}>
+              {hasUpsells ? '💰' : '➖'} 4. Upsells: {hasUpsells ? `RM ${(order.upsell_amount || 0).toFixed(2)}` : 'None'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Status Indicators */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)', fontSize: '0.875rem' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', fontSize: '0.875rem', flexWrap: 'wrap' }}>
         <span style={{ color: isDelivered ? '#15803d' : '#6b7280' }}>
           {isDelivered ? '✅' : '⏳'} Delivered
         </span>
         <span style={{ color: hasPodPhoto ? '#15803d' : '#d97706' }}>
           {hasPodPhoto ? '✅' : '⚠️'} POD Photo
         </span>
+        <span style={{ color: paymentCollected ? '#15803d' : '#dc2626' }}>
+          {paymentCollected ? '✅' : '❌'} Payment Collected
+        </span>
         <span style={{ color: currentCommission > 0 ? '#15803d' : '#6b7280' }}>
           {currentCommission > 0 ? '✅' : '⏳'} Commission Set
         </span>
-        {trip.commission?.actualized_at && (
+        {isReleased && (
           <span style={{ color: '#15803d' }}>
-            ✅ Released
+            ✅ Released {new Date(isReleased).toLocaleDateString()}
           </span>
         )}
       </div>
