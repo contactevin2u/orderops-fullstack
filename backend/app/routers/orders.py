@@ -58,13 +58,29 @@ def trigger_auto_assignment(db: Session, order_id: int):
     """Trigger auto-assignment after order creation"""
     try:
         from ..services.assignment_service import AssignmentService
+        import logging
         
-        service = AssignmentService(db)
-        result = service.auto_assign_all()
+        logger = logging.getLogger(__name__)
+        logger.info(f"Triggering auto-assignment after order {order_id} creation")
         
-        print(f"Auto-assignment triggered after order {order_id} creation: {result.get('message', 'Unknown result')}")
-        return result
+        # Create a new database session for the assignment service
+        # to avoid transaction conflicts
+        from ..db import SessionLocal
+        with SessionLocal() as fresh_db:
+            service = AssignmentService(fresh_db)
+            result = service.auto_assign_all()
+            
+            logger.info(f"Auto-assignment result for order {order_id}: {result.get('message', 'Unknown result')}")
+            print(f"Auto-assignment triggered after order {order_id} creation: {result.get('message', 'Unknown result')}")
+            return result
+            
     except Exception as e:
+        import logging
+        import traceback
+        
+        logger = logging.getLogger(__name__)
+        logger.error(f"Auto-assignment failed after order {order_id} creation: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         print(f"Auto-assignment failed after order {order_id} creation: {e}")
         # Don't fail order creation if assignment fails
         return None
