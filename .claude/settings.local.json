@@ -160,7 +160,15 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
-      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)"
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)"
     ],
     "deny": [],
     "ask": []
