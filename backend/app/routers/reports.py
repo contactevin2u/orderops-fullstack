@@ -43,7 +43,7 @@ def outstanding(
         )
         .filter(Trip.status == "DELIVERED")
         .filter(Trip.delivered_at != None)
-        .filter(Trip.delivered_at <= as_of)
+        .filter(Trip.delivered_at <= datetime.combine(as_of, datetime.max.time()))
     )
     if order_id:
         query = query.filter(Order.id == order_id)

@@ -148,7 +148,7 @@ Respond with valid JSON only:
             self.db.flush()  # Get the order ID
             
             # Auto-assign immediately using unified service
-            assignment_result = self.assignment_service.auto_assign_new_orders()
+            assignment_result = self.assignment_service.auto_assign_all()
             
             self.db.commit()
             
@@ -207,7 +207,7 @@ Respond with valid JSON only:
             self.db.flush()
             
             # Auto-assign pickup
-            assignment_result = self.assignment_service.auto_assign_new_orders()
+            assignment_result = self.assignment_service.auto_assign_all()
             
             self.db.commit()
             
