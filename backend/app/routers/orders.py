@@ -63,16 +63,28 @@ def trigger_auto_assignment(db: Session, order_id: int):
         logger = logging.getLogger(__name__)
         logger.info(f"Triggering auto-assignment after order {order_id} creation")
         
-        # Create a new database session for the assignment service
-        # to avoid transaction conflicts
-        from ..db import SessionLocal
-        with SessionLocal() as fresh_db:
-            service = AssignmentService(fresh_db)
+        # Use the existing database session but ensure it's in a good state
+        # The session should be committed by now, so we can use it for queries
+        try:
+            service = AssignmentService(db)
             result = service.auto_assign_all()
             
             logger.info(f"Auto-assignment result for order {order_id}: {result.get('message', 'Unknown result')}")
             print(f"Auto-assignment triggered after order {order_id} creation: {result.get('message', 'Unknown result')}")
             return result
+            
+        except Exception as session_error:
+            # If there's a session issue, try with a fresh session
+            logger.warning(f"Session issue, trying fresh session: {session_error}")
+            from ..db import get_session
+            
+            for fresh_db in get_session():
+                service = AssignmentService(fresh_db)
+                result = service.auto_assign_all()
+                
+                logger.info(f"Auto-assignment result (fresh session) for order {order_id}: {result.get('message', 'Unknown result')}")
+                print(f"Auto-assignment triggered (fresh session) after order {order_id} creation: {result.get('message', 'Unknown result')}")
+                return result
             
     except Exception as e:
         import logging
@@ -82,6 +94,7 @@ def trigger_auto_assignment(db: Session, order_id: int):
         logger.error(f"Auto-assignment failed after order {order_id} creation: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         print(f"Auto-assignment failed after order {order_id} creation: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
         # Don't fail order creation if assignment fails
         return None
 
@@ -269,7 +282,15 @@ def create_order(
         log_action(db, current_user, "order.create", f"order_id={order.id}")
         
         # Trigger auto-assignment after order creation
-        trigger_auto_assignment(db, order.id)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"About to trigger auto-assignment for order {order.id}")
+        print(f"About to trigger auto-assignment for order {order.id}")
+        
+        trigger_result = trigger_auto_assignment(db, order.id)
+        
+        logger.info(f"Auto-assignment trigger completed for order {order.id}: {trigger_result}")
+        print(f"Auto-assignment trigger completed for order {order.id}: {trigger_result}")
         
         return envelope(OrderOut.model_validate(order))
     except Exception as e:
@@ -909,7 +930,15 @@ def create_simple_order(
         log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
         
         # Trigger auto-assignment after order creation
-        trigger_auto_assignment(db, order.id)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"About to trigger auto-assignment for simple order {order.id}")
+        print(f"About to trigger auto-assignment for simple order {order.id}")
+        
+        trigger_result = trigger_auto_assignment(db, order.id)
+        
+        logger.info(f"Auto-assignment trigger completed for simple order {order.id}: {trigger_result}")
+        print(f"Auto-assignment trigger completed for simple order {order.id}: {trigger_result}")
         
         return {
             "id": order.id,
