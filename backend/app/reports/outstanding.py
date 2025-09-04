@@ -95,24 +95,25 @@ def compute_expected_for_order(order, as_of, trip=None) -> Decimal:
     if is_delivered and plan and plan.monthly_amount:
         total_plan_due = calculate_plan_due(plan, as_of, trip_delivered_at)
         
-        # If upfront_billed_amount is 0 but we have rental items, assume first month is in subtotal
-        effective_upfront = upfront_billed
-        if upfront_billed == Decimal("0") and subtotal > 0:
-            # Check if this appears to be first month (delivered recently)
-            start = plan.start_date
-            if not start and trip_delivered_at:
-                start = trip_delivered_at.date() if hasattr(trip_delivered_at, 'date') else trip_delivered_at
-            if not start and order and getattr(order, 'delivery_date', None):
-                start = order.delivery_date.date() if hasattr(order.delivery_date, 'date') else order.delivery_date
-                
-            if start:
-                months = months_elapsed(start, as_of)
-                # If we're in month 1 and subtotal includes monthly amount, don't double count
-                if months == 1 and abs(subtotal - Decimal(str(plan.monthly_amount))) < Decimal("0.01"):
-                    effective_upfront = Decimal(str(plan.monthly_amount))
-        
-        # Plan accrual is the total due minus what was already billed upfront
-        plan_accrual = max(total_plan_due - effective_upfront, Decimal("0"))
+        # By convention, first month is always included in order items/subtotal
+        # Only accrue additional months beyond the first
+        start = plan.start_date
+        if not start and trip_delivered_at:
+            start = trip_delivered_at.date() if hasattr(trip_delivered_at, 'date') else trip_delivered_at
+        if not start and order and getattr(order, 'delivery_date', None):
+            start = order.delivery_date.date() if hasattr(order.delivery_date, 'date') else order.delivery_date
+            
+        cutoff = getattr(order, "returned_at", None) if order else None
+        if cutoff and hasattr(cutoff, 'date'):
+            cutoff = cutoff.date()
+            
+        if start:
+            months = min(
+                months_elapsed(start, as_of, cutoff=cutoff),
+                getattr(plan, "months", None) or 10 ** 6,
+            )
+            additional_months = max(months - 1, 0)  # Exclude first month (always in subtotal)
+            plan_accrual = q2(Decimal(str(plan.monthly_amount or 0)) * additional_months)
         
     return q2(base_amount + plan_accrual)
 
