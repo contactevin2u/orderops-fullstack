@@ -152,7 +152,15 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
-      "Bash(set PYTHONPATH=.)"
+      "Bash(set PYTHONPATH=.)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\orders/**)"
     ],
     "deny": [],
     "ask": []

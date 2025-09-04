@@ -24,6 +24,7 @@ export default function OrderDetailPage(){
   const [disc,setDisc] = React.useState<string>("");
   const [delFee,setDelFee] = React.useState<string>("");
   const [retDelFee,setRetDelFee] = React.useState<string>("");
+  const [editRetDelFee,setEditRetDelFee] = React.useState<string>("");
   const [retCollect,setRetCollect] = React.useState<boolean>(false);
   const [retMethod,setRetMethod] = React.useState<string>("");
   const [retRef,setRetRef] = React.useState<string>("");
@@ -60,7 +61,10 @@ export default function OrderDetailPage(){
     try{
       const d = await orderDue(orderId, date);
       setDue(d);
-    }catch(e:any){ setError(e); }
+    }catch(e:any){ 
+      console.error('Failed to load due amount:', e);
+      setDue(null); 
+    }
   }, []);
 
   const load = React.useCallback(async () => {
@@ -72,6 +76,7 @@ export default function OrderDetailPage(){
       setDisc(String(o?.discount ?? ""));
       setDelFee(String(o?.delivery_fee ?? ""));
       setRetDelFee(String(o?.return_delivery_fee ?? ""));
+      setEditRetDelFee(String(o?.return_delivery_fee ?? ""));
       setNotes(String(o?.notes ?? ""));
       setDeliveryDate(o?.delivery_date ? (o.delivery_date as string).slice(0,10) : "");
       setOrderCode(String(o?.code ?? ""));
@@ -83,7 +88,7 @@ export default function OrderDetailPage(){
       setPlanMonths(o?.plan?.months ? String(o.plan.months) : "");
       setPlanMonthly(o?.plan?.monthly_amount ? String(o.plan.monthly_amount) : "");
       setItems(o?.items ? o.items.map((it:any)=>({ ...it, qty: String(it.qty), monthly_amount: it.monthly_amount ? String(it.monthly_amount) : "" })) : []);
-      setCommission(o?.trip?.commission?.computed_amount ? String(o.trip.commission.computed_amount) : "");
+      setCommission(o?.trip?.commission && o.trip.commission.computed_amount !== undefined ? String(o.trip.commission.computed_amount) : "");
     }catch(e:any){ setError(e); }
   }, [id]);
 
@@ -152,7 +157,7 @@ export default function OrderDetailPage(){
         penalty_fee: Number(penalty||0),
         discount: Number(disc||0),
         delivery_fee: Number(delFee||0),
-        return_delivery_fee: Number(retDelFee||0),
+        return_delivery_fee: Number(editRetDelFee||0),
         notes,
       };
       if(deliveryDate) patch.delivery_date = deliveryDate; // ISO
@@ -196,7 +201,7 @@ export default function OrderDetailPage(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const d = due || await orderDue(order.id);
-      if((order.type === 'RENTAL' || !retCollect) && d && Number(d?.balance || d?.outstanding || 0) > 0){
+      if(order.type === 'RENTAL' && !retCollect && d && Number(d?.balance || d?.outstanding || 0) > 0){
         setErr("Outstanding must be cleared before return");
         setBusy(false);
         return;
@@ -410,7 +415,7 @@ export default function OrderDetailPage(){
             </div>
             <div className="row">
               <div className="col"><label>Delivery Fee</label><input className="input" type="number" min="0" step="0.01" value={delFee} onChange={e=>setDelFee(e.target.value)} /></div>
-              <div className="col"><label>Return Delivery Fee</label><input className="input" type="number" min="0" step="0.01" value={retDelFee} onChange={e=>setRetDelFee(e.target.value)} /></div>
+              <div className="col"><label>Return Delivery Fee</label><input className="input" type="number" min="0" step="0.01" value={editRetDelFee} onChange={e=>setEditRetDelFee(e.target.value)} /></div>
             </div>
             <div className="row">
               <div className="col">
