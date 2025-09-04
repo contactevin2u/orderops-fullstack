@@ -196,7 +196,7 @@ export default function OrderDetailPage(){
     setBusy(true); setErr(""); setMsg("");
     try{
       const d = due || await orderDue(order.id);
-      if((order.type === 'RENTAL' || !retCollect) && d && Number(d?.outstanding || d?.balance || 0) > 0){
+      if((order.type === 'RENTAL' || !retCollect) && d && Number(d?.balance || d?.outstanding || 0) > 0){
         setErr("Outstanding must be cleared before return");
         setBusy(false);
         return;
@@ -324,11 +324,12 @@ export default function OrderDetailPage(){
               <div>Discount</div><div>- RM {Number(order.discount||0).toFixed(2)}</div>
               <div>Total</div><div><b>RM {Number(order.total||0).toFixed(2)}</b></div>
               <div>Paid</div><div>RM {Number(order.paid_amount||0).toFixed(2)}</div>
-              <div>Balance</div><div><b>RM {Number(order.balance||0).toFixed(2)}</b></div>
               {due && (<>
                 <div>Accrued</div><div>RM {Number(due.accrued||0).toFixed(2)}</div>
-                <div>Outstanding</div><div><b>RM {Number(due.outstanding||0).toFixed(2)}</b></div>
-              </>)}
+                <div>Outstanding</div><div><b>RM {Number(due.outstanding||due.balance||0).toFixed(2)}</b></div>
+              </>) || (
+                <div>Balance</div><div><b>RM {Number(order.balance||0).toFixed(2)}</b></div>
+              )}
             </div>
 
             <div className="hr" />
