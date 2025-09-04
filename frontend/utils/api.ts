@@ -149,6 +149,38 @@ export function parseMessage(text: string) {
   return request<Json>("/parse", { json: { text, message: text } });
 }
 
+// Advanced 4-stage parsing pipeline
+export function parseAdvancedMessage(text: string) {
+  return request<any>("/parse/advanced", { json: { text, message: text } });
+}
+
+// Individual stages for testing/debugging
+export function classifyMessage(text: string) {
+  return request<any>("/parse/classify", { json: { text, message: text } });
+}
+
+export function findMotherOrder(text: string) {
+  return request<any>("/parse/find-order", { json: { text, message: text } });
+}
+
+// Background job processing
+export function createParseJob(text: string, sessionId?: string) {
+  return request<any>("/jobs/parse", { 
+    json: { text, session_id: sessionId } 
+  });
+}
+
+export function getJobStatus(jobId: string) {
+  return request<any>(`/jobs/${jobId}`);
+}
+
+export function listJobs(sessionId?: string, limit = 20) {
+  const sp = new URLSearchParams();
+  if (sessionId) sp.set("session_id", sessionId);
+  sp.set("limit", String(limit));
+  return request<any>(`/jobs?${sp.toString()}`);
+}
+
 // -------- Orders (normalized)
 type OrdersList = { items: any[]; total?: number };
 
@@ -312,8 +344,15 @@ export function cancelInstallment(
 }
 
 export function orderDue(id: number, asOf?: string) {
-  const qs = asOf ? `?as_of=${encodeURIComponent(asOf)}` : "";
-  return request<any>(`/orders/${id}/due${qs}`);
+  const sp = new URLSearchParams();
+  sp.set("order_id", String(id));
+  sp.set("include_zero_balance", "true");
+  if (asOf) sp.set("as_of", asOf);
+  return request<any>(`/reports/outstanding?${sp.toString()}`).then(r => {
+    // Return single order data in same format as old API
+    const item = r.items?.[0];
+    return item || { balance: 0, expected: 0, paid: 0, to_collect: 0, to_refund: 0, accrued: 0 };
+  });
 }
 
 export function markSuccess(id: number) {

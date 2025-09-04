@@ -133,9 +133,9 @@ STRICT rules:
    - If the text says delivery is free/FOC/waived (“FOC”, “free”, “percuma”, “waive”), set delivery_fee = 0.
 
 2) Item typing
-   - OUTRIGHT when it’s a one-time purchase price (RM2200).
-   - INSTALLMENT when pattern like “RM259 x 6 bulan / installment”, populate plan.months, items[i].monthly_amount.
-   - RENTAL when “sewa”/“rent”, items[i].monthly_amount is the monthly rent.
+   - OUTRIGHT when it's a one-time purchase price (RM2200).
+   - INSTALLMENT when pattern like "RM259 x 6 bulan / installment", populate plan.months, plan.monthly_amount, items[i].monthly_amount.
+   - RENTAL when "sewa"/"rent", populate plan.monthly_amount with total monthly rent, items[i].monthly_amount is per-item monthly rent, plan.months should be null for open-ended rentals.
    - If multiple types exist across items, order.type = "MIXED". Otherwise set to the sole type.
 
 3) Totals semantics (populate if present, or set 0 when unknown; DO NOT fabricate):
@@ -152,7 +152,12 @@ STRICT rules:
    - If a token like “WC2009” appears, set order.code to it.
    - delivery_date may be “19/8”, “19-08”, or embedded text like “Deliver 28/8”. Keep as provided string.
 
-6) Safety
+6) Plan object requirements
+   - For INSTALLMENT orders: Always populate plan.plan_type="INSTALLMENT", plan.months (e.g. 6), plan.monthly_amount (total monthly payment).
+   - For RENTAL orders: Always populate plan.plan_type="RENTAL", plan.months=null, plan.monthly_amount (total monthly rent).
+   - For OUTRIGHT orders: Set plan.plan_type=null, plan.months=null, plan.monthly_amount=null.
+
+7) Safety
    - If you are not confident about a numeric, set it to 0 instead of guessing.
    - Do not invent items or fees not implied by the text.
 

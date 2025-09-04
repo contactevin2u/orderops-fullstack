@@ -7,8 +7,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Order, Role
-from ..reports.outstanding import compute_expected_for_order
+from ..models import Order, Role, Trip
+from ..reports.outstanding import compute_expected_for_order, calculate_plan_due
 from ..services.ordersvc import _sum_posted_payments, q2
 
 router = APIRouter(
@@ -25,22 +25,29 @@ def outstanding(
     exclude_cleared: bool = Query(default=True),
     limit: int = Query(50, ge=1, le=1000),
     offset: int = Query(0, ge=0),
+    order_id: int | None = Query(default=None),
+    include_zero_balance: bool = Query(default=False),
     db: Session = Depends(get_session),
 ):
     as_of = as_of or date.today()
     query = (
         db.query(Order)
+        .join(Trip, Order.id == Trip.order_id)
         .options(
             selectinload(Order.customer),
             selectinload(Order.items),
             selectinload(Order.plan),
             selectinload(Order.payments),
             selectinload(Order.adjustments).selectinload(Order.payments),
+            selectinload(Order.trip),
         )
-        .filter(Order.delivery_date != None)
-        .filter(Order.delivery_date <= as_of)
+        .filter(Trip.status == "DELIVERED")
+        .filter(Trip.delivered_at != None)
+        .filter(Trip.delivered_at <= as_of)
     )
-    if order_type and order_type != "ALL":
+    if order_id:
+        query = query.filter(Order.id == order_id)
+    elif order_type and order_type != "ALL":
         query = query.filter(Order.type == order_type)
     if exclude_cleared:
         query = query.filter(Order.status != "RETURNED")
@@ -56,8 +63,14 @@ def outstanding(
             (_sum_posted_payments(ch) for ch in getattr(order, "adjustments", []) or []), Decimal("0")
         )
         balance = q2(expected - paid)
-        if balance <= 0:
+        if not include_zero_balance and balance <= 0:
             continue
+        
+        # Add cashier-friendly fields like orderDue API
+        to_collect = q2(balance if balance > 0 else Decimal("0"))
+        to_refund = q2(-balance if balance < 0 else Decimal("0"))
+        accrued = calculate_plan_due(order.plan, as_of)
+        
         items.append(
             {
                 "id": order.id,
@@ -69,6 +82,9 @@ def outstanding(
                 "paid": float(paid),
                 "fees": float(fees),
                 "balance": float(balance),
+                "to_collect": float(to_collect),
+                "to_refund": float(to_refund),
+                "accrued": float(accrued),
             }
         )
         totals["expected"] += expected

@@ -21,7 +21,9 @@ def calculate_plan_due(plan, as_of) -> Decimal:
     if not plan:
         return Decimal("0")
     order_obj = getattr(plan, "order", None)
-    start = plan.start_date or (order_obj.delivery_date if order_obj else None)
+    # Use trip delivery date instead of order delivery date
+    trip_delivered_at = getattr(order_obj.trip, "delivered_at", None) if order_obj and hasattr(order_obj, "trip") else None
+    start = plan.start_date or (trip_delivered_at.date() if trip_delivered_at else None)
     cutoff = getattr(order_obj, "returned_at", None) if order_obj else None
     months = min(
         months_elapsed(start, as_of, cutoff=cutoff),
@@ -31,10 +33,23 @@ def calculate_plan_due(plan, as_of) -> Decimal:
 
 
 def compute_expected_for_order(order, as_of) -> Decimal:
-    fees = q2((order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0))
+    # Check if order has been delivered via trip status
+    trip = getattr(order, "trip", None)
+    is_delivered = trip and getattr(trip, "status", None) == "DELIVERED"
+    
+    # Only charge fees after delivery
+    fees = Decimal("0")
+    if is_delivered:
+        fees = q2((order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0))
+    
     if order.status in {"CANCELLED", "RETURNED"}:
         child_total = sum((Decimal(ch.total or 0) for ch in getattr(order, "adjustments", []) or []), Decimal("0"))
         return q2(child_total)
+    
+    # Only charge amounts after delivery
+    if not is_delivered:
+        return Decimal("0")
+        
     one_time_net = q2((order.subtotal or 0) - (order.discount or 0))
     plan = getattr(order, "plan", None)
     plan_accrued = calculate_plan_due(plan, as_of)

@@ -119,10 +119,9 @@ def _compute_subtotal_from_items(items) -> Decimal:
             lt = (up or Decimal("0")) * (qty or 0)
         lt = Decimal(str(lt or 0))
         if item_type in PLAN_ITEM_TYPES:
-            if item_type in FEE_ITEM_TYPES or lt < 0:
-                subtotal += lt
-            else:
-                continue
+            # Include RENTAL/INSTALLMENT items in subtotal if they have upfront costs (first month, deposits, etc.)
+            # This allows first month rent or upfront installment payments to be invoiced
+            subtotal += lt
         else:
             subtotal += lt
     return q2(subtotal)
