@@ -48,16 +48,19 @@ export type Driver = {
 };
 
 function mapOrder(o: any): Order {
+  // Address priority: customer_address (from API join) > address > composed address
+  const address = o.customer_address || 
+                  o.customerAddress || 
+                  o.address ||
+                  [o.address1, o.address2].filter(Boolean).join(' ') ||
+                  '';
+                  
   return {
     id: String(o.id ?? ''),
     orderNo: o.code || o.orderNo || String(o.id ?? ''),
     status: o.trip?.status || o.status || 'UNASSIGNED', // Use trip status first, then order status
     deliveryDate: o.delivery_date || o.deliveryDate || '',
-    address:
-      o.address ||
-      [o.address1, o.address2].filter(Boolean).join(' ') ||
-      o.customer_address ||
-      '',
+    address: address,
     customerName: o.customer_name || o.customerName || '', // Add customer name
     customerAddress: o.customer_address || o.customerAddress || '', // Add customer address  
     lat: o.lat ?? o.latitude ?? o.location?.lat,
@@ -131,11 +134,20 @@ export async function fetchOnHold(date: string): Promise<Order[]> {
 
 export async function fetchRouteOrders(
   routeId: string,
-  _date: string,
+  date: string,
 ): Promise<Order[]> {
-  const { items } = await listOrders(undefined, undefined, undefined, 500);
+  // Fetch orders with proper filtering - use route-specific API if available
+  // For now, use the orders API with date filter and then filter by route
+  const { items } = await listOrders(undefined, undefined, undefined, 500, { date });
   return (items || [])
-    .filter((o: any) => o.trip?.route_id === Number(routeId))
+    .filter((o: any) => {
+      // More robust route filtering - check both trip.route_id and routeId fields
+      const tripRouteId = o.trip?.route_id;
+      const orderRouteId = o.route_id;
+      const targetRouteId = Number(routeId);
+      
+      return tripRouteId === targetRouteId || orderRouteId === targetRouteId;
+    })
     .map(mapOrder);
 }
 
