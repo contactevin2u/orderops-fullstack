@@ -1,0 +1,27 @@
+
+#!/usr/bin/env python
+
+
+"""merge heads
+
+Revision ID: a3c70e9437fe
+Revises: 20250902_upsell_records, bg_jobs_001
+Create Date: 2025-09-04 11:24:19.351724
+
+"""
+from __future__ import annotations
+
+from alembic import op
+import sqlalchemy as sa
+
+# revision identifiers, used by Alembic.
+revision = 'a3c70e9437fe'
+down_revision = ('20250902_upsell_records', 'bg_jobs_001')
+branch_labels = None
+depends_on = None
+
+def upgrade() -> None:
+    pass
+
+def downgrade() -> None:
+    pass

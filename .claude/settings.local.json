@@ -31,7 +31,8 @@
       "Bash(del check_migration.py)",
       "Bash(git tag:*)",
       "Bash(git log:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(alembic:*)"
     ],
     "deny": [],
     "ask": []
