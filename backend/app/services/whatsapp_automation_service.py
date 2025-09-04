@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.models.order import Order
 from app.models.customer import Customer
-from app.services.unified_assignment_service import UnifiedAssignmentService
+from app.services.assignment_service import AssignmentService
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class WhatsAppAutomationService:
     def __init__(self, db: Session, openai_api_key: Optional[str] = None):
         self.db = db
         self.openai_client = OpenAI(api_key=openai_api_key) if (openai_api_key and OPENAI_AVAILABLE) else None
-        self.assignment_service = UnifiedAssignmentService(db, openai_api_key)
+        self.assignment_service = AssignmentService(db)
 
     def process_whatsapp_message(self, message_data: Dict[str, Any]) -> Dict[str, Any]:
         """Main pipeline: WhatsApp message -> Order -> Assignment"""

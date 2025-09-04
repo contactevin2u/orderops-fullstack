@@ -57,7 +57,11 @@ def outstanding(
     items: list[dict] = []
     totals = {"expected": Decimal("0"), "paid": Decimal("0"), "fees": Decimal("0"), "balance": Decimal("0")}
     for order in orders:
-        expected = compute_expected_for_order(order, as_of)
+        # Get trip data from the joined query
+        trip = getattr(order, "trip", None)
+        trip_delivered_at = getattr(trip, "delivered_at", None) if trip else None
+        
+        expected = compute_expected_for_order(order, as_of, trip)
         fees = q2((order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0))
         paid = _sum_posted_payments(order) + sum(
             (_sum_posted_payments(ch) for ch in getattr(order, "adjustments", []) or []), Decimal("0")
@@ -69,7 +73,7 @@ def outstanding(
         # Add cashier-friendly fields like orderDue API
         to_collect = q2(balance if balance > 0 else Decimal("0"))
         to_refund = q2(-balance if balance < 0 else Decimal("0"))
-        accrued = calculate_plan_due(order.plan, as_of)
+        accrued = calculate_plan_due(order.plan, as_of, trip_delivered_at)
         
         items.append(
             {

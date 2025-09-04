@@ -17,14 +17,27 @@ def months_elapsed(start_date, as_of, cutoff=None) -> int:
     return months
 
 
-def calculate_plan_due(plan, as_of) -> Decimal:
+def calculate_plan_due(plan, as_of, trip_delivered_at=None) -> Decimal:
+    """Calculate plan due amount with explicit trip delivery date."""
     if not plan:
         return Decimal("0")
+    
     order_obj = getattr(plan, "order", None)
-    # Use trip delivery date instead of order delivery date
-    trip_delivered_at = getattr(order_obj.trip, "delivered_at", None) if order_obj and hasattr(order_obj, "trip") else None
-    start = plan.start_date or (trip_delivered_at.date() if trip_delivered_at else None)
+    
+    # Start date priority: plan.start_date > trip_delivered_at > order.delivery_date
+    start = plan.start_date
+    if not start and trip_delivered_at:
+        start = trip_delivered_at.date() if hasattr(trip_delivered_at, 'date') else trip_delivered_at
+    if not start and order_obj and order_obj.delivery_date:
+        start = order_obj.delivery_date.date() if hasattr(order_obj.delivery_date, 'date') else order_obj.delivery_date
+    
+    if not start:
+        return Decimal("0")
+    
     cutoff = getattr(order_obj, "returned_at", None) if order_obj else None
+    if cutoff and hasattr(cutoff, 'date'):
+        cutoff = cutoff.date()
+    
     months = min(
         months_elapsed(start, as_of, cutoff=cutoff),
         getattr(plan, "months", None) or 10 ** 6,
@@ -32,10 +45,14 @@ def calculate_plan_due(plan, as_of) -> Decimal:
     return q2(Decimal(plan.monthly_amount) * months)
 
 
-def compute_expected_for_order(order, as_of) -> Decimal:
-    # Check if order has been delivered via trip status
-    trip = getattr(order, "trip", None)
+def compute_expected_for_order(order, as_of, trip=None) -> Decimal:
+    """Calculate expected amount for order with explicit trip data."""
+    # Use passed trip or get from order relationship
+    if trip is None:
+        trip = getattr(order, "trip", None)
+    
     is_delivered = trip and getattr(trip, "status", None) == "DELIVERED"
+    trip_delivered_at = getattr(trip, "delivered_at", None) if trip else None
     
     if order.status in {"CANCELLED", "RETURNED"}:
         child_total = sum((Decimal(ch.total or 0) for ch in getattr(order, "adjustments", []) or []), Decimal("0"))
@@ -51,16 +68,17 @@ def compute_expected_for_order(order, as_of) -> Decimal:
     
     # Plan accrual only starts after delivery (ongoing rental/installment)
     plan_accrual = Decimal("0")
-    if is_delivered:
+    if is_delivered and plan:
         # Add plan accrual only after delivery (subtract upfront already billed)
-        plan_accrued = calculate_plan_due(plan, as_of)
+        plan_accrued = calculate_plan_due(plan, as_of, trip_delivered_at)
         plan_accrual = max(plan_accrued - upfront_billed, Decimal("0"))
     
     return q2(one_time_net + fees + plan_accrual)
 
 
-def compute_balance(order, as_of) -> Decimal:
-    expected = compute_expected_for_order(order, as_of)
+def compute_balance(order, as_of, trip=None) -> Decimal:
+    """Calculate balance with explicit trip data."""
+    expected = compute_expected_for_order(order, as_of, trip)
     paid = _sum_posted_payments(order) + sum(
         (_sum_posted_payments(ch) for ch in getattr(order, "adjustments", []) or []), Decimal("0")
     )

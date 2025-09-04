@@ -238,16 +238,17 @@ class AssignmentService:
         return result
     
     def _get_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
-        """Get optimal assignments using ONLY OpenAI - no fallback"""
-        
-        if not self.openai_client:
-            raise ValueError("OpenAI client not configured - OPENAI_API_KEY required for AI-only assignment")
+        """Get optimal assignments using OpenAI with fallback to simple logic"""
         
         if len(orders) == 0 or len(drivers) == 0:
             return []
-            
-        # AI-ONLY assignment - no fallback allowed
-        return self._openai_assignments(orders, drivers)
+        
+        # Use OpenAI if available, otherwise fall back to simple assignment
+        if self.openai_client:
+            return self._openai_assignments(orders, drivers)
+        else:
+            logger.warning("OpenAI not available - using simple distance assignment")
+            return self._simple_assignments(orders, drivers)
     
     def _openai_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
         """Use OpenAI for optimal assignments with proximity consideration"""
