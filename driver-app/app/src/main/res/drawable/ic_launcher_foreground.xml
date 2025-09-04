@@ -1,5 +1,13 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#FF9800" android:pathData="M54,10 L98,98 L10,98 Z"/>
-</vector>
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Uses drawable-nodpi/aa_alive.jpg -->
+    <item
+        android:top="8dp"
+        android:bottom="8dp"
+        android:left="8dp"
+        android:right="8dp">
+        <bitmap
+            android:src="@drawable/aa_alive"
+            android:gravity="center" />
+    </item>
+</layer-list>

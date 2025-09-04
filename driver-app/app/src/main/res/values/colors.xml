@@ -1,5 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple40">#6650a4</color>
-    <color name="purple80">#d0bcff</color>
-    <color name="orange">#ff9800</color>
+    <color name="ic_launcher_background">#6200EE</color>
 </resources>
