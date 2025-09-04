@@ -8,7 +8,8 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, String, DateTime, Text, Integer, func
 
-from ..db import get_session, Base
+from ..db import get_session
+from ..models import Base
 from .advanced_parser import advanced_parser
 
 
