@@ -147,8 +147,20 @@ Respond with valid JSON only:
             self.db.add(order)
             self.db.flush()  # Get the order ID
             
-            # Auto-assign immediately using unified service
-            assignment_result = self.assignment_service.auto_assign_all()
+            # Auto-assign immediately using assignment service
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"WhatsApp: About to trigger auto-assignment for order {order.id} ({order.code})")
+            print(f"WhatsApp: About to trigger auto-assignment for order {order.id} ({order.code})")
+            
+            try:
+                assignment_result = self.assignment_service.auto_assign_all()
+                logger.info(f"WhatsApp: Auto-assignment completed for order {order.id}: {assignment_result}")
+                print(f"WhatsApp: Auto-assignment completed for order {order.id}: {assignment_result}")
+            except Exception as e:
+                logger.error(f"WhatsApp: Auto-assignment failed for order {order.id}: {e}")
+                print(f"WhatsApp: Auto-assignment failed for order {order.id}: {e}")
+                assignment_result = {"success": False, "error": str(e)}
             
             self.db.commit()
             
@@ -207,7 +219,19 @@ Respond with valid JSON only:
             self.db.flush()
             
             # Auto-assign pickup
-            assignment_result = self.assignment_service.auto_assign_all()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"WhatsApp: About to trigger auto-assignment for pickup {pickup_order.id} ({pickup_order.code})")
+            print(f"WhatsApp: About to trigger auto-assignment for pickup {pickup_order.id} ({pickup_order.code})")
+            
+            try:
+                assignment_result = self.assignment_service.auto_assign_all()
+                logger.info(f"WhatsApp: Auto-assignment completed for pickup {pickup_order.id}: {assignment_result}")
+                print(f"WhatsApp: Auto-assignment completed for pickup {pickup_order.id}: {assignment_result}")
+            except Exception as e:
+                logger.error(f"WhatsApp: Auto-assignment failed for pickup {pickup_order.id}: {e}")
+                print(f"WhatsApp: Auto-assignment failed for pickup {pickup_order.id}: {e}")
+                assignment_result = {"success": False, "error": str(e)}
             
             self.db.commit()
             
