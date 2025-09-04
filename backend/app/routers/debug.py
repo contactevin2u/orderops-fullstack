@@ -513,3 +513,109 @@ def debug_schedule_alignment(db: Session = Depends(get_session)):
             "error": str(e),
             "traceback": traceback.format_exc()
         })
+@router.get("/test-outstanding/{order_id}")
+def test_outstanding_calculation(order_id: int, db: Session = Depends(get_session)):
+    """Test outstanding calculation for a specific order - for debugging only"""
+    try:
+        from datetime import date
+        from decimal import Decimal
+        from ..reports.outstanding import compute_expected_for_order, compute_balance, calculate_plan_due, months_elapsed
+        from ..services.ordersvc import _sum_posted_payments
+        from ..models.order import Order
+        from ..models.trip import Trip
+        
+        # Get the order
+        order = db.query(Order).filter(Order.id == order_id).first()
+        if not order:
+            return envelope({"error": f"Order {order_id} not found"})
+        
+        # Get trip data  
+        trip = db.query(Trip).filter(Trip.order_id == order_id).first()
+        
+        today = date.today()
+        
+        # Test step by step calculation
+        result = {
+            "order_id": order_id,
+            "order_code": order.code,
+            "order_type": order.type,
+            "order_status": order.status,
+            "today": today.isoformat(),
+            "raw_data": {},
+            "calculations": {},
+            "final_results": {}
+        }
+        
+        # Raw data
+        result["raw_data"] = {
+            "subtotal": float(order.subtotal or 0),
+            "discount": float(order.discount or 0), 
+            "delivery_fee": float(order.delivery_fee or 0),
+            "return_delivery_fee": float(order.return_delivery_fee or 0),
+            "penalty_fee": float(order.penalty_fee or 0),
+            "delivery_date": order.delivery_date.isoformat() if order.delivery_date else None,
+            "returned_at": order.returned_at.isoformat() if order.returned_at else None,
+        }
+        
+        # Trip data
+        if trip:
+            result["raw_data"]["trip"] = {
+                "id": trip.id,
+                "status": trip.status,
+                "delivered_at": trip.delivered_at.isoformat() if trip.delivered_at else None,
+            }
+        
+        # Plan data
+        if order.plan:
+            plan = order.plan
+            result["raw_data"]["plan"] = {
+                "monthly_amount": float(plan.monthly_amount or 0),
+                "months": plan.months,
+                "start_date": plan.start_date.isoformat() if plan.start_date else None,
+                "upfront_billed_amount": float(plan.upfront_billed_amount or 0),
+            }
+            
+            # Test months calculation
+            if plan.start_date:
+                result["calculations"]["months_elapsed"] = months_elapsed(
+                    plan.start_date, today, cutoff=order.returned_at.date() if order.returned_at else None
+                )
+                result["calculations"]["plan_due"] = float(calculate_plan_due(plan, today, 
+                    trip.delivered_at if trip else None))
+        
+        # Test expected calculation
+        expected = compute_expected_for_order(order, today, trip)
+        result["calculations"]["expected"] = float(expected)
+        
+        # Test payments
+        paid = _sum_posted_payments(order)
+        adjustments_paid = sum(
+            (_sum_posted_payments(ch) for ch in getattr(order, "adjustments", []) or []), 
+            Decimal("0")
+        )
+        total_paid = paid + adjustments_paid
+        
+        result["calculations"]["payments"] = {
+            "order_payments": float(paid),
+            "adjustment_payments": float(adjustments_paid),
+            "total_paid": float(total_paid)
+        }
+        
+        # Test balance calculation
+        balance = compute_balance(order, today, trip)
+        result["final_results"] = {
+            "expected": float(expected),
+            "paid": float(total_paid), 
+            "balance": float(balance),
+            "to_collect": float(max(balance, Decimal("0"))),
+            "to_refund": float(max(-balance, Decimal("0")))
+        }
+        
+        return envelope(result)
+        
+    except Exception as e:
+        import traceback
+        return envelope({
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        })
