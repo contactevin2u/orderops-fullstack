@@ -5,16 +5,25 @@ from ..services.ordersvc import _sum_posted_payments, q2
 
 
 def months_elapsed(start_date, as_of, cutoff=None) -> int:
+    """Calculate months elapsed from start_date to as_of, with proper cutoff handling"""
     if not start_date:
         return 0
     if as_of < start_date:
         return 0
-    months = (as_of.year - start_date.year) * 12 + (as_of.month - start_date.month)
-    if as_of.day >= start_date.day:
+        
+    # Apply cutoff first if it exists and is before as_of
+    end_date = as_of
+    if cutoff and cutoff < as_of:
+        end_date = cutoff
+    
+    # Calculate full months elapsed
+    months = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+    
+    # Add 1 if we've passed the start day in the current month
+    if end_date.day >= start_date.day:
         months += 1
-    if cutoff and as_of > cutoff:
-        return months_elapsed(start_date, cutoff)
-    return months
+        
+    return max(0, months)
 
 
 def calculate_plan_due(plan, as_of, trip_delivered_at=None) -> Decimal:
@@ -42,7 +51,7 @@ def calculate_plan_due(plan, as_of, trip_delivered_at=None) -> Decimal:
         months_elapsed(start, as_of, cutoff=cutoff),
         getattr(plan, "months", None) or 10 ** 6,
     )
-    return q2(Decimal(plan.monthly_amount) * months)
+    return q2(Decimal(str(plan.monthly_amount or 0)) * months)
 
 
 def compute_expected_for_order(order, as_of, trip=None) -> Decimal:
@@ -51,29 +60,44 @@ def compute_expected_for_order(order, as_of, trip=None) -> Decimal:
     if trip is None:
         trip = getattr(order, "trip", None)
     
-    is_delivered = trip and getattr(trip, "status", None) == "DELIVERED"
+    # Check for delivered status - could be DELIVERED, SUCCESS, or COMPLETED
+    trip_status = getattr(trip, "status", None) if trip else None
+    is_delivered = trip_status in {"DELIVERED", "SUCCESS", "COMPLETED"} if trip_status else False
     trip_delivered_at = getattr(trip, "delivered_at", None) if trip else None
     
     if order.status in {"CANCELLED", "RETURNED"}:
+        # For cancelled/returned orders, only count adjustment totals (fees, penalties, etc.)
         child_total = sum((Decimal(ch.total or 0) for ch in getattr(order, "adjustments", []) or []), Decimal("0"))
         return q2(child_total)
     
-    # Calculate upfront collection amount (always available for driver)
-    one_time_net = q2((order.subtotal or 0) - (order.discount or 0))
     plan = getattr(order, "plan", None)
-    upfront_billed = q2(getattr(plan, "upfront_billed_amount", 0) or 0)
+    order_type = (getattr(order, "type", "") or "").upper()
     
-    # ALL FEES are always included for driver collection (delivery, return, penalty)
-    fees = q2((order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0))
+    # Base calculation components
+    subtotal = q2(getattr(order, "subtotal", 0) or 0)
+    discount = q2(getattr(order, "discount", 0) or 0)
+    delivery_fee = q2(getattr(order, "delivery_fee", 0) or 0)
+    return_delivery_fee = q2(getattr(order, "return_delivery_fee", 0) or 0)
+    penalty_fee = q2(getattr(order, "penalty_fee", 0) or 0)
     
-    # Plan accrual only starts after delivery (ongoing rental/installment)
+    # For OUTRIGHT orders: always include full amount regardless of delivery
+    if order_type == "OUTRIGHT":
+        return q2(subtotal - discount + delivery_fee + return_delivery_fee + penalty_fee)
+    
+    # For RENTAL/INSTALLMENT orders: more complex logic
+    upfront_billed = q2(Decimal(str(getattr(plan, "upfront_billed_amount", 0) or 0))) if plan else Decimal("0")
+    
+    # Always include upfront amount and fees
+    base_amount = q2(subtotal - discount + delivery_fee + return_delivery_fee + penalty_fee)
+    
+    # Add ongoing plan accrual only if delivered
     plan_accrual = Decimal("0")
-    if is_delivered and plan:
-        # Add plan accrual only after delivery (subtract upfront already billed)
-        plan_accrued = calculate_plan_due(plan, as_of, trip_delivered_at)
-        plan_accrual = max(plan_accrued - upfront_billed, Decimal("0"))
-    
-    return q2(one_time_net + fees + plan_accrual)
+    if is_delivered and plan and plan.monthly_amount:
+        total_plan_due = calculate_plan_due(plan, as_of, trip_delivered_at)
+        # Plan accrual is the total due minus what was already billed upfront
+        plan_accrual = max(total_plan_due - upfront_billed, Decimal("0"))
+        
+    return q2(base_amount + plan_accrual)
 
 
 def compute_balance(order, as_of, trip=None) -> Decimal:
