@@ -440,7 +440,15 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
 
     injected_amount = Decimal("0")
     if monthly_amount > 0:
-        items, injected_amount = ensure_first_month_fee_line(items, plan_type, monthly_amount)
+        # Check if items already include rental/installment items
+        has_plan_items = any(
+            (item.get("item_type", "")).upper() in PLAN_ITEM_TYPES 
+            for item in items
+        )
+        
+        # Only add first month fee if no plan items exist (mixed orders with equipment purchase)
+        if not has_plan_items:
+            items, injected_amount = ensure_first_month_fee_line(items, plan_type, monthly_amount)
 
     subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(items, charges, totals)
     balance = q2(total - paid)
