@@ -63,6 +63,24 @@ class AdvancedParserService:
             order_data = parse_whatsapp_text(text)
             order = create_from_parsed(db, order_data)
             
+            # Trigger auto-assignment after order creation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Parser: About to trigger auto-assignment for order {order.id} ({order.code})")
+            print(f"Parser: About to trigger auto-assignment for order {order.id} ({order.code})")
+            
+            assignment_result = None
+            try:
+                from ..services.assignment_service import AssignmentService
+                assignment_service = AssignmentService(db)
+                assignment_result = assignment_service.auto_assign_all()
+                logger.info(f"Parser: Auto-assignment completed for order {order.id}: {assignment_result}")
+                print(f"Parser: Auto-assignment completed for order {order.id}: {assignment_result}")
+            except Exception as e:
+                logger.error(f"Parser: Auto-assignment failed for order {order.id}: {e}")
+                print(f"Parser: Auto-assignment failed for order {order.id}: {e}")
+                assignment_result = {"success": False, "error": str(e)}
+            
             return {
                 "status": "success",
                 "type": "delivery",
@@ -70,7 +88,8 @@ class AdvancedParserService:
                 "order_code": order.code,
                 "message": f"New order {order.code} created successfully",
                 "classification": classification,
-                "parsed_data": order_data
+                "parsed_data": order_data,
+                "assignment_result": assignment_result
             }
             
         except Exception as e:
