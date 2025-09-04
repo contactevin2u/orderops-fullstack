@@ -37,24 +37,28 @@ def compute_expected_for_order(order, as_of) -> Decimal:
     trip = getattr(order, "trip", None)
     is_delivered = trip and getattr(trip, "status", None) == "DELIVERED"
     
-    # Only charge fees after delivery
-    fees = Decimal("0")
-    if is_delivered:
-        fees = q2((order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0))
-    
     if order.status in {"CANCELLED", "RETURNED"}:
         child_total = sum((Decimal(ch.total or 0) for ch in getattr(order, "adjustments", []) or []), Decimal("0"))
         return q2(child_total)
     
-    # Only charge amounts after delivery
-    if not is_delivered:
-        return Decimal("0")
-        
+    # Calculate upfront collection amount (always available for driver)
     one_time_net = q2((order.subtotal or 0) - (order.discount or 0))
     plan = getattr(order, "plan", None)
-    plan_accrued = calculate_plan_due(plan, as_of)
     upfront_billed = q2(getattr(plan, "upfront_billed_amount", 0) or 0)
-    return q2(one_time_net + fees + max(plan_accrued - upfront_billed, Decimal("0")))
+    
+    # Delivery-based charges (fees and ongoing plan accrual)
+    delivery_based_amount = Decimal("0")
+    if is_delivered:
+        # Add fees only after delivery
+        fees = q2((order.delivery_fee or 0) + (order.return_delivery_fee or 0) + (order.penalty_fee or 0))
+        delivery_based_amount += fees
+        
+        # Add plan accrual only after delivery (subtract upfront already billed)
+        plan_accrued = calculate_plan_due(plan, as_of)
+        ongoing_plan_due = max(plan_accrued - upfront_billed, Decimal("0"))
+        delivery_based_amount += ongoing_plan_due
+    
+    return q2(one_time_net + delivery_based_amount)
 
 
 def compute_balance(order, as_of) -> Decimal:
