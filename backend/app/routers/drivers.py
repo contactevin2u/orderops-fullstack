@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy import select, func, and_
@@ -19,6 +19,7 @@ from ..schemas import (
     CommissionMonthOut,
 )
 from ..utils.storage import save_pod_image
+from ..reports.outstanding import compute_balance
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -108,7 +109,7 @@ def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_d
         "notes": getattr(order, "notes", None),
         "total": str(getattr(order, "total", Decimal("0")) or Decimal("0")),
         "paid_amount": str(getattr(order, "paid_amount", Decimal("0")) or Decimal("0")),
-        "balance": str(getattr(order, "balance", Decimal("0")) or Decimal("0")),
+        "balance": str(compute_balance(order, date.today())),
         "type": getattr(order, "type", None),
         "items": items,
         "commission": commission_info,
