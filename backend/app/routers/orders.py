@@ -30,7 +30,7 @@ from ..services.ordersvc import (
     q2,
     ensure_plan_first_month_fee,
 )
-from ..reports.outstanding import compute_expected_for_order, calculate_plan_due
+from ..reports.outstanding import compute_expected_for_order, calculate_plan_due, compute_balance
 from ..services.status_updates import (
     apply_buyback,
     cancel_installment,
@@ -168,6 +168,8 @@ def list_orders(
     out: list[OrderListOut] = []
     for (order, customer_name, customer_address, trip, driver_name, commission) in rows:
         dto = OrderOut.model_validate(order).model_dump()
+        # Replace static balance with dynamic outstanding calculation
+        dto["balance"] = float(compute_balance(order, date_cls.today()))
         dto["customer_name"] = customer_name
         dto["customer_address"] = customer_address
         if trip:
