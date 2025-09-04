@@ -156,7 +156,7 @@ export default function BackgroundParsePage() {
       <Card>
         <h1 style={{ marginTop: 0 }}>Background Message Parser</h1>
         <p style={{ color: '#6b7280', marginBottom: 24 }}>
-          Paste WhatsApp messages and they'll be processed automatically in the background. 
+          Paste WhatsApp messages and they&apos;ll be processed automatically in the background. 
           Orders will be created automatically for deliveries, and adjustments applied for returns.
         </p>
 
