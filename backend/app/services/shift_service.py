@@ -120,9 +120,11 @@ class ShiftService:
         clock_out_time = datetime.now(timezone.utc)
         total_hours = (clock_out_time - active_shift.clock_in_at).total_seconds() / 3600
 
-        # Validate shift duration
+        # Log long shifts but don't block clock-out
         if total_hours > MAX_SHIFT_DURATION_HOURS:
-            raise ValueError(f"Shift duration ({total_hours:.1f}h) exceeds maximum allowed ({MAX_SHIFT_DURATION_HOURS}h)")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Long shift detected: Driver {driver_id} worked {total_hours:.1f}h (>{MAX_SHIFT_DURATION_HOURS}h)")
 
         active_shift.clock_out_at = clock_out_time
         active_shift.clock_out_lat = lat

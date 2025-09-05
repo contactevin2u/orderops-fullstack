@@ -126,7 +126,7 @@ class AssignmentService:
                 "lng": 101.6869
             })
         
-        logger.info(f"Found {len(result)} orders to assign (includes overdue orders, excludes cancelled/buyback/returned)")
+        logger.debug(f"Found {len(result)} orders to assign")
         return result
     
     def _get_available_drivers(self) -> List[Dict[str, Any]]:
@@ -150,16 +150,8 @@ class AssignmentService:
             .all()
         )
         
-        # CRITICAL DEBUG: Log exactly what we found
-        logger.info(f"DEPLOYMENT CHECK: Using exact date filtering for {today}")
-        logger.info(f"DEPLOYMENT CHECK: SQL query should be: schedule_date == '{today}' AND is_scheduled = True")
-        
-        logger.info(f"Found {len(scheduled_drivers)} scheduled drivers for {today}")
-        for schedule in scheduled_drivers:
-            logger.info(f"Scheduled driver: {schedule.driver_id} for {schedule.schedule_date}")
-        
         if not scheduled_drivers:
-            logger.info("No scheduled drivers for today")
+            logger.debug("No scheduled drivers for today")
             return []
         
         scheduled_ids = {schedule.driver_id for schedule in scheduled_drivers}
@@ -168,9 +160,24 @@ class AssignmentService:
         clocked_in_shifts = self.db.query(DriverShift).filter(DriverShift.status == "ACTIVE").all()
         clocked_in_ids = {shift.driver_id for shift in clocked_in_shifts}
         
-        # Get active drivers who are scheduled
+        # OPTIMIZED: Get drivers with active trips in single query
+        from sqlalchemy import func
+        
+        # Get active trips count per driver in one query
+        active_trips_subquery = (
+            self.db.query(
+                Trip.driver_id,
+                func.count(Trip.id).label('active_count')
+            )
+            .filter(Trip.status.in_(["ASSIGNED", "STARTED"]))
+            .group_by(Trip.driver_id)
+            .subquery()
+        )
+        
+        # Get drivers with their active trip counts
         drivers = (
-            self.db.query(Driver)
+            self.db.query(Driver, active_trips_subquery.c.active_count)
+            .outerjoin(active_trips_subquery, Driver.id == active_trips_subquery.c.driver_id)
             .filter(
                 and_(
                     Driver.is_active == True,
@@ -181,34 +188,35 @@ class AssignmentService:
         )
         
         result = []
-        for driver in drivers:
+        for driver, active_count in drivers:
             is_clocked_in = driver.id in clocked_in_ids
+            active_trips_count = active_count or 0
             
-            # Get active trips with locations - properly load relationships for proximity
-            active_trips_query = (
+            # Get recent delivery history for area familiarity (last 30 days)
+            from datetime import timedelta
+            thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
+            
+            recent_trips = (
                 self.db.query(Trip)
-                .options(
-                    joinedload(Trip.order).joinedload(Order.customer)
-                )
+                .options(joinedload(Trip.order).joinedload(Order.customer))
                 .filter(
                     and_(
                         Trip.driver_id == driver.id,
-                        Trip.status.in_(["ASSIGNED", "STARTED"])
+                        Trip.status == "DELIVERED",
+                        Trip.delivered_at >= thirty_days_ago
                     )
                 )
+                .limit(10)  # Last 10 deliveries for area pattern
                 .all()
             )
             
-            active_trips_count = len(active_trips_query)
-            
-            # Get existing trip locations for FANCY proximity consideration! 🚀
             existing_trip_locations = []
-            for trip in active_trips_query:
+            for trip in recent_trips:
                 if trip.order and trip.order.customer and trip.order.customer.address:
                     existing_trip_locations.append({
                         "order_id": trip.order_id,
                         "address": trip.order.customer.address,
-                        "status": trip.status
+                        "status": "DELIVERED"
                     })
             
             # Priority: 1=Scheduled+Clocked, 2=Scheduled only
@@ -217,6 +225,7 @@ class AssignmentService:
             result.append({
                 "driver_id": driver.id,
                 "driver_name": driver.name or f"Driver {driver.id}",
+                "base_warehouse": getattr(driver, 'base_warehouse', 'BATU_CAVES'),
                 "is_clocked_in": is_clocked_in,
                 "is_scheduled": True,  # All are scheduled
                 "priority": priority,
@@ -229,12 +238,7 @@ class AssignmentService:
         # Sort: Scheduled+Clocked first (priority 1), then Scheduled only (priority 2), then by workload
         result.sort(key=lambda d: (d["priority"], d["active_trips"]))
         
-        # CRITICAL DEBUG: Show exactly what we're returning
-        logger.info(f"DEPLOYMENT CHECK: Final result has {len(result)} drivers")
-        for driver in result:
-            logger.info(f"DEPLOYMENT CHECK: Driver {driver['driver_id']} ({driver['driver_name']}) - Priority: {driver['priority']}")
-        
-        logger.info(f"Found {len(result)} scheduled drivers (clocked+scheduled: {sum(1 for d in result if d['is_clocked_in'])}, scheduled only: {sum(1 for d in result if not d['is_clocked_in'])})")
+        logger.debug(f"Found {len(result)} scheduled drivers")
         return result
     
     def _get_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
@@ -243,12 +247,11 @@ class AssignmentService:
         if len(orders) == 0 or len(drivers) == 0:
             return []
         
-        # Use OpenAI if available, otherwise fall back to simple assignment
-        if self.openai_client:
-            return self._openai_assignments(orders, drivers)
-        else:
-            logger.warning("OpenAI not available - using simple distance assignment")
-            return self._simple_assignments(orders, drivers)
+        # ONLY use OpenAI - no manual fallback logic
+        if not self.openai_client:
+            raise ValueError("OpenAI API key required for PhD-level route optimization. Manual assignment disabled.")
+        
+        return self._openai_assignments(orders, drivers)
     
     def _openai_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
         """Use OpenAI for optimal assignments with proximity consideration"""
@@ -260,7 +263,9 @@ DRIVERS WITH CURRENT ASSIGNMENTS:"""
         
         for d in drivers:
             status = "CLOCKED IN" if d["is_clocked_in"] else "SCHEDULED"
-            prompt += f"\n- Driver {d['driver_id']}: {d['driver_name']} ({status})"
+            warehouse = d.get('base_warehouse', 'BATU_CAVES')
+            warehouse_label = "📍 Batu Caves" if warehouse == "BATU_CAVES" else "📍 Kota Kinabalu"
+            prompt += f"\n- Driver {d['driver_id']}: {d['driver_name']} ({status}) - {warehouse_label}"
             
             existing_locations = d.get('existing_trip_locations', [])
             if existing_locations:
@@ -276,34 +281,83 @@ DRIVERS WITH CURRENT ASSIGNMENTS:"""
         for o in orders:
             prompt += f"\n- Order {o['order_id']}: {o['customer_name']} at {o['address']} (RM{o['total']:.0f})"
         
-        prompt += f"""\n\nOPTIMIZATION RULES:
-1. PRIORITY: Clocked-in drivers > Scheduled drivers
-2. PROXIMITY: Assign orders near driver's existing assignments to minimize travel
-3. WORKLOAD: Balance total assignments across drivers
-4. EFFICIENCY: Group nearby deliveries to same driver when possible
+        prompt += f"""\n\nWAREHOUSE & GEOGRAPHY CONTEXT:
+- MAIN BASE: Batu Caves, Selangor (Peninsular Malaysia)
+- SABAH BASE: Kota Kinabalu warehouse (East Malaysia)
+
+PENINSULAR ROUTES from Batu Caves:
+- NORTH: Kedah (Alor Setar), Penang (Georgetown), Perlis - can be 1-2 drivers
+- SOUTH: Johor (JB), Melaka, N9 - can be 1-2 drivers depending on spread
+- EAST: Pahang (Kuantan), Terengganu, Kelantan (Kota Bharu) - SPLIT if Pahang+Kelantan
+- LOCAL: KL, Selangor areas - multiple drivers
+
+SABAH ROUTES from Kota Kinabalu:
+- All Sabah orders MUST be assigned to Kota Kinabalu-based drivers only
+- Sabah areas: Kota Kinabalu, Sandakan, Tawau, Lahad Datu, Kota Belud
+- DO NOT assign Sabah orders to Peninsular drivers (different logistics network)
+
+OPTIMIZATION STRATEGY:
+1. ROUTE CLUSTERING: If driver has orders going NORTH (Kedah), prioritize other NORTH orders (Penang) to same driver
+2. SMART SPLITTING: For EAST route, don't mix Pahang+Kelantan orders to same driver (400+ km apart)
+3. FUEL EFFICIENCY: Group orders by highway routes (Plus Highway directions)
+4. DRIVER PRIORITY: Clocked-in drivers > Scheduled drivers
+5. WORKLOAD BALANCE: But geographic efficiency overrides pure workload balance
+
+CRITICAL: Consider total driving distance and fuel costs. Sometimes 2 drivers for same direction is more efficient than 1 driver doing massive detours.
 
 Return optimized assignments as JSON schema:
-{{"assignments": [{{"order_id": int, "driver_id": int, "reason": "proximity/workload/priority"}}]}}
-
-Focus on geographic efficiency - drivers with existing assignments in an area should get nearby new orders."""
+{{"assignments": [{{"order_id": int, "driver_id": int, "reason": "route_efficiency/fuel_savings/geographic_clustering"}}]}}"""
 
         response = self.openai_client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Use full GPT-4 for PhD-level optimization
             messages=[
                 {
                     "role": "system", 
-                    "content": """You are a logistics optimization AI specializing in Malaysian delivery routing. 
-                    You understand Malaysian geography, major roads, and traffic patterns in Kuala Lumpur/Selangor region.
-                    
-                    Your goal: Minimize total driver travel time and distance by intelligently clustering nearby deliveries.
-                    Consider existing driver assignments to create efficient route continuity.
-                    
-                    Always return valid JSON only - no explanations or markdown formatting."""
+                    "content": """You are a PhD-level Logistics Operations Research specialist with expertise in:
+
+🎓 ACADEMIC CREDENTIALS:
+- PhD in Operations Research & Supply Chain Optimization  
+- 15+ years optimizing delivery networks across Southeast Asia
+- Published researcher in vehicle routing problems (VRP) and traveling salesman optimization
+- Expert in Malaysian geography, road networks, traffic patterns, and logistics costs
+
+🧠 ADVANCED OPTIMIZATION TECHNIQUES:
+- Multi-depot vehicle routing problem (MD-VRP) solving
+- Time-window optimization and capacity constraints
+- Dynamic programming for route sequencing  
+- Graph theory applications for network optimization
+- Real-time traffic and fuel cost modeling
+- Machine learning-based demand forecasting integration
+
+🗺️ MALAYSIAN EXPERTISE:
+- Intimate knowledge of Plus Highway system, toll costs, traffic bottlenecks
+- Interstate distance matrices (KL-Kedah 400km, Pahang-Kelantan 500km+)
+- Fuel consumption patterns across different vehicle types
+- Weather impact on delivery times (monsoon season considerations)
+- Border crossing logistics for Sabah (air cargo coordination)
+- Peak hour congestion patterns in Klang Valley
+
+💡 CREATIVE OPTIMIZATION STRATEGIES:
+- Sometimes counter-intuitive solutions are optimal (don't just cluster by proximity)
+- Consider driver fatigue, rest stops, overnight logistics for long routes  
+- Account for return journey costs (empty vehicle kilometers)
+- Hub-and-spoke vs direct delivery trade-offs
+- Cross-docking opportunities for efficiency gains
+- Dynamic re-routing based on real-time conditions
+
+🎯 YOUR MISSION: Achieve PhD-level route optimization that minimizes:
+1. Total fuel costs across entire fleet
+2. Driver hours while maximizing utilization  
+3. Customer delivery time windows
+4. Vehicle wear and operational complexity
+
+Think beyond basic clustering. Use advanced operations research principles. Be creative and innovative.
+Always return pure JSON - no explanations needed."""
                 },
                 {"role": "user", "content": prompt}
             ],
-            max_tokens=2000,
-            temperature=0.1,
+            max_tokens=4000,  # More tokens for complex PhD-level reasoning
+            temperature=0.2,  # Slightly higher for creative optimization solutions
             response_format={"type": "json_object"}
         )
 
@@ -320,105 +374,13 @@ Focus on geographic efficiency - drivers with existing assignments in an area sh
                 return assignments
         except Exception as e:
             logger.error(f"Failed to parse OpenAI response: {e}")
-        
-        return self._simple_assignments(orders, drivers)
-    
-    def _simple_assignments(self, orders: List[Dict], drivers: List[Dict]) -> List[Dict[str, Any]]:
-        """Enhanced assignment with proximity consideration"""
-        assignments = []
-        
-        # Group drivers by priority (already sorted)
-        priority_1_drivers = [d for d in drivers if d.get("priority") == 1]  # Scheduled + Clocked
-        priority_2_drivers = [d for d in drivers if d.get("priority") == 2]  # Scheduled only
-        
-        all_drivers = priority_1_drivers + priority_2_drivers
-        
-        if not all_drivers:
-            logger.warning("No scheduled drivers available for assignment")
-            return []
-        
-        # Track workload
-        driver_workload = {d["driver_id"]: d["active_trips"] for d in all_drivers}
-        
-        for order in orders:
-            best_driver = None
-            best_score = float('inf')
+            logger.error(f"Raw response: {ai_response}")
             
-            # Evaluate each driver for this order
-            for driver in all_drivers:
-                # Base score from priority and workload
-                priority_score = driver["priority"] * 1000  # High penalty for lower priority
-                workload_score = driver_workload[driver["driver_id"]] * 100
-                
-                # Proximity bonus: check if order is near existing assignments
-                proximity_bonus = 0
-                existing_locations = driver.get('existing_trip_locations', [])
-                if existing_locations:
-                    order_address = order.get('address', '').lower()
-                    for existing_loc in existing_locations:
-                        existing_address = existing_loc.get('address', '').lower()
-                        
-                        # Simple geographic proximity heuristics for Malaysia
-                        if self._addresses_likely_nearby(order_address, existing_address):
-                            proximity_bonus = -500  # Strong bonus for proximity
-                            break
-                        elif self._addresses_same_area(order_address, existing_address):
-                            proximity_bonus = -200  # Moderate bonus for same general area
-                
-                # Calculate final score (lower is better)
-                total_score = priority_score + workload_score + proximity_bonus
-                
-                if total_score < best_score:
-                    best_score = total_score
-                    best_driver = driver
-            
-            if best_driver:
-                assignments.append({
-                    "order_id": order["order_id"],
-                    "driver_id": best_driver["driver_id"]
-                })
-                
-                # Update workload for next assignment
-                driver_workload[best_driver["driver_id"]] += 1
-        
-        logger.info(f"Enhanced proximity assignment created {len(assignments)} assignments")
-        return assignments
+            # No fallback - force OpenAI-only optimization
+            raise ValueError(f"PhD-level optimization failed: {e}. Check OpenAI API configuration.")
     
-    def _addresses_likely_nearby(self, addr1: str, addr2: str) -> bool:
-        """Check if two addresses are likely nearby (same street/building/area)"""
-        # Extract common Malaysian address patterns
-        addr1_parts = set(addr1.split())
-        addr2_parts = set(addr2.split())
-        
-        # Check for exact street name matches
-        common_words = addr1_parts.intersection(addr2_parts)
-        
-        # Common indicators of nearby addresses
-        nearby_indicators = {
-            'jalan', 'jln', 'lorong', 'taman', 'bandar', 'pju', 'ss', 'usj', 
-            'section', 'seksyen', 'lot', 'no', 'blok', 'block', 'plaza', 'mall'
-        }
-        
-        # If they share specific location identifiers
-        location_matches = len(common_words.intersection(nearby_indicators))
-        word_overlap = len(common_words) / max(len(addr1_parts), len(addr2_parts), 1)
-        
-        return location_matches >= 2 or word_overlap > 0.4
-    
-    def _addresses_same_area(self, addr1: str, addr2: str) -> bool:
-        """Check if addresses are in same general area"""
-        addr1_parts = set(addr1.split())
-        addr2_parts = set(addr2.split())
-        
-        # Major area identifiers
-        area_indicators = {
-            'kuala', 'lumpur', 'kl', 'selangor', 'shah', 'alam', 'petaling', 'jaya', 'pj',
-            'subang', 'klang', 'ampang', 'cheras', 'kepong', 'wangsa', 'maju', 'setapak',
-            'damansara', 'bangsar', 'mont', 'kiara', 'ttdi', 'puchong', 'seri', 'kembangan'
-        }
-        
-        common_areas = addr1_parts.intersection(addr2_parts).intersection(area_indicators)
-        return len(common_areas) > 0
+    # 🚀 PURE AI OPTIMIZATION - All manual logic removed
+    # Let OpenAI's PhD-level expertise handle everything!
     
     def _apply_assignment(self, order_id: int, driver_id: int) -> Dict[str, Any]:
         """Apply a single assignment - create trip and route if needed"""

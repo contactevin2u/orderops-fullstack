@@ -14,6 +14,7 @@ class Driver(Base):
     name: Mapped[str | None] = mapped_column(String(100), nullable=True)
     phone: Mapped[str | None] = mapped_column(String(20), nullable=True, index=True)
     firebase_uid: Mapped[str] = mapped_column(String(128), unique=True, index=True)
+    base_warehouse: Mapped[str] = mapped_column(String(20), default="BATU_CAVES", nullable=False)  # BATU_CAVES | KOTA_KINABALU
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
