@@ -21,8 +21,8 @@ android {
         applicationId = "com.yourco.driverAA"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.0.9"
+        versionCode = 13
+        versionName = "1.2.2"
 
         val localProps = rootProject.file("local.properties")
         val props = Properties()
