@@ -43,8 +43,9 @@ export type Route = {
 };
 
 export type Driver = {
-  id: string;
+  id: number;
   name?: string;
+  phone?: string;
   base_warehouse?: string;
 };
 

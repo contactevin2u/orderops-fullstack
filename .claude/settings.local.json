@@ -428,7 +428,12 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\utils/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack/**)",
-      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)"
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)"
     ],
     "deny": [],
     "ask": []
