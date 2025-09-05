@@ -2,7 +2,7 @@ import React from "react";
 import { useRouter } from "next/router";
 import Card from "@/components/Card";
 import PageHeader from "@/components/PageHeader";
-import { parseMessage } from "@/utils/api";
+import { parseAdvancedMessage, normalizeParsedForOrder } from "@/utils/api";
 
 export default function NewQuotationPage() {
   const router = useRouter();
@@ -29,19 +29,6 @@ export default function NewQuotationPage() {
   const [err, setErr] = React.useState("");
   const [rawText, setRawText] = React.useState("");
 
-  // Reuse helper from parse page to be tolerant of slightly different shapes
-  function normalizeParsedForOrder(input: any) {
-    if (!input) return null;
-    const payload = typeof input === "object" && "parsed" in input ? input.parsed : input;
-    const core = payload && payload.data ? payload.data : payload;
-    if (core?.customer && core?.order) return { customer: core.customer, order: core.order };
-    if (!core) return null;
-    if (!core.customer && (core.order || core.items)) {
-      return { customer: core.customer || {}, order: core.order || core };
-    }
-    return core;
-  }
-
   function updateItem(idx: number, field: string, value: any) {
     const copy = [...items];
     copy[idx] = { ...copy[idx], [field]: value };
@@ -60,7 +47,7 @@ export default function NewQuotationPage() {
     setBusy(true);
     setErr("");
     try {
-      const res = await parseMessage(rawText);
+      const res = await parseAdvancedMessage(rawText);
       const parsed = normalizeParsedForOrder(res) || {};
       const customer = parsed.customer || {};
       const order = parsed.order || {};

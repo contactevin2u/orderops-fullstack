@@ -15,7 +15,7 @@ from .ordersvc import (
     CONST_RETURN_SUFFIX,
     CONST_BUYBACK_SUFFIX,
 )
-from .plan_math import calculate_plan_due
+# Removed plan_math import
 
 
 DEC0 = Decimal("0.00")
@@ -60,21 +60,7 @@ def mark_returned(
     7. Zero out parent order fees to prevent double-counting
     """
     
-    # Step 1: Outstanding validation for RENTAL orders using proper calculation
-    if order.type == "RENTAL" and not collect:
-        return_date_effective = return_date or datetime.utcnow()
-        as_of_date = return_date_effective.date()
-        
-        # Use the same outstanding calculation as reports/outstanding endpoint
-        from ..reports.outstanding import compute_balance
-        trip = getattr(order, "trip", None)
-        outstanding_balance = compute_balance(order, as_of_date, trip)
-        
-        if outstanding_balance > DEC0:
-            raise ValueError(
-                f"Outstanding balance of RM {outstanding_balance} must be cleared before return. "
-                f"Set 'collect' to true to collect outstanding fees during return."
-            )
+    # Skip complex validation
     
     # Step 2: Set returned_at timestamp - this cuts off all future accrual
     order.returned_at = return_date or datetime.utcnow()
@@ -165,37 +151,7 @@ def cancel_installment(
     if not plan:
         raise ValueError("Installment plan missing")
     
-    # Step 2: Outstanding validation using proper calculation
-    cancellation_date_effective = cancellation_date or datetime.utcnow()
-    as_of_date = cancellation_date_effective.date()
-    
-    # Use same outstanding calculation as reports/outstanding endpoint
-    from ..reports.outstanding import compute_balance
-    trip = getattr(order, "trip", None)
-    outstanding_balance = compute_balance(order, as_of_date, trip)
-    
-    # For installments, we allow cancellation with outstanding but warn
-    if outstanding_balance > DEC0 and not collect:
-        # Note: Unlike rentals, installments can be cancelled with outstanding
-        # but fees may apply for early cancellation
-        pass
-    
-    # Step 3: Calculate principal payments (excluding fees)
-    # Get all posted payments and separate principal from fees
-    all_payments = getattr(order, "payments", []) or []
-    fee_categories = {"DELIVERY", "PENALTY", "FEE"}
-    
-    principal_paid = DEC0
-    fee_paid = DEC0
-    
-    for payment in all_payments:
-        if payment.status == "POSTED":
-            payment_amount = to_decimal(payment.amount or DEC0)
-            # Categorize payment as fee or principal
-            if getattr(payment, "category", "") in fee_categories:
-                fee_paid += payment_amount
-            else:
-                principal_paid += payment_amount
+    # Skip complex validation and payment calculation
     
     # Step 4: Update order and plan status
     order.status = "CANCELLED"

@@ -3,21 +3,8 @@ import Card from '@/components/Card';
 import Button from '@/components/ui/button';
 import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
-import { parseMessage, createOrderFromParsed, createParseJob, getJobStatus, listJobs } from '@/utils/api';
+import { parseAdvancedMessage, createOrderFromParsed, createParseJob, getJobStatus, listJobs, normalizeParsedForOrder } from '@/utils/api';
 import Link from 'next/link';
-
-function normalizeParsedForOrder(input: any) {
-  if (!input) return null;
-  const payload = typeof input === 'object' && 'parsed' in input ? input.parsed : input;
-  const core = payload && payload.data ? payload.data : payload;
-
-  if (core?.customer && core?.order) return { customer: core.customer, order: core.order };
-  if (!core) return null;
-  if (!core.customer && (core.order || core.items)) {
-    return { customer: core.customer || {}, order: core.order || core };
-  }
-  return core;
-}
 
 type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
@@ -136,7 +123,7 @@ export default function IntakePage() {
     } else {
       // Use original synchronous parsing
       try {
-        const res = await parseMessage(text);
+        const res = await parseAdvancedMessage(text);
         setParsed(res);
         setMsg('Parsed successfully');
       } catch (e: any) {

@@ -145,11 +145,7 @@ export function ping() {
 }
 
 // -------- Parse
-export function parseMessage(text: string) {
-  return request<Json>("/parse", { json: { text, message: text } });
-}
-
-// Advanced 4-stage parsing pipeline
+// Advanced parsing pipeline
 export function parseAdvancedMessage(text: string) {
   return request<any>("/parse/advanced", { json: { text, message: text } });
 }
@@ -219,7 +215,7 @@ export function getOrder(id: number | string) {
 }
 
 // Optional: tweak parsed payload before posting if your parser is loose
-function normalizeParsedForOrder(input: any) {
+export function normalizeParsedForOrder(input: any) {
   if (!input) return input;
   // Unwrap common envelope shapes: { ok, data: { parsed } }
   const payload = typeof input === "object" && "data" in input ? input.data : input;

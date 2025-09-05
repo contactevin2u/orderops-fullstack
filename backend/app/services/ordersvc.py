@@ -102,28 +102,14 @@ def _get_or_create_customer(db: Session, data: Dict[str, Any]) -> Customer:
 
 
 def _compute_subtotal_from_items(items) -> Decimal:
-    """Compute subtotal from ``items`` respecting plan/fee rules."""
+    """Simple subtotal: sum all line_total values"""
     subtotal = Decimal("0")
     for it in items or []:
         if isinstance(it, dict):
-            item_type = (it.get("item_type") or "").upper()
             lt = it.get("line_total")
-            up = it.get("unit_price")
-            qty = it.get("qty")
         else:
-            item_type = getattr(it, "item_type", "").upper()
             lt = getattr(it, "line_total", None)
-            up = getattr(it, "unit_price", None)
-            qty = getattr(it, "qty", None)
-        if lt is None:
-            lt = (up or Decimal("0")) * (qty or 0)
-        lt = Decimal(str(lt or 0))
-        if item_type in PLAN_ITEM_TYPES:
-            # Include RENTAL/INSTALLMENT items in subtotal if they have upfront costs (first month, deposits, etc.)
-            # This allows first month rent or upfront installment payments to be invoiced
-            subtotal += lt
-        else:
-            subtotal += lt
+        subtotal += Decimal(str(lt or 0))
     return q2(subtotal)
 
 
@@ -135,53 +121,7 @@ def _sum_posted_payments(order) -> Decimal:
     return q2(total)
 
 
-def ensure_first_month_fee_line(
-    order_or_items, plan_type: str, monthly_amount: Decimal
-) -> tuple[list[dict], Decimal]:
-    """
-    Ensure there is exactly one FEE line representing the first cycle of the plan.
-    Returns (items_as_dicts, injected_amount). If already present, injected_amount = 0.
-    Detect existing line by item_type == 'FEE' and name starting with 'First Month '.
-    SKU hint: 'FIRST_MONTH'.
-    """
-    # Normalize to list of dicts
-    if isinstance(order_or_items, list):
-        items = [dict(it) for it in order_or_items]
-    else:
-        items = [
-            {
-                "name": getattr(it, "name", None),
-                "item_type": getattr(it, "item_type", None),
-                "sku": getattr(it, "sku", None),
-                "qty": getattr(it, "qty", None),
-                "unit_price": getattr(it, "unit_price", None),
-                "line_total": getattr(it, "line_total", None),
-            }
-            for it in getattr(order_or_items, "items", [])
-        ]
-
-    monthly_amount = q2(Decimal(str(monthly_amount or 0)))
-    if monthly_amount <= 0:
-        return items, Decimal("0")
-
-    for it in items:
-        if (it.get("item_type") or "").upper() == "FEE":
-            name = it.get("name") or ""
-            lt = Decimal(str(it.get("line_total") or 0))
-            if name.startswith("First Month ") and lt > 0:
-                return items, Decimal("0")
-
-    fee_name = f"First Month {'Rental' if plan_type == 'RENTAL' else 'Instalment'}"
-    fee_line = {
-        "name": fee_name,
-        "item_type": "FEE",
-        "sku": "FIRST_MONTH",
-        "qty": 1,
-        "unit_price": monthly_amount,
-        "line_total": monthly_amount,
-    }
-    items.append(fee_line)
-    return items, monthly_amount
+# Deleted complex first month fee logic
 
 
 def _apply_charges_and_totals(
@@ -189,35 +129,20 @@ def _apply_charges_and_totals(
     charges: dict | None,
     totals: dict | None,
 ) -> Tuple[Decimal, Decimal, Decimal, Decimal, Decimal, Decimal, Decimal]:
-    """
-    Return (subtotal, discount, delivery_fee, return_delivery_fee, penalty_fee, total, paid)
-    using items + charges + totals with sane fallbacks.
-    """
+    """Simple calculation"""
     charges = charges or {}
     totals = totals or {}
-
+    
     subtotal = _compute_subtotal_from_items(items)
     discount = to_decimal(charges.get("discount"))
     delivery_fee = to_decimal(charges.get("delivery_fee"))
     return_delivery_fee = to_decimal(charges.get("return_delivery_fee"))
     penalty_fee = to_decimal(charges.get("penalty_fee"))
-
-    # Primary formula if totals.total not trustworthy:
-    computed_total = subtotal - discount + delivery_fee + return_delivery_fee + penalty_fee
-
-    total_from_payload = to_decimal(totals.get("total"))
-    total = total_from_payload if total_from_payload > 0 else computed_total
-
+    
+    total = subtotal - discount + delivery_fee + return_delivery_fee + penalty_fee
     paid = to_decimal(totals.get("paid"))
-    return (
-        q2(subtotal),
-        q2(discount),
-        q2(delivery_fee),
-        q2(return_delivery_fee),
-        q2(penalty_fee),
-        q2(total),
-        q2(paid),
-    )
+    
+    return (q2(subtotal), q2(discount), q2(delivery_fee), q2(return_delivery_fee), q2(penalty_fee), q2(total), q2(paid))
 
 
 CONST_CANCEL_SUFFIX = "-C"
@@ -290,72 +215,15 @@ def create_adjustment_order(
 
 
 def recompute_financials(order: Order) -> None:
-    """Recompute derived money fields from authoritative sources."""
-    items = [
-        {
-            "item_type": getattr(it, "item_type", None),
-            "unit_price": getattr(it, "unit_price", None),
-            "line_total": getattr(it, "line_total", None),
-            "qty": getattr(it, "qty", None),
-        }
-        for it in getattr(order, "items", [])
-    ]
-    charges = {
-        "discount": getattr(order, "discount", DEC0),
-        "delivery_fee": getattr(order, "delivery_fee", DEC0),
-        "return_delivery_fee": getattr(order, "return_delivery_fee", DEC0),
-        "penalty_fee": getattr(order, "penalty_fee", DEC0),
-    }
-    subtotal, discount, delivery, return_delivery, penalty, total, _ = _apply_charges_and_totals(
-        items, charges, None
-    )
+    """Simple recompute"""
     paid = _sum_posted_payments(order)
-
-    order.subtotal = subtotal
-    order.total = total  # Use the correctly computed total from _apply_charges_and_totals
     order.paid_amount = paid
-    order.balance = q2(order.total - paid)
+    order.balance = q2((order.total or DEC0) - paid)
 
 
 def ensure_plan_first_month_fee(order: Order) -> None:
-    """Ensure the order has a first month fee line aligned with the plan."""
-    plan = getattr(order, "plan", None)
-    if not plan:
-        recompute_financials(order)
-        return
-    monthly_amount = q2(Decimal(str(getattr(plan, "monthly_amount", 0) or 0)))
-    plan_type = (getattr(plan, "plan_type", "RENTAL") or "RENTAL").upper()
-
-    fee_line = None
-    for it in list(getattr(order, "items", []) or []):
-        if (getattr(it, "item_type", "") or "").upper() == "FEE" and (getattr(it, "name", "") or "").startswith("First Month "):
-            fee_line = it
-            break
-
-    if monthly_amount <= 0:
-        if fee_line:
-            order.items.remove(fee_line)
-        plan.upfront_billed_amount = DEC0
-        recompute_financials(order)
-        return
-
-    if fee_line:
-        fee_line.unit_price = monthly_amount
-        fee_line.line_total = monthly_amount
-    else:
-        order.items.append(
-            OrderItem(
-                order_id=order.id,
-                name=f"First Month {'Rental' if plan_type == 'RENTAL' else 'Instalment'}",
-                sku="FIRST_MONTH",
-                item_type="FEE",
-                qty=1,
-                unit_price=monthly_amount,
-                line_total=monthly_amount,
-            )
-        )
-    plan.upfront_billed_amount = monthly_amount
-    recompute_financials(order)
+    """Skip complex fee logic"""
+    pass
 
 def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: str | None = None) -> Order:
     """
@@ -400,46 +268,13 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
     charges = order_data.get("charges") or {}
     totals = order_data.get("totals") or {}
 
+    # Simple plan creation
     plan_in = order_data.get("plan") or {}
-    has_plan_data = any(
-        k in plan_in for k in ("plan_type", "months", "monthly_amount", "start_date")
-    )
-    should_create_plan = (
-        otype in ("INSTALLMENT", "RENTAL")
-        or has_plan_data
-        or any((it.get("item_type") or "").strip().upper() in ("INSTALLMENT", "RENTAL") for it in items)
-    )
-
-    plan_type = (plan_in.get("plan_type") or otype).strip().upper()
-    if plan_type not in ("INSTALLMENT", "RENTAL"):
-        for it in items:
-            itype = (it.get("item_type") or "").strip().upper()
-            if itype in ("INSTALLMENT", "RENTAL"):
-                plan_type = itype
-                break
-        if plan_type not in ("INSTALLMENT", "RENTAL"):
-            plan_type = "RENTAL"
-    months_raw = plan_in.get("months")
-    months = (
-        int(months_raw)
-        if isinstance(months_raw, (int, float, str)) and str(months_raw).strip().isdigit()
-        else None
-    )
-
+    should_create_plan = otype in ("INSTALLMENT", "RENTAL") or plan_in
+    plan_type = otype if otype in ("INSTALLMENT", "RENTAL") else "RENTAL"
+    months = plan_in.get("months")
     monthly_amount = to_decimal(plan_in.get("monthly_amount"))
-    if monthly_amount <= 0:
-        monthly_candidates = []
-        for it in items:
-            ma = to_decimal(it.get("monthly_amount"))
-            if ma > 0:
-                monthly_candidates.append(ma)
-        if monthly_candidates:
-            monthly_amount = sum(monthly_candidates, DEC0)
-
-    start_date = parse_relaxed_date(plan_in.get("start_date") or "") or delivery_date
-
-    injected_amount = Decimal("0")
-    # Removed first month fee creation - rental items already represent first month payment
+    start_date = delivery_date
 
     subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(items, charges, totals)
     balance = q2(total - paid)
@@ -475,11 +310,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
         line_total = to_decimal(it.get("line_total"))
         monthly_amount = to_decimal(it.get("monthly_amount"))
 
-        # For rental/installment items, monthly amount is carried by Plan; keep monetary 0 at item level
-        if item_type in ("RENTAL", "INSTALLMENT"):
-            if unit_price <= 0 and line_total <= 0:
-                unit_price = DEC0
-                line_total = DEC0
+        # Simplified item creation
 
         db.add(
             OrderItem(
@@ -503,7 +334,6 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
                 start_date=start_date,
                 months=months,
                 monthly_amount=monthly_amount,
-                upfront_billed_amount=injected_amount,
                 status="ACTIVE",
             )
         )

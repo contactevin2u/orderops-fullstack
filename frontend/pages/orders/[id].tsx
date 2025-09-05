@@ -342,8 +342,6 @@ export default function OrderDetailPage(){
                 <div>Expected</div><div>RM {Number(due.expected||0).toFixed(2)}</div>
                 <div>Accrued</div><div>RM {Number(due.accrued||0).toFixed(2)}</div>
                 <div>Outstanding</div><div><b>RM {Number(due.balance||0).toFixed(2)}</b></div>
-              </>) || (<>
-                <div>Balance (Static)</div><div><b>RM {Number(order.balance||0).toFixed(2)}</b></div>
               </>)}
             </div>
 
