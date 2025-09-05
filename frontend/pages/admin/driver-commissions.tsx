@@ -1,5 +1,5 @@
 import React from 'react';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   listDrivers, 

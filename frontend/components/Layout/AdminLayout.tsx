@@ -1,10 +1,13 @@
 import React from 'react';
 import { useRouter } from 'next/router';
-import AdminNav from './AdminNav';
+import AdminNav from '../admin/AdminNav';
+import { useToast } from '@/hooks/useToast';
+import { ToastContainer } from '@/components/ui/toast';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const mainRef = React.useRef<HTMLElement>(null);
   const router = useRouter();
+  const { toasts, removeToast } = useToast();
 
   React.useEffect(() => {
     mainRef.current?.focus();
@@ -37,6 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       >
         {children}
       </main>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 export default function AdminUsersPage() {
   const [username, setUsername] = useState('');

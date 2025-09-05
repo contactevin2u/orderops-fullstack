@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 import { 
   Zap,
   CheckCircle, 

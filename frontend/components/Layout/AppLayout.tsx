@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import React from 'react';
-import LanguageSwitcher from './LanguageSwitcher';
+import LanguageSwitcher from '../LanguageSwitcher';
 import { useTranslation } from 'react-i18next';
 import {
   Inbox,

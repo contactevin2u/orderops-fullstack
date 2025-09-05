@@ -10,7 +10,7 @@ import {
   Route,
 } from '@/utils/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 const RouteDetailDrawer = dynamic(() => import('@/components/admin/RouteDetailDrawer'));
 const RouteFormModal = dynamic(() => import('@/components/admin/RouteFormModal'));

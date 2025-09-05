@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import AdminLayout from '@/components/admin/AdminLayout';
-import { fetchDrivers, type Driver } from '@/utils/apiAdapter';
-import { createDriver, fetchDriver, updateDriver } from '@/utils/api';
+import AdminLayout from '@/components/Layout/AdminLayout';
+import { Button } from '@/components/ui/button';
+import { useDrivers, useCreateDriver, useUpdateDriver } from '@/hooks/useDrivers';
+import { useToast } from '@/hooks/useToast';
+import { formatPhone } from '@/lib/format';
+import { driverCreateSchema, driverUpdateSchema, type DriverCreateForm, type DriverUpdateForm } from '@/lib/zod-schemas';
+import type { Driver } from '@/utils/apiAdapter';
 
 interface DriverFormData {
   email: string;
@@ -25,69 +28,44 @@ export default function AdminDriversPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const queryClient = useQueryClient();
+  const { success, error } = useToast();
+  const { data: drivers, isLoading, isError, refetch } = useDrivers();
 
-  const driversQuery = useQuery({
-    queryKey: ['drivers'],
-    queryFn: fetchDrivers,
-  });
+  const createDriverMutation = useCreateDriver();
+  const updateDriverMutation = useUpdateDriver();
 
-  const createDriverMutation = useMutation({
-    mutationFn: createDriver,
-    onSuccess: () => {
-      setMessage({ type: 'success', text: 'Driver created successfully' });
-      setFormData(initialFormData);
-      setShowForm(false);
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.detail || 'Failed to create driver';
-      setMessage({ type: 'error', text: errorMessage });
-    },
-  });
-
-  const updateDriverMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => updateDriver(id, data),
-    onSuccess: () => {
-      setMessage({ type: 'success', text: 'Driver updated successfully' });
-      setEditingDriver(null);
-      queryClient.invalidateQueries({ queryKey: ['drivers'] });
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.detail || 'Failed to update driver';
-      setMessage({ type: 'error', text: errorMessage });
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMessage(null);
 
-    if (editingDriver) {
-      // Update existing driver
-      if (!formData.name) {
-        setMessage({ type: 'error', text: 'Name is required' });
-        return;
-      }
-      
-      updateDriverMutation.mutate({
-        id: editingDriver.id,
-        data: {
+    try {
+      if (editingDriver) {
+        // Update existing driver
+        const updateData = driverUpdateSchema.parse({
           name: formData.name,
           phone: formData.phone,
           base_warehouse: formData.base_warehouse,
-        }
-      });
-    } else {
-      // Create new driver
-      if (!formData.email || !formData.password || !formData.name) {
-        setMessage({ type: 'error', text: 'Email, password, and name are required' });
-        return;
+        });
+        
+        await updateDriverMutation.mutateAsync({
+          id: editingDriver.id,
+          data: updateData
+        });
+        
+        success('Driver updated successfully');
+        setEditingDriver(null);
+      } else {
+        // Create new driver
+        const createData = driverCreateSchema.parse(formData);
+        await createDriverMutation.mutateAsync(createData);
+        
+        success('Driver created successfully');
+        setFormData(initialFormData);
+        setShowForm(false);
       }
-
-      createDriverMutation.mutate(formData);
+    } catch (err: any) {
+      const errorMessage = err?.detail || err?.message || 'Operation failed';
+      error(errorMessage);
     }
   };
 
@@ -101,12 +79,10 @@ export default function AdminDriversPage() {
       base_warehouse: driver.base_warehouse || 'BATU_CAVES',
     });
     setShowForm(true);
-    setMessage(null);
   };
 
   const handleView = (driver: Driver) => {
     setViewingDriver(driver);
-    setMessage(null);
   };
 
   const closeModals = () => {
@@ -114,7 +90,6 @@ export default function AdminDriversPage() {
     setEditingDriver(null);
     setViewingDriver(null);
     setFormData(initialFormData);
-    setMessage(null);
   };
 
   const handleInputChange = (field: keyof DriverFormData) => (
@@ -127,34 +102,20 @@ export default function AdminDriversPage() {
     <div className="max-w-6xl">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Driver Management</h1>
-        <button
-          className="btn"
+        <Button
           onClick={() => {
             if (showForm) {
               closeModals();
             } else {
               setShowForm(true);
               setFormData(initialFormData);
-              setMessage(null);
             }
           }}
         >
           {showForm ? 'Cancel' : 'Add New Driver'}
-        </button>
+        </Button>
       </div>
 
-      {message && (
-        <div
-          className={`mb-4 p-4 rounded-md ${
-            message.type === 'success'
-              ? 'bg-green-50 text-green-700 border border-green-200'
-              : 'bg-red-50 text-red-700 border border-red-200'
-          }`}
-          role="alert"
-        >
-          {message.text}
-        </div>
-      )}
 
       {showForm && (
         <div className="mb-8 p-6 bg-gray-50 rounded-lg border">
@@ -274,32 +235,29 @@ export default function AdminDriversPage() {
           <h2 className="text-lg font-semibold">Active Drivers</h2>
         </div>
 
-        {driversQuery.isLoading && (
+        {isLoading && (
           <div className="p-6 text-center">
             <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             <p className="mt-2 text-gray-600">Loading drivers...</p>
           </div>
         )}
 
-        {driversQuery.isError && (
+        {isError && (
           <div className="p-6 text-center text-red-600" role="alert">
             <p>Failed to load drivers. Please try again.</p>
-            <button
-              className="btn secondary mt-2"
-              onClick={() => driversQuery.refetch()}
-            >
+            <Button variant="secondary" className="mt-2" onClick={() => refetch()}>
               Retry
-            </button>
+            </Button>
           </div>
         )}
 
-        {driversQuery.data && driversQuery.data.length === 0 && (
+        {drivers && drivers.length === 0 && (
           <div className="p-6 text-center text-gray-600">
             <p>No drivers found. Create your first driver to get started.</p>
           </div>
         )}
 
-        {driversQuery.data && driversQuery.data.length > 0 && (
+        {drivers && drivers.length > 0 && (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -322,7 +280,7 @@ export default function AdminDriversPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {driversQuery.data.map((driver: Driver) => (
+                {drivers.map((driver: Driver) => (
                   <tr key={driver.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       #{driver.id}

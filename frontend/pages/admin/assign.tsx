@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
 import { fetchUnassigned, Order } from '@/utils/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 const AssignToRouteModal = dynamic(() => import('@/components/admin/AssignToRouteModal'));
 

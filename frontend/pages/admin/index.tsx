@@ -10,7 +10,7 @@ import {
   BarChart3,
   Settings
 } from 'lucide-react';
-import AdminLayout from '@/components/admin/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 export default function AdminIndexPage() {
 
