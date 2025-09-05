@@ -3,7 +3,7 @@
 import os
 import json
 import logging
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_
@@ -131,8 +131,6 @@ class AssignmentService:
         logger.info(f"Looking for drivers scheduled for: {today}")
         
         # Get scheduled drivers for today ONLY
-        from datetime import datetime, timedelta
-        
         # Get scheduled drivers for TODAY ONLY - no date range
         # DEBUGGING: This should only return drivers 2 and 3 for 2025-09-01
         scheduled_drivers = (
@@ -189,7 +187,6 @@ class AssignmentService:
             active_trips_count = active_count or 0
             
             # Get recent delivery history for area familiarity (last 30 days)
-            from datetime import timedelta
             thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
             
             recent_trips = (
