@@ -405,7 +405,10 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
-      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\alembic\\versions/**)"
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\alembic\\versions/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\driver-app\\app/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\.github\\workflows/**)"
     ],
     "deny": [],
     "ask": []
