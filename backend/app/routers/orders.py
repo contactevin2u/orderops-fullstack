@@ -373,7 +373,9 @@ def generate_quotation_pdf(body: QuotationIn):
     )
 
 
-@router.get("/{order_id}/due", response_model=dict)
+@router.get("/{order_id}/due", response_model=dict)  
+# Outstanding calculation - simplified business logic:
+# OUTRIGHT: Static balance only | RENTAL: Monthly accrual until returned | INSTALLMENT: Monthly accrual until cancelled
 def get_order_due(order_id: int, as_of: date_cls | None = None, db: Session = Depends(get_session)):
     order = db.get(Order, order_id)
     if not order:

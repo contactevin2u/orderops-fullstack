@@ -48,16 +48,11 @@ def mark_returned(
     payment_date: date | None = None,
 ) -> Order:
     """
-    Mark an order as returned with proper outstanding validation and accrual cutoff.
-    
-    Clean refactored workflow:
-    1. Validate outstanding using proper calculation (for RENTAL orders)  
-    2. Set returned_at timestamp (cuts off accrual)
-    3. Update order status to RETURNED
-    4. Cancel plan to stop future accrual
-    5. Create adjustment order with fees
-    6. Handle fee collection if requested
-    7. Zero out parent order fees to prevent double-counting
+    SIMPLIFIED rental return:
+    1. Set returned_at (stops accrual)
+    2. Update status to RETURNED  
+    3. Apply return delivery fee (user entered)
+    4. Create adjustment for fees
     """
     
     # Skip complex validation
@@ -131,17 +126,11 @@ def cancel_installment(
     cancellation_date: datetime | None = None,
 ) -> Order:
     """
-    Cancel an installment plan with proper outstanding validation and principal calculation.
-    
-    Clean refactored workflow:
-    1. Validate installment order and plan
-    2. Check outstanding amounts using proper calculation  
-    3. Calculate principal payments (excluding fees)
-    4. Cancel order and plan status
-    5. Create adjustment order for fees only
-    6. Handle fee collection if requested
-    7. Prorate items based on principal payments only
-    8. Zero parent fees to prevent double-counting
+    SIMPLIFIED installment cancellation:
+    1. Apply penalty fee (user entered)
+    2. Apply return delivery fee (user entered)  
+    3. Cancel installment plan (stops accrual)
+    4. Create adjustment for fees only
     """
     
     # Step 1: Validate order type and plan
@@ -151,17 +140,15 @@ def cancel_installment(
     if not plan:
         raise ValueError("Installment plan missing")
     
-    # Skip complex validation and payment calculation
-    
-    # Step 4: Update order and plan status
-    order.status = "CANCELLED"
-    plan.status = "CANCELLED"
-    
-    # Step 5: Set penalty and return fees if provided
+    # Simple: Set penalty and return fees (user entered amounts)
     if penalty is not None:
         order.penalty_fee = to_decimal(penalty)
     if return_fee is not None:
         order.return_delivery_fee = to_decimal(return_fee)
+    
+    # Cancel order and plan (stops accrual)
+    order.status = "CANCELLED"
+    plan.status = "CANCELLED"
     
     # Step 6: Create adjustment order for fees (before zeroing parent)
     charges = {}
@@ -191,49 +178,8 @@ def cancel_installment(
         adj_order.paid_amount = adj_order.total
         adj_order.balance = DEC0
     
-    # Step 8: Prorate items based on principal payments only
-    remaining_principal = principal_paid
-    
-    # Get all non-fee items for proration
-    principal_items = [
-        item for item in order.items 
-        if getattr(item, "item_type", "") not in {"FEE"}
-    ]
-    
-    # Calculate total principal value
-    total_principal_value = sum(
-        to_decimal(item.line_total or DEC0) for item in principal_items
-    )
-    
-    # Prorate based on proportional payment
-    for item in principal_items:
-        item_total = to_decimal(item.line_total or DEC0)
-        
-        if total_principal_value > DEC0 and remaining_principal > DEC0:
-            # Calculate proportional amount paid for this item
-            item_proportion = item_total / total_principal_value
-            item_paid = (principal_paid * item_proportion).quantize(Decimal("0.01"))
-            
-            # Cap at item total
-            item_paid = min(item_paid, item_total)
-            
-            if item_paid >= item_total:
-                # Item fully paid - keep as is
-                pass
-            elif item_paid > DEC0:
-                # Item partially paid - prorate
-                qty = to_decimal(item.qty or 1)
-                new_unit_price = (item_paid / qty).quantize(Decimal("0.01"))
-                item.unit_price = new_unit_price
-                item.line_total = item_paid
-            else:
-                # Item not paid - void it
-                item.unit_price = DEC0
-                item.line_total = DEC0
-        else:
-            # No principal payments or no principal value - void all items
-            item.unit_price = DEC0
-            item.line_total = DEC0
+    # Step 8: Keep original order items unchanged (simplified business logic)
+    # User-entered penalty and return delivery fees are handled via adjustment orders only
     
     # Step 9: Zero out parent order fees to prevent double-counting  
     # This must happen AFTER adjustment order creation

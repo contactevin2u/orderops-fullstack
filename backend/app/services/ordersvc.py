@@ -268,12 +268,26 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
     charges = order_data.get("charges") or {}
     totals = order_data.get("totals") or {}
 
-    # Simple plan creation
+    # Simple plan creation aligned with business logic
     plan_in = order_data.get("plan") or {}
     should_create_plan = otype in ("INSTALLMENT", "RENTAL") or plan_in
+    
+    # Plan type: INSTALLMENT (RM159 x 6), RENTAL (RM240/bulan), or infer from items  
     plan_type = otype if otype in ("INSTALLMENT", "RENTAL") else "RENTAL"
-    months = plan_in.get("months")
+    
+    # For INSTALLMENT: months is required (e.g., 6 months)
+    # For RENTAL: months is None (unlimited until return)
+    months = plan_in.get("months") if plan_type == "INSTALLMENT" else None
+    
+    # Monthly amount from plan or aggregate from items with monthly_amount
     monthly_amount = to_decimal(plan_in.get("monthly_amount"))
+    if monthly_amount <= 0:
+        # Simple aggregation from items
+        for it in items:
+            ma = to_decimal(it.get("monthly_amount"))
+            if ma > 0:
+                monthly_amount += ma
+    
     start_date = delivery_date
 
     subtotal, discount, df, rdf, pf, total, paid = _apply_charges_and_totals(items, charges, totals)
