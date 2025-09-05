@@ -420,7 +420,15 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
-      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)"
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\driver-app/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\driver-app\\app\\src\\main\\java\\com\\yourco\\driverAA\\data\\api/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)"
     ],
     "deny": [],
     "ask": []

@@ -383,7 +383,9 @@ data class UpsellRequest(
 
 @Serializable
 data class ApiResponse<T>(
-    val data: T
+    val ok: Boolean = true,
+    val data: T,
+    val error: String? = null
 )
 
 @Serializable
