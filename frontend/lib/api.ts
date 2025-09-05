@@ -150,6 +150,11 @@ export function parseAdvancedMessage(text: string) {
   return request<any>("/parse/advanced", { json: { text, message: text } });
 }
 
+// Simple quotation parser
+export function parseQuotationMessage(text: string) {
+  return request<any>("/parse/quotation", { json: { text, message: text } });
+}
+
 // Individual stages for testing/debugging
 export function classifyMessage(text: string) {
   return request<any>("/parse/classify", { json: { text, message: text } });

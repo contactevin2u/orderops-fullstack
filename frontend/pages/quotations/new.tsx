@@ -2,7 +2,7 @@ import React from "react";
 import { useRouter } from "next/router";
 import Card from "@/components/Card";
 import PageHeader from "@/components/PageHeader";
-import { parseAdvancedMessage, normalizeParsedForOrder } from "@/lib/api";
+import { parseQuotationMessage, normalizeParsedForOrder } from "@/lib/api";
 
 export default function NewQuotationPage() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export default function NewQuotationPage() {
     setBusy(true);
     setErr("");
     try {
-      const res = await parseAdvancedMessage(rawText);
+      const res = await parseQuotationMessage(rawText);
       const parsed = normalizeParsedForOrder(res) || {};
       const customer = parsed.customer || {};
       const order = parsed.order || {};
