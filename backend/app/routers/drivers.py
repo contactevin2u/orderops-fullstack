@@ -621,6 +621,32 @@ def my_upsell_incentives(
     }
 
 
+@router.get("/{driver_id}", response_model=DriverOut, dependencies=[Depends(require_roles(Role.ADMIN))])
+def get_driver(driver_id: int, db: Session = Depends(get_session)):
+    """Get a single driver by ID"""
+    driver = db.get(Driver, driver_id)
+    if not driver:
+        raise HTTPException(404, "Driver not found")
+    return driver
+
+
+@router.put("/{driver_id}", response_model=DriverOut, dependencies=[Depends(require_roles(Role.ADMIN))])
+def update_driver(driver_id: int, payload: dict, db: Session = Depends(get_session)):
+    """Update driver details"""
+    driver = db.get(Driver, driver_id)
+    if not driver:
+        raise HTTPException(404, "Driver not found")
+    
+    # Update allowed fields
+    allowed_fields = {"name", "phone", "base_warehouse"}
+    for field, value in payload.items():
+        if field in allowed_fields and hasattr(driver, field):
+            setattr(driver, field, value)
+    
+    db.commit()
+    return driver
+
+
 @router.get(
     "/{driver_id}/commissions",
     response_model=list[CommissionMonthOut],

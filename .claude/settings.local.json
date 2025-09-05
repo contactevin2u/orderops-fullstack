@@ -408,7 +408,14 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\alembic\\versions/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\driver-app\\app/**)",
-      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\.github\\workflows/**)"
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\.github\\workflows/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\pages\\admin/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\frontend\\utils/**)"
     ],
     "deny": [],
     "ask": []

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { fetchDrivers, type Driver } from '@/utils/apiAdapter';
-import { createDriver } from '@/utils/api';
+import { createDriver, fetchDriver, updateDriver } from '@/utils/api';
 
 interface DriverFormData {
   email: string;
@@ -23,6 +23,8 @@ const initialFormData: DriverFormData = {
 export default function AdminDriversPage() {
   const [formData, setFormData] = useState<DriverFormData>(initialFormData);
   const [showForm, setShowForm] = useState(false);
+  const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
+  const [viewingDriver, setViewingDriver] = useState<Driver | null>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const queryClient = useQueryClient();
@@ -46,16 +48,73 @@ export default function AdminDriversPage() {
     },
   });
 
+  const updateDriverMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateDriver(id, data),
+    onSuccess: () => {
+      setMessage({ type: 'success', text: 'Driver updated successfully' });
+      setEditingDriver(null);
+      queryClient.invalidateQueries({ queryKey: ['drivers'] });
+    },
+    onError: (error: any) => {
+      const errorMessage = error?.detail || 'Failed to update driver';
+      setMessage({ type: 'error', text: errorMessage });
+    },
+  });
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setMessage(null);
 
-    if (!formData.email || !formData.password || !formData.name) {
-      setMessage({ type: 'error', text: 'Email, password, and name are required' });
-      return;
-    }
+    if (editingDriver) {
+      // Update existing driver
+      if (!formData.name) {
+        setMessage({ type: 'error', text: 'Name is required' });
+        return;
+      }
+      
+      updateDriverMutation.mutate({
+        id: editingDriver.id,
+        data: {
+          name: formData.name,
+          phone: formData.phone,
+          base_warehouse: formData.base_warehouse,
+        }
+      });
+    } else {
+      // Create new driver
+      if (!formData.email || !formData.password || !formData.name) {
+        setMessage({ type: 'error', text: 'Email, password, and name are required' });
+        return;
+      }
 
-    createDriverMutation.mutate(formData);
+      createDriverMutation.mutate(formData);
+    }
+  };
+
+  const handleEdit = (driver: Driver) => {
+    setEditingDriver(driver);
+    setFormData({
+      email: '', // Not editable
+      password: '', // Not editable
+      name: driver.name || '',
+      phone: driver.phone || '',
+      base_warehouse: driver.base_warehouse || 'BATU_CAVES',
+    });
+    setShowForm(true);
+    setMessage(null);
+  };
+
+  const handleView = (driver: Driver) => {
+    setViewingDriver(driver);
+    setMessage(null);
+  };
+
+  const closeModals = () => {
+    setShowForm(false);
+    setEditingDriver(null);
+    setViewingDriver(null);
+    setFormData(initialFormData);
+    setMessage(null);
   };
 
   const handleInputChange = (field: keyof DriverFormData) => (
@@ -71,10 +130,12 @@ export default function AdminDriversPage() {
         <button
           className="btn"
           onClick={() => {
-            setShowForm(!showForm);
-            setMessage(null);
             if (showForm) {
+              closeModals();
+            } else {
+              setShowForm(true);
               setFormData(initialFormData);
+              setMessage(null);
             }
           }}
         >
@@ -97,7 +158,9 @@ export default function AdminDriversPage() {
 
       {showForm && (
         <div className="mb-8 p-6 bg-gray-50 rounded-lg border">
-          <h2 className="text-lg font-semibold mb-4">Create New Driver</h2>
+          <h2 className="text-lg font-semibold mb-4">
+            {editingDriver ? `Edit Driver: ${editingDriver.name}` : 'Create New Driver'}
+          </h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -146,54 +209,58 @@ export default function AdminDriversPage() {
                 Determines which region this driver will handle deliveries for
               </p>
             </div>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address *
-              </label>
-              <input
-                id="email"
-                type="email"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={formData.email}
-                onChange={handleInputChange('email')}
-                required
-                placeholder="driver@company.com"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Password *
-              </label>
-              <input
-                id="password"
-                type="password"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={formData.password}
-                onChange={handleInputChange('password')}
-                required
-                placeholder="Secure password for driver login"
-                minLength={6}
-              />
-              <p className="mt-1 text-sm text-gray-500">
-                Password will be used by the driver to log into the mobile app
-              </p>
-            </div>
+            
+            {!editingDriver && (
+              <>
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address *
+                  </label>
+                  <input
+                    id="email"
+                    type="email"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.email}
+                    onChange={handleInputChange('email')}
+                    required
+                    placeholder="driver@company.com"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    Password *
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.password}
+                    onChange={handleInputChange('password')}
+                    required
+                    placeholder="Secure password for driver login"
+                    minLength={6}
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Password will be used by the driver to log into the mobile app
+                  </p>
+                </div>
+              </>
+            )}
             <div className="flex gap-3 pt-2">
               <button
                 type="submit"
-                disabled={createDriverMutation.isPending}
+                disabled={createDriverMutation.isPending || updateDriverMutation.isPending}
                 className="btn flex-1 md:flex-none disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {createDriverMutation.isPending ? 'Creating...' : 'Create Driver'}
+                {editingDriver 
+                  ? (updateDriverMutation.isPending ? 'Updating...' : 'Update Driver')
+                  : (createDriverMutation.isPending ? 'Creating...' : 'Create Driver')
+                }
               </button>
               <button
                 type="button"
                 className="btn secondary flex-1 md:flex-none"
-                onClick={() => {
-                  setShowForm(false);
-                  setFormData(initialFormData);
-                  setMessage(null);
-                }}
+                onClick={closeModals}
               >
                 Cancel
               </button>
@@ -285,17 +352,13 @@ export default function AdminDriversPage() {
                       <div className="flex gap-2">
                         <button
                           className="text-blue-600 hover:text-blue-800"
-                          onClick={() => {
-                            // TODO: Implement view driver details
-                          }}
+                          onClick={() => handleView(driver)}
                         >
                           View
                         </button>
                         <button
                           className="text-indigo-600 hover:text-indigo-800"
-                          onClick={() => {
-                            // TODO: Implement edit driver
-                          }}
+                          onClick={() => handleEdit(driver)}
                         >
                           Edit
                         </button>
@@ -308,6 +371,97 @@ export default function AdminDriversPage() {
           </div>
         )}
       </div>
+
+      {/* View Driver Modal */}
+      {viewingDriver && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Driver Details</h2>
+              <button
+                onClick={closeModals}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h3 className="font-medium text-gray-700 mb-2">Basic Information</h3>
+                  <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div>
+                      <span className="font-medium">Driver ID:</span>
+                      <span className="ml-2">#{viewingDriver.id}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Name:</span>
+                      <span className="ml-2">{viewingDriver.name || 'No name provided'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Phone:</span>
+                      <span className="ml-2">{viewingDriver.phone || 'No phone provided'}</span>
+                    </div>
+                    <div>
+                      <span className="font-medium">Status:</span>
+                      <span className="ml-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-medium text-gray-700 mb-2">Warehouse Assignment</h3>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div>
+                      <span className="font-medium">Base Warehouse:</span>
+                      <div className="mt-2">
+                        {viewingDriver.base_warehouse === 'KOTA_KINABALU' ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                            🏢 Kota Kinabalu, Sabah
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                            🏢 Batu Caves, Selangor
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm text-gray-600">
+                        {viewingDriver.base_warehouse === 'KOTA_KINABALU' 
+                          ? 'Handles deliveries in East Malaysia (Sabah region)'
+                          : 'Handles deliveries in Peninsular Malaysia from Batu Caves hub'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 pt-4">
+                <button
+                  className="btn"
+                  onClick={() => {
+                    closeModals();
+                    handleEdit(viewingDriver);
+                  }}
+                >
+                  Edit Driver
+                </button>
+                <button
+                  className="btn secondary"
+                  onClick={closeModals}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <h3 className="font-medium text-blue-800 mb-2">📱 Driver Mobile App</h3>

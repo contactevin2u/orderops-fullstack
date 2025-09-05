@@ -456,8 +456,24 @@ export function createDriver(payload: {
   password: string;
   name?: string;
   phone?: string;
+  base_warehouse?: string;
 }) {
   return request<any>("/drivers", { json: payload });
+}
+
+export function fetchDriver(driverId: number) {
+  return request<any>(`/drivers/${driverId}`);
+}
+
+export function updateDriver(driverId: number, payload: {
+  name?: string;
+  phone?: string;
+  base_warehouse?: string;
+}) {
+  return request<any>(`/drivers/${driverId}`, { 
+    method: "PUT",
+    json: payload 
+  });
 }
 
 export function listDriverCommissions(driverId: number) {
