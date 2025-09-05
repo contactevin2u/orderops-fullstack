@@ -45,6 +45,7 @@ export type Route = {
 export type Driver = {
   id: string;
   name?: string;
+  base_warehouse?: string;
 };
 
 function mapOrder(o: any): Order {

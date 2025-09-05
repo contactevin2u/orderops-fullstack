@@ -133,7 +133,12 @@ def register_driver_for_testing(payload: DriverCreateIn, db: Session = Depends(g
         )
     except Exception as exc:  # pragma: no cover - network/cred failures
         raise HTTPException(400, "Failed to create driver") from exc
-    driver = Driver(firebase_uid=fb_user.uid, name=payload.name, phone=payload.phone)
+    driver = Driver(
+        firebase_uid=fb_user.uid, 
+        name=payload.name, 
+        phone=payload.phone,
+        base_warehouse=payload.base_warehouse
+    )
     db.add(driver)
     db.commit()
     db.refresh(driver)
@@ -150,7 +155,12 @@ def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
         )
     except Exception as exc:  # pragma: no cover - network/cred failures
         raise HTTPException(400, "Failed to create driver") from exc
-    driver = Driver(firebase_uid=fb_user.uid, name=payload.name, phone=payload.phone)
+    driver = Driver(
+        firebase_uid=fb_user.uid, 
+        name=payload.name, 
+        phone=payload.phone,
+        base_warehouse=payload.base_warehouse
+    )
     db.add(driver)
     db.commit()
     db.refresh(driver)

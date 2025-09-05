@@ -9,6 +9,7 @@ interface DriverFormData {
   password: string;
   name: string;
   phone: string;
+  base_warehouse: string;
 }
 
 const initialFormData: DriverFormData = {
@@ -16,6 +17,7 @@ const initialFormData: DriverFormData = {
   password: '',
   name: '',
   phone: '',
+  base_warehouse: 'BATU_CAVES',
 };
 
 export default function AdminDriversPage() {
@@ -122,9 +124,27 @@ export default function AdminDriversPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   value={formData.phone}
                   onChange={handleInputChange('phone')}
-                  placeholder="+1 (555) 123-4567"
+                  placeholder="+60 12-345 6789"
                 />
               </div>
+            </div>
+            <div>
+              <label htmlFor="base_warehouse" className="block text-sm font-medium text-gray-700 mb-1">
+                Base Warehouse *
+              </label>
+              <select
+                id="base_warehouse"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={formData.base_warehouse}
+                onChange={(e) => setFormData(prev => ({ ...prev, base_warehouse: e.target.value }))}
+                required
+              >
+                <option value="BATU_CAVES">🏢 Batu Caves, Selangor (Peninsular Malaysia)</option>
+                <option value="KOTA_KINABALU">🏢 Kota Kinabalu, Sabah (East Malaysia)</option>
+              </select>
+              <p className="mt-1 text-sm text-gray-500">
+                Determines which region this driver will handle deliveries for
+              </p>
             </div>
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -224,6 +244,9 @@ export default function AdminDriversPage() {
                     Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Base Warehouse
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -240,6 +263,17 @@ export default function AdminDriversPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {driver.name || (
                         <span className="text-gray-400 italic">No name provided</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {driver.base_warehouse === 'KOTA_KINABALU' ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          🏢 Kota Kinabalu
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          🏢 Batu Caves
+                        </span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

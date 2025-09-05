@@ -173,6 +173,7 @@ class DriverOut(BaseModel):
     id: int
     name: str | None = None
     phone: str | None = None
+    base_warehouse: str = "BATU_CAVES"
 
     class Config:
         from_attributes = True
@@ -243,3 +244,4 @@ class DriverCreateIn(BaseModel):
     password: str
     name: str | None = None
     phone: str | None = None
+    base_warehouse: str = "BATU_CAVES"
