@@ -32,9 +32,10 @@ class AssignmentService:
     def __init__(self, db: Session):
         self.db = db
         self.openai_client = None
-        openai_api_key = os.getenv("OPENAI_API_KEY")
-        if openai_api_key and OPENAI_AVAILABLE:
-            self.openai_client = OpenAI(api_key=openai_api_key)
+        
+        from ..core.config import settings
+        if settings.OPENAI_API_KEY and OPENAI_AVAILABLE:
+            self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def auto_assign_all(self) -> Dict[str, Any]:
         """Auto-assign all eligible orders to drivers"""
