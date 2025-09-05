@@ -433,7 +433,8 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack/**)",
-      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)"
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app/**)",
+      "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\reports/**)"
     ],
     "deny": [],
     "ask": []
