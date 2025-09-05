@@ -18,12 +18,7 @@ from app.models.customer import Customer
 
 logger = logging.getLogger(__name__)
 
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
-    logger.warning("OpenAI not available - using simple distance assignment")
+from openai import OpenAI
 
 
 class AssignmentService:
@@ -34,7 +29,7 @@ class AssignmentService:
         self.openai_client = None
         
         from ..core.config import settings
-        if settings.OPENAI_API_KEY and OPENAI_AVAILABLE:
+        if settings.OPENAI_API_KEY:
             self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     def auto_assign_all(self) -> Dict[str, Any]:
