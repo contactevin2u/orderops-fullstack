@@ -271,7 +271,15 @@ export default function OrderDetailPage(){
           <div>
             <Card>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="m-0">{order.code || order.id} <span className="badge">{order.status}</span></h2>
+              <h2 className="m-0">
+                {order.code || order.id} 
+                <span className="badge">{order.status}</span>
+                {order.trip && (
+                  <span className="badge" style={{ marginLeft: '8px', backgroundColor: order.trip.status === 'DELIVERED' ? '#10b981' : order.trip.status === 'IN_TRANSIT' ? '#f59e0b' : '#6b7280' }}>
+                    Trip: {order.trip.status}
+                  </span>
+                )}
+              </h2>
               <a className="btn secondary" href={invoicePrintUrl(order.id)} target="_blank" rel="noreferrer">
                 Invoice PDF
               </a>

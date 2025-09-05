@@ -220,9 +220,22 @@ export default function RouteDetailDrawer({ route, onClose }: Props) {
                   )}
                 </td>
                 <td style={{ fontSize: '0.8em', maxWidth: '120px', wordWrap: 'break-word' }}>
-                  {o.customerAddress || o.address || 'No address'}
+                  {o.address || 'No address'}
                 </td>
-                <td>{o.status}</td>
+                <td>
+                  <div style={{ fontSize: '0.8em' }}>
+                    <div>{o.status}</div>
+                    {o.trip && (
+                      <div style={{ 
+                        fontSize: '0.75em', 
+                        color: o.trip.status === 'DELIVERED' ? '#10b981' : o.trip.status === 'IN_TRANSIT' ? '#f59e0b' : '#6b7280',
+                        fontWeight: 500
+                      }}>
+                        Trip: {o.trip.status}
+                      </div>
+                    )}
+                  </div>
+                </td>
                 <td>
                   <button onClick={() => removeMutation.mutate(o.id)}>Remove</button>
                 </td>
