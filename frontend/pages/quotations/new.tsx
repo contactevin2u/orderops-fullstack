@@ -2,7 +2,7 @@ import React from "react";
 import { useRouter } from "next/router";
 import Card from "@/components/Card";
 import PageHeader from "@/components/PageHeader";
-import { parseAdvancedMessage, normalizeParsedForOrder } from "@/utils/api";
+import { parseAdvancedMessage, normalizeParsedForOrder } from "@/lib/api";
 
 export default function NewQuotationPage() {
   const router = useRouter();

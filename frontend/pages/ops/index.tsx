@@ -6,7 +6,7 @@ import { Toolbar } from "@/components/ops/Toolbar";
 import StatusPill from "@/components/ops/StatusPill";
 import OrderActions from "@/components/ops/OrderActions";
 import { Button } from "@/components/ui/button";
-import { listOrders } from "@/utils/api";
+import { listOrders } from "@/lib/api";
 
 export default function OpsOrdersPage() {
   const { data, mutate } = useSWR("ops-orders", () => listOrders(undefined, undefined, undefined, 50));

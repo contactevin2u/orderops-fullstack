@@ -8,7 +8,7 @@ import {
   cancelInstallment,
   markBuyback,
   orderDue,
-} from "@/utils/api";
+} from "@/lib/api";
 
 type Tab = 'return' | 'cancel' | 'buyback';
 

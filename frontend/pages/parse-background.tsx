@@ -1,7 +1,7 @@
 import React from 'react';
 import Card from '@/components/Card';
 import Button from '@/components/ui/button';
-import { createParseJob, getJobStatus, listJobs } from '@/utils/api';
+import { createParseJob, getJobStatus, listJobs } from '@/lib/api';
 import Link from 'next/link';
 
 type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';

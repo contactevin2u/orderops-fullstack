@@ -3,7 +3,7 @@ import Card from '@/components/Card';
 import Button from '@/components/ui/button';
 import TermsModal from '@/components/ui/TermsModal';
 import { useTranslation } from 'react-i18next';
-import { parseAdvancedMessage, createOrderFromParsed, createParseJob, getJobStatus, listJobs, normalizeParsedForOrder } from '@/utils/api';
+import { parseAdvancedMessage, createOrderFromParsed, createParseJob, getJobStatus, listJobs, normalizeParsedForOrder } from '@/lib/api';
 import Link from 'next/link';
 
 type JobStatus = 'pending' | 'processing' | 'completed' | 'failed';

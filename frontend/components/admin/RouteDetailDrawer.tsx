@@ -1,12 +1,12 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Route, Order } from '@/utils/apiAdapter';
+import type { Route, Order } from '@/lib/apiAdapter';
 import {
   fetchUnassigned,
   assignOrdersToRoute,
   removeOrdersFromRoute,
   fetchRouteOrders,
-} from '@/utils/apiAdapter';
+} from '@/lib/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
 
 interface Props {

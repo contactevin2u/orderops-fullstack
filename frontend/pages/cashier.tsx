@@ -1,13 +1,17 @@
 import React from "react";
 import Link from "next/link";
 import Card from "@/components/Card";
+import { Button } from "@/components/ui/button";
+import { useOrders } from "@/hooks/useOrders";
+import { useToast } from "@/hooks/useToast";
+import { formatCurrency } from "@/lib/format";
 import {
   listOrders,
   orderDue,
   addPayment,
   voidPayment,
   exportPayments,
-} from "@/utils/api";
+} from "@/lib/api";
 
 export default function CashierPage() {
   const [q, setQ] = React.useState("");
@@ -23,8 +27,7 @@ export default function CashierPage() {
   const [reference, setReference] = React.useState("");
   const [category, setCategory] = React.useState("");
 
-  const [msg, setMsg] = React.useState("");
-  const [err, setErr] = React.useState("");
+  const { success, error: showError } = useToast();
 
   const amountRef = React.useRef<HTMLInputElement>(null);
   const lastPaymentId = React.useRef<number | null>(null);
@@ -39,7 +42,7 @@ export default function CashierPage() {
         const r = await listOrders(q, undefined, undefined, 20);
         setResults(r.items || []);
       } catch (e: any) {
-        setErr(e?.message || "Search failed");
+        showError(e?.message || "Search failed");
       }
     }, 300);
     return () => clearTimeout(t);
@@ -50,7 +53,7 @@ export default function CashierPage() {
       const d = await orderDue(id, date);
       setDue(d);
     } catch (e: any) {
-      setErr(e?.message || "Failed to load due");
+      showError(e?.message || "Failed to load due");
     }
   }, [date]);
 
@@ -66,8 +69,8 @@ export default function CashierPage() {
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!order) return;
-    setErr("");
-    setMsg("");
+    showError("");
+    success("");
     try {
       const p = await addPayment({
         order_id: order.id,
@@ -81,10 +84,10 @@ export default function CashierPage() {
       lastPaymentId.current = p?.id;
       await refreshDue(order.id);
       setAmount("");
-      setMsg("Recorded");
+      success("Recorded");
       amountRef.current?.focus();
     } catch (e: any) {
-      setErr(e?.message || "Failed to post");
+      showError(e?.message || "Failed to post");
     }
   };
 
@@ -95,11 +98,11 @@ export default function CashierPage() {
         if (lastPaymentId.current) {
           voidPayment(lastPaymentId.current)
             .then(async () => {
-              setMsg("Last payment voided");
+              success("Last payment voided");
               await refreshDue(order.id);
               lastPaymentId.current = null;
             })
-            .catch((er: any) => setErr(er?.message || "Undo failed"));
+            .catch((er: any) => showError(er?.message || "Undo failed"));
         }
       }
     };
@@ -113,7 +116,7 @@ export default function CashierPage() {
 
   const doExport = async () => {
     if (!start || !end) return;
-    setErr("");
+    showError("");
     try {
       const blob = await exportPayments(start, end, { mark });
       const url = URL.createObjectURL(blob);
@@ -123,7 +126,7 @@ export default function CashierPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch (e: any) {
-      setErr(e?.message || "Export failed");
+      showError(e?.message || "Export failed");
     }
   };
 
@@ -225,7 +228,7 @@ export default function CashierPage() {
           ) : (
             <div>Select an order to record payment.</div>
           )}
-          <div style={{ color: err ? "#ffb3b3" : "#9fffba" }}>{err || msg}</div>
+          {/* Status messages now handled by toast notifications */}
         </Card>
 
         <Card className="stack" style={{ width: 260 }}>

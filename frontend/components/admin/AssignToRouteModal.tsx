@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchRoutes, assignOrdersToRoute } from '@/utils/apiAdapter';
+import { fetchRoutes, assignOrdersToRoute } from '@/lib/apiAdapter';
 
 interface Props {
   orderIds: string[];

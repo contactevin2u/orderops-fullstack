@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
-import { getMe } from '@/utils/api';
+import { getMe } from '@/lib/api';
 
 export type NavItem = {
   href: string;

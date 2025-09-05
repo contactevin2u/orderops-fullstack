@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { fetchDrivers, createRoute, updateRoute } from '@/utils/apiAdapter';
+import { fetchDrivers, createRoute, updateRoute } from '@/lib/apiAdapter';
 
 interface Props {
   date: string;
@@ -91,7 +91,7 @@ export default function RouteFormModal({ date, route, onClose }: Props) {
                 className="select"
               >
                 <option value="">No secondary driver</option>
-                {drivers?.filter(d => d.id !== driverId).map((d) => (
+                {drivers?.filter(d => d.id !== Number(driverId)).map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.name || d.id}
                   </option>

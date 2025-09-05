@@ -5,7 +5,7 @@ import { useDrivers, useCreateDriver, useUpdateDriver } from '@/hooks/useDrivers
 import { useToast } from '@/hooks/useToast';
 import { formatPhone } from '@/lib/format';
 import { driverCreateSchema, driverUpdateSchema, type DriverCreateForm, type DriverUpdateForm } from '@/lib/zod-schemas';
-import type { Driver } from '@/utils/apiAdapter';
+import type { Driver } from '@/lib/apiAdapter';
 
 interface DriverFormData {
   email: string;

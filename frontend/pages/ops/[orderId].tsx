@@ -4,7 +4,7 @@ import useSWR from "swr";
 import { Page, PageHeader } from "@/components/ops/Page";
 import StatusPill from "@/components/ops/StatusPill";
 import OrderActions from "@/components/ops/OrderActions";
-import { getOrder } from "@/utils/api";
+import { getOrder } from "@/lib/api";
 
 export default function OrderDetailPage() {
   const router = useRouter();

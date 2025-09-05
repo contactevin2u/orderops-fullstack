@@ -1,7 +1,9 @@
 import Card from "@/components/Card";
-import Button from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import React from "react";
-import { outstanding } from "@/utils/api";
+import { outstanding } from "@/lib/api";
+import { useToast } from "@/hooks/useToast";
+import { formatCurrency } from "@/lib/format";
 import Link from "next/link";
 
 export default function OutstandingPage() {
@@ -13,18 +15,18 @@ export default function OutstandingPage() {
   const [loading, setLoading] = React.useState(false);
   const [sort, setSort] = React.useState<{key: string; asc: boolean}>({key: '', asc: true});
 
+  const { error: showError } = useToast();
+
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
       const r = await outstanding(type, asOf);
       setRows(r.items || []);
-    } catch (e) {
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Failed to load outstanding orders:', e);
-      }
+    } catch (e: any) {
+      showError('Failed to load outstanding orders', e?.message);
     }
     setLoading(false);
-  }, [type, asOf]);
+  }, [type, asOf, showError]);
 
   React.useEffect(() => {
     load();

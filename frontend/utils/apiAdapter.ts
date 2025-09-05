@@ -82,7 +82,7 @@ function mapOrder(o: any): Order {
 }
 
 function mapDriver(d: any): Driver {
-  return { id: String(d.id ?? ''), name: d.name };
+  return { id: Number(d.id ?? 0), name: d.name, phone: d.phone, base_warehouse: d.base_warehouse };
 }
 
 function mapRoute(r: any): Route {

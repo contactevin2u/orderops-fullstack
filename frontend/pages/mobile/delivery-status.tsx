@@ -14,7 +14,7 @@ import {
   type Route, 
   type Order, 
   type Driver 
-} from '@/utils/apiAdapter';
+} from '@/lib/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
 
 export default function MobileDeliveryStatusPage() {
@@ -415,7 +415,7 @@ export default function MobileDeliveryStatusPage() {
                       <button
                         key={driver.id}
                         className="driver-btn"
-                        onClick={() => handleAssignDriver(driver.id, false)}
+                        onClick={() => handleAssignDriver(String(driver.id), false)}
                         disabled={updateRouteMutation.isPending}
                       >
                         {driver.name}
@@ -441,7 +441,7 @@ export default function MobileDeliveryStatusPage() {
                       <button
                         key={driver.id}
                         className="driver-btn"
-                        onClick={() => handleAssignDriver(driver.id, true)}
+                        onClick={() => handleAssignDriver(String(driver.id), true)}
                         disabled={updateRouteMutation.isPending}
                       >
                         {driver.name}

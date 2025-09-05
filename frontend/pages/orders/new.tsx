@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 import TermsModal from "@/components/ui/TermsModal";
 import Card from "@/components/Card";
 import PageHeader from "@/components/PageHeader";
-import { createManualOrder, parseAdvancedMessage, normalizeParsedForOrder } from "@/utils/api";
+import { createManualOrder, parseAdvancedMessage, normalizeParsedForOrder } from "@/lib/api";
 
 export default function NewOrderPage(){
   const router = useRouter();

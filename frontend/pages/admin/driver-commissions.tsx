@@ -8,7 +8,7 @@ import {
   updateCommission, 
   listUpsellRecords, 
   releaseUpsellIncentive 
-} from '@/utils/api';
+} from '@/lib/api';
 
 export default function DriverCommissionsPage() {
   const [driverId, setDriverId] = React.useState<string>('');

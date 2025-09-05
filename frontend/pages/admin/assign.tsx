@@ -2,7 +2,7 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import dynamic from 'next/dynamic';
 import { useQuery } from '@tanstack/react-query';
-import { fetchUnassigned, Order } from '@/utils/apiAdapter';
+import { fetchUnassigned, Order } from '@/lib/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
 import AdminLayout from '@/components/Layout/AdminLayout';
 

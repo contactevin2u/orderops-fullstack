@@ -1,21 +1,23 @@
 import React from "react";
-import useSWR from "swr";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StatusBadge from "@/components/StatusBadge";
 import PageHeader from "@/components/PageHeader";
 import Card from "@/components/Card";
+import { Button } from "@/components/ui/button";
+import { useOrders } from "@/hooks/useOrders";
+import { useDrivers } from "@/hooks/useDrivers";
+import { useToast } from "@/hooks/useToast";
 import {
-  listOrders,
   addPayment,
   markReturned,
   cancelInstallment,
   markBuyback,
   markSuccess,
   assignOrderToDriver,
-  listDrivers,
   invoicePrintUrl,
   orderDue,
-} from "@/utils/api";
+  listDrivers,
+} from "@/lib/api";
 import Link from "next/link";
 
 const PAGE_SIZE = 25;
@@ -31,25 +33,20 @@ export default function OperatorOrdersPage() {
   const [selected, setSelected] = React.useState<Set<number>>(new Set());
   const [active, setActive] = React.useState<number>(-1);
 
-  const params = React.useMemo(() => ({ q, status, event }), [q, status, event]);
+  const { success, error: showError } = useToast();
+  
+  const params = React.useMemo(() => ({
+    q: q || undefined,
+    status: status || undefined,
+  }), [q, status]);
 
-  const fetcher = React.useCallback(() => {
-    return listOrders(
-      params.q || undefined,
-      params.status || undefined,
-      params.event || undefined,
-      500
-    );
-  }, [params]);
-
-  const { data, error, isLoading, mutate } = useSWR(["orders-operator", params], fetcher, {
-    revalidateOnMount: false,
-  });
+  const { data, error, isLoading, refetch } = useOrders(params);
+  const { data: drivers } = useDrivers();
 
   React.useEffect(() => {
-    const t = setTimeout(() => mutate(), 100);
+    const t = setTimeout(() => refetch(), 100);
     return () => clearTimeout(t);
-  }, [params, mutate]);
+  }, [params, refetch]);
 
   const items = data?.items || [];
   let filtered = items as any[];
@@ -77,11 +74,11 @@ export default function OperatorOrdersPage() {
         date,
         idempotencyKey: crypto.randomUUID(),
       });
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }, [mutate]);
+  }, [refetch]);
 
   const markReturnOrCollect = React.useCallback(async (order: any) => {
     const collect = window.confirm("Collect item?");
@@ -99,31 +96,31 @@ export default function OperatorOrdersPage() {
     }
     try {
       await markReturned(order.id, undefined, { collect });
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }, [mutate]);
+  }, [refetch]);
 
   const cancelInst = React.useCallback(async (order: any) => {
     try {
       await cancelInstallment(order.id, {});
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }, [mutate]);
+  }, [refetch]);
 
   const buyback = React.useCallback(async (order: any) => {
     const amt = window.prompt("Buyback amount?");
     if (!amt) return;
     try {
       await markBuyback(order.id, Number(amt), {});
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
-  }, [mutate]);
+  }, [refetch]);
 
   React.useEffect(() => {
     function onKey(e: KeyboardEvent) {
@@ -172,7 +169,7 @@ export default function OperatorOrdersPage() {
   async function markDone(order: any) {
     try {
       await markSuccess(order.id);
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
@@ -186,7 +183,7 @@ export default function OperatorOrdersPage() {
       );
       if (!choice) return;
       await assignOrderToDriver(order.id, choice);
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }
@@ -216,7 +213,7 @@ export default function OperatorOrdersPage() {
         }
       }
     }
-    mutate();
+    refetch();
   }
 
   function batchExport() {
@@ -242,7 +239,7 @@ export default function OperatorOrdersPage() {
           }
         }
       }
-      mutate();
+      refetch();
     } catch (e: any) {
       alert(e?.message || "Failed");
     }

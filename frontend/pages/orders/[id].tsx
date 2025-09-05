@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
 import Card from "@/components/Card";
-import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePrintUrl, orderDue, markSuccess, updateCommission } from "@/utils/api";
+import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePrintUrl, orderDue, markSuccess, updateCommission } from "@/lib/api";
 
 export default function OrderDetailPage(){
   const router = useRouter();

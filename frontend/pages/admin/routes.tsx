@@ -8,7 +8,7 @@ import {
   fetchOnHold,
   fetchDrivers,
   Route,
-} from '@/utils/apiAdapter';
+} from '@/lib/apiAdapter';
 import { getOrderBadges } from '@/utils/orderBadges';
 import AdminLayout from '@/components/Layout/AdminLayout';
 

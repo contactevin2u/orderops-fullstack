@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import '@/i18n';
 import { useRouter } from 'next/router';
-import Layout from '@/components/Layout';
+import { AppLayout as Layout } from '@/components/Layout';
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
