@@ -200,22 +200,31 @@ export default function OrderDetailPage(){
   async function onReturned(){
     setBusy(true); setErr(""); setMsg("");
     try{
-      const d = due || await orderDue(order.id);
-      if(order.type === 'RENTAL' && !retCollect && d && Number(d?.balance || d?.outstanding || 0) > 0){
-        setErr("Outstanding must be cleared before return");
+      // Get current outstanding amount using proper calculation
+      const d = due || await orderDue(order.id, asOf);
+      
+      // For RENTAL orders, validate outstanding is cleared unless collect=true
+      if(order.type === 'RENTAL' && !retCollect && d && Number(d?.balance || 0) > 0){
+        setErr(`Outstanding balance of RM ${Number(d.balance || 0).toFixed(2)} must be cleared before return. Check 'Collect' to collect fees during return.`);
         setBusy(false);
         return;
       }
+      
       const out = await markReturned(order.id, undefined, {
         collect: retCollect,
         return_delivery_fee: retDelFee ? Number(retDelFee) : undefined,
         method: retMethod || undefined,
         reference: retRef || undefined,
       });
+      
       setOrder(out?.order || out);
       await loadDue(order.id, asOf);
-      setMsg("Marked as returned");
-    }catch(e:any){ setError(e); } finally{ setBusy(false); }
+      setMsg("Marked as returned successfully");
+    }catch(e:any){ 
+      setError(e); 
+    } finally{ 
+      setBusy(false); 
+    }
   }
 
   async function onSuccess(){
