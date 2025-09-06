@@ -636,3 +636,118 @@ export function getOrderUIDs(orderId: number | string) {
     total_returned: number;
   }>(`/orders/${orderId}/uids`);
 }
+
+// -------- UID Generation and Management
+export function generateUID(data: {
+  sku_id: number;
+  item_type: 'NEW' | 'RENTAL';
+  serial_number?: string;
+}) {
+  return request<{
+    success: boolean;
+    items: Array<{
+      uid: string;
+      type: string;
+      copy_number?: number;
+      serial?: string;
+    }>;
+    message: string;
+  }>('/inventory/generate-uid', { json: data });
+}
+
+export function scanUID(data: {
+  order_id: number;
+  action: 'LOAD_OUT' | 'DELIVER' | 'RETURN' | 'REPAIR' | 'SWAP' | 'LOAD_IN';
+  uid: string;
+  sku_id?: number;
+  notes?: string;
+}) {
+  return request<{
+    success: boolean;
+    uid: string;
+    action: string;
+    sku_name?: string;
+    message: string;
+  }>('/inventory/uid/scan', { json: data });
+}
+
+export function getDriverStockStatus(driverId: number) {
+  return request<{
+    driver_id: number;
+    stock_items: Array<{
+      sku_name: string;
+      count: number;
+      items: Array<{
+        uid: string;
+        serial?: string;
+        type: string;
+        copy_number?: number;
+      }>;
+    }>;
+    total_items: number;
+  }>(`/inventory/drivers/${driverId}/stock-status`);
+}
+
+// -------- SKU Management
+export function getAllSKUs() {
+  return request<Array<{
+    id: number;
+    code: string;
+    name: string;
+    category?: string;
+    description?: string;
+    is_serialized: boolean;
+    is_active: boolean;
+    created_at: string;
+  }>>('/skus');
+}
+
+export function createSKU(data: {
+  code: string;
+  name: string;
+  category?: string;
+  description?: string;
+  is_serialized?: boolean;
+}) {
+  return request<{
+    success: boolean;
+    sku_id: number;
+    message: string;
+  }>('/skus', { json: data });
+}
+
+export function updateSKU(skuId: number, data: {
+  code?: string;
+  name?: string;
+  category?: string;
+  description?: string;
+  is_serialized?: boolean;
+  is_active?: boolean;
+}) {
+  return request<{
+    success: boolean;
+    message: string;
+  }>(`/skus/${skuId}`, { method: 'PUT', json: data });
+}
+
+export function deleteSKU(skuId: number) {
+  return request<{
+    success: boolean;
+    message: string;
+  }>(`/skus/${skuId}`, { method: 'DELETE' });
+}
+
+// -------- QR Code Generation
+export function generateQRCode(data: {
+  uid?: string;
+  order_id?: number;
+  content?: string;
+  size?: number;
+}) {
+  return request<{
+    success: boolean;
+    qr_code_base64: string;
+    format: string;
+    message: string;
+  }>('/inventory/generate-qr', { json: data });
+}
