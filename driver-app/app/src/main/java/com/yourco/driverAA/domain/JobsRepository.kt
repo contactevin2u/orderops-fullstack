@@ -4,6 +4,7 @@ import android.util.Log
 import com.yourco.driverAA.data.api.*
 import com.yourco.driverAA.data.db.*
 import com.yourco.driverAA.data.network.ConnectivityManager
+import com.yourco.driverAA.data.repository.UserRepository
 import com.yourco.driverAA.data.sync.SyncManager
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.*
@@ -24,7 +25,8 @@ class JobsRepository @Inject constructor(
     private val photosDao: PhotosDao,
     private val uidScansDao: UIDScansDao,
     private val syncManager: SyncManager,
-    private val connectivityManager: ConnectivityManager
+    private val connectivityManager: ConnectivityManager,
+    private val userRepository: UserRepository
 ) {
     private val TAG = "JobsRepository"
     fun getJobs(statusFilter: String = "active"): Flow<Result<List<JobDto>>> {
@@ -208,7 +210,8 @@ class JobsRepository @Inject constructor(
     }
     
     suspend fun getLorryStock(date: String): Result<LorryStockResponse> = try {
-        val stock = api.getLorryStock(date)
+        val userInfo = userRepository.getCurrentUserInfo().getOrThrow()
+        val stock = api.getLorryStock(userInfo.id, date)
         Result.Success(stock)
     } catch (e: Exception) {
         Result.error(e, "load_stock")
