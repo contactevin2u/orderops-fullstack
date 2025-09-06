@@ -38,7 +38,7 @@ class OfflineJobsRepository @Inject constructor(
         } else {
             jobsDao.getJobsByStatus(statusFilter)
         }.map { entities -> 
-            Result.Success(entities.map { it.toDto() })
+            Result.Success(entities.map { it.toDto() }) as Result<List<JobDto>>
         }.onStart {
             // Trigger background sync if online
             if (connectivityManager.isOnline()) {
