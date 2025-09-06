@@ -6,9 +6,11 @@ import com.yourco.driverAA.BuildConfig
 import com.yourco.driverAA.data.api.AuthInterceptor
 import com.yourco.driverAA.data.api.DriverApi
 import com.yourco.driverAA.data.auth.AuthService
-import com.yourco.driverAA.data.db.AppDatabase
-import com.yourco.driverAA.data.db.LocationPingDao
+import com.yourco.driverAA.data.db.*
+import com.yourco.driverAA.data.network.ConnectivityManager
+import com.yourco.driverAA.data.sync.SyncManager
 import com.yourco.driverAA.domain.JobsRepository
+import com.yourco.driverAA.domain.OfflineJobsRepository
 import com.google.firebase.auth.FirebaseAuth
 import dagger.Module
 import dagger.Provides
@@ -54,15 +56,64 @@ object AppModule {
     @Provides
     @Singleton
     fun provideDatabase(@ApplicationContext context: Context): AppDatabase =
-        Room.databaseBuilder(context, AppDatabase::class.java, "app.db").build()
+        Room.databaseBuilder(context, AppDatabase::class.java, "app.db")
+            .fallbackToDestructiveMigration() // For development - remove in production
+            .build()
 
+    // DAOs
     @Provides
     fun provideLocationDao(db: AppDatabase): LocationPingDao = db.locationDao()
+    
+    @Provides
+    fun provideJobsDao(db: AppDatabase): JobsDao = db.jobsDao()
+    
+    @Provides
+    fun provideOutboxDao(db: AppDatabase): OutboxDao = db.outboxDao()
+    
+    @Provides
+    fun providePhotosDao(db: AppDatabase): PhotosDao = db.photosDao()
+    
+    @Provides
+    fun provideUIDScansDao(db: AppDatabase): UIDScansDao = db.uidScansDao()
 
+    // Network and Connectivity
+    @Provides
+    @Singleton
+    fun provideConnectivityManager(@ApplicationContext context: Context): ConnectivityManager =
+        ConnectivityManager(context)
+
+    // Sync Manager
+    @Provides
+    @Singleton
+    fun provideSyncManager(
+        api: DriverApi,
+        jobsDao: JobsDao,
+        outboxDao: OutboxDao,
+        photosDao: PhotosDao,
+        uidScansDao: UIDScansDao,
+        connectivityManager: ConnectivityManager
+    ): SyncManager = SyncManager(api, jobsDao, outboxDao, photosDao, uidScansDao, connectivityManager)
+
+    // Repositories
     @Provides
     @Singleton
     fun provideJobsRepository(api: DriverApi): JobsRepository = JobsRepository(api)
     
+    @Provides
+    @Singleton
+    fun provideOfflineJobsRepository(
+        api: DriverApi,
+        jobsDao: JobsDao,
+        outboxDao: OutboxDao,
+        photosDao: PhotosDao,
+        uidScansDao: UIDScansDao,
+        syncManager: SyncManager,
+        connectivityManager: ConnectivityManager
+    ): OfflineJobsRepository = OfflineJobsRepository(
+        api, jobsDao, outboxDao, photosDao, uidScansDao, syncManager, connectivityManager
+    )
+
+    // Firebase
     @Provides
     @Singleton
     fun provideFirebaseAuth(): FirebaseAuth = FirebaseAuth.getInstance()
