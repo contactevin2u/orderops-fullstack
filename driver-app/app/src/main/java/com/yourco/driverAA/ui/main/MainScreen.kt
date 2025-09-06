@@ -1,6 +1,7 @@
 package com.yourco.driverAA.ui.main
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.List
@@ -12,7 +13,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.yourco.driverAA.ui.components.OrderOpsIconButton
 import com.yourco.driverAA.ui.stock.StockScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -28,29 +31,66 @@ fun MainScreen(
     val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star, Icons.Default.Inventory, Icons.Default.AccessTime)
     
     Column(modifier = Modifier.fillMaxSize()) {
-        // Top App Bar with Sign Out button
+        // Enhanced Top App Bar
         TopAppBar(
-            title = { Text("Driver App") },
+            title = { 
+                Text(
+                    text = "OrderOps Driver",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold
+                )
+            },
             actions = {
-                IconButton(
-                    onClick = onSignOut
-                ) {
-                    Icon(
-                        Icons.Filled.Logout,
-                        contentDescription = "Sign Out",
-                        tint = MaterialTheme.colorScheme.onSurface
+                OrderOpsIconButton(
+                    onClick = onSignOut,
+                    icon = Icons.Filled.Logout,
+                    contentDescription = "Sign Out",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.primary
+            )
+        )
+        
+        // Enhanced Tab Row
+        TabRow(
+            selectedTabIndex = selectedTabIndex,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            indicator = { tabPositions ->
+                if (selectedTabIndex < tabPositions.size) {
+                    TabRowDefaults.SecondaryIndicator(
+                        modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
+                        height = 3.dp,
+                        color = MaterialTheme.colorScheme.primary
                     )
                 }
             }
-        )
-        
-        TabRow(selectedTabIndex = selectedTabIndex) {
+        ) {
             tabs.forEachIndexed { index, title ->
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { selectedTabIndex = index },
-                    text = { Text(title) },
-                    icon = { Icon(tabIcons[index], contentDescription = null) }
+                    text = { 
+                        Text(
+                            text = title,
+                            fontWeight = if (selectedTabIndex == index) FontWeight.Bold else FontWeight.Medium,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    },
+                    icon = { 
+                        Icon(
+                            tabIcons[index], 
+                            contentDescription = null,
+                            tint = if (selectedTabIndex == index) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                    }
                 )
             }
         }

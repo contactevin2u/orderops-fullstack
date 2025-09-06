@@ -613,14 +613,14 @@ def my_upsell_incentives(
         elif record.incentive_status == "RELEASED":
             total_released += float(record.driver_incentive)
     
-    return {
+    return envelope({
         "incentives": incentives,
         "summary": {
             "total_pending": total_pending,
             "total_released": total_released,
             "total_records": len(incentives)
         }
-    }
+    })
 
 
 @router.get("/{driver_id}", response_model=DriverOut, dependencies=[Depends(require_roles(Role.ADMIN))])

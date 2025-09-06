@@ -3,13 +3,13 @@ package com.yourco.driverAA
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import dagger.hilt.android.AndroidEntryPoint
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.install.model.AppUpdateType
 import com.google.android.play.core.install.model.UpdateAvailability
 import com.yourco.driverAA.navigation.NavGraph
+import com.yourco.driverAA.ui.theme.OrderOpsDriverTheme
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         checkForUpdates()
         setContent {
-            MaterialTheme {
+            OrderOpsDriverTheme {
                 Surface { NavGraph() }
             }
         }

@@ -19,6 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.api.JobDto
+import com.yourco.driverAA.ui.components.OrderJobCard
+import com.yourco.driverAA.ui.components.OrderOpsCard
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -148,8 +150,13 @@ fun OrdersList(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(filteredAndSortedJobs) { job ->
-                            OrderCard(
-                                job = job,
+                            OrderJobCard(
+                                orderCode = job.code ?: job.id,
+                                customerName = job.customer_name ?: "Unknown Customer",
+                                status = job.status ?: "UNKNOWN",
+                                deliveryDate = job.delivery_date,
+                                address = job.address,
+                                phone = job.customer_phone,
                                 onClick = { onJobClick(job.id) }
                             )
                         }
@@ -160,129 +167,3 @@ fun OrdersList(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun OrderCard(
-    job: JobDto,
-    onClick: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onClick() },
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            // Order ID and Status
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "Order #${job.code ?: job.id}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                AssistChip(
-                    onClick = { },
-                    label = { 
-                        Text(
-                            text = job.status?.uppercase() ?: "UNKNOWN",
-                            style = MaterialTheme.typography.labelSmall
-                        ) 
-                    }
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            // Customer Info
-            job.customer_name?.let { customerName ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Person,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = customerName,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            
-            // Phone
-            job.customer_phone?.let { phone ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Phone,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = phone,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            
-            // Delivery Date
-            job.delivery_date?.let { deliveryDate ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "Delivery: $deliveryDate",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            
-            // Address  
-            job.address?.let { address ->
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(bottom = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.LocationOn,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = address,
-                        style = MaterialTheme.typography.bodyMedium,
-                        maxLines = 2
-                    )
-                }
-            }
-            
-            // Commission info removed - view commissions in dedicated tab
-        }
-    }
-}
