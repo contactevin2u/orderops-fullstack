@@ -550,22 +550,6 @@ export function getInventoryConfig() {
   }>('/inventory/config');
 }
 
-export function scanUID(data: {
-  order_id: number;
-  action: 'ISSUE' | 'RETURN';
-  uid: string;
-  sku_id?: number;
-  notes?: string;
-}) {
-  return request<{
-    success: boolean;
-    message: string;
-    uid: string;
-    action: string;
-    sku_name?: string;
-    order_item_id?: number;
-  }>('/inventory/uid/scan', { json: data });
-}
 
 export function getLorryStock(driverId: number, date: string) {
   return request<{
@@ -657,17 +641,18 @@ export function generateUID(data: {
 
 export function scanUID(data: {
   order_id: number;
-  action: 'LOAD_OUT' | 'DELIVER' | 'RETURN' | 'REPAIR' | 'SWAP' | 'LOAD_IN';
+  action: 'ISSUE' | 'RETURN' | 'LOAD_OUT' | 'DELIVER' | 'REPAIR' | 'SWAP' | 'LOAD_IN';
   uid: string;
   sku_id?: number;
   notes?: string;
 }) {
   return request<{
     success: boolean;
+    message: string;
     uid: string;
     action: string;
     sku_name?: string;
-    message: string;
+    order_item_id?: number;
   }>('/inventory/uid/scan', { json: data });
 }
 
