@@ -38,6 +38,11 @@ export default function DriverCommissionsPage() {
     enabled: !!driverId,
   });
 
+  const inventoryConfigQuery = useQuery({
+    queryKey: ['inventory-config'],
+    queryFn: getInventoryConfig,
+  });
+
   const releaseCommissionMutation = useMutation({
     mutationFn: markSuccess,
     onSuccess: () => {
@@ -387,11 +392,7 @@ function OrderCard({
   const [showUidDetails, setShowUidDetails] = React.useState(false);
   const [commissionAmount, setCommissionAmount] = React.useState('');
   
-  // Fetch inventory config and UID data
-  const inventoryConfigQuery = useQuery({
-    queryKey: ['inventory-config'],
-    queryFn: getInventoryConfig,
-  });
+  // Fetch UID data (inventory config is already available from parent scope)
   
   const orderUidsQuery = useQuery({
     queryKey: ['order-uids', order.id],
