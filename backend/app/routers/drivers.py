@@ -678,7 +678,7 @@ def get_lorry_stock(
     driver_id: int,
     date: str,  # YYYY-MM-DD format
     db: Session = Depends(get_session),
-    current_user=Depends(driver_auth)
+    current_user=Depends(require_roles(Role.ADMIN, Role.CASHIER))
 ):
     """Get lorry stock for driver on specific date - integrates with enhanced UID inventory system"""
     if not settings.UID_INVENTORY_ENABLED:

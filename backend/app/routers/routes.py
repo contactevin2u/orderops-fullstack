@@ -149,7 +149,7 @@ def get_route_orders(route_id: int, db: Session = Depends(get_session)):
             "code": order.code if order else None,
             "status": trip.status,
             "delivery_date": order.delivery_date.isoformat() if order and order.delivery_date else None,
-            "address": order.address if order else None,
+            "address": customer.address if customer else None,  # Get address from customer
             "customer_name": customer.name if customer else None,
             "customer_address": customer.address if customer else None,
             "customer_phone": customer.phone if customer else None,
