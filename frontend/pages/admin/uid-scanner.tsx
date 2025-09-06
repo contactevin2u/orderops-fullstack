@@ -499,7 +499,7 @@ export default function UIDScannerPage() {
         <div className="text-sm text-gray-600 space-y-2">
           <p>• <strong>Camera Scanning:</strong> Enable camera to scan QR codes automatically (requires camera permissions)</p>
           <p>• <strong>Manual Entry:</strong> Type or paste UID directly into the input field</p>
-          <p>• <strong>Actions:</strong> Select appropriate action based on what you're doing with the item</p>
+          <p>• <strong>Actions:</strong> Select appropriate action based on what you&apos;re doing with the item</p>
           <p>• <strong>Order Tracking:</strong> Enter order ID to see all UIDs associated with that order</p>
           <p>• <strong>Manual SKU:</strong> Override SKU detection if UID is not in system database</p>
         </div>

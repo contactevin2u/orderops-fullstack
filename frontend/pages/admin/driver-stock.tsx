@@ -117,7 +117,13 @@ export default function DriverStockPage() {
     try {
       setStockLoading(true);
       const response = await getLorryStock(parseInt(selectedDriver), selectedDate);
-      setLorryStock(response);
+      setLorryStock({ date: response.date, lines: response.items.map(item => ({
+        sku_id: item.sku_id,
+        sku_name: item.sku_name,
+        expected_count: item.expected_count,
+        scanned_count: item.scanned_count,
+        variance: item.variance
+      })) });
     } catch (err: any) {
       console.log('No lorry stock data for this date:', err);
       setLorryStock({ date: selectedDate, lines: [] });
@@ -423,7 +429,7 @@ export default function DriverStockPage() {
                 <div className="text-center py-8 text-gray-500">
                   <div className="text-3xl mb-2">📋</div>
                   <p>No count data for this date</p>
-                  <p className="text-xs">Click "New Count" to start counting</p>
+                  <p className="text-xs">Click &quot;New Count&quot; to start counting</p>
                 </div>
               )}
             </Card>
@@ -453,8 +459,8 @@ export default function DriverStockPage() {
               <div>
                 <h4 className="font-medium text-gray-900 mb-2">Usage Tips</h4>
                 <ul className="text-gray-600 space-y-1">
-                  <li>• Use "Current Stock" to see real-time UID-tracked items</li>
-                  <li>• Use "Daily Count" for manual inventory reconciliation</li>
+                  <li>• Use &quot;Current Stock&quot; to see real-time UID-tracked items</li>
+                  <li>• Use &quot;Daily Count&quot; for manual inventory reconciliation</li>
                   <li>• Compare both views to identify discrepancies</li>
                   <li>• Upload counts at end of each day for accurate tracking</li>
                 </ul>

@@ -383,7 +383,7 @@ export default function UIDGeneratorPage() {
           <p>• <strong>New Items:</strong> Generate 2 UIDs (Copy 1 & Copy 2) for items being sold - one stays with customer, one for records</p>
           <p>• <strong>Serial Numbers:</strong> Add manufacturer serial numbers for warranty and tracking purposes</p>
           <p>• <strong>QR Codes:</strong> Enable QR generation for easy scanning with mobile devices</p>
-          <p>• <strong>Labels:</strong> Use "Print Labels" to create physical labels with UID and QR codes</p>
+          <p>• <strong>Labels:</strong> Use &quot;Print Labels&quot; to create physical labels with UID and QR codes</p>
         </div>
       </Card>
     </div>
