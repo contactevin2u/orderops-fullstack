@@ -228,12 +228,18 @@ class RouteUpdateIn(BaseModel):
     notes: str | None = None
 
 
+class RouteStopOut(BaseModel):
+    orderId: str
+    seq: int
+
 class RouteOut(BaseModel):
     id: int
     driver_id: int
+    driver_id_2: int | None = None  # Secondary driver
     route_date: dt.date
     name: str | None = None
     notes: str | None = None
+    stops: list[RouteStopOut] = []
 
     class Config:
         from_attributes = True

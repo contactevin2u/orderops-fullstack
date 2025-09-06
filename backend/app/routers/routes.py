@@ -1,10 +1,11 @@
 from datetime import date as dt_date
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from ..db import get_session
 from ..models import DriverRoute, Trip, Order, Driver, Role
-from ..schemas import RouteCreateIn, RouteOut, RouteUpdateIn
+from ..schemas import RouteCreateIn, RouteOut, RouteUpdateIn, RouteStopOut
 from ..auth.deps import require_roles
 
 router = APIRouter(
@@ -79,7 +80,43 @@ def list_routes(date: str | None = None, db: Session = Depends(get_session)):
         except ValueError:
             raise HTTPException(400, "Invalid date format")
         q = q.filter(DriverRoute.route_date == d)
-    return q.order_by(DriverRoute.route_date.desc(), DriverRoute.id.desc()).all()
+    
+    routes = q.order_by(DriverRoute.route_date.desc(), DriverRoute.id.desc()).all()
+    
+    # Enrich each route with stops data
+    result = []
+    for route in routes:
+        # Get trips/orders for this route
+        trips = db.query(Trip).filter(Trip.route_id == route.id).order_by(Trip.id).all()
+        
+        # Get secondary driver ID from trips (if any trip has one)
+        secondary_driver_id = None
+        for trip in trips:
+            if trip.driver_id_2:
+                secondary_driver_id = trip.driver_id_2
+                break
+        
+        # Create stops data
+        stops = []
+        for i, trip in enumerate(trips):
+            stops.append(RouteStopOut(
+                orderId=str(trip.order_id),
+                seq=i + 1
+            ))
+        
+        # Create route response with stops
+        route_data = RouteOut(
+            id=route.id,
+            driver_id=route.driver_id,
+            driver_id_2=secondary_driver_id,  # Get from trips
+            route_date=route.route_date,
+            name=route.name,
+            notes=route.notes,
+            stops=stops
+        )
+        result.append(route_data)
+    
+    return result
 
 
 @router.post("/{route_id}/orders", response_model=dict)
