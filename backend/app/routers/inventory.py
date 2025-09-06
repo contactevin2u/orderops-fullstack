@@ -49,6 +49,18 @@ class GenerateUIDResponse(BaseModel):
     items: List[dict]  # Generated items with UIDs
     message: str
 
+class GenerateQRRequest(BaseModel):
+    uid: Optional[str] = None
+    order_id: Optional[int] = None
+    content: Optional[str] = None
+    size: Optional[int] = 256
+
+class GenerateQRResponse(BaseModel):
+    success: bool
+    qr_code_base64: str
+    format: str
+    message: str
+
 class StockLineItem(BaseModel):
     sku_id: int
     counted_quantity: int
@@ -576,7 +588,7 @@ async def create_sku_alias(
         
         await log_action(
             db,
-            user_id=current_user.get("user_id", 0),
+            user_id=current_user.id,
             action="SKU_ALIAS_CREATE",
             resource_type="sku_alias",
             resource_id=alias.id,
@@ -783,21 +795,45 @@ async def generate_uid(
         return envelope({"success": True, "message": "UID inventory disabled"})
     
     try:
-        service = InventoryService(db)
+        # Get SKU info
+        sku = db.get(SKU, request.sku_id)
+        if not sku:
+            raise HTTPException(status_code=404, detail="SKU not found")
         
         # Map string to enum
         item_type = ItemType.NEW if request.item_type.upper() == "NEW" else ItemType.RENTAL
         
-        items = service.generate_item_copies(
-            sku_id=request.sku_id,
-            driver_id=current_user.id,
-            scan_date=datetime.utcnow().date(),
-            item_type=item_type,
-            serial_number=request.serial_number
-        )
+        # Generate simple admin UID format: SKU001-ADMIN-20240906-001
+        sku_code = f"SKU{sku.id:03d}"
+        today_str = datetime.utcnow().strftime("%Y%m%d")
         
-        # Save items to database
-        for item in items:
+        # Find next sequence number for today
+        existing_count = db.execute(
+            select(func.count(Item.uid)).where(
+                Item.uid.like(f"{sku_code}-ADMIN-{today_str}-%")
+            )
+        ).scalar() or 0
+        
+        items = []
+        copies = 2 if item_type == ItemType.NEW else 1
+        
+        for copy_num in range(1, copies + 1):
+            seq_num = existing_count + copy_num
+            if copies > 1:
+                uid = f"{sku_code}-ADMIN-{today_str}-{seq_num:03d}-C{copy_num}"
+            else:
+                uid = f"{sku_code}-ADMIN-{today_str}-{seq_num:03d}"
+            
+            item = Item(
+                uid=uid,
+                sku_id=request.sku_id,
+                item_type=item_type,
+                copy_number=copy_num if copies > 1 else None,
+                oem_serial=request.serial_number,
+                status=ItemStatus.AVAILABLE,
+                created_at=datetime.utcnow()
+            )
+            items.append(item)
             db.add(item)
         
         db.commit()

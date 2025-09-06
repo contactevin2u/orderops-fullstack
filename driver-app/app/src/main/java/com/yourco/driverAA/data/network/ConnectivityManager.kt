@@ -31,7 +31,9 @@ class ConnectivityManager @Inject constructor(
         
         override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
             val hasInternet = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-                             networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                             (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                              networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                              networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
             _isOnline.value = hasInternet
         }
     }
@@ -44,7 +46,7 @@ class ConnectivityManager @Inject constructor(
         try {
             val networkRequest = NetworkRequest.Builder()
                 .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+                // Remove NET_CAPABILITY_VALIDATED requirement - too strict
                 .build()
             
             connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
@@ -60,8 +62,12 @@ class ConnectivityManager @Inject constructor(
             val activeNetwork = connectivityManager.activeNetwork ?: return false
             val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork) ?: return false
             
+            // Less strict check - only require internet capability, not validation
+            // This prevents false negatives when Android hasn't validated the connection yet
             networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-            networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            (networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+             networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+             networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
         } catch (e: Exception) {
             false
         }
