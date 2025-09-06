@@ -1,6 +1,7 @@
 import React from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import StatusBadge from "@/components/StatusBadge";
+import UIDStatus from "@/components/UIDStatus";
 import PageHeader from "@/components/PageHeader";
 import Card from "@/components/Card";
 import { Button } from "@/components/ui/button";
@@ -339,6 +340,7 @@ function OrdersTable({ items, selected, toggleSelect, active, setActive, actions
             <th style={{ textAlign: 'right' }}>Outstanding</th>
             <th>Status</th>
             <th>Event</th>
+            <th>UIDs</th>
             <th>Updated</th>
             <th></th>
           </tr>
@@ -355,6 +357,7 @@ function OrdersTable({ items, selected, toggleSelect, active, setActive, actions
               <td style={{ textAlign: 'right' }}>RM {Number(o.balance || o.outstanding || 0).toFixed(2)}</td>
               <td><StatusBadge value={o.status} /></td>
               <td>{o.event || o.type || '-'}</td>
+              <td><UIDStatus orderId={o.id} orderStatus={o.status} compact /></td>
               <td>{o.updated_at ? new Date(o.updated_at).toLocaleDateString() : '-'}</td>
               <td>
                 <details>
@@ -374,7 +377,7 @@ function OrdersTable({ items, selected, toggleSelect, active, setActive, actions
           ))}
           {items.length === 0 && (
             <tr>
-              <td colSpan={9} style={{ opacity: 0.7 }}>No orders</td>
+              <td colSpan={10} style={{ opacity: 0.7 }}>No orders</td>
             </tr>
           )}
         </tbody>

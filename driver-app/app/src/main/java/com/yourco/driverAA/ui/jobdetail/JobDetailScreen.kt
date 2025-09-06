@@ -131,6 +131,10 @@ fun JobDetailScreen(
     val uploadingPhotos by viewModel.uploadingPhotos.collectAsState()
     val uploadedPhotos by viewModel.uploadedPhotos.collectAsState()
     val uploadedPhotoFiles by viewModel.uploadedPhotoFiles.collectAsState()
+    val inventoryConfig by viewModel.inventoryConfig.collectAsState()
+    val showUIDScanDialog by viewModel.showUIDScanDialog.collectAsState()
+    val scannedUIDs by viewModel.scannedUIDs.collectAsState()
+    val uidScanLoading by viewModel.uidScanLoading.collectAsState()
 
     LaunchedEffect(jobId) {
         viewModel.loadJob(jobId)
@@ -168,7 +172,10 @@ fun JobDetailScreen(
                     onUpsellItem = viewModel::showUpsellDialog,
                     uploadingPhotos = uploadingPhotos,
                     uploadedPhotos = uploadedPhotos,
-                    uploadedPhotoFiles = uploadedPhotoFiles
+                    uploadedPhotoFiles = uploadedPhotoFiles,
+                    inventoryConfig = inventoryConfig,
+                    scannedUIDs = scannedUIDs,
+                    onShowUIDScan = viewModel::showUIDScanDialog
                 )
             }
         }
@@ -206,7 +213,10 @@ private fun JobDetailContent(
     onUpsellItem: ((JobItemDto) -> Unit)? = null,
     uploadingPhotos: Set<Int> = emptySet(),
     uploadedPhotos: Set<Int> = emptySet(),
-    uploadedPhotoFiles: Map<Int, File> = emptyMap()
+    uploadedPhotoFiles: Map<Int, File> = emptyMap(),
+    inventoryConfig: com.yourco.driverAA.data.api.InventoryConfigResponse? = null,
+    scannedUIDs: List<com.yourco.driverAA.data.api.UIDScanResponse> = emptyList(),
+    onShowUIDScan: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -413,6 +423,19 @@ private fun JobDetailContent(
                     uploadingPhotos = uploadingPhotos,
                     uploadedPhotos = uploadedPhotos,
                     uploadedPhotoFiles = uploadedPhotoFiles
+                )
+            }
+        }
+        
+        // Show UID scanning section after POD photos when enabled and order is delivered
+        if (inventoryConfig?.uid_inventory_enabled == true && 
+            job.status?.uppercase() == "DELIVERED" &&
+            uploadedPhotos.isNotEmpty()) {
+            item {
+                UIDScanSection(
+                    scannedUIDs = scannedUIDs,
+                    isRequired = inventoryConfig.uid_scan_required_after_pod,
+                    onShowUIDScan = onShowUIDScan
                 )
             }
         }
@@ -1346,4 +1369,232 @@ private fun PhotoPreviewDialog(
             }
         }
     }
+    
+    // UID Scan dialog
+    if (showUIDScanDialog) {
+        UIDScanDialog(
+            onDismiss = { viewModel.dismissUIDScanDialog() },
+            onScanUID = { uid -> 
+                viewModel.scanUID(uid)
+                viewModel.dismissUIDScanDialog()
+            },
+            isLoading = uidScanLoading
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UIDScanSection(
+    scannedUIDs: List<com.yourco.driverAA.data.api.UIDScanResponse>,
+    isRequired: Boolean,
+    onShowUIDScan: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "UID Tracking",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                
+                if (isRequired) {
+                    AssistChip(
+                        onClick = { },
+                        label = { 
+                            Text(
+                                text = "DIPERLUKAN",
+                                style = MaterialTheme.typography.labelSmall
+                            ) 
+                        },
+                        colors = AssistChipDefaults.assistChipColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            labelColor = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    )
+                } else {
+                    AssistChip(
+                        onClick = { },
+                        label = { 
+                            Text(
+                                text = "PILIHAN",
+                                style = MaterialTheme.typography.labelSmall
+                            ) 
+                        }
+                    )
+                }
+            }
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Text(
+                text = if (isRequired) {
+                    "Sila imbas UID barang yang dihantar. UID diperlukan untuk melengkapkan pesanan ini."
+                } else {
+                    "Sila imbas UID barang yang dihantar untuk tujuan inventori (pilihan)."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            
+            // Show scanned UIDs
+            if (scannedUIDs.isNotEmpty()) {
+                Text(
+                    text = "UID Diimbas (${scannedUIDs.size})",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                
+                scannedUIDs.forEach { scanned ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 2.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = scanned.uid,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium
+                                )
+                                scanned.sku_name?.let { name ->
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Icon(
+                                Icons.Default.CheckCircle,
+                                contentDescription = "Scanned",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+            }
+            
+            // Scan button
+            Button(
+                onClick = onShowUIDScan,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isRequired && scannedUIDs.isEmpty()) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.secondary
+                    }
+                )
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Imbas UID")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun UIDScanDialog(
+    onDismiss: () -> Unit,
+    onScanUID: (String) -> Unit,
+    isLoading: Boolean = false
+) {
+    var uidText by remember { mutableStateOf("") }
+    
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Imbas UID",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Masukkan atau imbas UID barang yang dihantar:",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                
+                OutlinedTextField(
+                    value = uidText,
+                    onValueChange = { uidText = it },
+                    label = { Text("UID") },
+                    placeholder = { Text("cth: AA123456789") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !isLoading
+                )
+                
+                if (isLoading) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Memproses...",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { 
+                    if (uidText.isNotBlank()) {
+                        onScanUID(uidText)
+                        uidText = ""
+                    }
+                },
+                enabled = uidText.isNotBlank() && !isLoading
+            ) {
+                Text("Rekod UID")
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = onDismiss,
+                enabled = !isLoading
+            ) {
+                Text("Batal")
+            }
+        }
+    )
 }

@@ -68,6 +68,19 @@ interface DriverApi {
     @GET("drivers/shifts/history")
     suspend fun getShiftHistory(@Query("limit") limit: Int = 10): List<ShiftResponse>
     
+    // UID Inventory endpoints
+    @GET("inventory/config")
+    suspend fun getInventoryConfig(): InventoryConfigResponse
+    
+    @POST("inventory/uid/scan")
+    suspend fun scanUID(@Body request: UIDScanRequest): UIDScanResponse
+    
+    @GET("drivers/lorry-stock/{date}")
+    suspend fun getLorryStock(@Path("date") date: String): LorryStockResponse
+    
+    @POST("inventory/sku/resolve")
+    suspend fun resolveSKU(@Body request: SKUResolveRequest): SKUResolveResponse
+    
     // Admin endpoints
     @GET("ai-assignments/suggestions")
     suspend fun getAIAssignmentSuggestions(): AssignmentSuggestionsResponse
@@ -440,4 +453,70 @@ data class UpsellResponse(
     val message: String,
     val new_total: String,
     val order: OrderDto? = null
+)
+
+// UID Inventory DTOs
+@Serializable
+data class InventoryConfigResponse(
+    val uid_inventory_enabled: Boolean,
+    val uid_scan_required_after_pod: Boolean,
+    val inventory_mode: String // "off" | "optional" | "required"
+)
+
+@Serializable
+data class UIDScanRequest(
+    val order_id: Int,
+    val action: String, // "LOAD_OUT" | "DELIVER" | "RETURN" | "REPAIR" | "SWAP" | "LOAD_IN" | "ISSUE"
+    val uid: String,
+    val sku_id: Int? = null, // Optional if UID already exists
+    val notes: String? = null
+)
+
+@Serializable
+data class UIDScanResponse(
+    val success: Boolean,
+    val message: String,
+    val uid: String,
+    val action: String,
+    val sku_name: String? = null,
+    val order_item_id: Int? = null
+)
+
+@Serializable
+data class LorryStockItem(
+    val sku_id: Int,
+    val sku_name: String,
+    val expected_count: Int,
+    val scanned_count: Int? = null,
+    val variance: Int? = null
+)
+
+@Serializable
+data class LorryStockResponse(
+    val date: String,
+    val driver_id: Int,
+    val items: List<LorryStockItem>,
+    val total_expected: Int,
+    val total_scanned: Int? = null,
+    val total_variance: Int? = null
+)
+
+@Serializable
+data class SKUResolveRequest(
+    val name: String,
+    val threshold: Double = 0.8
+)
+
+@Serializable
+data class SKUMatch(
+    val sku_id: Int,
+    val sku_name: String,
+    val confidence: Double,
+    val match_type: String // "exact" | "alias" | "fuzzy"
+)
+
+@Serializable
+data class SKUResolveResponse(
+    val matches: List<SKUMatch>,
+    val suggestions: List<String> = emptyList()
 )

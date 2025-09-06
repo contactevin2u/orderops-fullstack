@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useRouter } from "next/router";
 import { useTranslation } from "react-i18next";
 import Card from "@/components/Card";
+import UIDTracker from "@/components/UIDTracker";
 import { getOrder, updateOrder, addPayment, voidPayment, voidOrder, markReturned, markBuyback, invoicePrintUrl, orderDue, markSuccess, updateCommission } from "@/lib/api";
 
 export default function OrderDetailPage(){
@@ -583,6 +584,11 @@ export default function OrderDetailPage(){
                 </div>
               )}
             </Card>
+
+            {/* UID Tracking - Show for delivered orders or when POD photos exist */}
+            {(order.status === 'DELIVERED' || order.status === 'SUCCESS' || (order.trip?.pod_photo_urls?.length > 0)) && (
+              <UIDTracker orderId={order.id} orderStatus={order.status} />
+            )}
 
           <div className={`mt-2 ${err ? 'text-red-300' : 'text-green-300'}`} aria-live="polite">{err || msg}</div>
         </div>

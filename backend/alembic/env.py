@@ -18,13 +18,13 @@ def get_url() -> str:
     url = os.getenv("DATABASE_URL", "")
     if not url:
         return url
-    # Coerce to psycopg v3
+    # Coerce to psycopg v3 (PostgreSQL only)
     if url.startswith("postgres://"):
         url = "postgresql+psycopg://" + url[len("postgres://"):]
     elif url.startswith("postgresql://") and "+psycopg" not in url:
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
-    # Enforce TLS (Render DBs expect this)
-    if "sslmode=" not in url:
+    # Enforce TLS (Render DBs expect this, but only for PostgreSQL)
+    if url.startswith("postgresql") and "sslmode=" not in url:
         sep = "&" if "?" in url else "?"
         url = f"{url}{sep}sslmode=require"
     return url

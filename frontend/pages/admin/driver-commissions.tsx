@@ -7,7 +7,9 @@ import {
   markSuccess, 
   updateCommission, 
   listUpsellRecords, 
-  releaseUpsellIncentive 
+  releaseUpsellIncentive,
+  getInventoryConfig,
+  getOrderUIDs
 } from '@/lib/api';
 
 export default function DriverCommissionsPage() {
@@ -339,16 +341,22 @@ export default function DriverCommissionsPage() {
           border: '1px solid #dbeafe'
         }}>
           <h3 style={{ fontWeight: 500, color: '#1e40af', marginBottom: 'var(--space-2)' }}>
-            💡 Updated Commission Verification Process
+            💡 Enhanced Commission Verification Process
           </h3>
           <div className="stack" style={{ fontSize: '0.875rem', color: '#1e40af' }}>
             <p><strong>1. POD Available & Correct</strong> - Verify delivery proof photos are uploaded and valid</p>
             <p><strong>2. Order Delivered</strong> - Confirm order status is DELIVERED</p>
             <p><strong>3. Initial Payment Collected</strong> - Ensure customer payment was received</p>
-            <p><strong>4. Check for Upsells</strong> - Review any additional items sold (affects commission)</p>
-            <p><strong>5. Enter Commission & Release</strong> - Set amount and release payment to driver</p>
+            {inventoryConfigQuery.data?.uid_inventory_enabled && inventoryConfigQuery.data?.uid_scan_required_after_pod && (
+              <p><strong>4. UID Scanning Complete</strong> - Verify driver scanned required UIDs for inventory tracking</p>
+            )}
+            <p><strong>{inventoryConfigQuery.data?.uid_inventory_enabled && inventoryConfigQuery.data?.uid_scan_required_after_pod ? '5' : '4'}. Check for Upsells</strong> - Review any additional items sold (affects commission)</p>
+            <p><strong>{inventoryConfigQuery.data?.uid_inventory_enabled && inventoryConfigQuery.data?.uid_scan_required_after_pod ? '6' : '5'}. Enter Commission & Release</strong> - Set amount and release payment to driver</p>
             <p style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2)', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-1)' }}>
               <strong>Note:</strong> All verification steps must be completed before commission can be released. 
+              {inventoryConfigQuery.data?.uid_inventory_enabled && (
+                <span> UID inventory tracking is now integrated for enhanced delivery verification.</span>
+              )}
               Commission is released immediately when entered (if all conditions are met).
             </p>
           </div>
@@ -376,7 +384,20 @@ function OrderCard({
   readOnly?: boolean;
 }) {
   const [showPodPhotos, setShowPodPhotos] = React.useState(false);
+  const [showUidDetails, setShowUidDetails] = React.useState(false);
   const [commissionAmount, setCommissionAmount] = React.useState('');
+  
+  // Fetch inventory config and UID data
+  const inventoryConfigQuery = useQuery({
+    queryKey: ['inventory-config'],
+    queryFn: getInventoryConfig,
+  });
+  
+  const orderUidsQuery = useQuery({
+    queryKey: ['order-uids', order.id],
+    queryFn: () => getOrderUIDs(order.id),
+    enabled: inventoryConfigQuery.data?.uid_inventory_enabled === true,
+  });
   
   const trip = order.trip || {};
   const currentCommission = trip.commission?.computed_amount || order.commission || 0;
@@ -387,8 +408,17 @@ function OrderCard({
   const hasUpsells = (order.upsell_amount || 0) > 0; // Check for upsells
   const isReleased = trip.commission?.actualized_at; // Check if already released
   
-  // Full verification requires all 4 steps
-  const canRelease = isDelivered && hasPodPhoto && paymentCollected && currentCommission > 0 && !isReleased;
+  // UID verification (if inventory system enabled)
+  const inventoryEnabled = inventoryConfigQuery.data?.uid_inventory_enabled === true;
+  const uidData = orderUidsQuery.data;
+  const hasUidScans = inventoryEnabled && uidData && uidData.uids && uidData.uids.length > 0;
+  const uidScanRequired = inventoryEnabled && inventoryConfigQuery.data?.uid_scan_required_after_pod === true;
+  
+  // Enhanced verification includes UID scanning if required
+  const uidVerificationPassed = !uidScanRequired || hasUidScans;
+  
+  // Full verification requires all steps (with UID if enabled and required)
+  const canRelease = isDelivered && hasPodPhoto && paymentCollected && currentCommission > 0 && !isReleased && uidVerificationPassed;
   
   // Initialize commission amount from current commission
   React.useEffect(() => {
@@ -442,6 +472,22 @@ function OrderCard({
                 }}
               >
                 📸 {showPodPhotos ? 'Hide' : 'View'} POD ({podPhotos.length})
+              </button>
+            )}
+            {inventoryEnabled && hasUidScans && (
+              <button
+                onClick={() => setShowUidDetails(!showUidDetails)}
+                style={{ 
+                  padding: '0.125rem 0.5rem', 
+                  borderRadius: 'var(--radius-1)',
+                  background: '#dbeafe',
+                  color: '#1d4ed8',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                🏷️ {showUidDetails ? 'Hide' : 'View'} UIDs ({uidData?.uids?.length || 0})
               </button>
             )}
           </div>
@@ -537,8 +583,13 @@ function OrderCard({
             <span style={{ color: paymentCollected ? '#15803d' : '#dc2626' }}>
               {paymentCollected ? '✅' : '❌'} 3. Initial Payment Collected
             </span>
+            {inventoryEnabled && uidScanRequired && (
+              <span style={{ color: hasUidScans ? '#15803d' : '#dc2626' }}>
+                {hasUidScans ? '✅' : '❌'} 4. UID Scanning Complete
+              </span>
+            )}
             <span style={{ color: hasUpsells ? '#f59e0b' : '#6b7280' }}>
-              {hasUpsells ? '💰' : '➖'} 4. Upsells: {hasUpsells ? `RM ${(order.upsell_amount || 0).toFixed(2)}` : 'None'}
+              {hasUpsells ? '💰' : '➖'} {inventoryEnabled && uidScanRequired ? '5' : '4'}. Upsells: {hasUpsells ? `RM ${(order.upsell_amount || 0).toFixed(2)}` : 'None'}
             </span>
           </div>
         </div>
@@ -555,6 +606,11 @@ function OrderCard({
         <span style={{ color: paymentCollected ? '#15803d' : '#dc2626' }}>
           {paymentCollected ? '✅' : '❌'} Payment Collected
         </span>
+        {inventoryEnabled && uidScanRequired && (
+          <span style={{ color: hasUidScans ? '#15803d' : '#dc2626' }}>
+            {hasUidScans ? '✅' : '❌'} UID Scanned
+          </span>
+        )}
         <span style={{ color: currentCommission > 0 ? '#15803d' : '#6b7280' }}>
           {currentCommission > 0 ? '✅' : '⏳'} Commission Set
         </span>
@@ -603,6 +659,53 @@ function OrderCard({
           </div>
           <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 'var(--space-2)' }}>
             Click on any photo to view full size
+          </p>
+        </div>
+      )}
+
+      {showUidDetails && inventoryEnabled && uidData && uidData.uids && uidData.uids.length > 0 && (
+        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: '#f8fafc', borderRadius: 'var(--radius-2)' }}>
+          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
+            UID Scan History
+          </h4>
+          <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.875rem', color: '#6b7280' }}>
+            Total: {uidData.uids.length} scans • 
+            Load-outs: {uidData.load_out || 0} • 
+            Deliveries: {uidData.deliver || 0} • 
+            Returns: {uidData.return || 0}
+          </div>
+          <div className="stack" style={{ gap: 'var(--space-2)' }}>
+            {uidData.uids.map((uid: any, index: number) => (
+              <div key={index} style={{
+                padding: 'var(--space-2)',
+                background: 'white',
+                borderRadius: 'var(--radius-1)',
+                border: '1px solid #e5e7eb',
+                fontSize: '0.75rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-1)' }}>
+                  <strong style={{ fontFamily: 'monospace' }}>{uid.uid}</strong>
+                  <span style={{
+                    padding: '0.125rem 0.375rem',
+                    borderRadius: 'var(--radius-1)',
+                    fontSize: '0.625rem',
+                    fontWeight: 600,
+                    background: uid.action === 'DELIVER' ? '#dcfce7' : uid.action === 'LOAD_OUT' ? '#dbeafe' : '#fef3c7',
+                    color: uid.action === 'DELIVER' ? '#15803d' : uid.action === 'LOAD_OUT' ? '#1d4ed8' : '#d97706'
+                  }}>
+                    {uid.action}
+                  </span>
+                </div>
+                <div style={{ color: '#6b7280' }}>
+                  {uid.sku_name && <div>{uid.sku_name}</div>}
+                  <div>{uid.driver_name} • {new Date(uid.scanned_at).toLocaleString()}</div>
+                  {uid.notes && <div style={{ fontStyle: 'italic' }}>{uid.notes}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 'var(--space-2)' }}>
+            UID scanning provides detailed inventory tracking for enhanced delivery verification
           </p>
         </div>
       )}

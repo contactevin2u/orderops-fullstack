@@ -9,7 +9,7 @@ import datetime as dt
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
@@ -20,6 +20,8 @@ from ..schemas import (
 )
 from ..utils.storage import save_pod_image
 from ..reports.outstanding import compute_balance
+from ..core.config import settings
+from ..utils.responses import envelope
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -669,3 +671,74 @@ def driver_commissions(driver_id: int, db: Session = Depends(get_session)):
         {"month": row.month, "total": float(row.total or 0)}
         for row in rows
     ]
+
+
+@router.get("/{driver_id}/lorry-stock/{date}", response_model=dict)
+def get_lorry_stock(
+    driver_id: int,
+    date: str,  # YYYY-MM-DD format
+    db: Session = Depends(get_session),
+    current_user=Depends(driver_auth)
+):
+    """Get lorry stock for driver on specific date - integrates with enhanced UID inventory system"""
+    if not settings.UID_INVENTORY_ENABLED:
+        return envelope({
+            "date": date,
+            "driver_id": driver_id,
+            "items": [],
+            "total_expected": 0,
+            "total_scanned": 0,
+            "total_variance": 0
+        })
+    
+    try:
+        # Parse date
+        target_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    # Get stock records with SKU details
+    stock_records = db.execute(
+        select(LorryStock, SKU)
+        .join(SKU, LorryStock.sku_id == SKU.id)
+        .where(
+            and_(
+                LorryStock.driver_id == driver_id,
+                LorryStock.as_of_date == target_date
+            )
+        )
+        .order_by(SKU.code)
+    ).all()
+    
+    items = []
+    total_expected = 0
+    total_scanned = 0
+    total_variance = 0
+    
+    for stock, sku in stock_records:
+        # For compatibility, map the enhanced backend format to driver app format
+        # In the enhanced system, we calculate expected vs counted
+        expected_count = 0  # Would be calculated from previous day + transactions
+        scanned_count = stock.qty_counted
+        variance = scanned_count - expected_count
+        
+        items.append({
+            "sku_id": sku.id,
+            "sku_name": sku.name,
+            "expected_count": expected_count,
+            "scanned_count": scanned_count,
+            "variance": variance
+        })
+        
+        total_expected += expected_count
+        total_scanned += scanned_count
+        total_variance += variance
+    
+    return envelope({
+        "date": date,
+        "driver_id": driver_id,
+        "items": items,
+        "total_expected": total_expected,
+        "total_scanned": total_scanned,
+        "total_variance": total_variance
+    })

@@ -16,6 +16,11 @@ from .driver_schedule import DriverSchedule, DriverAvailabilityPattern
 from .user import User, Role
 from .audit_log import AuditLog
 from .upsell_record import UpsellRecord
+from .sku import SKU
+from .item import Item
+from .order_item_uid import OrderItemUID
+from .lorry_stock import LorryStock
+from .sku_alias import SKUAlias
 
 __all__ = [
     "Base",
@@ -40,4 +45,9 @@ __all__ = [
     "Role",
     "AuditLog",
     "UpsellRecord",
+    "SKU",
+    "Item",
+    "OrderItemUID",
+    "LorryStock",
+    "SKUAlias",
 ]

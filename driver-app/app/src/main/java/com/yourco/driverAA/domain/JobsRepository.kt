@@ -11,6 +11,12 @@ import com.yourco.driverAA.data.api.OrderDto
 import com.yourco.driverAA.data.api.UpsellRequest
 import com.yourco.driverAA.data.api.UpsellResponse
 import com.yourco.driverAA.data.api.ApiResponse
+import com.yourco.driverAA.data.api.InventoryConfigResponse
+import com.yourco.driverAA.data.api.UIDScanRequest
+import com.yourco.driverAA.data.api.UIDScanResponse
+import com.yourco.driverAA.data.api.LorryStockResponse
+import com.yourco.driverAA.data.api.SKUResolveRequest
+import com.yourco.driverAA.data.api.SKUResolveResponse
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -87,5 +93,34 @@ class JobsRepository @Inject constructor(
         Result.Success(response.data)
     } catch (e: Exception) {
         Result.error(e, "submit_report")
+    }
+    
+    // UID Inventory methods
+    suspend fun getInventoryConfig(): Result<InventoryConfigResponse> = try {
+        val config = api.getInventoryConfig()
+        Result.Success(config)
+    } catch (e: Exception) {
+        Result.error(e, "load_config")
+    }
+    
+    suspend fun scanUID(request: UIDScanRequest): Result<UIDScanResponse> = try {
+        val response = api.scanUID(request)
+        Result.Success(response)
+    } catch (e: Exception) {
+        Result.error(e, "uid_scan")
+    }
+    
+    suspend fun getLorryStock(date: String): Result<LorryStockResponse> = try {
+        val stock = api.getLorryStock(date)
+        Result.Success(stock)
+    } catch (e: Exception) {
+        Result.error(e, "load_stock")
+    }
+    
+    suspend fun resolveSKU(request: SKUResolveRequest): Result<SKUResolveResponse> = try {
+        val response = api.resolveSKU(request)
+        Result.Success(response)
+    } catch (e: Exception) {
+        Result.error(e, "resolve_sku")
     }
 }

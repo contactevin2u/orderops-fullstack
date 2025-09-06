@@ -536,3 +536,99 @@ export function setDailySchedule(data: {
 }) {
   return request<any>('/driver-schedule/daily-override', { json: data });
 }
+
+// -------- UID Inventory
+export function getInventoryConfig() {
+  return request<{
+    uid_inventory_enabled: boolean;
+    uid_scan_required_after_pod: boolean;
+    inventory_mode: string;
+  }>('/inventory/config');
+}
+
+export function scanUID(data: {
+  order_id: number;
+  action: 'ISSUE' | 'RETURN';
+  uid: string;
+  sku_id?: number;
+  notes?: string;
+}) {
+  return request<{
+    success: boolean;
+    message: string;
+    uid: string;
+    action: string;
+    sku_name?: string;
+    order_item_id?: number;
+  }>('/inventory/uid/scan', { json: data });
+}
+
+export function getLorryStock(driverId: number, date: string) {
+  return request<{
+    date: string;
+    driver_id: number;
+    items: Array<{
+      sku_id: number;
+      sku_name: string;
+      expected_count: number;
+      scanned_count?: number;
+      variance?: number;
+    }>;
+    total_expected: number;
+    total_scanned?: number;
+    total_variance?: number;
+  }>(`/drivers/${driverId}/lorry-stock/${date}`);
+}
+
+export function uploadLorryStock(data: {
+  date: string;
+  stock_data: Array<{
+    sku_id: number;
+    counted_quantity: number;
+  }>;
+}) {
+  return request<{
+    success: boolean;
+    message: string;
+    upload_id: number;
+    items_processed: number;
+  }>('/inventory/lorry-stock/upload', { json: data });
+}
+
+export function resolveSKU(name: string, threshold = 0.8) {
+  return request<{
+    matches: Array<{
+      sku_id: number;
+      sku_name: string;
+      confidence: number;
+      match_type: 'exact' | 'alias' | 'fuzzy';
+    }>;
+    suggestions: string[];
+  }>('/inventory/sku/resolve', { json: { name, threshold } });
+}
+
+export function addSKUAlias(skuId: number, alias: string) {
+  return request<{
+    success: boolean;
+    message: string;
+    alias_id: number;
+  }>('/inventory/sku/alias', { json: { sku_id: skuId, alias } });
+}
+
+export function getOrderUIDs(orderId: number | string) {
+  return request<{
+    order_id: number;
+    uids: Array<{
+      id: number;
+      uid: string;
+      action: 'ISSUE' | 'RETURN';
+      sku_id?: number;
+      sku_name?: string;
+      scanned_at: string;
+      driver_name?: string;
+      notes?: string;
+    }>;
+    total_issued: number;
+    total_returned: number;
+  }>(`/orders/${orderId}/uids`);
+}

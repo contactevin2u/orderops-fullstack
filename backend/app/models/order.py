@@ -37,3 +37,4 @@ class Order(Base):
     payments = relationship("Payment", cascade="all, delete-orphan")
     parent = relationship("Order", remote_side=[id], backref="adjustments")
     trip = relationship("Trip", back_populates="order", uselist=False)
+    item_uids = relationship("OrderItemUID", back_populates="order")

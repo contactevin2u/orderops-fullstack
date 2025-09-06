@@ -30,6 +30,20 @@ class Settings(BaseSettings):
     # Firebase
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     ADMIN_EMAILS: Optional[str] = None
+    
+    # UID Inventory System
+    UID_INVENTORY_ENABLED: bool = False
+    UID_SCAN_REQUIRED_AFTER_POD: bool = False
+    
+    @property
+    def uid_inventory_mode(self) -> str:
+        """Convenience property for UID inventory mode"""
+        if not self.UID_INVENTORY_ENABLED:
+            return "off"
+        elif self.UID_SCAN_REQUIRED_AFTER_POD:
+            return "required"
+        else:
+            return "optional"
 
     class Config:
         env_file = ".env"

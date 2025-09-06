@@ -6,12 +6,14 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.yourco.driverAA.ui.stock.StockScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -22,8 +24,8 @@ fun MainScreen(
 ) {
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     
-    val tabs = listOf("Active Orders", "Completed Orders", "Commissions", "Clock In/Out")
-    val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star, Icons.Default.AccessTime)
+    val tabs = listOf("Active Orders", "Completed Orders", "Commissions", "Stock", "Clock In/Out")
+    val tabIcons = listOf(Icons.Default.List, Icons.Default.CheckCircle, Icons.Default.Star, Icons.Default.Inventory, Icons.Default.AccessTime)
     
     Column(modifier = Modifier.fillMaxSize()) {
         // Top App Bar with Sign Out button
@@ -57,7 +59,8 @@ fun MainScreen(
             0 -> ActiveOrdersContent(onJobClick = onJobClick)
             1 -> CompletedOrdersContent(onJobClick = onJobClick)
             2 -> CommissionsContent()
-            3 -> ClockInOutContent(onClockInOutClick = onClockInOutClick)
+            3 -> StockContent()
+            4 -> ClockInOutContent(onClockInOutClick = onClockInOutClick)
         }
     }
 }
@@ -75,6 +78,11 @@ private fun CompletedOrdersContent(onJobClick: (String) -> Unit) {
 @Composable
 private fun CommissionsContent() {
     CommissionsList()
+}
+
+@Composable
+private fun StockContent() {
+    StockScreen()
 }
 
 @Composable

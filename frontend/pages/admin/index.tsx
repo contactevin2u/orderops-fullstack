@@ -8,7 +8,8 @@ import {
   Calendar,
   ArrowRight,
   BarChart3,
-  Settings
+  Settings,
+  Package
 } from 'lucide-react';
 import AdminLayout from '@/components/Layout/AdminLayout';
 
@@ -38,6 +39,12 @@ export default function AdminIndexPage() {
       description: 'Manage admin and cashier accounts', 
       href: '/admin/users',
       icon: Users
+    },
+    {
+      title: 'Inventory Management',
+      description: 'Manage UID tracking and stock levels',
+      href: '/admin/inventory',
+      icon: Package
     }
   ];
 

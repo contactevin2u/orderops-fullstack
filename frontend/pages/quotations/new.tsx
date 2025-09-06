@@ -48,7 +48,9 @@ export default function NewQuotationPage() {
     setErr("");
     try {
       const res = await parseQuotationMessage(rawText);
-      const parsed = normalizeParsedForOrder(res) || {};
+      const normalized = normalizeParsedForOrder(res) || {};
+      // Handle both direct and wrapped responses
+      const parsed = normalized.parsed || normalized;
       const customer = parsed.customer || {};
       const order = parsed.order || {};
 
