@@ -92,3 +92,31 @@ fun InfoChip(
         )
     }
 }
+
+@Composable
+fun StatusChip(
+    status: String,
+    modifier: Modifier = Modifier
+) {
+    val (backgroundColor, textColor) = when (status.uppercase()) {
+        "PENDING" -> StatusPending to Color.White
+        "RELEASED" -> StatusCompleted to Color.White
+        "CANCELLED" -> StatusCancelled to Color.White
+        else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(backgroundColor)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = status.uppercase(),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = textColor
+        )
+    }
+}
