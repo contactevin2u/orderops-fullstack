@@ -676,9 +676,8 @@ function OrderCard({
           </h4>
           <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.875rem', color: '#6b7280' }}>
             Total: {uidData.uids.length} scans • 
-            Load-outs: {uidData.load_out || 0} • 
-            Deliveries: {uidData.deliver || 0} • 
-            Returns: {uidData.return || 0}
+            Issued: {uidData.total_issued || 0} • 
+            Returned: {uidData.total_returned || 0}
           </div>
           <div className="stack" style={{ gap: 'var(--space-2)' }}>
             {uidData.uids.map((uid: any, index: number) => (
