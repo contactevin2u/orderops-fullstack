@@ -2,6 +2,7 @@ import {
   listRoutes,
   listOrders,
   addOrdersToRoute,
+  getRouteOrders,
   createRoute as apiCreateRoute,
   updateRoute as apiUpdateRoute,
   listDrivers,
@@ -138,42 +139,14 @@ export async function fetchRouteOrders(
   routeId: string,
   date: string,
 ): Promise<Order[]> {
-  // Fetch orders with proper filtering - use route-specific API if available
-  // For now, use the orders API with date filter and then filter by route
-  const { items } = await listOrders(undefined, undefined, undefined, 500, { date });
-  const targetRouteId = Number(routeId);
+  // Use the dedicated backend endpoint for fetching route orders
+  const orders = await getRouteOrders(Number(routeId));
   
-  return (items || [])
-    .filter((o: any) => {
-      // Debug logging to see what we're filtering
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Filtering order:', o.id, {
-          trip_route_id: o.trip?.route_id,
-          order_route_id: o.route_id,
-          target_route_id: targetRouteId,
-          has_trip: !!o.trip
-        });
-      }
-      
-      // More robust route filtering - check both trip.route_id and routeId fields
-      const tripRouteId = o.trip?.route_id;
-      const orderRouteId = o.route_id;
-      
-      // Handle both string and number comparisons
-      const matches = (
-        tripRouteId === targetRouteId || 
-        tripRouteId === String(targetRouteId) ||
-        orderRouteId === targetRouteId || 
-        orderRouteId === String(targetRouteId)
-      );
-      
-      if (process.env.NODE_ENV === 'development' && matches) {
-        console.log('Found matching order for route:', o.id, 'route:', targetRouteId);
-      }
-      
-      return matches;
-    })
-    .map(mapOrder);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`Fetched ${orders.length} orders for route ${routeId}:`, orders);
+  }
+  
+  return (orders || []).map(mapOrder);
 }
 
 export async function createRoute(payload: {

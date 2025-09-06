@@ -453,7 +453,11 @@ export function listRoutes(date?: string) {
 }
 
 export function addOrdersToRoute(routeId: number, orderIds: number[]) {
-  return request<any>(`/routes/${routeId}/orders`, { json: { order_ids: orderIds } });
+  return request<any>(`/routes/${routeId}/orders`, { method: 'POST', json: { order_ids: orderIds } });
+}
+
+export function getRouteOrders(routeId: number) {
+  return request<any[]>(`/routes/${routeId}/orders`);
 }
 
 export function createDriver(payload: {

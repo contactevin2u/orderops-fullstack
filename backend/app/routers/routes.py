@@ -119,6 +119,53 @@ def list_routes(date: str | None = None, db: Session = Depends(get_session)):
     return result
 
 
+@router.get("/{route_id}/orders", response_model=list[dict])
+def get_route_orders(route_id: int, db: Session = Depends(get_session)):
+    """Get all orders/trips for a specific route"""
+    route = db.get(DriverRoute, route_id)
+    if not route:
+        raise HTTPException(404, "Route not found")
+    
+    # Join Trip with Order and Customer to get complete data including addresses
+    from sqlalchemy.orm import joinedload
+    from ..models import Customer
+    
+    trips = (
+        db.query(Trip)
+        .options(joinedload(Trip.order).joinedload(Order.customer))
+        .filter(Trip.route_id == route_id)
+        .order_by(Trip.id)
+        .all()
+    )
+    
+    orders_data = []
+    for trip in trips:
+        order = trip.order
+        customer = order.customer if order else None
+        
+        # Build order data similar to the main orders endpoint
+        order_data = {
+            "id": order.id if order else None,
+            "code": order.code if order else None,
+            "status": trip.status,
+            "delivery_date": order.delivery_date.isoformat() if order and order.delivery_date else None,
+            "address": order.address if order else None,
+            "customer_name": customer.name if customer else None,
+            "customer_address": customer.address if customer else None,
+            "customer_phone": customer.phone if customer else None,
+            "total": float(order.total) if order and order.total else 0,
+            "trip": {
+                "id": trip.id,
+                "status": trip.status,
+                "route_id": trip.route_id,
+                "driver_id": trip.driver_id,
+                "driver_id_2": trip.driver_id_2
+            }
+        }
+        orders_data.append(order_data)
+    
+    return orders_data
+
 @router.post("/{route_id}/orders", response_model=dict)
 def add_orders_to_route(route_id: int, body: dict, db: Session = Depends(get_session)):
     order_ids: list[int] = body.get("order_ids") or []
