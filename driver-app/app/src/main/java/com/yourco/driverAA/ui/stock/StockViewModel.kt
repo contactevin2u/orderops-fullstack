@@ -48,11 +48,11 @@ class StockViewModel @Inject constructor(
                 }
                 is Result.Error -> {
                     android.util.Log.w("StockViewModel", "Failed to load inventory config: ${result.throwable.message}")
-                    // Don't show error for config loading failure - just assume disabled
+                    // Fallback to enabled defaults for production
                     _inventoryConfig.value = InventoryConfigResponse(
-                        uid_inventory_enabled = false,
-                        uid_scan_required_after_pod = false,
-                        inventory_mode = "off"
+                        uid_inventory_enabled = true,
+                        uid_scan_required_after_pod = true,
+                        inventory_mode = "required"
                     )
                 }
                 is Result.Loading -> {

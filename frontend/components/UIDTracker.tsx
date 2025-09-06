@@ -43,11 +43,11 @@ export default function UIDTracker({ orderId, orderStatus }: UIDTrackerProps) {
       setConfig(configData);
     } catch (e: any) {
       console.error('Failed to load inventory config:', e);
-      // If config loading fails, assume disabled
+      // If config loading fails, assume enabled (fallback to safe defaults)
       setConfig({
-        uid_inventory_enabled: false,
-        uid_scan_required_after_pod: false,
-        inventory_mode: 'off'
+        uid_inventory_enabled: true,
+        uid_scan_required_after_pod: true,
+        inventory_mode: 'required'
       });
     }
   }, []);

@@ -31,9 +31,9 @@ class Settings(BaseSettings):
     FIREBASE_SERVICE_ACCOUNT_JSON: Optional[str] = None
     ADMIN_EMAILS: Optional[str] = None
     
-    # UID Inventory System
-    UID_INVENTORY_ENABLED: bool = False
-    UID_SCAN_REQUIRED_AFTER_POD: bool = False
+    # UID Inventory System - Hard-coded to be enabled across all environments
+    UID_INVENTORY_ENABLED: bool = True
+    UID_SCAN_REQUIRED_AFTER_POD: bool = True
     
     @property
     def uid_inventory_mode(self) -> str:
