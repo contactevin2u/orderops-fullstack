@@ -8,6 +8,7 @@ import com.yourco.driverAA.data.api.DriverApi
 import com.yourco.driverAA.data.auth.AuthService
 import com.yourco.driverAA.data.db.*
 import com.yourco.driverAA.data.network.ConnectivityManager
+import com.yourco.driverAA.data.repository.UserRepository
 import com.yourco.driverAA.data.sync.SyncManager
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.domain.OfflineJobsRepository
