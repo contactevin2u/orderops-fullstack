@@ -26,9 +26,7 @@ export default function UIDStatus({ orderId, orderStatus, compact = false }: UID
       try {
         // First check if inventory is enabled
         const config = await getInventoryConfig();
-        setInventoryEnabled(config.uid_inventory_enabled);
-        
-        if (!config.uid_inventory_enabled) return;
+        setInventoryEnabled(true);
 
         // Only load UID data for delivered orders or orders with POD
         if (orderStatus === 'DELIVERED' || orderStatus === 'SUCCESS') {
@@ -52,8 +50,6 @@ export default function UIDStatus({ orderId, orderStatus, compact = false }: UID
     loadData();
   }, [orderId, orderStatus]);
 
-  // Don't render if inventory is disabled
-  if (inventoryEnabled === false) return null;
   
   // Show loading state only briefly
   if (loading || inventoryEnabled === null) {

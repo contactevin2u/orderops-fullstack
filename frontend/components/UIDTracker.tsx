@@ -53,8 +53,6 @@ export default function UIDTracker({ orderId, orderStatus }: UIDTrackerProps) {
   }, []);
 
   const loadUIDs = React.useCallback(async () => {
-    if (!config?.uid_inventory_enabled) return;
-    
     setLoading(true);
     try {
       const data = await getOrderUIDs(orderId);
@@ -107,18 +105,14 @@ export default function UIDTracker({ orderId, orderStatus }: UIDTrackerProps) {
     }
   };
 
-  // Don't render if inventory system is disabled
-  if (!config || !config.uid_inventory_enabled) {
-    return null;
-  }
 
   return (
     <Card>
       <div className="flex justify-between items-center mb-4">
         <h3 className="m-0">UID Tracking</h3>
         <div className="flex gap-2">
-          <span className={`badge ${config.inventory_mode === 'required' ? 'text-red-600' : 'text-blue-600'}`}>
-            {config.inventory_mode === 'required' ? 'Required' : 'Optional'}
+          <span className={`badge ${config?.inventory_mode === 'required' ? 'text-red-600' : 'text-blue-600'}`}>
+            {config?.inventory_mode === 'required' ? 'Required' : 'Optional'}
           </span>
           <button 
             className="btn secondary text-sm"
@@ -280,7 +274,7 @@ export default function UIDTracker({ orderId, orderStatus }: UIDTrackerProps) {
               <div className="text-4xl mb-2">📦</div>
               <div className="font-medium">No UIDs tracked</div>
               <div className="text-sm">
-                {config.inventory_mode === 'required' 
+                {config?.inventory_mode === 'required' 
                   ? 'UIDs are required for this order but none have been scanned yet.'
                   : 'No UIDs have been scanned for this order yet.'
                 }

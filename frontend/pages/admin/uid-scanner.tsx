@@ -224,22 +224,6 @@ export default function UIDScannerPage() {
     return <Card>Loading UID Scanner...</Card>;
   }
 
-  if (!config?.uid_inventory_enabled) {
-    return (
-      <div>
-        <PageHeader title="UID Scanner" />
-        <Card>
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🚫</div>
-            <h2 className="text-xl font-semibold mb-2">UID System Disabled</h2>
-            <p className="text-gray-600">
-              The UID inventory system is currently disabled. Please contact your administrator.
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div>

@@ -70,12 +70,6 @@ class StockViewModel @Inject constructor(
         val dateString = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
         _selectedDate.value = dateString
         
-        // Don't load stock if inventory is disabled
-        if (_inventoryConfig.value?.uid_inventory_enabled != true) {
-            _lorryStock.value = null
-            _error.value = null
-            return
-        }
         
         viewModelScope.launch {
             _loading.value = true
@@ -108,7 +102,7 @@ class StockViewModel @Inject constructor(
     
     // Helper functions for UI
     fun isInventoryEnabled(): Boolean {
-        return _inventoryConfig.value?.uid_inventory_enabled == true
+        return true
     }
     
     fun getStockSummary(): String {
@@ -131,7 +125,7 @@ class StockViewModel @Inject constructor(
     fun getStockStatus(): StockStatus {
         val stock = _lorryStock.value
         return when {
-            !isInventoryEnabled() -> StockStatus.DISABLED
+            false -> StockStatus.DISABLED
             _loading.value -> StockStatus.LOADING
             _error.value != null -> StockStatus.ERROR
             stock == null -> StockStatus.NO_DATA

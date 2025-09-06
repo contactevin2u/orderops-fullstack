@@ -402,20 +402,19 @@ class JobDetailViewModel @Inject constructor(
     
     // UID Inventory functions
     fun isInventoryEnabled(): Boolean {
-        return _inventoryConfig.value?.uid_inventory_enabled == true
+        return true
     }
     
     fun isUIDScanRequired(): Boolean {
-        return _inventoryConfig.value?.uid_scan_required_after_pod == true
+        return true
     }
     
     fun shouldShowUIDScanAfterPOD(): Boolean {
         val config = _inventoryConfig.value
         val job = _job.value
         
-        // Show UID scanning if inventory is enabled and job is in DELIVERED status
-        return config?.uid_inventory_enabled == true && 
-               job?.status?.uppercase() == "DELIVERED" && 
+        // Show UID scanning if job is in DELIVERED status
+        return job?.status?.uppercase() == "DELIVERED" && 
                _uploadedPhotos.value.isNotEmpty()
     }
     
@@ -479,7 +478,7 @@ class JobDetailViewModel @Inject constructor(
         val scannedCount = _scannedUIDs.value.size
         
         return when {
-            !config.uid_inventory_enabled -> ""
+            false -> ""
             config.uid_scan_required_after_pod -> {
                 if (scannedCount == 0) {
                     "UID diperlukan sebelum selesai"

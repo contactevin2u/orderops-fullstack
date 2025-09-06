@@ -223,22 +223,6 @@ export default function DriverStockPage() {
     return <Card>Loading Driver Stock Management...</Card>;
   }
 
-  if (!config?.uid_inventory_enabled) {
-    return (
-      <div>
-        <PageHeader title="Driver Stock Management" />
-        <Card>
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">🚫</div>
-            <h2 className="text-xl font-semibold mb-2">UID System Disabled</h2>
-            <p className="text-gray-600">
-              The UID inventory system is currently disabled. Please contact your administrator.
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div>

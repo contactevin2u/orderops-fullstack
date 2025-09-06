@@ -48,7 +48,7 @@ export default function InventoryPage() {
   }, []);
 
   const loadStock = React.useCallback(async () => {
-    if (!selectedDriver || !config?.uid_inventory_enabled) return;
+    if (!selectedDriver) return;
 
     setLoading(true);
     setError('');
@@ -104,32 +104,6 @@ export default function InventoryPage() {
     return <Card>Loading inventory configuration...</Card>;
   }
 
-  if (!config.uid_inventory_enabled) {
-    return (
-      <div>
-        <PageHeader title="Inventory Management" />
-        <Card>
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📦</div>
-            <h2 className="text-xl font-semibold mb-2">UID Inventory System Disabled</h2>
-            <p className="text-gray-600 mb-4">
-              The UID inventory tracking system is currently disabled. 
-              To enable it, set the following environment variables:
-            </p>
-            <div className="bg-gray-100 p-4 rounded text-left max-w-md mx-auto">
-              <pre className="text-sm">
-{`UID_INVENTORY_ENABLED=true
-UID_SCAN_REQUIRED_AFTER_POD=true`}
-              </pre>
-            </div>
-            <p className="text-sm text-gray-500 mt-4">
-              Contact your system administrator to enable these features.
-            </p>
-          </div>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div>

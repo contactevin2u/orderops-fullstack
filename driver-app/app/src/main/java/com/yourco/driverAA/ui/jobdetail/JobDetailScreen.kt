@@ -439,9 +439,8 @@ private fun JobDetailContent(
             }
         }
         
-        // Show UID scanning section after POD photos when enabled and order is delivered
-        if (inventoryConfig?.uid_inventory_enabled == true && 
-            job.status?.uppercase() == "DELIVERED" &&
+        // Show UID scanning section after POD photos when order is delivered
+        if (job.status?.uppercase() == "DELIVERED" &&
             uploadedPhotos.isNotEmpty()) {
             item {
                 UIDScanSection(
