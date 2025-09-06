@@ -27,7 +27,7 @@ class Item(Base):
     copy_number = Column(Integer, nullable=True)  # 1 or 2 for NEW items, NULL for RENTAL
     oem_serial = Column(String, nullable=True)
     status = Column(SQLEnum(ItemStatus), nullable=False, default=ItemStatus.WAREHOUSE)
-    current_driver_id = Column(Integer, ForeignKey("driver.id"), nullable=True)
+    current_driver_id = Column(Integer, ForeignKey("drivers.id"), nullable=True)
     created_at = Column(DateTime, nullable=False, default=func.current_timestamp())
     
     # Relationships

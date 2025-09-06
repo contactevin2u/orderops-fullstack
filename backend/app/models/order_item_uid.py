@@ -18,9 +18,9 @@ class OrderItemUID(Base):
     __tablename__ = "order_item_uid"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    order_id = Column(Integer, ForeignKey("order.id"), nullable=False)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False)
     uid = Column(String, ForeignKey("item.uid"), nullable=False)
-    scanned_by = Column(Integer, ForeignKey("driver.id"), nullable=False)
+    scanned_by = Column(Integer, ForeignKey("drivers.id"), nullable=False)
     scanned_at = Column(DateTime, nullable=False, default=func.current_timestamp())
     action = Column(SQLEnum(UIDAction), nullable=False)
     sku_id = Column(Integer, ForeignKey("sku.id"), nullable=True)  # For manual entry
