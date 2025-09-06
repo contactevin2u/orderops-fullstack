@@ -183,7 +183,7 @@ def _openai_quotation_parser(text: str) -> dict:
                                 "line_total": {"type": "number"},
                                 "monthly_amount": {"type": "number"}
                             },
-                            "required": ["name", "item_type", "qty", "unit_price", "line_total"],
+                            "required": ["name", "item_type", "qty", "unit_price", "line_total", "monthly_amount"],
                             "additionalProperties": False
                         }
                     },
