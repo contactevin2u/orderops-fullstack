@@ -328,18 +328,27 @@ UID_SCAN_REQUIRED_AFTER_POD=true`}
         </Card>
       </div>
 
-      {/* Navigation Links */}
+      {/* Inventory Tools */}
       <Card>
-        <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Link href="/orders" className="btn secondary text-center">
-            View Orders with UID Tracking
+        <h3 className="text-lg font-semibold mb-4">Inventory Management Tools</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link href="/admin/uid-generator" className="btn text-center">
+            🏷️ UID Generator
           </Link>
-          <Link href="/admin/drivers" className="btn secondary text-center">
-            Manage Drivers
+          <Link href="/admin/qr-generator" className="btn text-center">
+            📱 QR Code Generator  
+          </Link>
+          <Link href="/admin/sku-management" className="btn text-center">
+            📦 SKU Management
+          </Link>
+          <Link href="/admin/uid-scanner" className="btn text-center">
+            📷 UID Scanner
+          </Link>
+          <Link href="/admin/driver-stock" className="btn text-center">
+            🚚 Driver Stock
           </Link>
           <Link href="/admin" className="btn secondary text-center">
-            Admin Dashboard
+            🏠 Admin Dashboard
           </Link>
         </div>
       </Card>

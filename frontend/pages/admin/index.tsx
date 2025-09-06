@@ -9,7 +9,11 @@ import {
   ArrowRight,
   BarChart3,
   Settings,
-  Package
+  Package,
+  QrCode,
+  ScanLine,
+  Tags,
+  Plus
 } from 'lucide-react';
 import AdminLayout from '@/components/Layout/AdminLayout';
 
@@ -45,6 +49,36 @@ export default function AdminIndexPage() {
       description: 'Manage UID tracking and stock levels',
       href: '/admin/inventory',
       icon: Package
+    },
+    {
+      title: 'UID Generator',
+      description: 'Generate new UIDs with QR codes for inventory items',
+      href: '/admin/uid-generator',
+      icon: Plus
+    },
+    {
+      title: 'QR Code Generator',
+      description: 'Create custom QR codes for various purposes',
+      href: '/admin/qr-generator',
+      icon: QrCode
+    },
+    {
+      title: 'SKU Management',
+      description: 'Manage product catalog and aliases',
+      href: '/admin/sku-management',
+      icon: Tags
+    },
+    {
+      title: 'UID Scanner',
+      description: 'Scan and track UIDs for inventory operations',
+      href: '/admin/uid-scanner',
+      icon: ScanLine
+    },
+    {
+      title: 'Driver Stock Management',
+      description: 'Monitor and manage driver inventory levels',
+      href: '/admin/driver-stock',
+      icon: Truck
     }
   ];
 
