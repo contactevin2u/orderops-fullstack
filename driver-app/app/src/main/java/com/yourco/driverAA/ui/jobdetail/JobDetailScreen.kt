@@ -1003,6 +1003,7 @@ private fun OnHoldDialog(
     onResponse: (customerAvailable: Boolean, deliveryDate: String?) -> Unit
 ) {
     var selectedDate by remember { mutableStateOf("") }
+    var selectedDateLabel by remember { mutableStateOf("") }
     var showDatePicker by remember { mutableStateOf(false) }
     
     AlertDialog(
@@ -1023,14 +1024,14 @@ private fun OnHoldDialog(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
-                if (selectedDate.isNotEmpty()) {
+                if (selectedDateLabel.isNotEmpty()) {
                     Card(
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.primaryContainer
                         )
                     ) {
                         Text(
-                            text = "Selected: $selectedDate",
+                            text = "Selected: $selectedDateLabel",
                             modifier = Modifier.padding(12.dp),
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium
@@ -1111,7 +1112,8 @@ private fun OnHoldDialog(
                     options.forEach { (label, dateValue) ->
                         TextButton(
                             onClick = {
-                                selectedDate = "$label ($dateValue)"
+                                selectedDate = dateValue
+                                selectedDateLabel = label
                                 showDatePicker = false
                             },
                             modifier = Modifier.fillMaxWidth()
