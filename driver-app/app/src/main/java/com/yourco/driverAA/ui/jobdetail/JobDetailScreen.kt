@@ -445,7 +445,7 @@ private fun JobDetailContent(
             item {
                 UIDScanSection(
                     scannedUIDs = scannedUIDs,
-                    isRequired = inventoryConfig.uid_scan_required_after_pod,
+                    isRequired = inventoryConfig?.uid_scan_required_after_pod ?: false,
                     onShowUIDScan = onShowUIDScan
                 )
             }
