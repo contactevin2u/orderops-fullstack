@@ -32,7 +32,7 @@ def upgrade():
     op.execute("UPDATE item SET status = 'WAREHOUSE' WHERE status = 'ACTIVE'")
     
     # Add foreign key constraint for current_driver_id
-    op.create_foreign_key('fk_item_current_driver_id', 'item', 'driver', ['current_driver_id'], ['id'])
+    op.create_foreign_key('fk_item_current_driver_id', 'item', 'drivers', ['current_driver_id'], ['id'])
     
     # Update order_item_uid table to support new actions
     op.add_column('order_item_uid', sa.Column('sku_id', sa.Integer(), nullable=True))

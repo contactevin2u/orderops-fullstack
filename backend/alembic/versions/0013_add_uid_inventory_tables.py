@@ -61,9 +61,9 @@ def upgrade() -> None:
         sa.Column('scanned_by', sa.Integer, nullable=False),
         sa.Column('scanned_at', sa.DateTime, nullable=False, default=sa.func.current_timestamp()),
         sa.Column('action', sa.String, nullable=False),
-        sa.ForeignKeyConstraint(['order_id'], ['order.id']),
+        sa.ForeignKeyConstraint(['order_id'], ['orders.id']),
         sa.ForeignKeyConstraint(['uid'], ['item.uid']),
-        sa.ForeignKeyConstraint(['scanned_by'], ['driver.id']),
+        sa.ForeignKeyConstraint(['scanned_by'], ['drivers.id']),
         sa.CheckConstraint("action IN ('ISSUE', 'RETURN')", name='ck_order_item_uid_action'),
         sa.UniqueConstraint('order_id', 'uid', 'action', name='uq_order_item_uid_order_uid_action'),
         sa.Index('ix_order_item_uid_order_id_action', 'order_id', 'action'),
@@ -80,9 +80,9 @@ def upgrade() -> None:
         sa.Column('uploaded_at', sa.DateTime, nullable=False, default=sa.func.current_timestamp()),
         sa.Column('uploaded_by', sa.Integer, nullable=False),
         sa.PrimaryKeyConstraint('driver_id', 'as_of_date', 'sku_id'),
-        sa.ForeignKeyConstraint(['driver_id'], ['driver.id']),
+        sa.ForeignKeyConstraint(['driver_id'], ['drivers.id']),
         sa.ForeignKeyConstraint(['sku_id'], ['sku.id']),
-        sa.ForeignKeyConstraint(['uploaded_by'], ['driver.id']),
+        sa.ForeignKeyConstraint(['uploaded_by'], ['drivers.id']),
         sa.Index('ix_lorry_stock_driver_date', 'driver_id', 'as_of_date')
     )
     
