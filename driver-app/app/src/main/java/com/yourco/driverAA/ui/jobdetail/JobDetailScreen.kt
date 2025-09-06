@@ -201,6 +201,18 @@ fun JobDetailScreen(
             }
         )
     }
+    
+    // UID Scan dialog
+    if (showUIDScanDialog) {
+        UIDScanDialog(
+            onDismiss = { viewModel.dismissUIDScanDialog() },
+            onScanUID = { uid -> 
+                viewModel.scanUID(uid)
+                viewModel.dismissUIDScanDialog()
+            },
+            isLoading = uidScanLoading
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1370,18 +1382,6 @@ private fun PhotoPreviewDialog(
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
-    }
-    
-    // UID Scan dialog
-    if (showUIDScanDialog) {
-        UIDScanDialog(
-            onDismiss = { viewModel.dismissUIDScanDialog() },
-            onScanUID = { uid -> 
-                viewModel.scanUID(uid)
-                viewModel.dismissUIDScanDialog()
-            },
-            isLoading = uidScanLoading
-        )
     }
 }
 
