@@ -15,7 +15,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '5852c5f76a34'
+revision = '0013_add_uid_inventory_tables'
 down_revision = '20250902_upsell_records'
 branch_labels = None
 depends_on = None
