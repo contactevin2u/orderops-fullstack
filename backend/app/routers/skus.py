@@ -117,7 +117,7 @@ async def create_sku(
         # Log audit action
         await log_action(
             db,
-            user_id=current_user.get("user_id", 0),
+            user_id=current_user.id,
             action="SKU_CREATE",
             resource_type="sku",
             resource_id=sku.id,
@@ -219,7 +219,7 @@ async def update_sku(
         # Log audit action
         await log_action(
             db,
-            user_id=current_user.get("user_id", 0),
+            user_id=current_user.id,
             action="SKU_UPDATE",
             resource_type="sku",
             resource_id=sku.id,
@@ -263,7 +263,7 @@ async def delete_sku(
         # Log audit action
         await log_action(
             db,
-            user_id=current_user.get("user_id", 0),
+            user_id=current_user.id,
             action="SKU_DELETE",
             resource_type="sku",
             resource_id=sku.id,
