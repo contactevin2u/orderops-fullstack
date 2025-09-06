@@ -23,6 +23,9 @@ interface SKU {
   id: number;
   code: string;
   name: string;
+  category?: string;
+  is_serialized: boolean;
+  is_active: boolean;
 }
 
 export default function UIDScannerPage() {

@@ -29,10 +29,10 @@ interface StockItem {
 
 interface LorryStockItem {
   sku_id: number;
-  sku_code: string;
   sku_name: string;
-  qty_counted: number;
-  uploaded_at: string;
+  expected_count: number;
+  scanned_count?: number;
+  variance?: number;
 }
 
 interface StockUploadItem {
@@ -176,7 +176,7 @@ export default function DriverStockPage() {
     
     if (lorryStock) {
       lorryStock.lines.forEach(line => {
-        initialCounts[line.sku_id] = line.qty_counted;
+        initialCounts[line.sku_id] = line.scanned_count || 0;
       });
     }
 
@@ -402,8 +402,8 @@ export default function DriverStockPage() {
                       <thead>
                         <tr>
                           <th>SKU</th>
-                          <th>Count</th>
-                          <th>Uploaded</th>
+                          <th>Counted</th>
+                          <th>Details</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -411,13 +411,17 @@ export default function DriverStockPage() {
                           <tr key={line.sku_id}>
                             <td>
                               <div className="font-medium">{line.sku_name}</div>
-                              <div className="text-xs text-gray-500">{line.sku_code}</div>
                             </td>
                             <td className="text-lg font-bold">
-                              {line.qty_counted}
+                              {line.scanned_count || 0}
                             </td>
                             <td className="text-xs">
-                              {new Date(line.uploaded_at).toLocaleString()}
+                              Expected: {line.expected_count}
+                              {line.variance !== undefined && (
+                                <div className={`font-medium ${line.variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  Variance: {line.variance >= 0 ? '+' : ''}{line.variance}
+                                </div>
+                              )}
                             </td>
                           </tr>
                         ))}
