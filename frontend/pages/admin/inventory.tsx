@@ -133,14 +133,13 @@ UID_SCAN_REQUIRED_AFTER_POD=true`}
 
   return (
     <div>
-      <PageHeader title="Inventory Management">
-        <div className="flex items-center gap-2 text-sm">
-          <span className={`px-2 py-1 rounded ${config.inventory_mode === 'required' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
-            {config.inventory_mode === 'required' ? 'Required' : 'Optional'}
-          </span>
-          <span className="text-gray-500">Mode</span>
-        </div>
-      </PageHeader>
+      <PageHeader title="Inventory Management" />
+      <div className="flex items-center gap-2 text-sm mb-4">
+        <span className={`px-2 py-1 rounded ${config.inventory_mode === 'required' ? 'bg-red-100 text-red-600' : 'bg-blue-100 text-blue-600'}`}>
+          {config.inventory_mode === 'required' ? 'Required' : 'Optional'}
+        </span>
+        <span className="text-gray-500">Mode</span>
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stock Management */}
