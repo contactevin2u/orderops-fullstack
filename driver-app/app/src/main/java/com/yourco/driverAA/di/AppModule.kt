@@ -97,7 +97,15 @@ object AppModule {
     // Repositories
     @Provides
     @Singleton
-    fun provideJobsRepository(api: DriverApi): JobsRepository = JobsRepository(api)
+    fun provideJobsRepository(
+        api: DriverApi,
+        jobsDao: JobsDao,
+        outboxDao: OutboxDao,
+        photosDao: PhotosDao,
+        uidScansDao: UIDScansDao,
+        syncManager: SyncManager,
+        connectivityManager: ConnectivityManager
+    ): JobsRepository = JobsRepository(api, jobsDao, outboxDao, photosDao, uidScansDao, syncManager, connectivityManager)
     
     @Provides
     @Singleton

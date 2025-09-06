@@ -1,25 +1,14 @@
 package com.yourco.driverAA.domain
 
-import com.yourco.driverAA.data.api.DriverApi
-import com.yourco.driverAA.data.api.JobDto
-import com.yourco.driverAA.data.api.OrderStatusUpdateDto
-import com.yourco.driverAA.data.api.PodUploadResponse
-import com.yourco.driverAA.data.api.CommissionMonthDto
-import com.yourco.driverAA.data.api.UpsellIncentivesDto
-import com.yourco.driverAA.data.api.OrderPatchDto
-import com.yourco.driverAA.data.api.OrderDto
-import com.yourco.driverAA.data.api.UpsellRequest
-import com.yourco.driverAA.data.api.UpsellResponse
-import com.yourco.driverAA.data.api.ApiResponse
-import com.yourco.driverAA.data.api.InventoryConfigResponse
-import com.yourco.driverAA.data.api.UIDScanRequest
-import com.yourco.driverAA.data.api.UIDScanResponse
-import com.yourco.driverAA.data.api.LorryStockResponse
-import com.yourco.driverAA.data.api.SKUResolveRequest
-import com.yourco.driverAA.data.api.SKUResolveResponse
+import android.util.Log
+import com.yourco.driverAA.data.api.*
+import com.yourco.driverAA.data.db.*
+import com.yourco.driverAA.data.network.ConnectivityManager
+import com.yourco.driverAA.data.sync.SyncManager
 import com.yourco.driverAA.util.Result
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.*
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -29,30 +18,93 @@ import javax.inject.Singleton
 
 @Singleton
 class JobsRepository @Inject constructor(
-    private val api: DriverApi
+    private val api: DriverApi,
+    private val jobsDao: JobsDao,
+    private val outboxDao: OutboxDao,
+    private val photosDao: PhotosDao,
+    private val uidScansDao: UIDScansDao,
+    private val syncManager: SyncManager,
+    private val connectivityManager: ConnectivityManager
 ) {
-    fun getJobs(statusFilter: String = "active"): Flow<Result<List<JobDto>>> = flow {
-        emit(Result.Loading)
-        try {
-            val jobs = api.getJobs(statusFilter)
-            emit(Result.Success(jobs))
-        } catch (e: Exception) {
-            emit(Result.error<List<JobDto>>(e, "load_jobs"))
+    private val TAG = "JobsRepository"
+    fun getJobs(statusFilter: String = "active"): Flow<Result<List<JobDto>>> {
+        return if (statusFilter == "active") {
+            jobsDao.getActiveJobs()
+        } else {
+            jobsDao.getJobsByStatus(statusFilter)
+        }.map { entities -> 
+            Result.Success(entities.map { it.toDto() }) as Result<List<JobDto>>
+        }.onStart {
+            // Trigger background sync if online
+            if (connectivityManager.isOnline()) {
+                try {
+                    syncManager.syncAll()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Background sync failed", e)
+                }
+            }
+        }.catch { e ->
+            emit(Result.error<List<JobDto>>(e as? Exception ?: Exception(e.message ?: "Unknown error"), "load_jobs"))
         }
     }
     
-    suspend fun getJob(id: String): Result<JobDto> = try {
-        val job = api.getJob(id)
-        Result.Success(job)
-    } catch (e: Exception) {
-        Result.error(e, "load_jobs")
+    suspend fun getJob(id: String): Result<JobDto> {
+        return try {
+            val localJob = jobsDao.getJobById(id)
+            if (localJob != null) {
+                // Return local data immediately
+                Result.Success(localJob.toDto())
+            } else if (connectivityManager.isOnline()) {
+                // Try to fetch from server if online
+                try {
+                    val serverJob = api.getJob(id)
+                    val jobEntity = JobEntity.fromDto(serverJob)
+                    jobsDao.insert(jobEntity)
+                    Result.Success(serverJob)
+                } catch (e: Exception) {
+                    Result.error(e, "load_jobs")
+                }
+            } else {
+                Result.error(Exception("Job not found locally and device is offline"), "load_jobs")
+            }
+        } catch (e: Exception) {
+            Result.error(e, "load_jobs")
+        }
     }
     
-    suspend fun updateOrderStatus(orderId: String, status: String): Result<JobDto> = try {
-        val updatedJob = api.updateOrderStatus(orderId, OrderStatusUpdateDto(status))
-        Result.Success(updatedJob)
-    } catch (e: Exception) {
-        Result.error(e, "update_status")
+    suspend fun updateOrderStatus(orderId: String, status: String): Result<JobDto> {
+        return try {
+            // Update local database immediately
+            jobsDao.updateJobStatus(orderId, status, "PENDING")
+            
+            // Queue for background sync
+            val operation = OutboxEntity(
+                operation = "UPDATE_STATUS",
+                entityId = orderId,
+                payload = Json.encodeToString(OrderStatusUpdateDto(status)),
+                endpoint = "drivers/orders/$orderId",
+                httpMethod = "PATCH",
+                priority = 1 // High priority for status updates
+            )
+            outboxDao.insert(operation)
+            
+            // Try immediate sync if online
+            if (connectivityManager.isOnline()) {
+                try {
+                    syncManager.syncAll()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Immediate sync failed, will retry later", e)
+                }
+            }
+            
+            // Return updated local data
+            val updatedJob = jobsDao.getJobById(orderId)?.toDto()
+                ?: throw Exception("Job not found after update")
+            
+            Result.Success(updatedJob)
+        } catch (e: Exception) {
+            Result.error(e, "update_status")
+        }
     }
     
     suspend fun uploadPodPhoto(orderId: String, photoFile: File, photoNumber: Int = 1): Result<PodUploadResponse> = try {
@@ -69,23 +121,68 @@ class JobsRepository @Inject constructor(
     suspend fun getUpsellIncentives(month: String? = null, status: String? = null): UpsellIncentivesDto = 
         api.getUpsellIncentives(month, status)
     
-    suspend fun getDriverOrders(month: String? = null): List<JobDto> = 
-        api.getDriverOrders(month)
+    suspend fun getDriverOrders(month: String? = null): List<JobDto> {
+        return try {
+            if (connectivityManager.isOnline()) {
+                val serverOrders = api.getDriverOrders(month)
+                // Cache the orders locally
+                val entities = serverOrders.map { JobEntity.fromDto(it) }
+                jobsDao.insertAll(entities)
+                serverOrders
+            } else {
+                // Return local data
+                jobsDao.getAllJobs().first().map { it.toDto() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to get driver orders", e)
+            // Fallback to local data
+            jobsDao.getAllJobs().first().map { it.toDto() }
+        }
+    }
     
-    suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> = try {
-        android.util.Log.i("JobsRepository", "Putting order $orderId on hold with delivery_date: $deliveryDate")
-        
-        // Update the order via PATCH endpoint and extract from envelope
-        val patchResponse = api.patchOrder(orderId, OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate))
-        android.util.Log.i("JobsRepository", "PATCH response: ${patchResponse}")
-        
-        // Convert OrderDto to JobDto by refetching (since they have different structures)
-        val updatedJob = api.getJob(orderId)
-        android.util.Log.i("JobsRepository", "Updated job status: ${updatedJob.status}")
-        
-        Result.Success(updatedJob)
-    } catch (e: Exception) {
-        Result.error(e, "update_status")
+    suspend fun handleOnHoldResponse(orderId: String, deliveryDate: String? = null): Result<JobDto> {
+        return try {
+            Log.i(TAG, "Putting order $orderId on hold with delivery_date: $deliveryDate")
+            
+            // Update local database immediately
+            val currentJob = jobsDao.getJobById(orderId)
+            if (currentJob != null) {
+                val updatedJob = currentJob.copy(
+                    status = "ON_HOLD",
+                    deliveryDate = deliveryDate,
+                    syncStatus = "PENDING",
+                    lastModified = System.currentTimeMillis()
+                )
+                jobsDao.update(updatedJob)
+            }
+            
+            // Queue for sync
+            val operation = OutboxEntity(
+                operation = "UPDATE_STATUS",
+                entityId = orderId,
+                payload = Json.encodeToString(OrderPatchDto(status = "ON_HOLD", delivery_date = deliveryDate)),
+                endpoint = "orders/$orderId/driver-update",
+                httpMethod = "PATCH",
+                priority = 1
+            )
+            outboxDao.insert(operation)
+            
+            // Try immediate sync
+            if (connectivityManager.isOnline()) {
+                try {
+                    syncManager.syncAll()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Immediate sync failed for on-hold", e)
+                }
+            }
+            
+            val updatedJob = jobsDao.getJobById(orderId)?.toDto()
+                ?: throw Exception("Job not found after on-hold update")
+            
+            Result.Success(updatedJob)
+        } catch (e: Exception) {
+            Result.error(e, "update_status")
+        }
     }
     
     suspend fun upsellOrder(orderId: String, request: UpsellRequest): Result<UpsellResponse> = try {
