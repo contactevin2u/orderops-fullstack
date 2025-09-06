@@ -830,7 +830,7 @@ async def generate_uid(
                 item_type=item_type,
                 copy_number=copy_num if copies > 1 else None,
                 oem_serial=request.serial_number,
-                status=ItemStatus.AVAILABLE,
+                status=ItemStatus.WAREHOUSE,
                 created_at=datetime.utcnow()
             )
             items.append(item)
