@@ -231,6 +231,7 @@ export default function DriverCommissionsPage() {
                     }
                     isUpdatingCommission={updateCommissionMutation.isPending}
                     showFullVerification={true}
+                    inventoryConfig={inventoryConfigQuery.data}
                   />
                 ))}
               </div>
@@ -262,6 +263,7 @@ export default function DriverCommissionsPage() {
                         }
                         isUpdatingCommission={updateCommissionMutation.isPending}
                         showFullVerification={true}
+                        inventoryConfig={inventoryConfigQuery.data}
                       />
                     ))}
                   </div>
@@ -289,6 +291,7 @@ export default function DriverCommissionsPage() {
                         }
                         isUpdatingCommission={updateCommissionMutation.isPending}
                         readOnly={true}
+                        inventoryConfig={inventoryConfigQuery.data}
                       />
                     ))}
                   </div>
@@ -378,7 +381,8 @@ function OrderCard({
   onUpdateCommission,
   isUpdatingCommission,
   showFullVerification = false,
-  readOnly = false
+  readOnly = false,
+  inventoryConfig
 }: { 
   order: any; 
   onRelease: () => void;
@@ -387,6 +391,7 @@ function OrderCard({
   isUpdatingCommission: boolean;
   showFullVerification?: boolean;
   readOnly?: boolean;
+  inventoryConfig?: any;
 }) {
   const [showPodPhotos, setShowPodPhotos] = React.useState(false);
   const [showUidDetails, setShowUidDetails] = React.useState(false);
@@ -397,7 +402,7 @@ function OrderCard({
   const orderUidsQuery = useQuery({
     queryKey: ['order-uids', order.id],
     queryFn: () => getOrderUIDs(order.id),
-    enabled: inventoryConfigQuery.data?.uid_inventory_enabled === true,
+    enabled: inventoryConfig?.uid_inventory_enabled === true,
   });
   
   const trip = order.trip || {};
@@ -410,10 +415,10 @@ function OrderCard({
   const isReleased = trip.commission?.actualized_at; // Check if already released
   
   // UID verification (if inventory system enabled)
-  const inventoryEnabled = inventoryConfigQuery.data?.uid_inventory_enabled === true;
+  const inventoryEnabled = inventoryConfig?.uid_inventory_enabled === true;
   const uidData = orderUidsQuery.data;
   const hasUidScans = inventoryEnabled && uidData && uidData.uids && uidData.uids.length > 0;
-  const uidScanRequired = inventoryEnabled && inventoryConfigQuery.data?.uid_scan_required_after_pod === true;
+  const uidScanRequired = inventoryEnabled && inventoryConfig?.uid_scan_required_after_pod === true;
   
   // Enhanced verification includes UID scanning if required
   const uidVerificationPassed = !uidScanRequired || hasUidScans;
