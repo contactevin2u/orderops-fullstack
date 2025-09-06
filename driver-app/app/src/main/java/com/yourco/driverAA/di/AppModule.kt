@@ -104,8 +104,9 @@ object AppModule {
         photosDao: PhotosDao,
         uidScansDao: UIDScansDao,
         syncManager: SyncManager,
-        connectivityManager: ConnectivityManager
-    ): JobsRepository = JobsRepository(api, jobsDao, outboxDao, photosDao, uidScansDao, syncManager, connectivityManager)
+        connectivityManager: ConnectivityManager,
+        userRepository: UserRepository
+    ): JobsRepository = JobsRepository(api, jobsDao, outboxDao, photosDao, uidScansDao, syncManager, connectivityManager, userRepository)
     
     @Provides
     @Singleton
