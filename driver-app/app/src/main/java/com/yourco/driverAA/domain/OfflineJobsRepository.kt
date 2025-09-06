@@ -49,7 +49,7 @@ class OfflineJobsRepository @Inject constructor(
                 }
             }
         }.catch { e ->
-            emit(Result.error<List<JobDto>>(Exception(e), "load_jobs"))
+            emit(Result.error<List<JobDto>>(e as? Exception ?: Exception(e.message ?: "Unknown error"), "load_jobs"))
         }
     }
     
