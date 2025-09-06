@@ -17,10 +17,18 @@ depends_on = None
 
 
 def upgrade():
+    # Create enum type first
+    item_type_enum = postgresql.ENUM('NEW', 'RENTAL', name='itemtype')
+    item_type_enum.create(op.get_bind(), checkfirst=True)
+    
     # Add new columns to item table
     op.add_column('item', sa.Column('item_type', sa.Enum('NEW', 'RENTAL', name='itemtype'), nullable=False, server_default='RENTAL'))
     op.add_column('item', sa.Column('copy_number', sa.Integer(), nullable=True))
     op.add_column('item', sa.Column('current_driver_id', sa.Integer(), nullable=True))
+    
+    # Create itemstatus enum if it doesn't exist (for status column)
+    item_status_enum = postgresql.ENUM('ACTIVE', 'WAREHOUSE', 'WITH_DRIVER', 'DELIVERED', 'RETURNED', 'IN_REPAIR', name='itemstatus')
+    item_status_enum.create(op.get_bind(), checkfirst=True)
     
     # Update item status enum to include new values
     op.execute("ALTER TYPE itemstatus ADD VALUE IF NOT EXISTS 'WITH_DRIVER'")
@@ -85,6 +93,9 @@ def downgrade():
     op.drop_column('item', 'current_driver_id')
     op.drop_column('item', 'copy_number') 
     op.drop_column('item', 'item_type')
+    
+    # Drop the itemtype enum
+    op.execute("DROP TYPE IF EXISTS itemtype")
     
     op.drop_column('order_item_uid', 'notes')
     op.drop_column('order_item_uid', 'sku_name')
