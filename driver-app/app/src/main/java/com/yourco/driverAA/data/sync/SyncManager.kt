@@ -33,8 +33,11 @@ class SyncManager @Inject constructor(
     private var syncJob: Job? = null
     
     suspend fun syncAll(): Boolean {
-        if (!connectivityManager.isOnline()) {
-            Log.d(TAG, "Skipping sync - device is offline")
+        val isOnline = connectivityManager.isOnline()
+        Log.i(TAG, "syncAll() called - ConnectivityManager.isOnline(): $isOnline")
+        
+        if (!isOnline) {
+            Log.w(TAG, "Skipping sync - device is offline according to ConnectivityManager")
             return false
         }
         
@@ -42,15 +45,19 @@ class SyncManager @Inject constructor(
             Log.i(TAG, "Starting full sync...")
             
             // 1. Download latest jobs from server (pull)
+            Log.d(TAG, "Step 1: Syncing jobs from server...")
             syncJobsFromServer()
             
             // 2. Process outbox operations (push)
+            Log.d(TAG, "Step 2: Processing outbox operations...")
             processOutboxOperations()
             
             // 3. Upload pending photos
+            Log.d(TAG, "Step 3: Uploading pending photos...")
             uploadPendingPhotos()
             
             // 4. Sync UID scans
+            Log.d(TAG, "Step 4: Syncing UID scans...")
             syncPendingUIDScans()
             
             Log.i(TAG, "Full sync completed successfully")

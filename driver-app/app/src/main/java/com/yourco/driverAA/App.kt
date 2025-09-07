@@ -9,6 +9,7 @@ import com.google.firebase.appcheck.appCheck
 import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
 import com.google.firebase.initialize
 import com.yourco.driverAA.work.WorkScheduling
+import com.yourco.driverAA.work.SyncWorker
 import com.yourco.driverAA.notifications.Notifications
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
@@ -32,6 +33,16 @@ class App : Application(), Configuration.Provider {
         Log.i("App", "BuildConfig.API_BASE: '${BuildConfig.API_BASE}'")
         Log.i("App", "Package name: ${packageName}")
         Log.i("App", "Build fingerprint: ${android.os.Build.FINGERPRINT}")
+        
+        // Check for internal testing indicators
+        val isInternalTesting = try {
+            packageManager.getInstallerPackageName(packageName) == "com.google.android.feedback"
+        } catch (e: Exception) {
+            false
+        }
+        Log.i("App", "Internal testing mode: $isInternalTesting")
+        Log.i("App", "Install source: ${try { packageManager.getInstallerPackageName(packageName) } catch (e: Exception) { "unknown" }}")
+        
         Log.i("App", "=== END STARTUP DEBUG INFO ===")
         
         if (BuildConfig.DEBUG) {
@@ -51,8 +62,10 @@ class App : Application(), Configuration.Provider {
         
         // Initialize notification channels
         Notifications.createJobsChannel(this)
-        // schedule periodic upload (15m) on app start
-        WorkScheduling.scheduleUpload(this)
+        
+        // Schedule periodic work
+        WorkScheduling.scheduleUpload(this) // Location uploads (15m)
+        SyncWorker.enqueuePeriodicSync(this) // Background sync (15m)
         
         Log.i("App", "App onCreate() completed successfully")
     }
