@@ -79,6 +79,7 @@ export default function AdminDriversPage() {
       name: driver.name || '',
       phone: driver.phone || '',
       base_warehouse: driver.base_warehouse || 'BATU_CAVES',
+      firebase_uid: '', // Not editable in edit mode
     });
     setShowForm(true);
   };
