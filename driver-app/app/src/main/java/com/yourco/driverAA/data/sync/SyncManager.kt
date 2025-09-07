@@ -101,6 +101,7 @@ class SyncManager @Inject constructor(
         
         when (operation.operation) {
             "UPDATE_STATUS" -> executeStatusUpdate(operation)
+            "UPDATE_STATUS_WITH_UIDS" -> executeStatusUpdateWithUIDs(operation)
             "UPSELL_ORDER" -> executeUpsellOrder(operation)
             "UPLOAD_POD" -> executePhotoUpload(operation)
             "SCAN_UID" -> executeUIDScan(operation)
@@ -151,6 +152,41 @@ class SyncManager @Inject constructor(
         // Mark operation as completed
         outboxDao.markCompleted(operation.id)
         Log.d(TAG, "Status update completed for job ${operation.entityId}")
+    }
+    
+    private suspend fun executeStatusUpdateWithUIDs(operation: OutboxEntity) {
+        Log.d(TAG, "Executing integrated status update with UIDs for job ${operation.entityId}")
+        
+        // Decode the integrated payload
+        val update = Json.decodeFromString<OrderStatusUpdateDto>(operation.payload)
+        
+        // Call the existing drivers API endpoint with UID actions
+        val response = api.updateOrderStatus(operation.entityId, update)
+        
+        Log.d(TAG, "Server response for integrated update: $response")
+        
+        // Update local job with server response
+        val jobEntity = JobEntity.fromDto(response).copy(syncStatus = "SYNCED")
+        jobsDao.update(jobEntity)
+        
+        // Update UID scans status if they were successful
+        update.uid_actions?.forEach { uidAction ->
+            uidScansDao.markSynced(operation.entityId, uidAction.uid)
+            Log.d(TAG, "Marked UID ${uidAction.uid} as synced for order ${operation.entityId}")
+        }
+        
+        // Mark operation as completed
+        outboxDao.markCompleted(operation.id)
+        
+        // Log UID processing results if available
+        response.uid_processing?.let { result ->
+            Log.d(TAG, "UID processing results: ${result.success_count}/${result.total_requested} successful")
+            if (result.errors.isNotEmpty()) {
+                Log.w(TAG, "UID processing errors: ${result.errors}")
+            }
+        }
+        
+        Log.d(TAG, "Integrated status update completed for job ${operation.entityId}")
     }
     
     private suspend fun executeUpsellOrder(operation: OutboxEntity) {

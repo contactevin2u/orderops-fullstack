@@ -24,6 +24,32 @@ import java.time.format.DateTimeFormatter
 fun StockScreen(
     viewModel: StockViewModel = hiltViewModel()
 ) {
+    // Check if morning stock verification is needed
+    var showStockVerification by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        // Check if driver needs to complete stock verification
+        viewModel.checkStockVerificationStatus { needsVerification ->
+            showStockVerification = needsVerification
+        }
+    }
+    
+    if (showStockVerification) {
+        com.yourco.driverAA.ui.stockverification.StockVerificationScreen(
+            onNavigateToOrders = { 
+                showStockVerification = false 
+            }
+        )
+    } else {
+        StockContent(viewModel)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StockContent(
+    viewModel: StockViewModel
+) {
     val lorryStock by viewModel.lorryStock.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()

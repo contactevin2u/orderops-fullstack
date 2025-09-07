@@ -202,8 +202,15 @@ class DriverOrderOut(BaseModel):
     items: List[OrderItemOut] = Field(default_factory=list)
 
 
+class UIDActionIn(BaseModel):
+    action: str  # DELIVER|COLLECT|REPAIR|SWAP
+    uid: str
+    sku_id: Optional[int] = None
+    notes: Optional[str] = None
+
 class DriverOrderUpdateIn(BaseModel):
     status: str  # IN_TRANSIT|DELIVERED|ON_HOLD
+    uid_actions: Optional[List[UIDActionIn]] = None  # New optional field
 
 
 class AssignDriverIn(BaseModel):

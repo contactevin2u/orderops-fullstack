@@ -27,6 +27,8 @@ class Driver(Base):
     availability_patterns = relationship("DriverAvailabilityPattern", back_populates="driver")
     scanned_items = relationship("OrderItemUID", back_populates="driver")
     lorry_stocks = relationship("LorryStock", foreign_keys="LorryStock.driver_id", back_populates="driver")
+    lorry_assignments = relationship("LorryAssignment", back_populates="driver")
+    holds = relationship("DriverHold", back_populates="driver")
 
 
 class DriverDevice(Base):

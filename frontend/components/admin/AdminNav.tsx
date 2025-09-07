@@ -9,6 +9,7 @@ export default function AdminNav() {
     { href: '/admin/drivers', label: 'Drivers' },
     { href: '/admin/routes', label: 'Routes' },
     { href: '/admin/assign', label: 'Assign Orders' },
+    { href: '/admin/lorry-management', label: 'Lorry Management' },
     { href: '/admin/driver-commissions', label: 'Commissions' },
     { href: '/admin/users', label: 'Users' },
   ];

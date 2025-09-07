@@ -102,6 +102,16 @@ interface DriverApi {
     
     @POST("orders/simple")
     suspend fun createOrder(@Body request: CreateOrderRequest): OrderDto
+    
+    // Lorry Management endpoints
+    @GET("lorry-management/my-assignment")
+    suspend fun getMyLorryAssignment(@Query("date") date: String? = null): ApiResponse<MyAssignmentResponse>
+    
+    @POST("lorry-management/clock-in-with-stock")
+    suspend fun clockInWithStock(@Body request: ClockInWithStockRequest): ApiResponse<ClockInResponse>
+    
+    @GET("lorry-management/driver-status")
+    suspend fun getDriverStatus(): ApiResponse<DriverStatusResponse>
 }
 
 @Serializable
@@ -109,6 +119,13 @@ data class UserDto(
     val id: Int,
     val username: String,
     val role: String
+)
+
+@Serializable
+data class UIDProcessingResult(
+    val success_count: Int,
+    val total_requested: Int,
+    val errors: List<String> = emptyList()
 )
 
 @Serializable
@@ -126,7 +143,8 @@ data class JobDto(
     val balance: String? = null,
     val type: String? = null, // OUTRIGHT | INSTALLMENT | RENTAL | MIXED
     val items: List<JobItemDto>? = null,
-    val commission: CommissionDto? = null
+    val commission: CommissionDto? = null,
+    val uid_processing: UIDProcessingResult? = null // New field for UID processing results
 )
 
 @Serializable
@@ -150,7 +168,18 @@ data class CommissionDto(
 data class LocationPingDto(val lat: Double, val lng: Double, val accuracy: Float, val speed: Float, val ts: Long)
 
 @Serializable
-data class OrderStatusUpdateDto(val status: String)
+data class UIDActionDto(
+    val action: String, // DELIVER, COLLECT, REPAIR, SWAP
+    val uid: String,
+    val sku_id: Int? = null,
+    val notes: String? = null
+)
+
+@Serializable
+data class OrderStatusUpdateDto(
+    val status: String,
+    val uid_actions: List<UIDActionDto>? = null // New optional field for integrated UID workflow
+)
 
 @Serializable
 data class PodUploadResponse(val url: String, val photo_number: Int)
@@ -535,4 +564,59 @@ data class LorryStockUploadRequest(
     val date: String,
     val items: List<LorryStockUploadItem>,
     val notes: String? = null
+)
+
+// Lorry Management DTOs
+@Serializable
+data class LorryAssignmentResponse(
+    val id: Int,
+    val lorry_id: String,
+    val assignment_date: String,
+    val status: String,
+    val stock_verified: Boolean,
+    val stock_verified_at: String? = null,
+    val shift_id: Int? = null,
+    val notes: String? = null
+)
+
+@Serializable
+data class MyAssignmentResponse(
+    val message: String? = null,
+    val assignment: LorryAssignmentResponse? = null
+)
+
+@Serializable
+data class ClockInWithStockRequest(
+    val lat: Double,
+    val lng: Double,
+    val location_name: String? = null,
+    val scanned_uids: List<String>
+)
+
+@Serializable
+data class ClockInResponse(
+    val shift_id: Int,
+    val clock_in_at: String,
+    val assignment_id: Int,
+    val lorry_id: String,
+    val stock_verification_required: Boolean,
+    val stock_verification_completed: Boolean,
+    val variance_detected: Boolean,
+    val message: String
+)
+
+@Serializable
+data class AssignmentStatus(
+    val has_assignment: Boolean,
+    val stock_verified: Boolean,
+    val lorry_id: String? = null
+)
+
+@Serializable
+data class DriverStatusResponse(
+    val can_access_orders: Boolean,
+    val has_active_holds: Boolean,
+    val hold_reasons: List<String>,
+    val assignment_status: AssignmentStatus,
+    val message: String
 )

@@ -21,6 +21,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.ui.components.OrderJobCard
 import com.yourco.driverAA.ui.components.OrderOpsCard
+import com.yourco.driverAA.ui.jobs.JobsListViewModel
+import com.yourco.driverAA.ui.components.ErrorCard
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -30,15 +32,21 @@ import java.util.Locale
 fun OrdersList(
     statusFilter: String,
     onJobClick: (String) -> Unit,
-    viewModel: OrdersListViewModel = hiltViewModel()
+    viewModel: JobsListViewModel = hiltViewModel()
 ) {
-    val jobs by viewModel.getJobs(statusFilter).collectAsState(initial = emptyList())
+    // Use enhanced JobsListViewModel with driver status checking
+    val jobs by viewModel.jobs.collectAsState()
     val loading by viewModel.loading.collectAsState()
+    val errorMessage by viewModel.errorMessage.collectAsState()
+    val canAccessOrders by viewModel.canAccessOrders.collectAsState()
+    val driverStatus by viewModel.driverStatus.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     var showSearch by remember { mutableStateOf(false) }
 
+    // Check driver status and load jobs
     LaunchedEffect(statusFilter) {
-        viewModel.loadJobs(statusFilter)
+        // The enhanced JobsListViewModel automatically checks driver status first
+        viewModel.refreshDriverStatus()
     }
 
     // Filter and sort jobs
@@ -79,6 +87,58 @@ fun OrdersList(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Driver Status Check for Active Orders
+        if (statusFilter == "active" && !canAccessOrders) {
+            // Show driver status restriction message
+            driverStatus?.let { status ->
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Access Restricted",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = status.message,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                        
+                        if (!status.assignment_status.stock_verified && status.assignment_status.has_assignment) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Please complete stock verification in the Stock tab",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+            }
+            
+            if (errorMessage != null) {
+                ErrorCard(
+                    message = errorMessage!!,
+                    onRetry = { viewModel.refreshDriverStatus() },
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            
+            return@Column // Don't show orders list if access is restricted
+        }
         // Search bar (for completed orders)
         if (statusFilter == "completed") {
             if (showSearch) {

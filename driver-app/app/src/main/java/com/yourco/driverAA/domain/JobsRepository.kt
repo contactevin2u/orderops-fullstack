@@ -127,6 +127,68 @@ class JobsRepository @Inject constructor(
         }
     }
     
+    /**
+     * Update order status with integrated UID actions - new workflow
+     */
+    suspend fun updateOrderStatusWithUIDActions(
+        orderId: String, 
+        status: String, 
+        uidActions: List<UIDActionDto>
+    ): Result<JobDto> {
+        return try {
+            Log.d(TAG, "Updating order $orderId to $status with ${uidActions.size} UID actions")
+            
+            // Update local database immediately
+            jobsDao.updateJobStatus(orderId, status, "PENDING")
+            
+            // Store UID actions locally (for offline support)
+            uidActions.forEach { uidAction ->
+                val uidScan = UIDScanEntity(
+                    orderId = orderId,
+                    uid = uidAction.uid,
+                    action = uidAction.action,
+                    scannedAt = System.currentTimeMillis(),
+                    syncStatus = "PENDING",
+                    notes = uidAction.notes
+                )
+                uidScansDao.insert(uidScan)
+            }
+            
+            // Queue integrated operation for background sync
+            val operation = OutboxEntity(
+                operation = "UPDATE_STATUS_WITH_UIDS",
+                entityId = orderId,
+                payload = Json.encodeToString(OrderStatusUpdateDto(status, uidActions)),
+                endpoint = "drivers/orders/$orderId",
+                httpMethod = "PATCH",
+                priority = 1 // High priority for status updates
+            )
+            outboxDao.insert(operation)
+            
+            Log.d(TAG, "Queued integrated operation for sync")
+            
+            // Try immediate sync if online
+            if (connectivityManager.isOnline()) {
+                try {
+                    Log.d(TAG, "Online - attempting immediate sync for UID actions")
+                    syncManager.syncAll()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Immediate sync failed, will retry later", e)
+                }
+            }
+            
+            // Return updated local data
+            val updatedJob = jobsDao.getJobById(orderId)?.toDto()
+                ?: throw Exception("Job not found after update")
+            
+            Log.d(TAG, "Successfully updated order with UID actions")
+            Result.Success(updatedJob)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to update order status with UID actions", e)
+            Result.error(e, "update_status_with_uids")
+        }
+    }
+    
     suspend fun uploadPodPhoto(orderId: String, photoFile: File, photoNumber: Int = 1): Result<PodUploadResponse> = try {
         val requestBody = photoFile.readBytes().toRequestBody("image/jpeg".toMediaTypeOrNull())
         val part = MultipartBody.Part.createFormData("file", photoFile.name, requestBody)
@@ -240,5 +302,27 @@ class JobsRepository @Inject constructor(
         Result.Success(response)
     } catch (e: Exception) {
         Result.error(e, "resolve_sku")
+    }
+    
+    // Lorry Management methods
+    suspend fun getMyLorryAssignment(date: String? = null): Result<LorryAssignmentResponse?> = try {
+        val response = api.getMyLorryAssignment(date)
+        Result.Success(response.data.assignment)
+    } catch (e: Exception) {
+        Result.error(e, "load_assignment")
+    }
+    
+    suspend fun clockInWithStock(request: ClockInWithStockRequest): Result<ClockInResponse> = try {
+        val response = api.clockInWithStock(request)
+        Result.Success(response.data)
+    } catch (e: Exception) {
+        Result.error(e, "clock_in_stock")
+    }
+    
+    suspend fun getDriverStatus(): Result<DriverStatusResponse> = try {
+        val response = api.getDriverStatus()
+        Result.Success(response.data)
+    } catch (e: Exception) {
+        Result.error(e, "driver_status")
     }
 }

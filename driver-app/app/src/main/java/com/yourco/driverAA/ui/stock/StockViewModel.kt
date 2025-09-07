@@ -100,6 +100,31 @@ class StockViewModel @Inject constructor(
         _error.value = null
     }
     
+    fun checkStockVerificationStatus(callback: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                when (val result = repository.getDriverStatus()) {
+                    is Result.Success -> {
+                        val status = result.data
+                        // If driver cannot access orders due to stock verification, show verification screen
+                        val needsVerification = !status.can_access_orders && 
+                                              status.assignment_status.has_assignment && 
+                                              !status.assignment_status.stock_verified
+                        callback(needsVerification)
+                    }
+                    is Result.Error -> {
+                        callback(false) // On error, show normal stock screen
+                    }
+                    is Result.Loading -> {
+                        // Keep checking
+                    }
+                }
+            } catch (e: Exception) {
+                callback(false) // On exception, show normal stock screen
+            }
+        }
+    }
+    
     // Helper functions for UI
     fun isInventoryEnabled(): Boolean {
         return true

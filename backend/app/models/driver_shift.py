@@ -54,6 +54,7 @@ class DriverShift(Base):
     # Relationships
     driver = relationship("Driver", back_populates="shifts")
     commission_entries = relationship("CommissionEntry", back_populates="shift")
+    lorry_assignment = relationship("LorryAssignment", back_populates="shift")
 
     @property
     def is_active(self) -> bool:

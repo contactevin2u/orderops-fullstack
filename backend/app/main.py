@@ -33,6 +33,7 @@ from .routers import (
     jobs,
     inventory,
     skus,
+    lorry_management,
 )
 from .audit import router as audit_router
 
@@ -74,4 +75,5 @@ app.include_router(admin_master.router)
 app.include_router(jobs.router)
 app.include_router(inventory.router)
 app.include_router(skus.router)
+app.include_router(lorry_management.router)
 app.include_router(audit_router)

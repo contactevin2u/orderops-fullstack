@@ -7,6 +7,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import com.yourco.driverAA.data.api.JobDto
+import com.yourco.driverAA.data.api.DriverStatusResponse
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -30,9 +31,15 @@ class JobsListViewModel @Inject constructor(
     
     private val _showRetryButton = MutableStateFlow(false)
     val showRetryButton: StateFlow<Boolean> = _showRetryButton.asStateFlow()
+    
+    private val _driverStatus = MutableStateFlow<DriverStatusResponse?>(null)
+    val driverStatus: StateFlow<DriverStatusResponse?> = _driverStatus.asStateFlow()
+    
+    private val _canAccessOrders = MutableStateFlow(true)
+    val canAccessOrders: StateFlow<Boolean> = _canAccessOrders.asStateFlow()
 
     init {
-        loadJobs()
+        checkDriverStatusAndLoadJobs()
     }
 
     fun loadJobs() {
@@ -73,5 +80,51 @@ class JobsListViewModel @Inject constructor(
     fun retryLoadJobs() {
         clearError()
         loadJobs()
+    }
+    
+    private fun checkDriverStatusAndLoadJobs() {
+        viewModelScope.launch {
+            _loading.value = true
+            
+            try {
+                when (val statusResult = repo.getDriverStatus()) {
+                    is Result.Success -> {
+                        val status = statusResult.data
+                        _driverStatus.value = status
+                        _canAccessOrders.value = status.can_access_orders
+                        
+                        if (status.can_access_orders) {
+                            // Driver can access orders, proceed with loading jobs
+                            loadJobs()
+                        } else {
+                            // Driver cannot access orders
+                            _loading.value = false
+                            _errorMessage.value = status.message
+                            _showRetryButton.value = false
+                            _jobs.value = emptyList()
+                        }
+                    }
+                    is Result.Error -> {
+                        _loading.value = false
+                        _errorMessage.value = statusResult.userMessage
+                        _showRetryButton.value = statusResult.isRecoverable
+                        _canAccessOrders.value = false
+                        _jobs.value = emptyList()
+                    }
+                    is Result.Loading -> {
+                        // Keep loading state
+                    }
+                }
+            } catch (e: Exception) {
+                _loading.value = false
+                _errorMessage.value = "Failed to check driver status: ${e.message}"
+                _showRetryButton.value = true
+                _canAccessOrders.value = false
+            }
+        }
+    }
+    
+    fun refreshDriverStatus() {
+        checkDriverStatusAndLoadJobs()
     }
 }

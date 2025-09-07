@@ -9,7 +9,7 @@ import datetime as dt
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU, OrderItemUID, Item
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
@@ -17,11 +17,13 @@ from ..schemas import (
     DriverOrderUpdateIn,
     DriverCreateIn,
     CommissionMonthOut,
+    UIDActionIn,
 )
 from ..utils.storage import save_pod_image
 from ..reports.outstanding import compute_balance
 from ..core.config import settings
 from ..utils.responses import envelope
+from ..utils.audit import log_action
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
@@ -385,6 +387,88 @@ def upload_pod_photo(
     return {"url": url, "photo_number": photo_number}
 
 
+def _process_uid_actions(
+    order_id: int, 
+    uid_actions: list[UIDActionIn], 
+    driver_id: int, 
+    db: Session
+) -> tuple[int, list[str]]:
+    """
+    Process UID actions during order completion.
+    Returns (success_count, error_messages).
+    Reuses existing UID validation logic.
+    """
+    if not settings.UID_INVENTORY_ENABLED:
+        return 0, ["UID inventory system disabled"]
+    
+    success_count = 0
+    errors = []
+    
+    for uid_action in uid_actions:
+        try:
+            # Validate UID exists
+            item = db.get(Item, uid_action.uid)
+            if not item:
+                errors.append(f"UID {uid_action.uid} not found in inventory")
+                continue
+            
+            # Check for duplicate scans (idempotent)
+            existing = db.execute(
+                select(OrderItemUID).where(
+                    and_(
+                        OrderItemUID.order_id == order_id,
+                        OrderItemUID.uid == uid_action.uid,
+                        OrderItemUID.action == uid_action.action
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if existing:
+                # Already processed - idempotent behavior
+                success_count += 1
+                continue
+            
+            # Create scan record
+            scan_record = OrderItemUID(
+                order_id=order_id,
+                uid=uid_action.uid,
+                scanned_by=driver_id,
+                action=uid_action.action,
+                scanned_at=datetime.now(timezone.utc),
+                notes=uid_action.notes
+            )
+            db.add(scan_record)
+            success_count += 1
+            
+        except Exception as e:
+            errors.append(f"Failed to process UID {uid_action.uid}: {str(e)}")
+    
+    # Commit UID actions
+    if success_count > 0:
+        try:
+            db.commit()
+            
+            # Log audit action
+            log_action(
+                db, 
+                user_id=driver_id, 
+                action="UID_INTEGRATED_SCAN", 
+                resource_type="order", 
+                resource_id=order_id,
+                details={
+                    "uid_actions": [{"action": ua.action, "uid": ua.uid} for ua in uid_actions],
+                    "success_count": success_count
+                }
+            )
+            
+        except Exception as e:
+            db.rollback()
+            errors.append(f"Database commit failed: {str(e)}")
+            success_count = 0
+    
+    return success_count, errors
+
+
 @router.patch("/orders/{order_id}", response_model=DriverOrderOut)  
 def update_order_status(
     order_id: int,
@@ -447,9 +531,36 @@ def update_order_status(
         pass
     
     db.add(TripEvent(trip_id=trip.id, status=payload.status))
+    
+    # Process UID actions if provided (new integrated feature)
+    uid_success_count = 0
+    uid_errors = []
+    if payload.uid_actions:
+        print(f"DEBUG: Processing {len(payload.uid_actions)} UID actions for order {order_id}")
+        uid_success_count, uid_errors = _process_uid_actions(order_id, payload.uid_actions, driver.id, db)
+        
+        if uid_errors:
+            print(f"DEBUG: UID processing errors: {uid_errors}")
+            # Continue with order completion even if some UIDs failed
+            # This maintains backward compatibility
+        
+        if uid_success_count > 0:
+            print(f"DEBUG: Successfully processed {uid_success_count} UID actions")
+    
     order = db.get(Order, order_id)
     db.commit()
-    return _order_to_driver_out(order, trip.status, trip, driver.id)
+    
+    # Return enhanced response with UID info if processed
+    response = _order_to_driver_out(order, trip.status, trip, driver.id)
+    if payload.uid_actions:
+        # Add UID processing results to response (non-breaking addition)
+        response["uid_processing"] = {
+            "success_count": uid_success_count,
+            "total_requested": len(payload.uid_actions),
+            "errors": uid_errors
+        }
+    
+    return response
 
 
 @router.get("/commissions", response_model=list[CommissionMonthOut])

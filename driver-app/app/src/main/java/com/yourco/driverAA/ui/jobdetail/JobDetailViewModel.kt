@@ -6,9 +6,6 @@ import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.JobItemDto
 import com.yourco.driverAA.data.api.UpsellRequest
 import com.yourco.driverAA.data.api.UpsellItemRequest
-import com.yourco.driverAA.data.api.InventoryConfigResponse
-import com.yourco.driverAA.data.api.UIDScanRequest
-import com.yourco.driverAA.data.api.UIDScanResponse
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.util.Result
 import com.yourco.driverAA.util.OrderStateValidator
@@ -63,18 +60,6 @@ class JobDetailViewModel @Inject constructor(
     private val _successMessage = MutableStateFlow<String?>(null)
     val successMessage: StateFlow<String?> = _successMessage.asStateFlow()
     
-    // UID Inventory state
-    private val _inventoryConfig = MutableStateFlow<InventoryConfigResponse?>(null)
-    val inventoryConfig: StateFlow<InventoryConfigResponse?> = _inventoryConfig.asStateFlow()
-    
-    private val _showUIDScanDialog = MutableStateFlow(false)
-    val showUIDScanDialog: StateFlow<Boolean> = _showUIDScanDialog.asStateFlow()
-    
-    private val _scannedUIDs = MutableStateFlow<List<UIDScanResponse>>(emptyList())
-    val scannedUIDs: StateFlow<List<UIDScanResponse>> = _scannedUIDs.asStateFlow()
-    
-    private val _uidScanLoading = MutableStateFlow(false)
-    val uidScanLoading: StateFlow<Boolean> = _uidScanLoading.asStateFlow()
     
     fun loadJob(jobId: String) {
         viewModelScope.launch {
@@ -84,9 +69,6 @@ class JobDetailViewModel @Inject constructor(
             
             // Load all driver jobs for validation
             loadAllJobs()
-            
-            // Load inventory configuration
-            loadInventoryConfig()
             
             when (val result = repository.getJob(jobId)) {
                 is Result.Success -> {
@@ -122,22 +104,6 @@ class JobDetailViewModel @Inject constructor(
         }
     }
     
-    private fun loadInventoryConfig() {
-        viewModelScope.launch {
-            when (val result = repository.getInventoryConfig()) {
-                is Result.Success -> {
-                    _inventoryConfig.value = result.data
-                }
-                is Result.Error -> {
-                    // Don't show error for background config loading
-                    android.util.Log.w("JobDetailViewModel", "Failed to load inventory config: ${result.throwable.message}")
-                }
-                is Result.Loading -> {
-                    // Loading handled by main job loading
-                }
-            }
-        }
-    }
     
     fun updateStatus(newStatus: String) {
         val currentJob = _job.value ?: return
@@ -172,6 +138,70 @@ class JobDetailViewModel @Inject constructor(
                     _job.value = result.data
                     _successMessage.value = getSuccessMessage(newStatus)
                     _loading.value = false
+                    
+                    // Reload all jobs to update validation state
+                    loadAllJobs()
+                }
+                is Result.Error -> {
+                    _error.value = MalayErrorMessages.getErrorMessage(result.throwable)
+                    _loading.value = false
+                }
+                is Result.Loading -> {
+                    _loading.value = true
+                }
+            }
+        }
+    }
+    
+    /**
+     * Update order status with integrated UID actions - new workflow
+     */
+    fun updateStatusWithUIDActions(newStatus: String, uidActions: List<UIDActionDto>) {
+        val currentJob = _job.value ?: return
+        val allJobsList = _allJobs.value
+        
+        // Same validation as existing updateStatus
+        if (newStatus == "IN_TRANSIT") {
+            val inTransitJobs = allJobsList.filter { it.status == "IN_TRANSIT" && it.id != currentJob.id }
+            if (inTransitJobs.isNotEmpty()) {
+                val inTransitJob = inTransitJobs.first()
+                _error.value = "Anda mempunyai pesanan dalam perjalanan (#${inTransitJob.code}). " +
+                    "Sila selesaikan pesanan tersebut dahulu sebelum memulakan pesanan baru."
+                return
+            }
+        }
+        
+        if (newStatus == "ON_HOLD") {
+            // Show dialog to ask about customer availability
+            _showOnHoldDialog.value = true
+            return
+        }
+        
+        viewModelScope.launch {
+            _loading.value = true
+            _error.value = null
+            _successMessage.value = null
+            
+            when (val result = repository.updateOrderStatusWithUIDActions(currentJob.id, newStatus, uidActions)) {
+                is Result.Success -> {
+                    _job.value = result.data
+                    
+                    // Enhanced success message with UID info
+                    val baseMessage = getSuccessMessage(newStatus)
+                    val uidInfo = if (uidActions.isNotEmpty()) {
+                        " (${uidActions.size} UID diproses)"
+                    } else ""
+                    
+                    _successMessage.value = baseMessage + uidInfo
+                    _loading.value = false
+                    
+                    // Check for UID processing results
+                    result.data.uid_processing?.let { uidResult ->
+                        if (uidResult.errors.isNotEmpty()) {
+                            // Show UID errors as warnings, but don't fail the operation
+                            _error.value = "Beberapa UID gagal diproses: ${uidResult.errors.joinToString(", ")}"
+                        }
+                    }
                     
                     // Reload all jobs to update validation state
                     loadAllJobs()
@@ -400,99 +430,4 @@ class JobDetailViewModel @Inject constructor(
         }
     }
     
-    // UID Inventory functions
-    fun isInventoryEnabled(): Boolean {
-        return true
-    }
-    
-    fun isUIDScanRequired(): Boolean {
-        return true
-    }
-    
-    fun shouldShowUIDScanAfterPOD(): Boolean {
-        val config = _inventoryConfig.value
-        val job = _job.value
-        
-        // Show UID scanning if job is in DELIVERED status
-        return job?.status?.uppercase() == "DELIVERED" && 
-               _uploadedPhotos.value.isNotEmpty()
-    }
-    
-    fun showUIDScanDialog() {
-        _showUIDScanDialog.value = true
-    }
-    
-    fun dismissUIDScanDialog() {
-        _showUIDScanDialog.value = false
-    }
-    
-    fun scanUID(uid: String, skuId: Int? = null, action: String = "ISSUE") {
-        val currentJob = _job.value ?: return
-        
-        viewModelScope.launch {
-            _uidScanLoading.value = true
-            _error.value = null
-            
-            val jobId = try {
-                currentJob.id.toInt()
-            } catch (e: NumberFormatException) {
-                _error.value = "ID pesanan tidak sah"
-                _uidScanLoading.value = false
-                return@launch
-            }
-            
-            val request = UIDScanRequest(
-                order_id = jobId,
-                action = action,
-                uid = uid.trim().uppercase(),
-                sku_id = skuId
-            )
-            
-            when (val result = repository.scanUID(request)) {
-                is Result.Success -> {
-                    // Add to scanned UIDs list
-                    _scannedUIDs.value = _scannedUIDs.value + result.data
-                    _successMessage.value = "UID ${result.data.uid} berjaya direkod"
-                    _uidScanLoading.value = false
-                }
-                is Result.Error -> {
-                    _error.value = "Gagal merekod UID: ${MalayErrorMessages.getErrorMessage(result.throwable)}"
-                    _uidScanLoading.value = false
-                }
-                is Result.Loading -> {
-                    _uidScanLoading.value = true
-                }
-            }
-        }
-    }
-    
-    fun canCompleteDeliveryWithoutUID(): Boolean {
-        val config = _inventoryConfig.value
-        
-        // Can complete if UID scanning is not required, or if not enabled at all
-        return config?.uid_scan_required_after_pod != true
-    }
-    
-    fun getUIDScanStatusMessage(): String {
-        val config = _inventoryConfig.value ?: return ""
-        val scannedCount = _scannedUIDs.value.size
-        
-        return when {
-            false -> ""
-            config.uid_scan_required_after_pod -> {
-                if (scannedCount == 0) {
-                    "UID diperlukan sebelum selesai"
-                } else {
-                    "$scannedCount UID direkod"
-                }
-            }
-            else -> {
-                if (scannedCount == 0) {
-                    "UID pilihan (boleh skip)"
-                } else {
-                    "$scannedCount UID direkod"
-                }
-            }
-        }
-    }
 }

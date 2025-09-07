@@ -131,10 +131,11 @@ fun JobDetailScreen(
     val uploadingPhotos by viewModel.uploadingPhotos.collectAsState()
     val uploadedPhotos by viewModel.uploadedPhotos.collectAsState()
     val uploadedPhotoFiles by viewModel.uploadedPhotoFiles.collectAsState()
-    val inventoryConfig by viewModel.inventoryConfig.collectAsState()
-    val showUIDScanDialog by viewModel.showUIDScanDialog.collectAsState()
-    val scannedUIDs by viewModel.scannedUIDs.collectAsState()
-    val uidScanLoading by viewModel.uidScanLoading.collectAsState()
+    
+    // Local state for UID actions dialog
+    var showUIDActionsDialog by remember { mutableStateOf(false) }
+    var pendingStatus by remember { mutableStateOf<String?>(null) }
+    var uidActions by remember { mutableStateOf<List<com.yourco.driverAA.data.api.UIDActionDto>>(emptyList()) }
 
     LaunchedEffect(jobId) {
         viewModel.loadJob(jobId)
@@ -172,10 +173,7 @@ fun JobDetailScreen(
                     onUpsellItem = viewModel::showUpsellDialog,
                     uploadingPhotos = uploadingPhotos,
                     uploadedPhotos = uploadedPhotos,
-                    uploadedPhotoFiles = uploadedPhotoFiles,
-                    inventoryConfig = inventoryConfig,
-                    scannedUIDs = scannedUIDs,
-                    onShowUIDScan = viewModel::showUIDScanDialog
+                    uploadedPhotoFiles = uploadedPhotoFiles
                 )
             }
         }
@@ -202,15 +200,28 @@ fun JobDetailScreen(
         )
     }
     
-    // UID Scan dialog
-    if (showUIDScanDialog) {
-        UIDScanDialog(
-            onDismiss = { viewModel.dismissUIDScanDialog() },
-            onScanUID = { uid -> 
-                viewModel.scanUID(uid)
-                viewModel.dismissUIDScanDialog()
+    // UID Actions dialog - integrated into delivery flow
+    if (showUIDActionsDialog && pendingStatus != null) {
+        UIDActionsDialog(
+            onDismiss = { 
+                showUIDActionsDialog = false
+                pendingStatus = null
+                uidActions = emptyList()
             },
-            isLoading = uidScanLoading
+            onConfirm = { actions ->
+                showUIDActionsDialog = false
+                if (actions.isNotEmpty()) {
+                    // Use new integrated API
+                    viewModel.updateStatusWithUIDActions(pendingStatus!!, actions)
+                } else {
+                    // Fallback to old API if no UID actions
+                    viewModel.updateStatus(pendingStatus!!)
+                }
+                pendingStatus = null
+                uidActions = emptyList()
+            },
+            currentUIDActions = uidActions,
+            onUpdateUIDActions = { uidActions = it }
         )
     }
 }
@@ -225,10 +236,7 @@ private fun JobDetailContent(
     onUpsellItem: ((JobItemDto) -> Unit)? = null,
     uploadingPhotos: Set<Int> = emptySet(),
     uploadedPhotos: Set<Int> = emptySet(),
-    uploadedPhotoFiles: Map<Int, File> = emptyMap(),
-    inventoryConfig: com.yourco.driverAA.data.api.InventoryConfigResponse? = null,
-    scannedUIDs: List<com.yourco.driverAA.data.api.UIDScanResponse> = emptyList(),
-    onShowUIDScan: () -> Unit = {}
+    uploadedPhotoFiles: Map<Int, File> = emptyMap()
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -439,17 +447,7 @@ private fun JobDetailContent(
             }
         }
         
-        // Show UID scanning section after POD photos when order is delivered
-        if (job.status?.uppercase() == "DELIVERED" &&
-            uploadedPhotos.isNotEmpty()) {
-            item {
-                UIDScanSection(
-                    scannedUIDs = scannedUIDs,
-                    isRequired = inventoryConfig?.uid_scan_required_after_pod ?: false,
-                    onShowUIDScan = onShowUIDScan
-                )
-            }
-        }
+        // UID scanning section removed - will be integrated into delivery flow
 
         item {
             // Status Action Buttons
@@ -608,7 +606,11 @@ private fun StatusActionButtons(
                             Text("Hold")
                         }
                         Button(
-                            onClick = { onStatusUpdate("DELIVERED") },
+                            onClick = { 
+                                // Show UID actions dialog before completing
+                                pendingStatus = "DELIVERED"
+                                showUIDActionsDialog = true
+                            },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiary
@@ -1386,216 +1388,171 @@ private fun PhotoPreviewDialog(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UIDScanSection(
-    scannedUIDs: List<com.yourco.driverAA.data.api.UIDScanResponse>,
-    isRequired: Boolean,
-    onShowUIDScan: () -> Unit
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "UID Tracking",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                if (isRequired) {
-                    AssistChip(
-                        onClick = { },
-                        label = { 
-                            Text(
-                                text = "DIPERLUKAN",
-                                style = MaterialTheme.typography.labelSmall
-                            ) 
-                        },
-                        colors = AssistChipDefaults.assistChipColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            labelColor = MaterialTheme.colorScheme.onErrorContainer
-                        )
-                    )
-                } else {
-                    AssistChip(
-                        onClick = { },
-                        label = { 
-                            Text(
-                                text = "PILIHAN",
-                                style = MaterialTheme.typography.labelSmall
-                            ) 
-                        }
-                    )
-                }
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Text(
-                text = if (isRequired) {
-                    "Sila imbas UID barang yang dihantar. UID diperlukan untuk melengkapkan pesanan ini."
-                } else {
-                    "Sila imbas UID barang yang dihantar untuk tujuan inventori (pilihan)."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            
-            // Show scanned UIDs
-            if (scannedUIDs.isNotEmpty()) {
-                Text(
-                    text = "UID Diimbas (${scannedUIDs.size})",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-                
-                scannedUIDs.forEach { scanned ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = scanned.uid,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontWeight = FontWeight.Medium
-                                )
-                                scanned.sku_name?.let { name ->
-                                    Text(
-                                        text = name,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                            Icon(
-                                Icons.Default.CheckCircle,
-                                contentDescription = "Scanned",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-            
-            // Scan button
-            Button(
-                onClick = onShowUIDScan,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRequired && scannedUIDs.isEmpty()) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.secondary
-                    }
-                )
-            ) {
-                Icon(Icons.Default.Add, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Imbas UID")
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun UIDScanDialog(
+private fun UIDActionsDialog(
     onDismiss: () -> Unit,
-    onScanUID: (String) -> Unit,
-    isLoading: Boolean = false
+    onConfirm: (List<com.yourco.driverAA.data.api.UIDActionDto>) -> Unit,
+    currentUIDActions: List<com.yourco.driverAA.data.api.UIDActionDto>,
+    onUpdateUIDActions: (List<com.yourco.driverAA.data.api.UIDActionDto>) -> Unit
 ) {
+    var selectedActionType by remember { mutableStateOf("DELIVER") }
     var uidText by remember { mutableStateOf("") }
+    
+    val actionTypes = listOf(
+        "DELIVER" to "Deliver to Customer",
+        "COLLECT" to "Collect from Customer", 
+        "REPAIR" to "Take for Repair",
+        "SWAP" to "Exchange Item"
+    )
     
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Imbas UID",
+                text = "UID Actions for Delivery",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
-            Column(
+            LazyColumn(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text(
-                    text = "Masukkan atau imbas UID barang yang dihantar:",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                item {
+                    Text(
+                        text = "Select action type and scan UIDs. This replaces the old post-delivery UID entry.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 
-                OutlinedTextField(
-                    value = uidText,
-                    onValueChange = { uidText = it },
-                    label = { Text("UID") },
-                    placeholder = { Text("cth: AA123456789") },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    enabled = !isLoading
-                )
+                // Action Type Selection
+                item {
+                    Text(
+                        text = "Action Type:",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(actionTypes) { (type, label) ->
+                            FilterChip(
+                                onClick = { selectedActionType = type },
+                                label = { Text(label) },
+                                selected = selectedActionType == type
+                            )
+                        }
+                    }
+                }
                 
-                if (isLoading) {
+                // UID Input
+                item {
+                    Text(
+                        text = "Scan or Enter UID:",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Medium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            strokeWidth = 2.dp
+                        OutlinedTextField(
+                            value = uidText,
+                            onValueChange = { uidText = it },
+                            label = { Text("UID") },
+                            placeholder = { Text("AA123456789") },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        
+                        Button(
+                            onClick = {
+                                if (uidText.isNotBlank()) {
+                                    val newAction = com.yourco.driverAA.data.api.UIDActionDto(
+                                        action = selectedActionType,
+                                        uid = uidText.trim().uppercase()
+                                    )
+                                    onUpdateUIDActions(currentUIDActions + newAction)
+                                    uidText = ""
+                                }
+                            },
+                            enabled = uidText.isNotBlank()
+                        ) {
+                            Text("Add")
+                        }
+                    }
+                }
+                
+                // Current UID Actions List
+                if (currentUIDActions.isNotEmpty()) {
+                    item {
                         Text(
-                            text = "Memproses...",
-                            style = MaterialTheme.typography.bodySmall
+                            text = "UID Actions (${currentUIDActions.size}):",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Medium
                         )
+                    }
+                    
+                    items(currentUIDActions) { uidAction ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = uidAction.uid,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = uidAction.action,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                
+                                IconButton(
+                                    onClick = {
+                                        onUpdateUIDActions(currentUIDActions - uidAction)
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Remove",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
         },
         confirmButton = {
             Button(
-                onClick = { 
-                    if (uidText.isNotBlank()) {
-                        onScanUID(uidText)
-                        uidText = ""
-                    }
-                },
-                enabled = uidText.isNotBlank() && !isLoading
+                onClick = { onConfirm(currentUIDActions) }
             ) {
-                Text("Rekod UID")
+                Text(if (currentUIDActions.isEmpty()) "Complete Without UIDs" else "Complete with ${currentUIDActions.size} UIDs")
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isLoading
-            ) {
-                Text("Batal")
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
             }
         }
     )
 }
+
