@@ -56,6 +56,10 @@ export default function LorryManagement() {
     assignment_date: formatInTimeZone(new Date(), 'UTC', 'yyyy-MM-dd'),
     notes: ''
   });
+
+  useEffect(() => {
+    loadData();
+  }, []);
   
   // Handle SSR case where session might be undefined
   if (!session) {
@@ -67,10 +71,6 @@ export default function LorryManagement() {
       </div>
     );
   }
-
-  useEffect(() => {
-    loadData();
-  }, []);
 
   const loadData = async () => {
     setLoading(true);
