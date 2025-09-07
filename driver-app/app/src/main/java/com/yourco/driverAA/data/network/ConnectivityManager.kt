@@ -44,14 +44,19 @@ class ConnectivityManager @Inject constructor(
     
     private fun registerNetworkCallback() {
         try {
-            val networkRequest = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                // Remove NET_CAPABILITY_VALIDATED requirement - too strict
-                .build()
-            
-            connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+            // Use default network callback for better reliability on Android 10+
+            connectivityManager.registerDefaultNetworkCallback(networkCallback)
         } catch (e: Exception) {
             android.util.Log.e("ConnectivityManager", "Failed to register network callback", e)
+            // Fallback for older Android versions
+            try {
+                val networkRequest = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    .build()
+                connectivityManager.registerNetworkCallback(networkRequest, networkCallback)
+            } catch (fallbackException: Exception) {
+                android.util.Log.e("ConnectivityManager", "Fallback network callback also failed", fallbackException)
+            }
         }
     }
     
