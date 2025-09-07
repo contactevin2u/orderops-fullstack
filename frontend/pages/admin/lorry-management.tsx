@@ -541,7 +541,7 @@ export default function LorryManagementPage() {
             <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-4)' }}>
               <div className="card">
                 <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-3)' }}>
-                  📊 Today's Activity
+                  📊 Today&apos;s Activity
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
