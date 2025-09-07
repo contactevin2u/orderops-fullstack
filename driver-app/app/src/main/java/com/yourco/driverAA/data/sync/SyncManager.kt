@@ -2,6 +2,7 @@ package com.yourco.driverAA.data.sync
 
 import android.util.Log
 import com.yourco.driverAA.data.api.DriverApi
+import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.OrderStatusUpdateDto
 import com.yourco.driverAA.data.api.OrderPatchDto
 import com.yourco.driverAA.data.api.UpsellRequest
