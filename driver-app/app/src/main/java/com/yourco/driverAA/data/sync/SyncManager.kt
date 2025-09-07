@@ -33,19 +33,19 @@ class SyncManager @Inject constructor(
     private val TAG = "SyncManager"
     private var syncJob: Job? = null
     
-    suspend fun syncAll(): Boolean {
-        Log.i(TAG, "syncAll() called - ConnectivityManager.isOnline(): ${connectivityManager.isOnline()}")
+    suspend fun syncAll(statusFilter: String = "active"): Boolean {
+        Log.i(TAG, "syncAll() called with statusFilter=$statusFilter - ConnectivityManager.isOnline(): ${connectivityManager.isOnline()}")
         
         // Note: When called from WorkManager, network availability is already guaranteed by NetworkType.CONNECTED constraint
         // When called directly (e.g. manual sync), we still want to check connectivity
         // However, we should trust WorkManager's network constraints over our own connectivity check
         
         return try {
-            Log.i(TAG, "Starting full sync...")
+            Log.i(TAG, "Starting full sync with statusFilter=$statusFilter...")
             
             // 1. Download latest jobs from server (pull)
             Log.d(TAG, "Step 1: Syncing jobs from server...")
-            syncJobsFromServer()
+            syncJobsFromServer(statusFilter)
             
             // 2. Process outbox operations (push)
             Log.d(TAG, "Step 2: Processing outbox operations...")
@@ -59,7 +59,7 @@ class SyncManager @Inject constructor(
             Log.d(TAG, "Step 4: Syncing UID scans...")
             syncPendingUIDScans()
             
-            Log.i(TAG, "Full sync completed successfully")
+            Log.i(TAG, "Full sync completed successfully with statusFilter=$statusFilter")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Sync failed", e)
@@ -67,16 +67,16 @@ class SyncManager @Inject constructor(
         }
     }
     
-    private suspend fun syncJobsFromServer() {
+    private suspend fun syncJobsFromServer(statusFilter: String = "active") {
         try {
-            Log.d(TAG, "Syncing jobs from server...")
-            val serverJobs = api.getJobs("active")
+            Log.d(TAG, "Syncing jobs from server with statusFilter=$statusFilter...")
+            val serverJobs = api.getJobs(statusFilter)
             
             // Convert to entities and insert/update locally
             val jobEntities = serverJobs.map { JobEntity.fromDto(it).copy(syncStatus = "SYNCED") }
             jobsDao.insertAll(jobEntities)
             
-            Log.d(TAG, "Synced ${jobEntities.size} jobs from server")
+            Log.d(TAG, "Synced ${jobEntities.size} jobs from server with statusFilter=$statusFilter")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync jobs from server", e)
             throw e

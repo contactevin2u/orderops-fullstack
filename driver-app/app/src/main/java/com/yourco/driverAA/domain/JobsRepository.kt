@@ -37,8 +37,8 @@ class JobsRepository @Inject constructor(
             // If online, sync first then emit data
             if (connectivityManager.isOnline()) {
                 try {
-                    Log.d(TAG, "Online - syncing jobs from server before returning data")
-                    syncManager.syncAll()
+                    Log.d(TAG, "Online - syncing jobs from server with statusFilter=$statusFilter before returning data")
+                    syncManager.syncAll(statusFilter)
                     Log.d(TAG, "Sync completed, now emitting local data")
                 } catch (e: Exception) {
                     Log.e(TAG, "Sync failed, will return local data", e)
