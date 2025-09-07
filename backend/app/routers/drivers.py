@@ -734,11 +734,14 @@ def get_lorry_stock(
         total_scanned += scanned_count
         total_variance += variance
     
-    return envelope({
+    response_data = {
         "date": date,
         "driver_id": driver_id,
         "items": items,
         "total_expected": total_expected,
         "total_scanned": total_scanned,
         "total_variance": total_variance
-    })
+    }
+    
+    print(f"DEBUG: Returning lorry stock response: {response_data}")
+    return envelope(response_data)

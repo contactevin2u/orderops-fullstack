@@ -498,10 +498,10 @@ data class LorryStockItem(
 data class LorryStockResponse(
     val date: String,
     val driver_id: Int,
-    val items: List<LorryStockItem>,
-    val total_expected: Int,
-    val total_scanned: Int? = null,
-    val total_variance: Int? = null
+    val items: List<LorryStockItem> = emptyList(),
+    val total_expected: Int = 0,
+    val total_scanned: Int = 0,
+    val total_variance: Int = 0
 )
 
 @Serializable
