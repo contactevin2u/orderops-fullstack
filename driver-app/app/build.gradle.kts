@@ -190,6 +190,13 @@ dependencies {
 
     implementation("com.jakewharton.timber:timber:5.0.1")
     
+    // QR Code Scanner
+    implementation("com.google.zxing:core:3.5.2")
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("androidx.camera:camera-camera2:1.3.4")
+    implementation("androidx.camera:camera-lifecycle:1.3.4")
+    implementation("androidx.camera:camera-view:1.3.4")
+    
     // Image loading - removed for build issues
     // implementation("io.coil-kt:coil-compose:2.7.0")
 

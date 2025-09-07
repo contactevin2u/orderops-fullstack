@@ -8,6 +8,11 @@ from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 import time
+import qrcode
+import qrcode.image.svg
+from io import BytesIO
+import base64
+from PIL import Image
 
 from ..db import get_session
 from ..models import Order, OrderItemUID, Item, SKU, LorryStock, SKUAlias, Driver
@@ -1044,3 +1049,68 @@ async def upload_lorry_stock(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class QRCodeRequest(BaseModel):
+    uid: Optional[str] = None
+    order_id: Optional[int] = None
+    content: Optional[str] = None
+    size: Optional[int] = 200
+
+
+class QRCodeResponse(BaseModel):
+    success: bool
+    qr_code_base64: str
+    format: str
+    message: str
+
+
+@router.post("/generate-qr", response_model=dict)
+async def generate_qr_code(
+    request: QRCodeRequest,
+    db: Session = Depends(get_session),
+    current_user = Depends(get_current_user)
+):
+    """Generate QR code for UID or custom content"""
+    try:
+        # Determine content to encode
+        if request.content:
+            content = request.content
+        elif request.uid:
+            content = f"UID:{request.uid}"
+        elif request.order_id:
+            content = f"ORDER:{request.order_id}"
+        else:
+            raise HTTPException(status_code=400, detail="Must provide content, uid, or order_id")
+        
+        # Generate QR code
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=max(1, request.size // 25),  # Scale box size based on requested size
+            border=4,
+        )
+        qr.add_data(content)
+        qr.make(fit=True)
+        
+        # Create image
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Resize to requested size
+        if request.size and request.size > 0:
+            img = img.resize((request.size, request.size), Image.LANCZOS)
+        
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        qr_code_base64 = base64.b64encode(buffer.getvalue()).decode()
+        
+        return envelope({
+            "success": True,
+            "qr_code_base64": f"data:image/png;base64,{qr_code_base64}",
+            "format": "PNG",
+            "message": "QR code generated successfully"
+        })
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"QR code generation failed: {str(e)}")
