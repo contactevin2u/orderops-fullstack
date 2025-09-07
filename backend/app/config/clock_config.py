@@ -13,8 +13,8 @@ STANDARD_WORKING_HOURS = 8.0
 OVERTIME_THRESHOLD = 8.0
 
 # Shift settings
-MAX_SHIFT_DURATION_HOURS = 16.0  # Maximum allowed shift duration
-AUTO_CLOCK_OUT_AFTER_HOURS = 24.0  # Auto clock-out if no manual clock-out
+MAX_SHIFT_DURATION_HOURS = 168.0  # Maximum allowed shift duration (1 week for testing)
+AUTO_CLOCK_OUT_AFTER_HOURS = 168.0  # Auto clock-out if no manual clock-out (1 week for testing)
 
 # Location accuracy requirements
 MIN_LOCATION_ACCURACY_METERS = 100.0
