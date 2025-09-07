@@ -258,3 +258,4 @@ class DriverCreateIn(BaseModel):
     name: str | None = None
     phone: str | None = None
     base_warehouse: str = "BATU_CAVES"
+    firebase_uid: str | None = None

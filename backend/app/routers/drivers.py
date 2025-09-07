@@ -150,17 +150,24 @@ def register_driver_for_testing(payload: DriverCreateIn, db: Session = Depends(g
 
 @router.post("", response_model=DriverOut, dependencies=[Depends(require_roles(Role.ADMIN))])
 def create_driver(payload: DriverCreateIn, db: Session = Depends(get_session)):
-    try:
-        fb_user = firebase_auth.create_user(
-            email=payload.email,
-            password=payload.password,
-            display_name=payload.name,
-            app=_get_app(),
-        )
-    except Exception as exc:  # pragma: no cover - network/cred failures
-        raise HTTPException(400, "Failed to create driver") from exc
+    # If firebase_uid is provided, use it instead of creating a new Firebase user
+    if payload.firebase_uid:
+        firebase_uid = payload.firebase_uid
+    else:
+        # Create new Firebase user
+        try:
+            fb_user = firebase_auth.create_user(
+                email=payload.email,
+                password=payload.password,
+                display_name=payload.name,
+                app=_get_app(),
+            )
+            firebase_uid = fb_user.uid
+        except Exception as exc:  # pragma: no cover - network/cred failures
+            raise HTTPException(400, "Failed to create Firebase user") from exc
+    
     driver = Driver(
-        firebase_uid=fb_user.uid, 
+        firebase_uid=firebase_uid, 
         name=payload.name, 
         phone=payload.phone,
         base_warehouse=payload.base_warehouse

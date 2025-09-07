@@ -86,6 +86,7 @@ export const driverCreateSchema = z.object({
   name: z.string().min(1, 'Driver name is required'),
   phone: phoneSchema,
   base_warehouse: z.enum(['BATU_CAVES', 'KOTA_KINABALU']),
+  firebase_uid: z.string().optional(),
 });
 
 export const driverUpdateSchema = z.object({

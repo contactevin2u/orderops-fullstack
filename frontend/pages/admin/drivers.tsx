@@ -13,6 +13,7 @@ interface DriverFormData {
   name: string;
   phone: string;
   base_warehouse: string;
+  firebase_uid: string;
 }
 
 const initialFormData: DriverFormData = {
@@ -21,6 +22,7 @@ const initialFormData: DriverFormData = {
   name: '',
   phone: '',
   base_warehouse: 'BATU_CAVES',
+  firebase_uid: '',
 };
 
 export default function AdminDriversPage() {
@@ -203,6 +205,22 @@ export default function AdminDriversPage() {
                   />
                   <p className="mt-1 text-sm text-gray-500">
                     Password will be used by the driver to log into the mobile app
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="firebase_uid" className="block text-sm font-medium text-gray-700 mb-1">
+                    Firebase UID (Optional)
+                  </label>
+                  <input
+                    id="firebase_uid"
+                    type="text"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    value={formData.firebase_uid}
+                    onChange={handleInputChange('firebase_uid')}
+                    placeholder="Firebase User ID for existing Firebase account"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    If the driver already has a Firebase account, enter their UID here to link it
                   </p>
                 </div>
               </>
