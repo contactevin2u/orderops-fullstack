@@ -115,7 +115,7 @@ async def create_sku(
         db.refresh(sku)
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="SKU_CREATE",
@@ -217,7 +217,7 @@ async def update_sku(
         db.refresh(sku)
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="SKU_UPDATE",
@@ -261,7 +261,7 @@ async def delete_sku(
         db.commit()
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="SKU_DELETE",

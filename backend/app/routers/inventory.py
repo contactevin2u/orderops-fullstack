@@ -171,7 +171,7 @@ async def scan_uids_for_delivery(
         db.commit()
         
         # Log audit action
-        await log_action(
+        log_action(
             db, 
             user_id=request.driver_id, 
             action="UID_SCAN_ISSUE", 
@@ -257,7 +257,7 @@ async def scan_uids_for_return(
     
     try:
         db.commit()
-        await log_action(
+        log_action(
             db, 
             user_id=request.driver_id, 
             action="UID_SCAN_RETURN", 
@@ -372,7 +372,7 @@ async def upload_lorry_stock(
         
         db.commit()
         
-        await log_action(
+        log_action(
             db,
             user_id=driver_id,
             action="LORRY_STOCK_UPLOAD",
@@ -586,7 +586,7 @@ async def create_sku_alias(
         db.add(alias)
         db.commit()
         
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="SKU_ALIAS_CREATE",
@@ -767,7 +767,7 @@ async def scan_uid(
         )
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action=f"UID_SCAN_{request.action}",
@@ -839,7 +839,7 @@ async def generate_uid(
         db.commit()
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="UID_GENERATE",
@@ -922,7 +922,7 @@ async def add_sku_alias(
         result = service.add_sku_alias(request["sku_id"], request["alias"])
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="SKU_ALIAS_ADD",
@@ -1002,7 +1002,7 @@ async def upload_lorry_stock(
         db.commit()
         
         # Log audit action
-        await log_action(
+        log_action(
             db,
             user_id=current_user.id,
             action="LORRY_STOCK_UPLOAD",
