@@ -347,6 +347,26 @@ private fun StockVerificationSection(
                         Text("Scan UID")
                     }
                     
+                    if (scannedUIDs.isEmpty()) {
+                        OutlinedButton(
+                            onClick = { 
+                                // Mark as explicitly verified empty - no scanned UIDs needed
+                                currentLocation?.let { (lat, lng) ->
+                                    onClockIn(lat, lng, locationName)
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            enabled = canClockIn && currentLocation != null && !isProcessing,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = AppColors.success
+                            )
+                        ) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Empty Lorry")
+                        }
+                    }
+                    
                     if (scannedUIDs.isNotEmpty()) {
                         OutlinedButton(
                             onClick = onClearAll,
@@ -407,33 +427,35 @@ private fun StockVerificationSection(
             }
         }
         
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        // Clock-in button
-        Button(
-            onClick = {
-                currentLocation?.let { (lat, lng) ->
-                    onClockIn(lat, lng, locationName)
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            enabled = canClockIn && !isProcessing && currentLocation != null,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = AppColors.success
-            )
-        ) {
-            if (isProcessing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    color = Color.White,
-                    strokeWidth = 2.dp
+        // Show main clock-in button only when UIDs have been scanned
+        if (scannedUIDs.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Button(
+                onClick = {
+                    currentLocation?.let { (lat, lng) ->
+                        onClockIn(lat, lng, locationName)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = canClockIn && !isProcessing && currentLocation != null,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.success
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Processing...")
-            } else {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Clock In & Verify Stock")
+            ) {
+                if (isProcessing) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Processing...")
+                } else {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Clock In & Verify Stock")
+                }
             }
         }
         
