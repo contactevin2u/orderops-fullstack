@@ -3,6 +3,8 @@ package com.yourco.driverAA.data.sync
 import android.util.Log
 import com.yourco.driverAA.data.api.DriverApi
 import com.yourco.driverAA.data.api.OrderStatusUpdateDto
+import com.yourco.driverAA.data.api.OrderPatchDto
+import com.yourco.driverAA.data.api.UpsellRequest
 import com.yourco.driverAA.data.api.UIDScanRequest
 import com.yourco.driverAA.data.db.*
 import com.yourco.driverAA.data.network.ConnectivityManager
@@ -93,6 +95,7 @@ class SyncManager @Inject constructor(
         
         when (operation.operation) {
             "UPDATE_STATUS" -> executeStatusUpdate(operation)
+            "UPSELL_ORDER" -> executeUpsellOrder(operation)
             "UPLOAD_POD" -> executePhotoUpload(operation)
             "SCAN_UID" -> executeUIDScan(operation)
             "CLOCK_IN" -> executeClockIn(operation)
@@ -105,16 +108,74 @@ class SyncManager @Inject constructor(
     }
     
     private suspend fun executeStatusUpdate(operation: OutboxEntity) {
-        val update = Json.decodeFromString<OrderStatusUpdateDto>(operation.payload)
-        val response = api.updateOrderStatus(operation.entityId, update)
-        
-        // Update local job with server response
-        val jobEntity = JobEntity.fromDto(response).copy(syncStatus = "SYNCED")
-        jobsDao.update(jobEntity)
+        // Check if this is a patch operation (ON_HOLD, etc.) or status update
+        if (operation.endpoint.contains("driver-update")) {
+            // Handle PATCH /orders/{id}/driver-update (returns ApiResponse<OrderDto>)
+            val update = Json.decodeFromString<OrderPatchDto>(operation.payload)
+            val response = api.patchOrder(operation.entityId, update)
+            
+            // Unwrap ApiResponse and update local job
+            val jobEntity = JobEntity.fromDto(
+                JobDto(
+                    id = response.data.id.toString(),
+                    code = response.data.code,
+                    status = response.data.status,
+                    customer_name = response.data.customer?.name,
+                    customer_phone = response.data.customer?.phone,
+                    address = response.data.customer?.address,
+                    delivery_date = response.data.delivery_date,
+                    notes = response.data.notes,
+                    total = response.data.total,
+                    paid_amount = response.data.paid_amount,
+                    balance = response.data.balance,
+                    type = response.data.type
+                )
+            ).copy(syncStatus = "SYNCED")
+            jobsDao.update(jobEntity)
+        } else {
+            // Handle PATCH /drivers/orders/{id} (returns JobDto directly)
+            val update = Json.decodeFromString<OrderStatusUpdateDto>(operation.payload)
+            val response = api.updateOrderStatus(operation.entityId, update)
+            
+            // Update local job with server response
+            val jobEntity = JobEntity.fromDto(response).copy(syncStatus = "SYNCED")
+            jobsDao.update(jobEntity)
+        }
         
         // Mark operation as completed
         outboxDao.markCompleted(operation.id)
         Log.d(TAG, "Status update completed for job ${operation.entityId}")
+    }
+    
+    private suspend fun executeUpsellOrder(operation: OutboxEntity) {
+        val upsellRequest = Json.decodeFromString<UpsellRequest>(operation.payload)
+        val response = api.upsellOrder(operation.entityId, upsellRequest)
+        
+        // Unwrap ApiResponse and handle the upsell response
+        if (response.data.success && response.data.order != null) {
+            // Update local job with the updated order data
+            val jobEntity = JobEntity.fromDto(
+                JobDto(
+                    id = response.data.order.id.toString(),
+                    code = response.data.order.code,
+                    status = response.data.order.status,
+                    customer_name = response.data.order.customer?.name,
+                    customer_phone = response.data.order.customer?.phone,
+                    address = response.data.order.customer?.address,
+                    delivery_date = response.data.order.delivery_date,
+                    notes = response.data.order.notes,
+                    total = response.data.order.total,
+                    paid_amount = response.data.order.paid_amount,
+                    balance = response.data.order.balance,
+                    type = response.data.order.type
+                )
+            ).copy(syncStatus = "SYNCED")
+            jobsDao.update(jobEntity)
+        }
+        
+        // Mark operation as completed
+        outboxDao.markCompleted(operation.id)
+        Log.d(TAG, "Upsell order completed for job ${operation.entityId}: ${response.data.message}")
     }
     
     private suspend fun executePhotoUpload(operation: OutboxEntity) {
