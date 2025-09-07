@@ -75,8 +75,11 @@ interface DriverApi {
     @POST("inventory/uid/scan")
     suspend fun scanUID(@Body request: UIDScanRequest): UIDScanResponse
     
-    @GET("drivers/{driver_id}/lorry-stock/{date}")
-    suspend fun getLorryStock(@Path("driver_id") driverId: Int, @Path("date") date: String): LorryStockResponse
+    @GET("inventory/lorry/{driver_id}/stock")
+    suspend fun getLorryStock(@Path("driver_id") driverId: Int, @Query("date") date: String): LorryStockResponse
+    
+    @POST("inventory/lorry/{driver_id}/stock/upload")
+    suspend fun uploadLorryStock(@Path("driver_id") driverId: Int, @Body body: LorryStockUploadRequest): ApiResponse<Unit>
     
     @POST("inventory/sku/resolve")
     suspend fun resolveSKU(@Body request: SKUResolveRequest): SKUResolveResponse
@@ -519,4 +522,17 @@ data class SKUMatch(
 data class SKUResolveResponse(
     val matches: List<SKUMatch>,
     val suggestions: List<String> = emptyList()
+)
+
+@Serializable
+data class LorryStockUploadItem(
+    val sku_id: Int,
+    val scanned_count: Int
+)
+
+@Serializable
+data class LorryStockUploadRequest(
+    val date: String,
+    val items: List<LorryStockUploadItem>,
+    val notes: String? = null
 )
