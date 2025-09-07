@@ -41,6 +41,17 @@ interface Driver {
 
 export default function LorryManagement() {
   const { data: session } = useSession();
+  
+  // Handle SSR case where session might be undefined
+  if (!session) {
+    return (
+      <div className="admin-container">
+        <div className="admin-main">
+          <div className="loading">Loading...</div>
+        </div>
+      </div>
+    );
+  }
   const [assignments, setAssignments] = useState<LorryAssignment[]>([]);
   const [holds, setHolds] = useState<DriverHold[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
