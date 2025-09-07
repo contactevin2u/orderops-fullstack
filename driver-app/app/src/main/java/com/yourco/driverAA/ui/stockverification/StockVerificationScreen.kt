@@ -196,7 +196,7 @@ fun StockVerificationScreen(
                             currentLocation = currentLocation,
                             locationName = locationName,
                             isProcessing = uiState.isProcessing,
-                            canClockIn = uiState.canClockIn && scannedUIDs.isNotEmpty()
+                            canClockIn = uiState.canClockIn
                         )
                     }
                 }
@@ -437,10 +437,10 @@ private fun StockVerificationSection(
             }
         }
         
-        if (!canClockIn && scannedUIDs.isEmpty()) {
+        if (!canClockIn) {
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Please scan at least one UID before clocking in",
+                text = "Complete stock verification to clock in",
                 style = MaterialTheme.typography.bodySmall,
                 color = AppColors.warning,
                 textAlign = TextAlign.Center,

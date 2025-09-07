@@ -109,12 +109,7 @@ class StockVerificationViewModel @Inject constructor(
                 return@launch
             }
             
-            if (_scannedUIDs.value.isEmpty()) {
-                _uiState.value = currentState.copy(
-                    error = "Please scan at least one UID before clocking in"
-                )
-                return@launch
-            }
+            // Allow empty scanned UIDs for empty lorries - backend will handle validation
             
             _uiState.value = currentState.copy(
                 isProcessing = true,

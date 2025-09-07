@@ -15,6 +15,7 @@ import com.yourco.driverAA.ui.main.MainScreen
 import com.yourco.driverAA.ui.admin.AdminMainScreen
 import com.yourco.driverAA.ui.jobdetail.JobDetailScreen
 import com.yourco.driverAA.ui.shifts.ClockInOutScreen
+import com.yourco.driverAA.ui.stockverification.StockVerificationScreen
 import com.yourco.driverAA.util.DeepLinks
 
 @Composable
@@ -61,11 +62,20 @@ fun NavGraph() {
         composable("jobs") {
             MainScreen(
                 onJobClick = { id -> navController.navigate("job/$id") },
-                onClockInOutClick = { navController.navigate("clock") },
+                onClockInOutClick = { navController.navigate("stock_verification") },
                 onSignOut = {
                     authService.signOut()
                     navController.navigate("login") {
                         popUpTo("jobs") { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable("stock_verification") {
+            StockVerificationScreen(
+                onNavigateToOrders = {
+                    navController.navigate("jobs") {
+                        popUpTo("stock_verification") { inclusive = true }
                     }
                 }
             )
