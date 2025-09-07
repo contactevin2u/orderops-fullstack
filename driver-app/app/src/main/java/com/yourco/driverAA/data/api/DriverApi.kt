@@ -12,7 +12,7 @@ import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface DriverApi {
-    @GET("auth/me")
+    @GET("driver/me")
     suspend fun getCurrentUser(): UserDto
     
     @GET("drivers/jobs")

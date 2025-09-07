@@ -9,6 +9,18 @@ from ..models import Driver, DriverDevice
 router = APIRouter(prefix="/driver", tags=["driver"])
 
 
+@router.get("/me")
+def get_me(driver=Depends(driver_auth)):
+    """Get current driver information - Firebase authenticated"""
+    return {
+        "id": driver.id,
+        "name": driver.name,
+        "phone": driver.phone,
+        "firebase_uid": driver.firebase_uid,
+        "role": "driver"
+    }
+
+
 class PushTokenIn(BaseModel):
     token: str
 
