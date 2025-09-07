@@ -1,10 +1,11 @@
 package com.yourco.driverAA.data.network
 
 import android.content.Context
-import android.net.ConnectivityManager
+import android.net.ConnectivityManager as SysConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,14 +14,15 @@ import javax.inject.Singleton
 
 @Singleton
 class ConnectivityManager @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
-    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as SysConnectivityManager
     
     private val _isOnline = MutableStateFlow(checkInitialConnectivity())
     val isOnline: StateFlow<Boolean> = _isOnline.asStateFlow()
     
-    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+    private val networkCallback = object : SysConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             _isOnline.value = true
         }
