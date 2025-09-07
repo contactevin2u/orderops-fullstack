@@ -121,7 +121,7 @@ class ConnectivityManager @Inject constructor(
         return online
     }
     
-    fun isOnlineFlow(): StateFlow<Boolean> = isOnline
+    fun getIsOnlineFlow(): StateFlow<Boolean> = isOnline
     
     fun unregisterCallback() {
         try {

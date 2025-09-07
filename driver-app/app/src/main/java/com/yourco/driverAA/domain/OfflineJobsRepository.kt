@@ -373,7 +373,7 @@ class OfflineJobsRepository @Inject constructor(
      */
     fun getOfflineStatus(): Flow<OfflineStatus> {
         return combine(
-            connectivityManager.isOnlineFlow(),
+            connectivityManager.getIsOnlineFlow(),
             outboxDao.getPendingCount(),
             outboxDao.getFailedCount(),
             photosDao.getPendingPhotosCount(),
