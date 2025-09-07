@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func
+from sqlalchemy.exc import IntegrityError
 from datetime import date, datetime, timedelta
 from typing import List, Optional
+import time
 
 from ..db import get_session
 from ..models import Order, OrderItemUID, Item, SKU, LorryStock, SKUAlias, Driver
@@ -807,36 +809,59 @@ async def generate_uid(
         sku_code = f"SKU{sku.id:03d}"
         today_str = datetime.utcnow().strftime("%Y%m%d")
         
-        # Find next sequence number for today
-        existing_count = db.execute(
-            select(func.count(Item.uid)).where(
-                Item.uid.like(f"{sku_code}-ADMIN-{today_str}-%")
-            )
-        ).scalar() or 0
-        
+        # Generate UIDs atomically with retry on conflicts
         items = []
         copies = 2 if item_type == ItemType.NEW else 1
+        max_retries = 3
         
-        for copy_num in range(1, copies + 1):
-            seq_num = existing_count + copy_num
-            if copies > 1:
-                uid = f"{sku_code}-ADMIN-{today_str}-{seq_num:03d}-C{copy_num}"
-            else:
-                uid = f"{sku_code}-ADMIN-{today_str}-{seq_num:03d}"
-            
-            item = Item(
-                uid=uid,
-                sku_id=request.sku_id,
-                item_type=item_type,
-                copy_number=copy_num if copies > 1 else None,
-                oem_serial=request.serial_number,
-                status=ItemStatus.WAREHOUSE,
-                created_at=datetime.utcnow()
-            )
-            items.append(item)
-            db.add(item)
-        
-        db.commit()
+        for attempt in range(max_retries):
+            try:
+                # Get next sequence number for today
+                existing_count = db.execute(
+                    select(func.count(Item.uid)).where(
+                        Item.uid.like(f"{sku_code}-ADMIN-{today_str}-%")
+                    )
+                ).scalar() or 0
+                
+                items = []  # Reset items list on retry
+                
+                for copy_num in range(1, copies + 1):
+                    seq_num = existing_count + copy_num
+                    if copies > 1:
+                        uid = f"{sku_code}-ADMIN-{today_str}-{seq_num:03d}-C{copy_num}"
+                    else:
+                        uid = f"{sku_code}-ADMIN-{today_str}-{seq_num:03d}"
+                    
+                    item = Item(
+                        uid=uid,
+                        sku_id=request.sku_id,
+                        item_type=item_type,
+                        copy_number=copy_num if copies > 1 else None,
+                        oem_serial=request.serial_number,
+                        status=ItemStatus.WAREHOUSE,
+                        created_at=datetime.utcnow()
+                    )
+                    items.append(item)
+                    db.add(item)
+                
+                db.commit()
+                break  # Success, exit retry loop
+                
+            except IntegrityError as e:
+                db.rollback()
+                if attempt < max_retries - 1:
+                    # Retry on unique constraint violation with exponential backoff
+                    time.sleep(0.1 * (2 ** attempt))
+                    continue
+                else:
+                    # Max retries exceeded
+                    raise HTTPException(
+                        status_code=500, 
+                        detail="Failed to generate unique UID after multiple attempts. Please try again."
+                    )
+            except Exception as e:
+                db.rollback()
+                raise  # Re-raise non-recoverable errors immediately
         
         # Log audit action
         log_action(
