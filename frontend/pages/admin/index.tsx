@@ -10,7 +10,8 @@ import {
   BarChart3,
   Settings,
   Tags,
-  Plus
+  Plus,
+  ShieldAlert
 } from 'lucide-react';
 import AdminLayout from '@/components/Layout/AdminLayout';
 
@@ -58,6 +59,12 @@ export default function AdminIndexPage() {
       description: 'Monitor and manage driver inventory levels',
       href: '/admin/driver-stock',
       icon: Truck
+    },
+    {
+      title: 'Lorry Management',
+      description: 'Integrated system: assignments, stock verification, driver holds & accountability',
+      href: '/admin/lorry-management',
+      icon: ShieldAlert
     }
   ];
 
