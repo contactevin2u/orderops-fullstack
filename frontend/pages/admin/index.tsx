@@ -9,9 +9,6 @@ import {
   ArrowRight,
   BarChart3,
   Settings,
-  Package,
-  QrCode,
-  ScanLine,
   Tags,
   Plus
 } from 'lucide-react';
@@ -45,34 +42,16 @@ export default function AdminIndexPage() {
       icon: Users
     },
     {
-      title: 'Inventory Management',
-      description: 'Manage UID tracking and stock levels',
-      href: '/admin/inventory',
-      icon: Package
-    },
-    {
       title: 'UID Generator',
       description: 'Generate new UIDs with QR codes for inventory items',
       href: '/admin/uid-generator',
       icon: Plus
     },
     {
-      title: 'QR Code Generator',
-      description: 'Create custom QR codes for various purposes',
-      href: '/admin/qr-generator',
-      icon: QrCode
-    },
-    {
       title: 'SKU Management',
       description: 'Manage product catalog and aliases',
       href: '/admin/sku-management',
       icon: Tags
-    },
-    {
-      title: 'UID Scanner',
-      description: 'Scan and track UIDs for inventory operations',
-      href: '/admin/uid-scanner',
-      icon: ScanLine
     },
     {
       title: 'Driver Stock Management',
