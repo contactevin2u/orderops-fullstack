@@ -410,7 +410,15 @@ async def get_lorry_stock(
 ):
     """Get lorry stock snapshot for a specific date"""
     if not settings.UID_INVENTORY_ENABLED:
-        return envelope({"message": "UID inventory system disabled", "lines": []})
+        return envelope({
+            "date": datetime.utcnow().date().isoformat(),
+            "driver_id": driver_id,
+            "items": [],
+            "total_expected": 0,
+            "total_scanned": 0,
+            "total_variance": 0,
+            "message": "UID inventory system disabled"
+        })
     
     # Parse date or use today
     if date:
@@ -434,18 +442,29 @@ async def get_lorry_stock(
         .order_by(SKU.code)
     ).all()
     
-    lines = []
+    items = []
+    total_scanned = 0
     for stock, sku in stock_records:
-        lines.append({
+        items.append({
             "sku_id": sku.id,
-            "sku_code": sku.code,
             "sku_name": sku.name,
-            "qty_counted": stock.qty_counted,
-            "uploaded_at": stock.uploaded_at.isoformat(),
-            "uploaded_by": stock.uploaded_by
+            "expected_count": stock.qty_counted,  # For now, treat counted as expected
+            "scanned_count": stock.qty_counted,
+            "variance": 0  # No variance calculation for basic implementation
         })
+        total_scanned += stock.qty_counted
     
-    return envelope({"date": target_date.isoformat(), "lines": lines})
+    # Match the LorryStockResponse structure expected by the driver app
+    response_data = {
+        "date": target_date.isoformat(),
+        "driver_id": driver_id,
+        "items": items,
+        "total_expected": total_scanned,  # For now, use same as scanned
+        "total_scanned": total_scanned,
+        "total_variance": 0
+    }
+    
+    return envelope(response_data)
 
 
 def _calculate_lorry_reconciliation(db: Session, driver_id: int, as_of_date: date, current_lines: List[StockLineItem]) -> dict:

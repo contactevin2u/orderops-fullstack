@@ -1,5 +1,6 @@
 package com.yourco.driverAA.data.api
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import okhttp3.MultipartBody
 import retrofit2.http.Body
@@ -516,21 +517,21 @@ data class UIDScanResponse(
 
 @Serializable
 data class LorryStockItem(
-    val sku_id: Int,
-    val sku_name: String,
-    val expected_count: Int,
-    val scanned_count: Int? = null,
+    @SerialName("sku_id") val skuId: Int,
+    @SerialName("sku_name") val skuName: String,
+    @SerialName("expected_count") val expectedCount: Int,
+    @SerialName("scanned_count") val scannedCount: Int? = null,
     val variance: Int? = null
 )
 
 @Serializable
 data class LorryStockResponse(
     val date: String,
-    val driver_id: Int,
+    @SerialName("driver_id") val driverId: Int,
     val items: List<LorryStockItem> = emptyList(),
-    val total_expected: Int = 0,
-    val total_scanned: Int = 0,
-    val total_variance: Int = 0
+    @SerialName("total_expected") val totalExpected: Int = 0,
+    @SerialName("total_scanned") val totalScanned: Int = 0,
+    @SerialName("total_variance") val totalVariance: Int = 0
 )
 
 @Serializable

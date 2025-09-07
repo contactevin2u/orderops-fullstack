@@ -57,21 +57,6 @@ export default function LorryManagement() {
     notes: ''
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-  
-  // Handle SSR case where session might be undefined
-  if (!session) {
-    return (
-      <div className="admin-container">
-        <div className="admin-main">
-          <div className="loading">Loading...</div>
-        </div>
-      </div>
-    );
-  }
-
   const loadData = async () => {
     setLoading(true);
     setError(null);
@@ -105,6 +90,21 @@ export default function LorryManagement() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+  }, []);
+  
+  // Handle SSR case where session might be undefined
+  if (!session) {
+    return (
+      <div className="admin-container">
+        <div className="admin-main">
+          <div className="loading">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();

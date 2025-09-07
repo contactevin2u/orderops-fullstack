@@ -259,7 +259,7 @@ private fun StockContent(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                text = "${stock.total_expected}",
+                                text = "${stock.totalExpected}",
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -271,7 +271,7 @@ private fun StockContent(
                             )
                         }
                         
-                        stock.total_scanned?.let { scanned ->
+                        stock.totalScanned?.let { scanned ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "$scanned",
@@ -287,7 +287,7 @@ private fun StockContent(
                             }
                         }
                         
-                        stock.total_variance?.let { variance ->
+                        stock.totalVariance?.let { variance ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = if (variance > 0) "+$variance" else "$variance",
@@ -366,7 +366,7 @@ private fun StockItemCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = item.sku_name,
+                    text = item.skuName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.weight(1f)
@@ -399,11 +399,11 @@ private fun StockItemCard(
             ) {
                 Column {
                     Text(
-                        text = "Expected: ${item.expected_count}",
+                        text = "Expected: ${item.expectedCount}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    item.scanned_count?.let { scanned ->
+                    item.scannedCount?.let { scanned ->
                         Text(
                             text = "Scanned: $scanned",
                             style = MaterialTheme.typography.bodySmall,

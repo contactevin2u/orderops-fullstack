@@ -132,9 +132,9 @@ class StockViewModel @Inject constructor(
     
     fun getStockSummary(): String {
         val stock = _lorryStock.value ?: return "No data"
-        val scanned = stock.total_scanned ?: 0
-        val expected = stock.total_expected
-        val variance = stock.total_variance ?: 0
+        val scanned = stock.totalScanned ?: 0
+        val expected = stock.totalExpected
+        val variance = stock.totalVariance ?: 0
         
         return when {
             variance == 0 -> "Stock matched: $scanned/$expected items"
@@ -154,9 +154,9 @@ class StockViewModel @Inject constructor(
             _loading.value -> StockStatus.LOADING
             _error.value != null -> StockStatus.ERROR
             stock == null -> StockStatus.NO_DATA
-            stock.total_variance == null -> StockStatus.PARTIAL_DATA
-            stock.total_variance == 0 -> StockStatus.BALANCED
-            stock.total_variance!! > 0 -> StockStatus.EXCESS
+            stock.totalVariance == null -> StockStatus.PARTIAL_DATA
+            stock.totalVariance == 0 -> StockStatus.BALANCED
+            stock.totalVariance!! > 0 -> StockStatus.EXCESS
             else -> StockStatus.SHORT
         }
     }
