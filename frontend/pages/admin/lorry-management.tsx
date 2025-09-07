@@ -40,7 +40,7 @@ interface Driver {
 }
 
 export default function LorryManagement() {
-  const { data: session } = useSession();
+  const { data: session } = useSession() || {};
   const [assignments, setAssignments] = useState<LorryAssignment[]>([]);
   const [holds, setHolds] = useState<DriverHold[]>([]);
   const [drivers, setDrivers] = useState<Driver[]>([]);
