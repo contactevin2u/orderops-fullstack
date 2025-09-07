@@ -30,20 +30,38 @@ class JobsRepository @Inject constructor(
 ) {
     private val TAG = "JobsRepository"
     fun getJobs(statusFilter: String = "active"): Flow<Result<List<JobDto>>> {
-        return if (statusFilter == "active") {
-            jobsDao.getActiveJobs()
-        } else {
-            jobsDao.getJobsByStatus(statusFilter)
-        }.map { entities -> 
-            Result.Success(entities.map { it.toDto() }) as Result<List<JobDto>>
-        }.onStart {
-            // Trigger background sync if online
+        return flow {
+            // First emit loading state
+            emit(Result.Loading)
+            
+            // If online, sync first then emit data
             if (connectivityManager.isOnline()) {
                 try {
+                    Log.d(TAG, "Online - syncing jobs from server before returning data")
                     syncManager.syncAll()
+                    Log.d(TAG, "Sync completed, now emitting local data")
                 } catch (e: Exception) {
-                    Log.e(TAG, "Background sync failed", e)
+                    Log.e(TAG, "Sync failed, will return local data", e)
                 }
+            }
+            
+            // Now emit the local data (fresh from sync if online)
+            val localJobs = if (statusFilter == "active") {
+                jobsDao.getActiveJobs().first()
+            } else {
+                jobsDao.getJobsByStatus(statusFilter).first()
+            }
+            
+            Log.d(TAG, "Emitting ${localJobs.size} jobs for statusFilter=$statusFilter")
+            emit(Result.Success(localJobs.map { it.toDto() }))
+            
+            // Continue observing local database changes
+            if (statusFilter == "active") {
+                jobsDao.getActiveJobs()
+            } else {
+                jobsDao.getJobsByStatus(statusFilter)
+            }.collect { entities ->
+                emit(Result.Success(entities.map { it.toDto() }))
             }
         }.catch { e ->
             emit(Result.error<List<JobDto>>(e as? Exception ?: Exception(e.message ?: "Unknown error"), "load_jobs"))
