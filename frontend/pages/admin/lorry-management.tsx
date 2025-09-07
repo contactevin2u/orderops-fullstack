@@ -115,8 +115,6 @@ export default function LorryManagementPage() {
 
   // Load all data
   const loadData = useCallback(async () => {
-    if (!session) return;
-    
     setLoading(true);
     setError(null);
     
@@ -149,7 +147,7 @@ export default function LorryManagementPage() {
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  }, []);
 
   useEffect(() => {
     loadData();

@@ -106,7 +106,7 @@ class ClockInResponse(BaseModel):
 async def create_lorry_assignment(
     request: LorryAssignmentRequest,
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles([Role.ADMIN]))
+    current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Assign a lorry to a driver for a specific date"""
     try:
@@ -187,7 +187,7 @@ async def get_lorry_assignments(
     driver_id: Optional[int] = None,
     lorry_id: Optional[str] = None,
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles([Role.ADMIN]))
+    current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Get lorry assignments with optional filters"""
     query = select(LorryAssignment, Driver).join(Driver, LorryAssignment.driver_id == Driver.id)
@@ -456,7 +456,7 @@ async def get_driver_status(
 async def create_driver_hold(
     request: DriverHoldRequest,
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles([Role.ADMIN]))
+    current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Create a driver hold"""
     # Check if driver exists
@@ -526,7 +526,7 @@ async def get_driver_holds(
     driver_id: Optional[int] = None,
     status: Optional[str] = None,  # ACTIVE, RESOLVED
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles([Role.ADMIN]))
+    current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Get driver holds with optional filters"""
     query = select(DriverHold, Driver).join(Driver, DriverHold.driver_id == Driver.id)
@@ -563,7 +563,7 @@ async def resolve_driver_hold(
     hold_id: int,
     resolution_notes: str,
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles([Role.ADMIN]))
+    current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Resolve a driver hold"""
     hold = db.get(DriverHold, hold_id)
