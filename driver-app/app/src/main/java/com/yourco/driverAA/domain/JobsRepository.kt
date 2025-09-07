@@ -144,7 +144,7 @@ class JobsRepository @Inject constructor(
             // Store UID actions locally (for offline support)
             uidActions.forEach { uidAction ->
                 val uidScan = UIDScanEntity(
-                    orderId = orderId,
+                    orderId = orderId.toInt(),
                     uid = uidAction.uid,
                     action = uidAction.action,
                     skuId = uidAction.sku_id,

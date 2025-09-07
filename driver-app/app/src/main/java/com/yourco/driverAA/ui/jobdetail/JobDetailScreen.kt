@@ -607,9 +607,8 @@ private fun StatusActionButtons(
                         }
                         Button(
                             onClick = { 
-                                // Show UID actions dialog before completing
-                                pendingStatus = "DELIVERED"
-                                showUIDActionsDialog = true
+                                // Complete order with integrated UID workflow
+                                onStatusUpdate("DELIVERED")
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
