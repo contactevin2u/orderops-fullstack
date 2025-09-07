@@ -65,10 +65,11 @@ export default function LorryManagement() {
     
     try {
       // Load assignments, holds, and drivers in parallel
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       const [assignmentsRes, holdsRes, driversRes] = await Promise.all([
-        fetch('/api/lorry-management/assignments'),
-        fetch('/api/lorry-management/holds'),
-        fetch('/api/drivers')
+        fetch(`${backendUrl}/lorry-management/assignments`),
+        fetch(`${backendUrl}/lorry-management/holds`),
+        fetch(`${backendUrl}/drivers`)
       ]);
 
       if (assignmentsRes.ok) {
@@ -112,7 +113,8 @@ export default function LorryManagement() {
     e.preventDefault();
     
     try {
-      const response = await fetch('/api/lorry-management/assignments', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/lorry-management/assignments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,7 +149,8 @@ export default function LorryManagement() {
     if (!resolutionNotes) return;
 
     try {
-      const response = await fetch(`/api/lorry-management/holds/${holdId}/resolve`, {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/lorry-management/holds/${holdId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(resolutionNotes)
