@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.JobItemDto
+import com.yourco.driverAA.data.api.UIDActionDto
 import com.yourco.driverAA.data.api.UpsellRequest
 import com.yourco.driverAA.data.api.UpsellItemRequest
 import com.yourco.driverAA.domain.JobsRepository

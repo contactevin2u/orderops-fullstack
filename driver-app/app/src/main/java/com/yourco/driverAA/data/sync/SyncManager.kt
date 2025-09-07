@@ -171,8 +171,13 @@ class SyncManager @Inject constructor(
         
         // Update UID scans status if they were successful
         update.uid_actions?.forEach { uidAction ->
-            uidScansDao.markSynced(operation.entityId, uidAction.uid)
-            Log.d(TAG, "Marked UID ${uidAction.uid} as synced for order ${operation.entityId}")
+            // Find the scan record and mark as synced
+            val scans = uidScansDao.getScansBySyncStatus("PENDING")
+            val matchingScan = scans.find { it.uid == uidAction.uid && it.orderId == operation.entityId.toInt() }
+            matchingScan?.let {
+                uidScansDao.updateSyncStatus(it.id, "SYNCED", System.currentTimeMillis())
+                Log.d(TAG, "Marked UID ${uidAction.uid} as synced for order ${operation.entityId}")
+            }
         }
         
         // Mark operation as completed

@@ -147,7 +147,7 @@ class JobsRepository @Inject constructor(
                     orderId = orderId,
                     uid = uidAction.uid,
                     action = uidAction.action,
-                    scannedAt = System.currentTimeMillis(),
+                    skuId = uidAction.sku_id,
                     syncStatus = "PENDING",
                     notes = uidAction.notes
                 )

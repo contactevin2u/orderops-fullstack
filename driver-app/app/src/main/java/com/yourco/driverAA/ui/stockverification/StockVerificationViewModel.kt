@@ -55,9 +55,9 @@ class StockVerificationViewModel @Inject constructor(
                     is Result.Error -> {
                         _uiState.value = _uiState.value.copy(
                             isLoading = false,
-                            error = result.exception.message ?: "Failed to load assignment"
+                            error = result.throwable.message ?: "Failed to load assignment"
                         )
-                        Log.e(TAG, "Failed to load assignment", result.exception)
+                        Log.e(TAG, "Failed to load assignment", result.throwable)
                     }
                     is Result.Loading -> {
                         // Keep loading state
@@ -149,9 +149,9 @@ class StockVerificationViewModel @Inject constructor(
                     is Result.Error -> {
                         _uiState.value = currentState.copy(
                             isProcessing = false,
-                            error = result.exception.message ?: "Clock-in failed"
+                            error = result.throwable.message ?: "Clock-in failed"
                         )
-                        Log.e(TAG, "Clock-in failed", result.exception)
+                        Log.e(TAG, "Clock-in failed", result.throwable)
                     }
                     is Result.Loading -> {
                         // Keep processing state
