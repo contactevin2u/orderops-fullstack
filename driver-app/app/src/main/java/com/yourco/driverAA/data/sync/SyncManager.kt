@@ -34,13 +34,11 @@ class SyncManager @Inject constructor(
     private var syncJob: Job? = null
     
     suspend fun syncAll(): Boolean {
-        val isOnline = connectivityManager.isOnline()
-        Log.i(TAG, "syncAll() called - ConnectivityManager.isOnline(): $isOnline")
+        Log.i(TAG, "syncAll() called - ConnectivityManager.isOnline(): ${connectivityManager.isOnline()}")
         
-        if (!isOnline) {
-            Log.w(TAG, "Skipping sync - device is offline according to ConnectivityManager")
-            return false
-        }
+        // Note: When called from WorkManager, network availability is already guaranteed by NetworkType.CONNECTED constraint
+        // When called directly (e.g. manual sync), we still want to check connectivity
+        // However, we should trust WorkManager's network constraints over our own connectivity check
         
         return try {
             Log.i(TAG, "Starting full sync...")

@@ -724,9 +724,7 @@ def _get_serialized_items_count(db: Session, order: Order) -> int:
 # Enhanced UID System Endpoints - Keep simple workflow integration
 
 @router.get("/config", response_model=dict)
-async def get_inventory_config(
-    current_user = Depends(get_current_user)
-):
+async def get_inventory_config():
     """Get inventory system configuration - integrates with existing commission workflow"""
     return envelope({
         "uid_inventory_enabled": settings.UID_INVENTORY_ENABLED,
