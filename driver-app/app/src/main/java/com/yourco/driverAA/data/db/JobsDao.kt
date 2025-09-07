@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface JobsDao {
-    @Query("SELECT * FROM jobs WHERE status IN ('NEW', 'ASSIGNED', 'IN_TRANSIT', 'ON_HOLD') ORDER BY lastModified DESC")
+    @Query("SELECT * FROM jobs WHERE status IN ('assigned', 'in_transit', 'on_hold') ORDER BY lastModified DESC")
     fun getActiveJobs(): Flow<List<JobEntity>>
     
     @Query("SELECT * FROM jobs WHERE status = :status ORDER BY lastModified DESC")

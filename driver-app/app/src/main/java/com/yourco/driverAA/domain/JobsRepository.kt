@@ -46,20 +46,20 @@ class JobsRepository @Inject constructor(
             }
             
             // Now emit the local data (fresh from sync if online)
-            val localJobs = if (statusFilter == "active") {
-                jobsDao.getActiveJobs().first()
-            } else {
-                jobsDao.getJobsByStatus(statusFilter).first()
+            val localJobs = when (statusFilter) {
+                "active" -> jobsDao.getActiveJobs().first()
+                "completed" -> jobsDao.getJobsByStatus("delivered").first()
+                else -> jobsDao.getJobsByStatus(statusFilter).first()
             }
             
             Log.d(TAG, "Emitting ${localJobs.size} jobs for statusFilter=$statusFilter")
             emit(Result.Success(localJobs.map { it.toDto() }))
             
             // Continue observing local database changes
-            if (statusFilter == "active") {
-                jobsDao.getActiveJobs()
-            } else {
-                jobsDao.getJobsByStatus(statusFilter)
+            when (statusFilter) {
+                "active" -> jobsDao.getActiveJobs()
+                "completed" -> jobsDao.getJobsByStatus("delivered")
+                else -> jobsDao.getJobsByStatus(statusFilter)
             }.collect { entities ->
                 emit(Result.Success(entities.map { it.toDto() }))
             }
@@ -229,8 +229,8 @@ class JobsRepository @Inject constructor(
     
     suspend fun getLorryStock(date: String): Result<LorryStockResponse> = try {
         val userInfo = userRepository.getCurrentUserInfo().getOrThrow()
-        val stock = api.getLorryStock(userInfo.id, date)
-        Result.Success(stock)
+        val response = api.getLorryStock(userInfo.id, date)
+        Result.Success(response.data) // Unwrap ApiResponse<LorryStockResponse>
     } catch (e: Exception) {
         Result.error(e, "load_stock")
     }

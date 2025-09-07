@@ -76,7 +76,7 @@ interface DriverApi {
     suspend fun scanUID(@Body request: UIDScanRequest): UIDScanResponse
     
     @GET("inventory/lorry/{driver_id}/stock")
-    suspend fun getLorryStock(@Path("driver_id") driverId: Int, @Query("date") date: String): LorryStockResponse
+    suspend fun getLorryStock(@Path("driver_id") driverId: Int, @Query("date") date: String): ApiResponse<LorryStockResponse>
     
     @POST("inventory/lorry/{driver_id}/stock/upload")
     suspend fun uploadLorryStock(@Path("driver_id") driverId: Int, @Body body: LorryStockUploadRequest): ApiResponse<Unit>
