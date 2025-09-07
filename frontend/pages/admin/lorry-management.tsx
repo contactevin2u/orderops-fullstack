@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import { formatInTimeZone } from 'date-fns-tz';
 import AdminNav from '../../components/admin/AdminNav';
@@ -57,7 +57,9 @@ export default function LorryManagement() {
     notes: ''
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
+    if (!session) return;
+    
     setLoading(true);
     setError(null);
     
@@ -89,12 +91,12 @@ export default function LorryManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session]);
 
   useEffect(() => {
     loadData();
-  }, []);
-  
+  }, [loadData]);
+
   // Handle SSR case where session might be undefined
   if (!session) {
     return (
