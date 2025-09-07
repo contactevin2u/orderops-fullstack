@@ -39,12 +39,16 @@ object AppModule {
         val client = OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
             .build()
-        // Log API base for debugging
-        val apiBase = BuildConfig.API_BASE.ifEmpty { 
-            android.util.Log.e("AppModule", "API_BASE is empty! Using fallback URL")
-            "https://api.example.com/" 
+        // Require non-blank API_BASE at startup - no silent fallbacks
+        require(BuildConfig.API_BASE.isNotBlank()) { "Missing API_BASE" }
+        val apiBase = BuildConfig.API_BASE.let { base ->
+            // Ensure base URL ends with trailing slash for Retrofit
+            if (base.endsWith("/")) base else "$base/"
         }
-        android.util.Log.i("AppModule", "Using API base: $apiBase")
+        
+        // Log only the host for debugging (not the full URL)
+        val host = runCatching { java.net.URI(apiBase).host }.getOrNull()
+        android.util.Log.i("AppModule", "API Host: $host")
         
         val retrofit = Retrofit.Builder()
             .baseUrl(apiBase)

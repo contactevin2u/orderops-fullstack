@@ -36,9 +36,9 @@ jobs:
           printf "%s" "$GOOGLE_SERVICES_JSON" > app/google-services.json
           test -s app/google-services.json
 
-      - name: Create local.properties
+      - name: Create local.properties with API_BASE
         working-directory: driver-app
-        run: echo API_BASE=$API_BASE >> local.properties
+        run: echo "API_BASE=$API_BASE" >> local.properties
 
       - name: Create debug keystore and show SHA-1
         working-directory: driver-app
@@ -66,7 +66,7 @@ jobs:
         with:
           gradle-version: 8.9
           build-root-directory: driver-app
-          arguments: ":app:assembleDebug"
+          arguments: ":app:assembleDebug -PAPI_BASE=${{ secrets.API_BASE }}"
         env:
           # Increase Gradle JVM heap size
           GRADLE_OPTS: "-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError"

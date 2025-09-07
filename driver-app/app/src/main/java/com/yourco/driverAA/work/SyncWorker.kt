@@ -22,18 +22,15 @@ class SyncWorker @AssistedInject constructor(
         Log.d(TAG, "Starting background sync...")
         
         return try {
-            if (connectivityManager.isOnline()) {
-                val syncSuccess = syncManager.syncAll()
-                if (syncSuccess) {
-                    Log.d(TAG, "Background sync completed successfully")
-                    Result.success()
-                } else {
-                    Log.w(TAG, "Background sync completed with errors")
-                    Result.retry()
-                }
+            // WorkManager already handles network connectivity with NetworkType.CONNECTED constraint
+            // No need to double-check with connectivityManager.isOnline()
+            val syncSuccess = syncManager.syncAll()
+            if (syncSuccess) {
+                Log.d(TAG, "Background sync completed successfully")
+                Result.success()
             } else {
-                Log.d(TAG, "Device is offline, skipping sync")
-                Result.retry() // Retry when connectivity is restored
+                Log.w(TAG, "Background sync completed with errors")
+                Result.retry()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Background sync failed", e)

@@ -24,12 +24,19 @@ android {
         versionCode = 24
         versionName = "1.4.0"
 
-        val localProps = rootProject.file("local.properties")
-        val props = Properties()
-        if (localProps.exists()) {
-            props.load(localProps.inputStream())
-        }
-        val apiBase = props.getProperty("API_BASE") ?: System.getenv("API_BASE") ?: "https://orderops-api-v1.onrender.com"
+        // Priority: Gradle property > local.properties > environment variable > fallback
+        val apiBase = (findProperty("API_BASE") as String?)
+            ?: run {
+                val localProps = rootProject.file("local.properties")
+                val props = Properties()
+                if (localProps.exists()) {
+                    props.load(localProps.inputStream())
+                }
+                props.getProperty("API_BASE")
+            }
+            ?: System.getenv("API_BASE")
+            ?: "https://orderops-api-v1.onrender.com"
+        
         println("DEBUG: Setting API_BASE to: $apiBase")
         buildConfigField("String", "API_BASE", "\"$apiBase\"")
     }
