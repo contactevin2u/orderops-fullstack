@@ -2,7 +2,7 @@ from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, or_
@@ -34,6 +34,37 @@ router = APIRouter(
     prefix="/lorry-management",
     tags=["lorry-management"],
 )
+
+logger = logging.getLogger(__name__)
+
+
+async def parse_json_request(request: Request) -> dict:
+    """Parse JSON request from either JSON object or JSON string"""
+    try:
+        # First try to get as normal JSON
+        body = await request.json()
+        return body
+    except Exception as e:
+        # If that fails, try to get as text and parse as JSON string
+        try:
+            body_text = await request.body()
+            body_str = body_text.decode('utf-8')
+            
+            # If it's already a JSON string, parse it
+            if body_str.startswith('"') and body_str.endswith('"'):
+                # Remove outer quotes and unescape
+                body_str = json.loads(body_str)
+            
+            # Parse the JSON string
+            body_dict = json.loads(body_str)
+            return body_dict
+        except Exception as parse_error:
+            logger.error(f"Failed to parse request body: {parse_error}")
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Invalid request format. Expected JSON object or valid JSON string. Error: {str(parse_error)}"
+            )
+
 
 # Pydantic models for request/response
 class LorryAssignmentRequest(BaseModel):
@@ -1014,15 +1045,22 @@ async def update_driver_priority_lorry(
 
 @router.post("/auto-assign", response_model=dict)
 async def auto_assign_lorries(
-    request: AutoAssignRequest,
+    raw_request: Request,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Automatically assign lorries to scheduled drivers"""
     try:
+        # Parse the request using our robust parser
+        body = await parse_json_request(raw_request)
+        request = AutoAssignRequest(**body)
+        
         assignment_date = datetime.strptime(request.assignment_date, "%Y-%m-%d").date()
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    except Exception as e:
+        logger.error(f"Error parsing auto-assign request: {e}")
+        raise HTTPException(status_code=422, detail=f"Invalid request format: {str(e)}")
     
     assignment_service = LorryAssignmentService(db)
     
