@@ -39,6 +39,7 @@ import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.api.JobDto
 import com.yourco.driverAA.data.api.JobItemDto
+import com.yourco.driverAA.ui.delivery.DeliveryCompletionScreen
 import java.io.File
 
 // Utility functions for WhatsApp integration
@@ -122,6 +123,7 @@ fun JobDetailScreen(
     onNavigateToActiveOrders: () -> Unit = {},
     viewModel: JobDetailViewModel = hiltViewModel()
 ) {
+    var showDeliveryCompletion by remember { mutableStateOf(false) }
     val job by viewModel.job.collectAsState()
     val loading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
@@ -196,6 +198,21 @@ fun JobDetailScreen(
             onDismiss = { viewModel.dismissUpsellDialog() },
             onUpsell = { item, upsellType, newName, newPrice, installmentMonths ->
                 viewModel.upsellItem(item, upsellType, newName, newPrice, installmentMonths)
+            }
+        )
+    }
+    
+    // Delivery Completion Screen
+    if (showDeliveryCompletion && job != null) {
+        DeliveryCompletionScreen(
+            job = job,
+            onCompleteDelivery = { uidActions ->
+                showDeliveryCompletion = false
+                // Use the UID-aware completion method
+                viewModel.updateStatusWithUIDActions("DELIVERED", uidActions)
+            },
+            onCancel = {
+                showDeliveryCompletion = false
             }
         )
     }
@@ -607,17 +624,16 @@ private fun StatusActionButtons(
                         }
                         Button(
                             onClick = { 
-                                // Complete order with integrated UID workflow
-                                onStatusUpdate("DELIVERED")
+                                showDeliveryCompletion = true
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.tertiary
                             )
                         ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null)
+                            Icon(Icons.Default.QrCodeScanner, contentDescription = null)
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Complete")
+                            Text("Scan & Complete")
                         }
                     }
                 }
