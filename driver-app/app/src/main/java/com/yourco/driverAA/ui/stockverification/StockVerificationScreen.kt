@@ -213,6 +213,7 @@ fun StockVerificationScreen(
                             locationName = locationName,
                             isProcessing = uiState.isProcessing,
                             canClockIn = uiState.canClockIn,
+                            isLoadingLocation = isLoadingLocation,
                             cameraPermissionLauncher = cameraPermissionLauncher,
                             context = context
                         )
@@ -324,6 +325,7 @@ private fun StockVerificationSection(
     locationName: String,
     isProcessing: Boolean,
     canClockIn: Boolean,
+    isLoadingLocation: Boolean,
     cameraPermissionLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     context: android.content.Context
 ) {
