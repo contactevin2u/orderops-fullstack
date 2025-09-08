@@ -234,12 +234,12 @@ fun StockVerificationScreen(
     
     // QR Scanner
     if (showQRScanner) {
-        QRScannerScreen(
-            title = "Scan Stock UID",
-            onQRCodeScanned = { uid ->
+        StockQRScannerScreen(
+            title = "Scan Stock UIDs",
+            onUIDScanned = { uid ->
                 viewModel.addScannedUID(uid)
-                showQRScanner = false
             },
+            scannedUIDs = scannedUIDs,
             onDismiss = { showQRScanner = false }
         )
     }
@@ -544,12 +544,12 @@ private fun StockVerificationSection(
     
     // QR Scanner
     if (showQRScanner) {
-        QRScannerScreen(
-            title = "Scan Stock UID",
-            onQRCodeScanned = { uid ->
+        StockQRScannerScreen(
+            title = "Scan Stock UIDs", 
+            onUIDScanned = { uid ->
                 onAddUID(uid)
-                showQRScanner = false
             },
+            scannedUIDs = scannedUIDs,
             onDismiss = { showQRScanner = false }
         )
     }
