@@ -276,7 +276,7 @@ async def get_my_lorry_assignment(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     else:
-        target_date = date.today()
+        target_date = datetime.now().date()
     
     assignment = db.execute(
         select(LorryAssignment).where(
@@ -1099,7 +1099,7 @@ async def get_assignment_status(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     else:
-        target_date = date.today()
+        target_date = datetime.now().date()
     
     assignment_service = LorryAssignmentService(db)
     status = assignment_service.get_assignment_status_for_date(target_date)
@@ -1155,7 +1155,7 @@ async def clock_in_with_stock(
             raise HTTPException(status_code=400, detail="lat and lng are required")
             
         # Get today's lorry assignment
-        today = date.today()
+        today = datetime.now().date()
         assignment = db.query(Lorry).filter(
             Lorry.is_active == True,
             Lorry.is_available == True
