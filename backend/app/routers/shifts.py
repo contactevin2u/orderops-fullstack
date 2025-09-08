@@ -1,18 +1,23 @@
 """Driver shift management endpoints"""
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date, timedelta
 from typing import List, Optional
+import json
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, select, func
 
 from app.auth.firebase import get_current_driver
 from app.db import get_session
 from app.models.driver import Driver
 from app.models.driver_shift import DriverShift
 from app.models.commission_entry import CommissionEntry
+from app.models.lorry_assignment import LorryAssignment
+from app.models.lorry_stock_verification import LorryStockVerification
+from app.models.driver_hold import DriverHold
 from app.services.shift_service import ShiftService
+from app.utils.audit_logger import audit_logger
 
 
 router = APIRouter(prefix="/drivers/shifts", tags=["shifts"])
@@ -28,6 +33,7 @@ class ClockInRequest(BaseModel):
     lat: float = Field(..., ge=-90, le=90, description="Latitude")
     lng: float = Field(..., ge=-180, le=180, description="Longitude")
     location_name: Optional[str] = Field(None, max_length=200, description="Human-readable location name")
+    scanned_uids: Optional[List[str]] = Field(None, description="UIDs scanned for stock verification (optional)")
 
 
 class ClockOutRequest(BaseModel):
@@ -108,16 +114,44 @@ async def clock_in(
     current_driver: Driver = Depends(get_current_driver),
     db: Session = Depends(get_session)
 ):
-    """Clock in driver at specified location"""
+    """Unified clock in with automatic stock verification if lorry assignment exists"""
     try:
-        shift_service = ShiftService(db)
-        shift = shift_service.clock_in(
-            driver_id=current_driver.id,
-            lat=request.lat,
-            lng=request.lng,
-            location_name=request.location_name
-        )
-        return ShiftResponse.from_model(shift)
+        # Check for existing shift today
+        today = date.today()
+        existing_shift = db.execute(
+            select(DriverShift).where(
+                and_(
+                    DriverShift.driver_id == current_driver.id,
+                    func.date(DriverShift.clock_in_at) == today,
+                    DriverShift.status == "ACTIVE"
+                )
+            )
+        ).scalar_one_or_none()
+        
+        if existing_shift:
+            raise HTTPException(status_code=409, detail="Already clocked in today")
+
+        # Check for lorry assignment
+        assignment = db.execute(
+            select(LorryAssignment).where(
+                and_(
+                    LorryAssignment.driver_id == current_driver.id,
+                    LorryAssignment.assignment_date == today
+                )
+            )
+        ).scalar_one_or_none()
+
+        # If assignment exists and not yet stock verified, handle stock verification
+        if assignment and not assignment.stock_verified:
+            return await _clock_in_with_stock_verification(
+                request, current_driver, assignment, db
+            )
+        else:
+            # Regular clock in (no assignment or already verified)
+            return await _regular_clock_in(request, current_driver, db)
+            
+    except HTTPException:
+        raise
     except Exception as e:
         # Handle database table not found errors during migration period
         if "does not exist" in str(e) or "no such table" in str(e):
@@ -260,3 +294,151 @@ async def get_shift_status(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get shift status: {str(e)}"
         )
+
+
+# Helper functions for unified clock-in
+
+async def _regular_clock_in(
+    request: ClockInRequest, 
+    driver: Driver, 
+    db: Session
+) -> ShiftResponse:
+    """Regular clock in without stock verification"""
+    shift_service = ShiftService(db)
+    shift = shift_service.clock_in(
+        driver_id=driver.id,
+        lat=request.lat,
+        lng=request.lng,
+        location_name=request.location_name
+    )
+    return ShiftResponse.from_model(shift)
+
+
+async def _clock_in_with_stock_verification(
+    request: ClockInRequest,
+    driver: Driver, 
+    assignment: LorryAssignment,
+    db: Session
+) -> ShiftResponse:
+    """Clock in with lorry stock verification"""
+    scanned_uids = request.scanned_uids or []
+    today = date.today()
+    
+    # Create shift record first
+    now = datetime.now()
+    shift = DriverShift(
+        driver_id=driver.id,
+        clock_in_at=now,
+        clock_in_lat=request.lat,
+        clock_in_lng=request.lng,
+        clock_in_location_name=request.location_name,
+        is_outstation=False,  # Can be enhanced later
+        status="ACTIVE"
+    )
+    
+    db.add(shift)
+    db.flush()  # Get shift ID
+    
+    # Update assignment with shift
+    assignment.shift_id = shift.id
+    assignment.status = "ACTIVE"
+    
+    # Process stock verification
+    variance_detected = False
+    missing_uids = []
+    unexpected_uids = []
+    
+    # Get expected UIDs for this lorry from previous day's verification
+    expected_uids = await _get_expected_lorry_stock(db, assignment.lorry_id, today)
+    
+    # Detect variances
+    scanned_set = set(scanned_uids)
+    expected_set = set(expected_uids)
+    
+    missing_uids = list(expected_set - scanned_set)  # Expected but not scanned
+    unexpected_uids = list(scanned_set - expected_set)  # Scanned but not expected
+    
+    variance_detected = len(missing_uids) > 0 or len(unexpected_uids) > 0
+    variance_count = len(missing_uids) + len(unexpected_uids)
+    
+    # Create stock verification record
+    verification = LorryStockVerification(
+        assignment_id=assignment.id,
+        driver_id=driver.id,
+        lorry_id=assignment.lorry_id,
+        verification_date=today,
+        scanned_uids=json.dumps(scanned_uids),
+        total_scanned=len(scanned_uids),
+        expected_uids=json.dumps(expected_uids),
+        total_expected=len(expected_uids),
+        variance_count=variance_count,
+        missing_uids=json.dumps(missing_uids),
+        unexpected_uids=json.dumps(unexpected_uids),
+        verified_at=now,
+        verified_by=driver.id
+    )
+    
+    db.add(verification)
+    
+    # Mark assignment as stock verified
+    assignment.stock_verified = True
+    assignment.stock_verified_at = now
+    
+    # Create driver hold if variance detected
+    if variance_detected:
+        hold_description = f"Stock variance detected for lorry {assignment.lorry_id}:"
+        if missing_uids:
+            hold_description += f" Missing {len(missing_uids)} items"
+        if unexpected_uids:
+            hold_description += f" Unexpected {len(unexpected_uids)} items"
+            
+        hold = DriverHold(
+            driver_id=driver.id,
+            reason="STOCK_VARIANCE",
+            description=hold_description,
+            status="ACTIVE",
+            created_by=1,  # System-generated
+            created_at=now,
+            lorry_id=assignment.lorry_id,
+            variance_count=variance_count
+        )
+        db.add(hold)
+    
+    # Commit all changes
+    db.commit()
+    
+    # Log audit trail
+    await audit_logger(
+        db=db, 
+        user_id=driver.id, 
+        action="UNIFIED_CLOCK_IN_WITH_STOCK", 
+        resource_type="driver_shift", 
+        resource_id=shift.id,
+        details={
+            "lorry_id": assignment.lorry_id,
+            "scanned_uids_count": len(scanned_uids),
+            "variance_detected": variance_detected,
+            "variance_count": variance_count
+        }
+    )
+    
+    return ShiftResponse.from_model(shift)
+
+
+async def _get_expected_lorry_stock(db: Session, lorry_id: str, today: date) -> list:
+    """Get expected stock for lorry from previous verification"""
+    yesterday = today - timedelta(days=1)
+    
+    # Get most recent verification for this lorry
+    yesterday_verification = db.execute(
+        select(LorryStockVerification)
+        .where(LorryStockVerification.lorry_id == lorry_id)
+        .where(LorryStockVerification.verification_date <= yesterday)
+        .order_by(LorryStockVerification.created_at.desc())
+    ).scalar_one_or_none()
+    
+    if yesterday_verification:
+        return json.loads(yesterday_verification.scanned_uids)
+    else:
+        # No previous verification found - return empty
+        return []

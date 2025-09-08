@@ -119,14 +119,14 @@ class StockVerificationViewModel @Inject constructor(
             Log.d(TAG, "Starting clock-in with ${_scannedUIDs.value.size} scanned UIDs")
             
             try {
-                val request = ClockInWithStockRequest(
+                val request = ClockInRequest(
                     lat = lat,
                     lng = lng,
                     location_name = locationName,
                     scanned_uids = _scannedUIDs.value
                 )
                 
-                when (val result = jobsRepository.clockInWithStock(request)) {
+                when (val result = jobsRepository.clockIn(request)) {
                     is Result.Success -> {
                         val response = result.data
                         _uiState.value = currentState.copy(

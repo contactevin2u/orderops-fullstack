@@ -120,11 +120,26 @@ export default function LorryManagementPage() {
     
     try {
       const backendUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
+      console.log('Loading lorry management data from:', backendUrl);
+      
       const [assignmentsRes, holdsRes, driversRes] = await Promise.all([
         fetch(`${backendUrl}/lorry-management/assignments`, { credentials: 'include' }),
         fetch(`${backendUrl}/lorry-management/holds`, { credentials: 'include' }),
         fetch(`${backendUrl}/drivers`, { credentials: 'include' })
       ]);
+
+      console.log('Response status:', {
+        assignments: assignmentsRes.status,
+        holds: holdsRes.status,
+        drivers: driversRes.status
+      });
+
+      // Check for 401s and redirect to login
+      if (assignmentsRes.status === 401 || holdsRes.status === 401 || driversRes.status === 401) {
+        console.log('401 Unauthorized - redirecting to login');
+        window.location.href = '/login';
+        return;
+      }
 
       if (assignmentsRes.ok) {
         const assignmentsData = await assignmentsRes.json();

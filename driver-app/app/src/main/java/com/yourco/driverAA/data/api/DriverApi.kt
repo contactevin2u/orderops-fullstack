@@ -233,7 +233,8 @@ data class UpsellIncentivesDto(
 data class ClockInRequest(
     val lat: Double,
     val lng: Double,
-    val location_name: String? = null
+    val location_name: String? = null,
+    val scanned_uids: List<String>? = null
 )
 
 @Serializable
