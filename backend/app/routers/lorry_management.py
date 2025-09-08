@@ -11,6 +11,7 @@ import json
 
 from ..db import get_session
 from ..models import (
+    Lorry,
     LorryAssignment, 
     LorryStockVerification, 
     DriverHold, 
@@ -26,6 +27,7 @@ from ..core.config import settings
 from ..utils.responses import envelope
 from ..utils.audit import log_action
 from ..services.lorry_inventory_service import LorryInventoryService
+from ..services.lorry_assignment_service import LorryAssignmentService
 
 
 router = APIRouter(
@@ -739,6 +741,45 @@ class StockTransactionResponse(BaseModel):
     transaction_date: str
     created_at: str
 
+# Lorry Management Models
+class CreateLorryRequest(BaseModel):
+    lorry_id: str
+    plate_number: Optional[str] = None
+    model: Optional[str] = None
+    capacity: Optional[str] = None
+    base_warehouse: str = "BATU_CAVES"
+    notes: Optional[str] = None
+
+class LorryResponse(BaseModel):
+    id: int
+    lorry_id: str
+    plate_number: Optional[str]
+    model: Optional[str]
+    capacity: Optional[str]
+    base_warehouse: str
+    is_active: bool
+    is_available: bool
+    notes: Optional[str]
+    current_location: Optional[str]
+    last_maintenance_date: Optional[str]
+    created_at: str
+    updated_at: str
+
+class UpdateDriverPriorityRequest(BaseModel):
+    priority_lorry_id: Optional[str] = None
+
+class AutoAssignRequest(BaseModel):
+    assignment_date: str  # YYYY-MM-DD
+
+class AssignmentStatusResponse(BaseModel):
+    assignment_date: str
+    scheduled_drivers: int
+    assigned_drivers: int
+    unassigned_drivers: int
+    available_lorries: int
+    can_auto_assign: bool
+    assignments: List[Dict[str, any]]
+
 
 # Admin Stock Management Endpoints
 
@@ -885,3 +926,171 @@ async def get_all_lorries_inventory_summary(
     inventory_service = LorryInventoryService(db)
     summary = inventory_service.get_lorry_inventory_summary()
     return envelope(summary)
+
+
+# Lorry Management Endpoints
+
+@router.post("/lorries", response_model=dict)
+async def create_lorry(
+    request: CreateLorryRequest,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Create a new lorry"""
+    assignment_service = LorryAssignmentService(db)
+    
+    result = assignment_service.create_lorry(
+        lorry_id=request.lorry_id,
+        plate_number=request.plate_number,
+        model=request.model,
+        capacity=request.capacity,
+        base_warehouse=request.base_warehouse,
+        notes=request.notes
+    )
+    
+    if result["success"]:
+        # Log audit action
+        log_action(
+            db, 
+            user_id=current_user.id, 
+            action="LORRY_CREATE", 
+            resource_type="lorry", 
+            resource_id=result["lorry"]["id"] if result["lorry"] else None,
+            details={
+                "lorry_id": request.lorry_id,
+                "base_warehouse": request.base_warehouse
+            }
+        )
+    
+    return envelope(result)
+
+
+@router.get("/lorries", response_model=dict)
+async def get_all_lorries(
+    include_inactive: bool = False,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get all lorries"""
+    assignment_service = LorryAssignmentService(db)
+    lorries = assignment_service.get_all_lorries(include_inactive=include_inactive)
+    
+    return envelope({
+        "lorries": lorries,
+        "total_count": len(lorries)
+    })
+
+
+@router.patch("/drivers/{driver_id}/priority-lorry", response_model=dict)
+async def update_driver_priority_lorry(
+    driver_id: int,
+    request: UpdateDriverPriorityRequest,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Update driver's priority lorry"""
+    assignment_service = LorryAssignmentService(db)
+    
+    result = assignment_service.update_driver_priority_lorry(
+        driver_id=driver_id,
+        priority_lorry_id=request.priority_lorry_id
+    )
+    
+    if result["success"]:
+        # Log audit action
+        log_action(
+            db, 
+            user_id=current_user.id, 
+            action="DRIVER_PRIORITY_LORRY_UPDATE", 
+            resource_type="driver", 
+            resource_id=driver_id,
+            details={
+                "priority_lorry_id": request.priority_lorry_id
+            }
+        )
+    
+    return envelope(result)
+
+
+@router.post("/auto-assign", response_model=dict)
+async def auto_assign_lorries(
+    request: AutoAssignRequest,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Automatically assign lorries to scheduled drivers"""
+    try:
+        assignment_date = datetime.strptime(request.assignment_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    assignment_service = LorryAssignmentService(db)
+    
+    result = assignment_service.auto_assign_lorries_for_date(
+        assignment_date=assignment_date,
+        admin_user_id=current_user.id
+    )
+    
+    if result["success"] and result["assignments_created"] > 0:
+        # Log audit action
+        log_action(
+            db, 
+            user_id=current_user.id, 
+            action="LORRY_AUTO_ASSIGN", 
+            resource_type="lorry_assignment", 
+            resource_id=None,
+            details={
+                "assignment_date": request.assignment_date,
+                "assignments_created": result["assignments_created"]
+            }
+        )
+    
+    return envelope(result)
+
+
+@router.get("/assignment-status", response_model=dict)
+async def get_assignment_status(
+    date: Optional[str] = None,  # YYYY-MM-DD, defaults to today
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get assignment status and statistics for a specific date"""
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    else:
+        target_date = date.today()
+    
+    assignment_service = LorryAssignmentService(db)
+    status = assignment_service.get_assignment_status_for_date(target_date)
+    
+    return envelope(status)
+
+
+@router.get("/drivers", response_model=dict)
+async def get_drivers_with_priority_lorries(
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get all active drivers with their priority lorry assignments"""
+    drivers = db.execute(
+        select(Driver).where(Driver.is_active == True).order_by(Driver.name, Driver.id)
+    ).scalars().all()
+    
+    driver_list = []
+    for driver in drivers:
+        driver_list.append({
+            "id": driver.id,
+            "name": driver.name or f"Driver {driver.id}",
+            "phone": driver.phone,
+            "base_warehouse": driver.base_warehouse,
+            "priority_lorry_id": driver.priority_lorry_id,
+            "created_at": driver.created_at.isoformat()
+        })
+    
+    return envelope({
+        "drivers": driver_list,
+        "total_count": len(driver_list)
+    })
