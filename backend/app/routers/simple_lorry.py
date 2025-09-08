@@ -172,6 +172,19 @@ async def get_all_lorries(
         )
 
 
+@router.post("/test-validation")
+async def test_validation(
+    request: CreateLorryRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """Test endpoint to debug validation issues"""
+    return envelope({
+        "message": "Validation successful",
+        "request_data": request.dict(),
+        "user": current_user.get('username', 'unknown')
+    })
+
+
 @router.get("/status")
 async def get_status(
     current_user: dict = Depends(get_current_user),
