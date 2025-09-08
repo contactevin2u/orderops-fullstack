@@ -319,6 +319,13 @@ class JobsRepository @Inject constructor(
         Result.error(e, "clock_in_stock")
     }
     
+    suspend fun clockIn(request: ClockInRequest): Result<ShiftResponse> = try {
+        val response = api.clockIn(request)
+        Result.Success(response)
+    } catch (e: Exception) {
+        Result.error(e, "clock_in")
+    }
+    
     suspend fun getDriverStatus(): Result<DriverStatusResponse> = try {
         val response = api.getDriverStatus()
         Result.Success(response.data)

@@ -136,7 +136,7 @@ class StockVerificationViewModel @Inject constructor(
                             canAccessOrders = true
                         )
                         
-                        Log.d(TAG, "Clock-in successful: ${response.message}")
+                        Log.d(TAG, "Clock-in successful: Shift ${response.id} started")
                         
                         // Clear scanned UIDs after successful clock-in
                         _scannedUIDs.value = emptyList()
@@ -178,7 +178,7 @@ data class StockVerificationUiState(
     val lorryAssignment: LorryAssignmentResponse? = null,
     val canClockIn: Boolean = false,
     val clockInComplete: Boolean = false,
-    val clockInResponse: ClockInResponse? = null,
+    val clockInResponse: ShiftResponse? = null,
     val canAccessOrders: Boolean = false,
     val error: String? = null
 )
