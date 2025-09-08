@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.location.*
 import com.yourco.driverAA.ui.components.*
+import com.yourco.driverAA.ui.qr.QRScannerScreen
 import com.yourco.driverAA.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,7 +37,7 @@ fun StockVerificationScreen(
     val uiState by viewModel.uiState.collectAsState()
     val scannedUIDs by viewModel.scannedUIDs.collectAsState()
     
-    var showUIDInput by remember { mutableStateOf(false) }
+    var showQRScanner by remember { mutableStateOf(false) }
     var currentLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var locationName by remember { mutableStateOf("") }
     
@@ -49,6 +50,15 @@ fun StockVerificationScreen(
                 currentLocation = Pair(lat, lng)
                 locationName = name
             }
+        }
+    }
+    
+    // Camera permission launcher
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            showQRScanner = true
         }
     }
     
@@ -196,7 +206,9 @@ fun StockVerificationScreen(
                             currentLocation = currentLocation,
                             locationName = locationName,
                             isProcessing = uiState.isProcessing,
-                            canClockIn = uiState.canClockIn
+                            canClockIn = uiState.canClockIn,
+                            cameraPermissionLauncher = cameraPermissionLauncher,
+                            context = context
                         )
                     }
                 }
@@ -214,14 +226,15 @@ fun StockVerificationScreen(
         }
     }
     
-    // UID Input Dialog
-    if (showUIDInput) {
-        UIDInputDialog(
-            onDismiss = { showUIDInput = false },
-            onUIDScanned = { uid ->
+    // QR Scanner
+    if (showQRScanner) {
+        QRScannerScreen(
+            title = "Scan Stock UID",
+            onQRCodeScanned = { uid ->
                 viewModel.addScannedUID(uid)
-                showUIDInput = false
-            }
+                showQRScanner = false
+            },
+            onDismiss = { showQRScanner = false }
         )
     }
 }
@@ -304,9 +317,11 @@ private fun StockVerificationSection(
     currentLocation: Pair<Double, Double>?,
     locationName: String,
     isProcessing: Boolean,
-    canClockIn: Boolean
+    canClockIn: Boolean,
+    cameraPermissionLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    context: android.content.Context
 ) {
-    var showUIDInput by remember { mutableStateOf(false) }
+    var showQRScanner by remember { mutableStateOf(false) }
     
     Column {
         // UID Scanning Section
@@ -339,7 +354,17 @@ private fun StockVerificationSection(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { showUIDInput = true },
+                        onClick = {
+                            if (ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.CAMERA
+                                ) == PackageManager.PERMISSION_GRANTED
+                            ) {
+                                showQRScanner = true
+                            } else {
+                                cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                            }
+                        },
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(Icons.Default.QrCodeScanner, contentDescription = null)
@@ -471,14 +496,15 @@ private fun StockVerificationSection(
         }
     }
     
-    // UID Input Dialog
-    if (showUIDInput) {
-        UIDInputDialog(
-            onDismiss = { showUIDInput = false },
-            onUIDScanned = { uid ->
+    // QR Scanner
+    if (showQRScanner) {
+        QRScannerScreen(
+            title = "Scan Stock UID",
+            onQRCodeScanned = { uid ->
                 onAddUID(uid)
-                showUIDInput = false
-            }
+                showQRScanner = false
+            },
+            onDismiss = { showQRScanner = false }
         )
     }
 }
