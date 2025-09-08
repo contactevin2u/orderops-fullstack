@@ -24,34 +24,6 @@ router = APIRouter(
 logger = logging.getLogger(__name__)
 
 
-async def parse_lorry_request(request: Request) -> CreateLorryRequest:
-    """Parse lorry request from either JSON object or JSON string"""
-    try:
-        # First try to get as normal JSON
-        body = await request.json()
-        return CreateLorryRequest(**body)
-    except Exception as e:
-        # If that fails, try to get as text and parse as JSON string
-        try:
-            body_text = await request.body()
-            body_str = body_text.decode('utf-8')
-            
-            # If it's already a JSON string, parse it
-            if body_str.startswith('"') and body_str.endswith('"'):
-                # Remove outer quotes and unescape
-                body_str = json.loads(body_str)
-            
-            # Parse the JSON string
-            body_dict = json.loads(body_str)
-            return CreateLorryRequest(**body_dict)
-        except Exception as parse_error:
-            logger.error(f"Failed to parse request body: {parse_error}")
-            raise HTTPException(
-                status_code=422, 
-                detail=f"Invalid request format. Expected JSON object or valid JSON string. Error: {str(parse_error)}"
-            )
-
-
 # Pydantic models for basic lorry operations
 class CreateLorryRequest(BaseModel):
     lorry_id: str
@@ -87,6 +59,34 @@ class LorryResponse(BaseModel):
     is_available: bool
     notes: Optional[str]
     created_at: str
+
+
+async def parse_lorry_request(request: Request) -> CreateLorryRequest:
+    """Parse lorry request from either JSON object or JSON string"""
+    try:
+        # First try to get as normal JSON
+        body = await request.json()
+        return CreateLorryRequest(**body)
+    except Exception as e:
+        # If that fails, try to get as text and parse as JSON string
+        try:
+            body_text = await request.body()
+            body_str = body_text.decode('utf-8')
+            
+            # If it's already a JSON string, parse it
+            if body_str.startswith('"') and body_str.endswith('"'):
+                # Remove outer quotes and unescape
+                body_str = json.loads(body_str)
+            
+            # Parse the JSON string
+            body_dict = json.loads(body_str)
+            return CreateLorryRequest(**body_dict)
+        except Exception as parse_error:
+            logger.error(f"Failed to parse request body: {parse_error}")
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Invalid request format. Expected JSON object or valid JSON string. Error: {str(parse_error)}"
+            )
 
 
 @router.post("/lorries", response_model=Dict[str, Any])
