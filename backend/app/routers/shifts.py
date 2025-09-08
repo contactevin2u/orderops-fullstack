@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, select, func
 
-from app.auth.firebase import get_current_driver
+from app.auth.firebase import driver_auth
 from app.db import get_session
 from app.models.driver import Driver
 from app.models.driver_shift import DriverShift
@@ -109,11 +109,14 @@ class ShiftSummaryResponse(BaseModel):
 @router.post("/clock-in", response_model=ShiftResponse)
 async def clock_in(
     request: ClockInRequest,
-    current_driver: Driver = Depends(get_current_driver),
+    current_driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Unified clock in with automatic stock verification if lorry assignment exists"""
     try:
+        print(f"DEBUG: Clock-in request received - lat: {request.lat}, lng: {request.lng}, scanned_uids: {request.scanned_uids}")
+        print(f"DEBUG: Driver: {current_driver.id if current_driver else 'None'}")
+        
         # Check for existing shift today
         today = date.today()
         existing_shift = db.execute(
@@ -183,7 +186,7 @@ async def clock_in(
 @router.post("/clock-out", response_model=ShiftResponse)
 async def clock_out(
     request: ClockOutRequest,
-    current_driver: Driver = Depends(get_current_driver),
+    current_driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Clock out driver at specified location"""
@@ -212,7 +215,7 @@ async def clock_out(
 
 @router.get("/active", response_model=Optional[ShiftResponse])
 async def get_active_shift(
-    current_driver: Driver = Depends(get_current_driver),
+    current_driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Get current active shift for driver"""
@@ -225,7 +228,7 @@ async def get_active_shift(
 async def get_shift_history(
     limit: int = 10,
     include_active: bool = True,
-    current_driver: Driver = Depends(get_current_driver),
+    current_driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Get driver's shift history"""
@@ -241,7 +244,7 @@ async def get_shift_history(
 @router.get("/{shift_id}/summary", response_model=ShiftSummaryResponse)
 async def get_shift_summary(
     shift_id: int,
-    current_driver: Driver = Depends(get_current_driver),
+    current_driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Get detailed shift summary including commission breakdown"""
@@ -273,7 +276,7 @@ async def get_shift_summary(
 
 @router.get("/status")
 async def get_shift_status(
-    current_driver: Driver = Depends(get_current_driver),
+    current_driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Get driver's current shift status and basic info"""
