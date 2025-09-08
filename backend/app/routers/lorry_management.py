@@ -290,7 +290,7 @@ async def get_my_lorry_assignment(
     if not assignment:
         return envelope({"message": "No lorry assignment found for today", "assignment": None})
     
-    response = {
+    assignment_data = {
         "id": assignment.id,
         "lorry_id": assignment.lorry_id,
         "assignment_date": assignment.assignment_date.strftime("%Y-%m-%d"),
@@ -299,6 +299,11 @@ async def get_my_lorry_assignment(
         "stock_verified_at": assignment.stock_verified_at.isoformat() if assignment.stock_verified_at else None,
         "shift_id": assignment.shift_id,
         "notes": assignment.notes
+    }
+    
+    response = {
+        "message": f"Assignment found for lorry {assignment.lorry_id}",
+        "assignment": assignment_data
     }
     
     return envelope(response)
