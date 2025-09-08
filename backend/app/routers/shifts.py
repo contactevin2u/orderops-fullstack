@@ -412,9 +412,7 @@ async def _clock_in_with_stock_verification(
         total_expected=len(expected_uids),
         variance_count=variance_count,
         missing_uids=json.dumps(missing_uids),
-        unexpected_uids=json.dumps(unexpected_uids),
-        verified_at=now,
-        verified_by=driver.id
+        unexpected_uids=json.dumps(unexpected_uids)
     )
     
     db.add(verification)
