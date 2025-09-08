@@ -74,7 +74,7 @@ function getUserFriendlyErrorMessage(status: number, path: string, serverMessage
   return serverMessage || `An unexpected error occurred (${status}). Please try again.`;
 }
 
-async function request<T = any>(
+export async function request<T = any>(
   path: string,
   init?: RequestInit & { json?: any; idempotencyKey?: string }
 ): Promise<T> {
