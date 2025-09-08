@@ -13,11 +13,9 @@ from app.db import get_session
 from app.models.driver import Driver
 from app.models.driver_shift import DriverShift
 from app.models.commission_entry import CommissionEntry
-from app.models.lorry_assignment import LorryAssignment
-from app.models.lorry_stock_verification import LorryStockVerification
-from app.models.driver_hold import DriverHold
+from app.models.lorry_assignment import LorryAssignment, LorryStockVerification, DriverHold
 from app.services.shift_service import ShiftService
-from app.utils.audit_logger import audit_logger
+from app.utils.audit import log_action
 
 
 router = APIRouter(prefix="/drivers/shifts", tags=["shifts"])
@@ -379,6 +377,7 @@ async def _clock_in_with_stock_verification(
     )
     
     db.add(verification)
+    db.flush()  # Get verification ID
     
     # Mark assignment as stock verified
     assignment.stock_verified = True
@@ -398,9 +397,8 @@ async def _clock_in_with_stock_verification(
             description=hold_description,
             status="ACTIVE",
             created_by=1,  # System-generated
-            created_at=now,
-            lorry_id=assignment.lorry_id,
-            variance_count=variance_count
+            related_assignment_id=assignment.id,
+            related_verification_id=verification.id
         )
         db.add(hold)
     
@@ -408,7 +406,7 @@ async def _clock_in_with_stock_verification(
     db.commit()
     
     # Log audit trail
-    await audit_logger(
+    log_action(
         db=db, 
         user_id=driver.id, 
         action="UNIFIED_CLOCK_IN_WITH_STOCK", 

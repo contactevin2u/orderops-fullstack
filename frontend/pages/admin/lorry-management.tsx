@@ -119,13 +119,12 @@ export default function LorryManagementPage() {
     setError(null);
     
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
-      console.log('Loading lorry management data from:', backendUrl);
+      console.log('Loading lorry management data from proxy');
       
       const [assignmentsRes, holdsRes, driversRes] = await Promise.all([
-        fetch(`${backendUrl}/lorry-management/assignments`, { credentials: 'include' }),
-        fetch(`${backendUrl}/lorry-management/holds`, { credentials: 'include' }),
-        fetch(`${backendUrl}/drivers`, { credentials: 'include' })
+        fetch(`/_api/lorry-management/assignments`, { credentials: 'include' }),
+        fetch(`/_api/lorry-management/holds`, { credentials: 'include' }),
+        fetch(`/_api/drivers`, { credentials: 'include' })
       ]);
 
       console.log('Response status:', {
@@ -173,8 +172,7 @@ export default function LorryManagementPage() {
     e.preventDefault();
     
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/lorry-management/assignments`, {
+      const response = await fetch(`/_api/lorry-management/assignments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -209,8 +207,7 @@ export default function LorryManagementPage() {
     e.preventDefault();
     
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/lorry-management/holds`, {
+      const response = await fetch(`/_api/lorry-management/holds`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -246,8 +243,7 @@ export default function LorryManagementPage() {
     if (!resolutionNotes) return;
 
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/lorry-management/holds/${holdId}/resolve`, {
+      const response = await fetch(`/_api/lorry-management/holds/${holdId}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
