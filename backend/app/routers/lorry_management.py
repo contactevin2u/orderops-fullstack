@@ -22,7 +22,7 @@ from ..models import (
     LorryStockTransaction
 )
 from ..auth.deps import require_roles, Role, get_current_user
-from ..auth.firebase import driver_auth
+from ..auth.firebase import driver_auth, firebase_auth
 from ..core.config import settings
 from ..utils.responses import envelope
 from ..utils.audit import log_action
