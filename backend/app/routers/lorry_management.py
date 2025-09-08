@@ -1024,11 +1024,15 @@ async def get_all_lorries(
 @router.patch("/drivers/{driver_id}/priority-lorry", response_model=dict)
 async def update_driver_priority_lorry(
     driver_id: int,
-    request: UpdateDriverPriorityRequest,
+    raw_request: Request,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Update driver's priority lorry"""
+    # Parse JSON with robust handling
+    body = await parse_json_request(raw_request)
+    request = UpdateDriverPriorityRequest(**body)
+    
     assignment_service = LorryAssignmentService(db)
     
     result = assignment_service.update_driver_priority_lorry(
