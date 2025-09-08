@@ -65,12 +65,12 @@ class LorryResponse(BaseModel):
     created_at: str
 
 
-async def parse_lorry_request(request: Request) -> CreateLorryRequest:
-    """Parse lorry request from either JSON object or JSON string"""
+async def parse_json_request(request: Request) -> dict:
+    """Parse JSON request from either JSON object or JSON string"""
     try:
         # First try to get as normal JSON
         body = await request.json()
-        return CreateLorryRequest(**body)
+        return body
     except Exception as e:
         # If that fails, try to get as text and parse as JSON string
         try:
@@ -84,13 +84,28 @@ async def parse_lorry_request(request: Request) -> CreateLorryRequest:
             
             # Parse the JSON string
             body_dict = json.loads(body_str)
-            return CreateLorryRequest(**body_dict)
+            return body_dict
         except Exception as parse_error:
             logger.error(f"Failed to parse request body: {parse_error}")
             raise HTTPException(
                 status_code=422, 
                 detail=f"Invalid request format. Expected JSON object or valid JSON string. Error: {str(parse_error)}"
             )
+
+
+async def parse_lorry_request(request: Request) -> CreateLorryRequest:
+    """Parse lorry request from either JSON object or JSON string"""
+    try:
+        body = await parse_json_request(request)
+        return CreateLorryRequest(**body)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to parse lorry request: {e}")
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid lorry request format: {str(e)}"
+        )
 
 
 @router.post("/lorries", response_model=Dict[str, Any])
@@ -290,12 +305,16 @@ async def get_drivers_with_priority_lorries(
 @router.patch("/drivers/{driver_id}/priority-lorry", response_model=Dict[str, Any])
 async def update_driver_priority_lorry(
     driver_id: int,
-    request: UpdatePriorityLorryRequest,
+    raw_request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
     """Update driver's priority lorry assignment"""
     try:
+        # Parse the request using our robust parser
+        body = await parse_json_request(raw_request)
+        request = UpdatePriorityLorryRequest(**body)
+        
         # Get the driver
         driver = db.execute(
             select(Driver).where(Driver.id == driver_id)
