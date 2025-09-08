@@ -119,6 +119,8 @@ async def clock_in(
         
         # Check for existing shift today
         today = date.today()
+        print(f"DEBUG: Checking for existing shift for driver {current_driver.id} on {today}")
+        
         existing_shift = db.execute(
             select(DriverShift).where(
                 and_(
@@ -128,6 +130,9 @@ async def clock_in(
                 )
             )
         ).scalar_one_or_none()
+        
+        print(f"DEBUG: Existing shift: {existing_shift}")
+        
         
         if existing_shift:
             raise HTTPException(status_code=409, detail="Already clocked in today")
@@ -154,10 +159,14 @@ async def clock_in(
     except HTTPException:
         raise
     except Exception as e:
+        error_msg = str(e)
+        print(f"DEBUG: Clock-in exception occurred: {error_msg}")
+        print(f"DEBUG: Exception type: {type(e)}")
+        
         # Handle database table not found errors during migration period
-        if "does not exist" in str(e) or "no such table" in str(e):
+        if "does not exist" in error_msg or "no such table" in error_msg:
             # Fallback: return a simplified successful response for driver app compatibility
-            print(f"FALLBACK: Clock-in tables missing, using simplified response: {str(e)}")
+            print(f"FALLBACK: Clock-in tables missing, using simplified response: {error_msg}")
             return ShiftResponse(
                 id=1,  # Placeholder
                 driver_id=current_driver.id,
@@ -177,9 +186,12 @@ async def clock_in(
                 notes=f"Simplified clock-in. Scanned {len(request.scanned_uids or [])} items.",
                 created_at=int(datetime.now(timezone.utc).timestamp())
             )
+        else:
+            print(f"ERROR: Non-table-missing error in clock-in: {error_msg}")
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Clock-in failed: {str(e)}"
+            detail=f"Clock-in failed: {error_msg}"
         )
 
 
