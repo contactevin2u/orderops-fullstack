@@ -2,12 +2,13 @@ from datetime import datetime, date
 from typing import List, Optional, Dict, Any
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, or_
 from sqlalchemy.exc import IntegrityError
 import json
+from fastapi.exceptions import RequestValidationError
 
 from ..db import get_session
 from ..models import Lorry
@@ -21,6 +22,34 @@ router = APIRouter(
 )
 
 logger = logging.getLogger(__name__)
+
+
+async def parse_lorry_request(request: Request) -> CreateLorryRequest:
+    """Parse lorry request from either JSON object or JSON string"""
+    try:
+        # First try to get as normal JSON
+        body = await request.json()
+        return CreateLorryRequest(**body)
+    except Exception as e:
+        # If that fails, try to get as text and parse as JSON string
+        try:
+            body_text = await request.body()
+            body_str = body_text.decode('utf-8')
+            
+            # If it's already a JSON string, parse it
+            if body_str.startswith('"') and body_str.endswith('"'):
+                # Remove outer quotes and unescape
+                body_str = json.loads(body_str)
+            
+            # Parse the JSON string
+            body_dict = json.loads(body_str)
+            return CreateLorryRequest(**body_dict)
+        except Exception as parse_error:
+            logger.error(f"Failed to parse request body: {parse_error}")
+            raise HTTPException(
+                status_code=422, 
+                detail=f"Invalid request format. Expected JSON object or valid JSON string. Error: {str(parse_error)}"
+            )
 
 
 # Pydantic models for basic lorry operations
@@ -62,12 +91,15 @@ class LorryResponse(BaseModel):
 
 @router.post("/lorries", response_model=Dict[str, Any])
 async def create_lorry(
-    request: CreateLorryRequest,
+    raw_request: Request,
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_session)
 ):
     """Create a new lorry"""
     try:
+        # Parse the request using our robust parser
+        request = await parse_lorry_request(raw_request)
+        
         logger.info(f"Creating lorry request: {request.dict()}")
         logger.info(f"Current user: {current_user.get('username', 'unknown')}")
         # Check if lorry_id already exists
