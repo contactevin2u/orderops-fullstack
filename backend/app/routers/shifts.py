@@ -113,9 +113,18 @@ async def clock_in(
     db: Session = Depends(get_session)
 ):
     """Unified clock in with automatic stock verification if lorry assignment exists"""
+    print(f"DEBUG: Clock-in request received - lat: {request.lat}, lng: {request.lng}, scanned_uids: {request.scanned_uids}")
+    print(f"DEBUG: Driver: {current_driver.id if current_driver else 'None'}")
+    
+    # Validate GPS coordinates - reject 0.0, 0.0 (no location)
+    if request.lat == 0.0 and request.lng == 0.0:
+        print("DEBUG: Invalid GPS coordinates (0.0, 0.0) - location services required")
+        raise HTTPException(
+            status_code=400, 
+            detail="Valid GPS location is required for clock-in. Please enable location services."
+        )
+    
     try:
-        print(f"DEBUG: Clock-in request received - lat: {request.lat}, lng: {request.lng}, scanned_uids: {request.scanned_uids}")
-        print(f"DEBUG: Driver: {current_driver.id if current_driver else 'None'}")
         
         # Check for existing shift today
         today = date.today()
