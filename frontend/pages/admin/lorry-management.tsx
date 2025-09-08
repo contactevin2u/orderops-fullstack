@@ -1,6 +1,5 @@
 import { useSession } from 'next-auth/react';
 import { useEffect, useMemo, useState } from 'react';
-import { request } from '../../utils/api';
 import AdminLayout from '@/components/Layout/AdminLayout';
 
 type Assignment = { id:number; lorry_id:string; driver_id:number; date:string; notes?:string|null; driver_name?: string; assignment_date?: string };
@@ -8,11 +7,22 @@ type Hold       = { id:number; driver_id:number; reason:string; status:'ACTIVE'|
 type Driver     = { id:number; name?:string|null; phone?:string|null };
 
 async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
-  try {
-    return await request<T>(path, init);
-  } catch (e: any) {
-    throw new Error(e.message || `Failed to fetch ${path}`);
+  const res = await fetch(`/_api${path.startsWith('/') ? '' : '/'}${path}`, {
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', ...(init.headers || {}) },
+    ...init,
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText} ${path}`);
+  const json = await res.json().catch(() => null);
+
+  // normalize: [], {}, {ok,data}, {data:{items}}
+  if (json && typeof json === 'object') {
+    if ('data' in json) {
+      const d: any = (json as any).data;
+      return (d && typeof d === 'object' && 'items' in d ? d.items : d) as T;
+    }
   }
+  return (json as T) ?? ([] as T);
 }
 
 const asArray = <T,>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : []);
