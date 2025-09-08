@@ -342,3 +342,58 @@ async def update_driver_priority_lorry(
             status_code=500,
             detail=f"Error updating priority lorry: {str(e)}"
         )
+
+
+@router.get("/assignments", response_model=Dict[str, Any])
+async def get_lorry_assignments(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Get lorry assignments - placeholder endpoint"""
+    return envelope([])
+
+
+@router.get("/holds", response_model=Dict[str, Any]) 
+async def get_driver_holds(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Get driver holds - placeholder endpoint"""
+    return envelope([])
+
+
+@router.get("/stock/summary", response_model=Dict[str, Any])
+async def get_stock_summary(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Get lorry stock summary - placeholder endpoint"""
+    return envelope({"lorries": []})
+
+
+@router.get("/stock/transactions", response_model=Dict[str, Any])
+async def get_stock_transactions(
+    limit: int = 50,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Get stock transactions - placeholder endpoint"""
+    return envelope([])
+
+
+@router.get("/assignment-status", response_model=Dict[str, Any])
+async def get_assignment_status(
+    date: Optional[str] = None,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Get assignment status - placeholder endpoint"""
+    return envelope({
+        "assignment_date": date or "2025-09-08",
+        "scheduled_drivers": 0,
+        "assigned_drivers": 0, 
+        "unassigned_drivers": 0,
+        "available_lorries": 0,
+        "can_auto_assign": False,
+        "assignments": []
+    })
