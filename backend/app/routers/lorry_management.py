@@ -608,6 +608,15 @@ async def _get_expected_lorry_stock(db: Session, lorry_id: str, date: date) -> L
     previous_day = date - timedelta(days=1)
     expected_stock = inventory_service.get_current_stock(lorry_id, previous_day)
     
+    # If no stock found, check if this is a valid "empty lorry" scenario
+    if not expected_stock:
+        # Check if there are any historical transactions for this lorry
+        has_history = inventory_service.has_transaction_history(lorry_id)
+        if not has_history:
+            logging.info(f"New lorry {lorry_id} with no history - empty start is expected")
+        else:
+            logging.info(f"Existing lorry {lorry_id} should be empty on {date}")
+    
     logging.info(f"Expected stock for lorry {lorry_id} on {date}: {len(expected_stock)} items")
     return expected_stock
 

@@ -1,7 +1,7 @@
 // import { useSession } from 'next-auth/react';
 import { useEffect, useState, useMemo } from 'react';
 import { request } from '../../utils/api';
-// import AdminLayout from '@/components/Layout/AdminLayout';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 // Types
 type Assignment = {
@@ -665,5 +665,5 @@ function LorryManagementPage() {
   );
 }
 
-// (LorryManagementPage as any).getLayout = (page: any) => <AdminLayout>{page}</AdminLayout>;
+(LorryManagementPage as any).getLayout = (page: any) => <AdminLayout>{page}</AdminLayout>;
 export default LorryManagementPage;

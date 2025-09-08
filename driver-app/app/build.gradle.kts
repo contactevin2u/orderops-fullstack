@@ -21,8 +21,8 @@ android {
         applicationId = "com.yourco.driverAA"
         minSdk = 24
         targetSdk = 35
-        versionCode = 38
-        versionName = "1.9.3"
+        versionCode = 40
+        versionName = "1.10.0"
 
         // Priority: Gradle property > local.properties > environment variable > fallback
         val apiBase = (findProperty("API_BASE") as String?)

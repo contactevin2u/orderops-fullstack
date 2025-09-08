@@ -758,12 +758,15 @@ async def scan_uid(
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
-    """Enhanced UID scanning with extended actions"""
+    """Enhanced UID scanning with extended actions and real-time lorry inventory updates"""
     if not settings.UID_INVENTORY_ENABLED:
         return envelope({"success": True, "message": "UID inventory disabled"})
     
     try:
+        from ..services.lorry_inventory_service import LorryInventoryService
+        
         service = InventoryService(db)
+        lorry_service = LorryInventoryService(db)
         
         # Map string action to enum
         action_map = {
@@ -789,6 +792,57 @@ async def scan_uid(
             sku_id=request.sku_id,
             notes=request.notes
         )
+        
+        # Enhanced: Also update lorry inventory for real-time variance detection
+        # Get driver's current lorry assignment if this is a driver scan
+        driver = None
+        if hasattr(current_user, 'driver_id'):
+            driver = db.get(Driver, current_user.driver_id)
+        elif hasattr(current_user, 'role') and current_user.role == 'DRIVER':
+            driver = db.execute(
+                select(Driver).where(Driver.user_id == current_user.id)
+            ).scalar_one_or_none()
+        
+        if driver:
+            # Get current lorry assignment
+            today = date.today()
+            assignment = db.execute(
+                select(LorryAssignment).where(
+                    and_(
+                        LorryAssignment.driver_id == driver.id,
+                        LorryAssignment.assignment_date == today
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if assignment and assignment.lorry_id:
+                # Process lorry stock transaction for variance tracking
+                try:
+                    uid_actions = [{
+                        "action": request.action,
+                        "uid": request.uid,
+                        "notes": request.notes or f"Order {request.order_id} - {request.action}"
+                    }]
+                    
+                    lorry_result = lorry_service.process_delivery_actions(
+                        lorry_id=assignment.lorry_id,
+                        order_id=request.order_id,
+                        driver_id=driver.id,
+                        admin_user_id=current_user.id,
+                        uid_actions=uid_actions
+                    )
+                    
+                    # Add lorry tracking info to result
+                    result["lorry_tracking"] = {
+                        "lorry_id": assignment.lorry_id,
+                        "transaction_created": lorry_result.get("success", False),
+                        "message": lorry_result.get("message", "")
+                    }
+                except Exception as e:
+                    # Don't fail the main scan if lorry tracking fails
+                    result["lorry_tracking"] = {
+                        "error": f"Lorry tracking failed: {str(e)}"
+                    }
         
         # Log audit action
         log_action(

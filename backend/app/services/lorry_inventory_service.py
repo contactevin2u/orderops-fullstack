@@ -53,6 +53,15 @@ class LorryInventoryService:
         logger.info(f"Current stock for lorry {lorry_id}: {len(current_stock)} items")
         return list(current_stock)
     
+    def has_transaction_history(self, lorry_id: str) -> bool:
+        """Check if a lorry has any transaction history"""
+        transaction_count = self.db.execute(
+            select(func.count(LorryStockTransaction.id))
+            .where(LorryStockTransaction.lorry_id == lorry_id)
+        ).scalar()
+        
+        return transaction_count > 0
+    
     def load_uids(
         self, 
         lorry_id: str, 
