@@ -17,13 +17,15 @@ from ..models import (
     Driver, 
     DriverShift, 
     Item,
-    User
+    User,
+    LorryStockTransaction
 )
 from ..auth.deps import require_roles, Role, get_current_user
 from ..auth.firebase import driver_auth
 from ..core.config import settings
 from ..utils.responses import envelope
 from ..utils.audit import log_action
+from ..services.lorry_inventory_service import LorryInventoryService
 
 
 router = APIRouter(
@@ -598,30 +600,16 @@ async def resolve_driver_hold(
 
 # Helper functions
 async def _get_expected_lorry_stock(db: Session, lorry_id: str, date: date) -> List[str]:
-    """Get expected UIDs for a lorry based on previous day's verification or initial stock"""
-    yesterday = date - timedelta(days=1)
+    """Get expected UIDs for a lorry based on admin stock transactions and deliveries"""
+    # Use the new inventory service to get real-time stock
+    inventory_service = LorryInventoryService(db)
     
-    # Get yesterday's verification for this lorry
-    yesterday_verification = db.execute(
-        select(LorryStockVerification)
-        .join(LorryAssignment, LorryStockVerification.assignment_id == LorryAssignment.id)
-        .where(
-            and_(
-                LorryAssignment.lorry_id == lorry_id,
-                LorryStockVerification.verification_date == yesterday
-            )
-        )
-        .order_by(LorryStockVerification.created_at.desc())
-    ).scalar_one_or_none()
+    # Get stock as of end of previous day to account for overnight changes
+    previous_day = date - timedelta(days=1)
+    expected_stock = inventory_service.get_current_stock(lorry_id, previous_day)
     
-    if yesterday_verification:
-        # Use yesterday's verified stock as expected stock
-        return json.loads(yesterday_verification.scanned_uids)
-    else:
-        # No previous verification found - return empty for now
-        # In a real system, this would come from initial lorry stock allocation
-        logging.warning(f"No previous verification found for lorry {lorry_id}")
-        return []
+    logging.info(f"Expected stock for lorry {lorry_id} on {date}: {len(expected_stock)} items")
+    return expected_stock
 
 
 async def _handle_variance_driver_holds(
@@ -709,3 +697,182 @@ def _get_driver_status_message(has_active_holds: bool, assignment: LorryAssignme
         return "Please complete stock verification before accessing orders."
     
     return "You can access your orders."
+
+
+# Admin Stock Management Models
+class LoadStockRequest(BaseModel):
+    uids: List[str]
+    notes: Optional[str] = None
+
+class UnloadStockRequest(BaseModel):
+    uids: List[str]
+    notes: Optional[str] = None
+
+class StockOperationResponse(BaseModel):
+    success: bool
+    message: str
+    processed_count: int
+    errors: List[str] = []
+
+class LorryInventoryResponse(BaseModel):
+    lorry_id: str
+    current_stock: List[str]
+    total_count: int
+    as_of_date: str
+
+class StockTransactionResponse(BaseModel):
+    id: int
+    lorry_id: str
+    action: str
+    uid: str
+    admin_user: str
+    notes: Optional[str]
+    transaction_date: str
+    created_at: str
+
+
+# Admin Stock Management Endpoints
+
+@router.post("/stock/{lorry_id}/load", response_model=dict)
+async def load_lorry_stock(
+    lorry_id: str,
+    request: LoadStockRequest,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Admin loads UIDs into a lorry"""
+    inventory_service = LorryInventoryService(db)
+    
+    result = inventory_service.load_uids(
+        lorry_id=lorry_id,
+        uids=request.uids,
+        admin_user_id=current_user.id,
+        notes=request.notes
+    )
+    
+    # Log audit action
+    log_action(
+        db, 
+        user_id=current_user.id, 
+        action="LORRY_STOCK_LOAD", 
+        resource_type="lorry_stock", 
+        resource_id=lorry_id,
+        details={
+            "uids_count": len(request.uids),
+            "loaded_count": result["loaded_count"],
+            "errors_count": len(result["errors"])
+        }
+    )
+    
+    return envelope(result)
+
+
+@router.post("/stock/{lorry_id}/unload", response_model=dict)
+async def unload_lorry_stock(
+    lorry_id: str,
+    request: UnloadStockRequest,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Admin unloads UIDs from a lorry"""
+    inventory_service = LorryInventoryService(db)
+    
+    result = inventory_service.unload_uids(
+        lorry_id=lorry_id,
+        uids=request.uids,
+        admin_user_id=current_user.id,
+        notes=request.notes
+    )
+    
+    # Log audit action
+    log_action(
+        db, 
+        user_id=current_user.id, 
+        action="LORRY_STOCK_UNLOAD", 
+        resource_type="lorry_stock", 
+        resource_id=lorry_id,
+        details={
+            "uids_count": len(request.uids),
+            "unloaded_count": result["unloaded_count"],
+            "errors_count": len(result["errors"])
+        }
+    )
+    
+    return envelope(result)
+
+
+@router.get("/stock/{lorry_id}", response_model=dict)
+async def get_lorry_current_stock(
+    lorry_id: str,
+    as_of_date: Optional[str] = None,  # YYYY-MM-DD
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get current stock in a lorry"""
+    inventory_service = LorryInventoryService(db)
+    
+    target_date = None
+    if as_of_date:
+        try:
+            target_date = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    
+    current_stock = inventory_service.get_current_stock(lorry_id, target_date)
+    
+    response = LorryInventoryResponse(
+        lorry_id=lorry_id,
+        current_stock=current_stock,
+        total_count=len(current_stock),
+        as_of_date=(target_date or date.today()).strftime("%Y-%m-%d")
+    )
+    
+    return envelope(response.model_dump())
+
+
+@router.get("/stock/transactions", response_model=dict)
+async def get_stock_transactions(
+    lorry_id: Optional[str] = None,
+    start_date: Optional[str] = None,  # YYYY-MM-DD
+    end_date: Optional[str] = None,    # YYYY-MM-DD
+    limit: int = 100,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get stock transaction history"""
+    inventory_service = LorryInventoryService(db)
+    
+    start_date_obj = None
+    end_date_obj = None
+    
+    if start_date:
+        try:
+            start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD")
+    
+    if end_date:
+        try:
+            end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD")
+    
+    transactions = inventory_service.get_stock_transactions(
+        lorry_id=lorry_id,
+        start_date=start_date_obj,
+        end_date=end_date_obj,
+        limit=limit
+    )
+    
+    return envelope(transactions)
+
+
+@router.get("/stock/summary", response_model=dict)
+async def get_all_lorries_inventory_summary(
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get summary of all lorry inventories"""
+    inventory_service = LorryInventoryService(db)
+    summary = inventory_service.get_lorry_inventory_summary()
+    return envelope(summary)

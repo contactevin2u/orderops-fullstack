@@ -22,6 +22,7 @@ from .order_item_uid import OrderItemUID
 from .lorry_stock import LorryStock
 from .sku_alias import SKUAlias
 from .lorry_assignment import LorryAssignment, LorryStockVerification, DriverHold
+from .lorry_stock_transaction import LorryStockTransaction
 
 __all__ = [
     "Base",
@@ -54,4 +55,5 @@ __all__ = [
     "LorryAssignment",
     "LorryStockVerification", 
     "DriverHold",
+    "LorryStockTransaction",
 ]

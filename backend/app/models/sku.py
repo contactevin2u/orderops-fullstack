@@ -20,3 +20,4 @@ class SKU(Base):
     items = relationship("Item", back_populates="sku")
     aliases = relationship("SKUAlias", back_populates="sku")
     lorry_stocks = relationship("LorryStock", back_populates="sku")
+    lorry_stock_transactions = relationship("LorryStockTransaction", back_populates="sku")
