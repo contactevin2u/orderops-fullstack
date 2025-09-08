@@ -22,7 +22,7 @@ from ..models import (
     LorryStockTransaction
 )
 from ..auth.deps import require_roles, Role, get_current_user
-from ..auth.firebase import driver_auth, firebase_auth
+from ..auth.firebase import driver_auth
 from ..core.config import settings
 from ..utils.responses import envelope
 from ..utils.audit import log_action
@@ -1137,7 +1137,7 @@ async def get_drivers_with_priority_lorries(
 @router.post("/clock-in-with-stock", response_model=dict)
 async def clock_in_with_stock(
     request: Request,
-    current_user = Depends(firebase_auth),
+    driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
     """Driver clock-in with stock verification - simplified version without complex database dependencies"""
@@ -1153,15 +1153,6 @@ async def clock_in_with_stock(
         
         if lat is None or lng is None:
             raise HTTPException(status_code=400, detail="lat and lng are required")
-            
-        # Get current driver
-        driver_uid = current_user.get("uid") if hasattr(current_user, 'get') else getattr(current_user, 'uid', None)
-        if not driver_uid:
-            raise HTTPException(status_code=401, detail="Driver authentication required")
-            
-        driver = db.query(Driver).filter(Driver.firebase_uid == driver_uid).first()
-        if not driver:
-            raise HTTPException(status_code=404, detail="Driver not found")
             
         # Get today's lorry assignment
         today = date.today()
