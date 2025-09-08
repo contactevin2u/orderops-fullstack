@@ -1,7 +1,7 @@
-import { useSession } from 'next-auth/react';
+// import { useSession } from 'next-auth/react';
 import { useEffect, useState, useMemo } from 'react';
 import { request } from '../../utils/api';
-import AdminLayout from '@/components/Layout/AdminLayout';
+// import AdminLayout from '@/components/Layout/AdminLayout';
 
 // Types
 type Assignment = {
@@ -61,7 +61,7 @@ async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T
 const asArray = <T,>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : []);
 
 function LorryManagementPage() {
-  const { status } = useSession();
+  // const { status } = useSession();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'assignments' | 'scanner' | 'transactions'>('dashboard');
@@ -178,19 +178,6 @@ function LorryManagementPage() {
   const removeScannedUID = (uid: string) => {
     setScannedUIDs(scannedUIDs.filter(u => u !== uid));
   };
-
-  if (status === 'loading') {
-    return <div className="p-6"><div className="text-gray-500">Loading session…</div></div>;
-  }
-
-  if (status === 'unauthenticated') {
-    return (
-      <div className="p-6">
-        <h1 className="text-xl font-semibold mb-2">Please sign in</h1>
-        <p className="text-gray-600">You need admin access to view Lorry Management.</p>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -678,5 +665,5 @@ function LorryManagementPage() {
   );
 }
 
-(LorryManagementPage as any).getLayout = (page: any) => <AdminLayout>{page}</AdminLayout>;
+// (LorryManagementPage as any).getLayout = (page: any) => <AdminLayout>{page}</AdminLayout>;
 export default LorryManagementPage;
