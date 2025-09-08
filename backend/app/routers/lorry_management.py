@@ -1,5 +1,5 @@
 from datetime import datetime, date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -778,7 +778,7 @@ class AssignmentStatusResponse(BaseModel):
     unassigned_drivers: int
     available_lorries: int
     can_auto_assign: bool
-    assignments: List[Dict[str, any]]
+    assignments: List[Dict[str, Any]]
 
 
 # Admin Stock Management Endpoints

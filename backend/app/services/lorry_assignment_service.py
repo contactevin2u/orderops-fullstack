@@ -1,7 +1,7 @@
 """Automated Lorry Assignment Service"""
 
 from datetime import datetime, date, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, or_
 import logging
@@ -33,7 +33,7 @@ class LorryAssignmentService:
         capacity: Optional[str] = None,
         base_warehouse: str = "BATU_CAVES",
         notes: Optional[str] = None
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """Create a new lorry"""
         try:
             # Check if lorry_id already exists
@@ -92,7 +92,7 @@ class LorryAssignmentService:
                 "lorry": None
             }
     
-    def get_all_lorries(self, include_inactive: bool = False) -> List[Dict[str, any]]:
+    def get_all_lorries(self, include_inactive: bool = False) -> List[Dict[str, Any]]:
         """Get all lorries"""
         query = select(Lorry)
         
@@ -120,7 +120,7 @@ class LorryAssignmentService:
             for lorry in lorries
         ]
     
-    def update_driver_priority_lorry(self, driver_id: int, priority_lorry_id: Optional[str]) -> Dict[str, any]:
+    def update_driver_priority_lorry(self, driver_id: int, priority_lorry_id: Optional[str]) -> Dict[str, Any]:
         """Update driver's priority lorry"""
         try:
             driver = self.db.get(Driver, driver_id)
@@ -167,7 +167,7 @@ class LorryAssignmentService:
                 "message": f"Error updating priority lorry: {str(e)}"
             }
     
-    def auto_assign_lorries_for_date(self, assignment_date: date, admin_user_id: int) -> Dict[str, any]:
+    def auto_assign_lorries_for_date(self, assignment_date: date, admin_user_id: int) -> Dict[str, Any]:
         """Automatically assign lorries to scheduled drivers for a specific date"""
         try:
             # Get all scheduled drivers for the date
@@ -319,7 +319,7 @@ class LorryAssignmentService:
         
         return None
     
-    def get_assignment_status_for_date(self, assignment_date: date) -> Dict[str, any]:
+    def get_assignment_status_for_date(self, assignment_date: date) -> Dict[str, Any]:
         """Get assignment status and statistics for a specific date"""
         # Get scheduled drivers
         scheduled_drivers = self.db.execute(
