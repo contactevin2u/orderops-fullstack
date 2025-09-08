@@ -152,7 +152,8 @@ export default function LorryManagementPage() {
 
       if (driversRes.ok) {
         const driversData = await driversRes.json();
-        setDrivers(driversData.data || []);
+        // Handle both wrapped {data: []} and raw array responses
+        setDrivers(Array.isArray(driversData) ? driversData : (driversData.data || []));
       }
 
     } catch (err) {
