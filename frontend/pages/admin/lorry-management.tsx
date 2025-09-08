@@ -119,7 +119,7 @@ export default function LorryManagementPage() {
     setError(null);
     
     try {
-      console.log('Loading lorry management data from proxy');
+      console.log('Loading lorry management data via proxy routes');
       
       const [assignmentsRes, holdsRes, driversRes] = await Promise.all([
         fetch(`/_api/lorry-management/assignments`, { credentials: 'include' }),
