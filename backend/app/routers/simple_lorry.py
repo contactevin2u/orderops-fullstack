@@ -269,8 +269,8 @@ async def get_drivers_with_priority_lorries(
                     "id": driver.id,
                     "name": driver.name,
                     "phone": driver.phone,
-                    "employee_id": driver.employee_id,
-                    "base_warehouse": getattr(driver, 'base_warehouse', None),
+                    "firebase_uid": driver.firebase_uid,
+                    "base_warehouse": driver.base_warehouse,
                     "priority_lorry_id": driver.priority_lorry_id,
                     "is_active": driver.is_active,
                     "created_at": driver.created_at.isoformat() if driver.created_at else None
