@@ -3,7 +3,7 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, or_
 from sqlalchemy.exc import IntegrityError
@@ -31,6 +31,20 @@ class CreateLorryRequest(BaseModel):
     capacity: Optional[str] = None
     base_warehouse: str = "BATU_CAVES"
     notes: Optional[str] = None
+    
+    @validator('lorry_id')
+    def validate_lorry_id(cls, v):
+        if not v or not v.strip():
+            raise ValueError('lorry_id cannot be empty')
+        if len(v) > 50:
+            raise ValueError('lorry_id cannot exceed 50 characters')
+        return v.strip()
+    
+    @validator('base_warehouse')
+    def validate_base_warehouse(cls, v):
+        if len(v) > 20:
+            raise ValueError('base_warehouse cannot exceed 20 characters')
+        return v
 
 
 class LorryResponse(BaseModel):
@@ -54,6 +68,8 @@ async def create_lorry(
 ):
     """Create a new lorry"""
     try:
+        logger.info(f"Creating lorry request: {request.dict()}")
+        logger.info(f"Current user: {current_user.get('username', 'unknown')}")
         # Check if lorry_id already exists
         existing = db.execute(
             select(Lorry).where(Lorry.lorry_id == request.lorry_id)
@@ -100,9 +116,12 @@ async def create_lorry(
             }
         })
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating lorry {request.lorry_id}: {e}")
+        logger.error(f"Exception type: {type(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Error creating lorry: {str(e)}"
