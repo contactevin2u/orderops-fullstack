@@ -11,7 +11,7 @@ import json
 from fastapi.exceptions import RequestValidationError
 
 from ..db import get_session
-from ..models import Lorry
+from ..models import Lorry, Driver
 from ..auth.deps import require_roles, Role, get_current_user
 from ..utils.responses import envelope
 
@@ -46,6 +46,10 @@ class CreateLorryRequest(BaseModel):
         if len(v) > 20:
             raise ValueError('base_warehouse cannot exceed 20 characters')
         return v
+
+
+class UpdatePriorityLorryRequest(BaseModel):
+    priority_lorry_id: Optional[str] = None
 
 
 class LorryResponse(BaseModel):
@@ -245,4 +249,96 @@ async def get_status(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching status: {str(e)}"
+        )
+
+
+@router.get("/drivers", response_model=Dict[str, Any])
+async def get_drivers_with_priority_lorries(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Get all active drivers with their priority lorry assignments"""
+    try:
+        drivers = db.execute(
+            select(Driver).where(Driver.is_active == True).order_by(Driver.name)
+        ).scalars().all()
+        
+        return envelope({
+            "drivers": [
+                {
+                    "id": driver.id,
+                    "name": driver.name,
+                    "phone": driver.phone,
+                    "employee_id": driver.employee_id,
+                    "base_warehouse": getattr(driver, 'base_warehouse', None),
+                    "priority_lorry_id": driver.priority_lorry_id,
+                    "is_active": driver.is_active,
+                    "created_at": driver.created_at.isoformat() if driver.created_at else None
+                }
+                for driver in drivers
+            ]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching drivers: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching drivers: {str(e)}"
+        )
+
+
+@router.patch("/drivers/{driver_id}/priority-lorry", response_model=Dict[str, Any])
+async def update_driver_priority_lorry(
+    driver_id: int,
+    request: UpdatePriorityLorryRequest,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_session)
+):
+    """Update driver's priority lorry assignment"""
+    try:
+        # Get the driver
+        driver = db.execute(
+            select(Driver).where(Driver.id == driver_id)
+        ).scalar_one_or_none()
+        
+        if not driver:
+            raise HTTPException(status_code=404, detail=f"Driver {driver_id} not found")
+        
+        # Extract priority_lorry_id from request
+        priority_lorry_id = request.priority_lorry_id
+        
+        # Validate lorry exists if provided
+        if priority_lorry_id:
+            existing_lorry = db.execute(
+                select(Lorry).where(Lorry.lorry_id == priority_lorry_id)
+            ).scalar_one_or_none()
+            
+            if not existing_lorry:
+                raise HTTPException(status_code=400, detail=f"Lorry {priority_lorry_id} not found")
+        
+        # Update driver's priority lorry
+        driver.priority_lorry_id = priority_lorry_id
+        db.commit()
+        db.refresh(driver)
+        
+        logger.info(f"Updated driver {driver_id} priority lorry to: {priority_lorry_id}")
+        
+        return envelope({
+            "success": True,
+            "message": f"Updated priority lorry for {driver.name or f'Driver {driver_id}'}",
+            "driver": {
+                "id": driver.id,
+                "name": driver.name,
+                "priority_lorry_id": driver.priority_lorry_id
+            }
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating driver priority lorry: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating priority lorry: {str(e)}"
         )
