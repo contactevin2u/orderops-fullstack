@@ -22,7 +22,7 @@ class LorryStockTransaction(Base):
     # Transaction details
     action: Mapped[str] = mapped_column(String(20), nullable=False)  # LOAD, UNLOAD, ADMIN_ADJUSTMENT, DELIVERY, COLLECTION
     uid: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    sku_id: Mapped[int | None] = mapped_column(ForeignKey("skus.id"), nullable=True, index=True)
+    sku_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
     
     # Related records
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True, index=True)  # For delivery actions
@@ -39,7 +39,6 @@ class LorryStockTransaction(Base):
     )
 
     # Relationships
-    sku = relationship("SKU", back_populates="lorry_stock_transactions")
     order = relationship("Order")
     driver = relationship("Driver")
     admin_user = relationship("User")

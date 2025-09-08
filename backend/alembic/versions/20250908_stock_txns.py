@@ -33,7 +33,6 @@ def upgrade():
         sa.ForeignKeyConstraint(['admin_user_id'], ['users.id'], ),
         sa.ForeignKeyConstraint(['driver_id'], ['drivers.id'], ),
         sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
-        sa.ForeignKeyConstraint(['sku_id'], ['skus.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
     
