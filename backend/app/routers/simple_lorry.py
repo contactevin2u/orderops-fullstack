@@ -101,7 +101,7 @@ async def create_lorry(
         request = await parse_lorry_request(raw_request)
         
         logger.info(f"Creating lorry request: {request.dict()}")
-        logger.info(f"Current user: {current_user.get('username', 'unknown')}")
+        logger.info(f"Current user: {getattr(current_user, 'username', getattr(current_user, 'email', 'unknown'))}")
         # Check if lorry_id already exists
         existing = db.execute(
             select(Lorry).where(Lorry.lorry_id == request.lorry_id)
@@ -213,7 +213,7 @@ async def test_validation(
     return envelope({
         "message": "Validation successful",
         "request_data": request.dict(),
-        "user": current_user.get('username', 'unknown')
+        "user": getattr(current_user, 'username', getattr(current_user, 'email', 'unknown'))
     })
 
 
