@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.google.android.gms.location.*
+import android.annotation.SuppressLint
 import com.yourco.driverAA.ui.components.*
 import com.yourco.driverAA.ui.qr.QRScannerScreen
 import com.yourco.driverAA.ui.theme.AppColors
@@ -40,6 +41,7 @@ fun StockVerificationScreen(
     var showQRScanner by remember { mutableStateOf(false) }
     var currentLocation by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     var locationName by remember { mutableStateOf("") }
+    var isLoadingLocation by remember { mutableStateOf(true) }
     
     // Location permission launcher
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -49,7 +51,10 @@ fun StockVerificationScreen(
             getCurrentLocation(context) { lat, lng, name ->
                 currentLocation = Pair(lat, lng)
                 locationName = name
+                isLoadingLocation = false
             }
+        } else {
+            isLoadingLocation = false
         }
     }
     
@@ -72,6 +77,7 @@ fun StockVerificationScreen(
             getCurrentLocation(context) { lat, lng, name ->
                 currentLocation = Pair(lat, lng)
                 locationName = name
+                isLoadingLocation = false
             }
         } else {
             locationPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION)
@@ -381,7 +387,7 @@ private fun StockVerificationSection(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            enabled = canClockIn && currentLocation != null && !isProcessing,
+                            enabled = canClockIn && currentLocation != null && !isProcessing && !isLoadingLocation,
                             colors = ButtonDefaults.outlinedButtonColors(
                                 contentColor = AppColors.success
                             )
@@ -463,7 +469,7 @@ private fun StockVerificationSection(
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = canClockIn && !isProcessing && currentLocation != null,
+                enabled = canClockIn && !isProcessing && currentLocation != null && !isLoadingLocation,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AppColors.success
                 )
@@ -484,15 +490,55 @@ private fun StockVerificationSection(
             }
         }
         
-        if (!canClockIn) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "Complete stock verification to clock in",
-                style = MaterialTheme.typography.bodySmall,
-                color = AppColors.warning,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
+        // Status messages
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        when {
+            isLoadingLocation -> {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Getting your location...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+            currentLocation == null -> {
+                Text(
+                    text = "Location required for clock-in",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppColors.error,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            !canClockIn -> {
+                Text(
+                    text = "Complete stock verification to clock in",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppColors.warning,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            else -> {
+                Text(
+                    text = "Location: $locationName",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = AppColors.success,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
     
@@ -509,12 +555,84 @@ private fun StockVerificationSection(
     }
 }
 
-// Helper function to get current location (simplified)
+// Helper function to get current location using FusedLocationProviderClient
 private fun getCurrentLocation(
     context: android.content.Context,
     onLocationReceived: (Double, Double, String) -> Unit
 ) {
-    // For now, using a placeholder implementation
-    // In a real app, you'd use FusedLocationProviderClient
-    onLocationReceived(0.0, 0.0, "Current Location")
+    try {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        
+        if (ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                if (location != null) {
+                    onLocationReceived(
+                        location.latitude,
+                        location.longitude,
+                        "Lat: ${String.format("%.4f", location.latitude)}, Lng: ${String.format("%.4f", location.longitude)}"
+                    )
+                } else {
+                    // Request fresh location if last known location is null
+                    requestFreshLocation(context, fusedLocationClient, onLocationReceived)
+                }
+            }.addOnFailureListener {
+                // Fallback to requesting fresh location
+                requestFreshLocation(context, fusedLocationClient, onLocationReceived)
+            }
+        } else {
+            onLocationReceived(0.0, 0.0, "Location permission not granted")
+        }
+    } catch (e: Exception) {
+        onLocationReceived(0.0, 0.0, "Location error: ${e.message}")
+    }
+}
+
+@SuppressLint("MissingPermission")
+private fun requestFreshLocation(
+    context: android.content.Context,
+    fusedLocationClient: FusedLocationProviderClient,
+    onLocationReceived: (Double, Double, String) -> Unit
+) {
+    val locationRequest = LocationRequest.Builder(
+        Priority.PRIORITY_HIGH_ACCURACY,
+        10000L // 10 seconds
+    ).apply {
+        setMinUpdateIntervalMillis(5000L) // 5 seconds
+        setMaxUpdateDelayMillis(15000L) // 15 seconds
+    }.build()
+    
+    val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            val location = locationResult.lastLocation
+            if (location != null) {
+                onLocationReceived(
+                    location.latitude,
+                    location.longitude,
+                    "Lat: ${String.format("%.4f", location.latitude)}, Lng: ${String.format("%.4f", location.longitude)}"
+                )
+                // Stop location updates after getting one result
+                fusedLocationClient.removeLocationUpdates(this)
+            }
+        }
+    }
+    
+    try {
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            context.mainLooper
+        )
+        
+        // Stop location updates after 30 seconds to prevent battery drain
+        android.os.Handler(context.mainLooper).postDelayed({
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }, 30000L)
+        
+    } catch (e: SecurityException) {
+        onLocationReceived(0.0, 0.0, "Location permission denied")
+    }
 }
