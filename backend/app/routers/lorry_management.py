@@ -968,11 +968,15 @@ async def get_all_lorries_inventory_summary(
 
 @router.post("/lorries", response_model=dict)
 async def create_lorry(
-    request: CreateLorryRequest,
+    raw_request: Request,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Create a new lorry"""
+    # Parse JSON with robust handling
+    body = await parse_json_request(raw_request)
+    request = CreateLorryRequest(**body)
+    
     assignment_service = LorryAssignmentService(db)
     
     result = assignment_service.create_lorry(
