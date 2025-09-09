@@ -15,10 +15,11 @@ import base64
 from PIL import Image
 
 from ..db import get_session
-from ..models import Order, OrderItemUID, Item, SKU, LorryStock, SKUAlias, Driver
+from ..models import Order, OrderItemUID, Item, SKU, LorryStock, SKUAlias, Driver, LorryAssignment
 from ..models.item import ItemType, ItemStatus
 from ..models.order_item_uid import UIDAction
 from ..services.inventory_service import InventoryService
+from ..services.lorry_inventory_service import LorryInventoryService
 from ..auth.deps import require_roles, Role, get_current_user
 from ..auth.firebase import driver_auth
 from ..core.config import settings
@@ -429,39 +430,85 @@ async def get_lorry_stock(
     else:
         target_date = datetime.utcnow().date()
     
-    # Get stock records
-    stock_records = db.execute(
-        select(LorryStock, SKU)
-        .join(SKU, LorryStock.sku_id == SKU.id)
-        .where(
+    # Get driver's current lorry assignment
+    assignment = db.execute(
+        select(LorryAssignment).where(
             and_(
-                LorryStock.driver_id == driver_id,
-                LorryStock.as_of_date == target_date
+                LorryAssignment.driver_id == driver_id,
+                LorryAssignment.assignment_date == target_date
             )
         )
-        .order_by(SKU.code)
-    ).all()
+    ).scalar_one_or_none()
     
+    if not assignment:
+        # No assignment found, return empty stock
+        response_data = {
+            "date": target_date.isoformat(),
+            "driver_id": driver_id,
+            "items": [],
+            "totalExpected": 0,
+            "totalScanned": 0,
+            "totalVariance": 0,
+            "message": "No lorry assignment found for this date"
+        }
+        return envelope(response_data)
+    
+    # Use lorry inventory service to get current stock
+    inventory_service = LorryInventoryService(db)
+    current_uids = inventory_service.get_current_stock(assignment.lorry_id, target_date)
+    
+    # Group UIDs by SKU for display
+    sku_counts = {}
     items = []
-    total_scanned = 0
-    for stock, sku in stock_records:
+    
+    for uid in current_uids:
+        # Get item details for this UID
+        item = db.execute(
+            select(Item, SKU)
+            .join(SKU, Item.sku_id == SKU.id)
+            .where(Item.uid == uid)
+        ).first()
+        
+        if item:
+            item_obj, sku = item
+            sku_key = f"{sku.id}_{sku.code}"
+            
+            if sku_key not in sku_counts:
+                sku_counts[sku_key] = {
+                    "sku_id": sku.id,
+                    "sku_name": sku.name,
+                    "sku_code": sku.code,
+                    "count": 0,
+                    "uids": []
+                }
+            
+            sku_counts[sku_key]["count"] += 1
+            sku_counts[sku_key]["uids"].append(uid)
+    
+    # Convert to items format expected by driver app
+    for sku_data in sku_counts.values():
         items.append({
-            "sku_id": sku.id,
-            "sku_name": sku.name,
-            "expected_count": stock.qty_counted,  # For now, treat counted as expected
-            "scanned_count": stock.qty_counted,
-            "variance": 0  # No variance calculation for basic implementation
+            "sku_id": sku_data["sku_id"],
+            "sku_name": sku_data["sku_name"],
+            "expected_count": sku_data["count"],  # Current stock is what's expected
+            "scanned_count": sku_data["count"],   # Assume all current stock is verified
+            "variance": 0,  # No variance for current stock view
+            "uids": sku_data["uids"]  # Include UIDs for scanning
         })
-        total_scanned += stock.qty_counted
+    
+    total_scanned = len(current_uids)
     
     # Match the LorryStockResponse structure expected by the driver app
     response_data = {
         "date": target_date.isoformat(),
         "driver_id": driver_id,
+        "lorry_id": assignment.lorry_id,
         "items": items,
-        "total_expected": total_scanned,  # For now, use same as scanned
-        "total_scanned": total_scanned,
-        "total_variance": 0
+        "totalExpected": len(current_uids),  # Total UID count
+        "totalScanned": len(current_uids),   # All current UIDs considered scanned
+        "totalVariance": 0,  # No variance for current stock view
+        "current_uids": current_uids,  # Include for verification workflow
+        "message": f"Current stock for lorry {assignment.lorry_id}"
     }
     
     return envelope(response_data)
@@ -1120,6 +1167,313 @@ async def upload_lorry_stock(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/uid/{uid}/details", response_model=dict)
+async def get_uid_details(
+    uid: str,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get comprehensive details for a specific UID including full history"""
+    # Get basic item details
+    item = db.execute(
+        select(Item, SKU)
+        .join(SKU, Item.sku_id == SKU.id)
+        .where(Item.uid == uid)
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail=f"UID {uid} not found")
+    
+    item_obj, sku = item
+    
+    # Get current driver if any
+    current_driver = None
+    if item_obj.current_driver_id:
+        driver = db.get(Driver, item_obj.current_driver_id)
+        if driver:
+            current_driver = {
+                "id": driver.id,
+                "name": driver.name,
+                "employee_id": driver.employee_id
+            }
+    
+    # Get stock transaction history
+    from ..models import LorryStockTransaction, User
+    
+    # Get all stock transactions for this UID
+    stock_transactions = db.execute(
+        select(LorryStockTransaction, User)
+        .join(User, LorryStockTransaction.admin_user_id == User.id, isouter=True)
+        .where(LorryStockTransaction.uid == uid)
+        .order_by(LorryStockTransaction.transaction_date.desc())
+    ).all()
+    
+    stock_history = []
+    for transaction, user in stock_transactions:
+        stock_history.append({
+            "id": transaction.id,
+            "action": transaction.action,
+            "lorry_id": transaction.lorry_id,
+            "order_id": transaction.order_id,
+            "driver_id": transaction.driver_id,
+            "admin_user": user.username if user else "System",
+            "notes": transaction.notes,
+            "transaction_date": transaction.transaction_date.isoformat(),
+            "created_at": transaction.created_at.isoformat()
+        })
+    
+    # Get order/delivery history
+    order_actions = db.execute(
+        select(OrderItemUID, Order, Driver)
+        .join(Order, OrderItemUID.order_id == Order.id)
+        .join(Driver, OrderItemUID.driver_id == Driver.id, isouter=True)
+        .where(OrderItemUID.uid == uid)
+        .order_by(OrderItemUID.created_at.desc())
+    ).all()
+    
+    delivery_history = []
+    for uid_action, order, driver in order_actions:
+        delivery_history.append({
+            "id": uid_action.id,
+            "order_id": order.id,
+            "order_number": order.order_number,
+            "action": uid_action.action,
+            "driver_name": driver.name if driver else None,
+            "notes": uid_action.notes,
+            "scanned_at": uid_action.created_at.isoformat()
+        })
+    
+    # Determine current location
+    current_location = "Unknown"
+    current_lorry = None
+    
+    if stock_history:
+        # Find the latest stock transaction to determine current location
+        latest_stock = stock_history[0]
+        if latest_stock["action"] in ["LOAD", "COLLECTION"]:
+            current_location = f"Lorry {latest_stock['lorry_id']}"
+            current_lorry = latest_stock['lorry_id']
+        elif latest_stock["action"] in ["UNLOAD"]:
+            current_location = "Warehouse"
+        elif latest_stock["action"] in ["DELIVERY"]:
+            current_location = "Delivered"
+    
+    response_data = {
+        "uid": uid,
+        "sku": {
+            "id": sku.id,
+            "code": sku.code,
+            "name": sku.name,
+            "type": sku.type.value if sku.type else None
+        },
+        "item": {
+            "id": item_obj.id,
+            "status": item_obj.status.value,
+            "item_type": item_obj.item_type.value,
+            "oem_serial_number": item_obj.oem_serial_number,
+            "created_at": item_obj.created_at.isoformat()
+        },
+        "current_location": current_location,
+        "current_lorry": current_lorry,
+        "current_driver": current_driver,
+        "stock_history": stock_history,
+        "delivery_history": delivery_history,
+        "total_transactions": len(stock_history) + len(delivery_history)
+    }
+    
+    return envelope(response_data)
+
+
+@router.get("/uid/search", response_model=dict)
+async def search_uids(
+    query: str,
+    limit: int = 50,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Search UIDs by various criteria"""
+    if len(query.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Query must be at least 2 characters")
+    
+    # Search UIDs by pattern
+    uid_results = db.execute(
+        select(Item, SKU)
+        .join(SKU, Item.sku_id == SKU.id)
+        .where(Item.uid.ilike(f"%{query}%"))
+        .limit(limit)
+    ).all()
+    
+    results = []
+    for item, sku in uid_results:
+        # Get latest stock location
+        from ..models import LorryStockTransaction
+        latest_transaction = db.execute(
+            select(LorryStockTransaction)
+            .where(LorryStockTransaction.uid == item.uid)
+            .order_by(LorryStockTransaction.transaction_date.desc())
+            .limit(1)
+        ).scalar_one_or_none()
+        
+        current_location = "Unknown"
+        if latest_transaction:
+            if latest_transaction.action in ["LOAD", "COLLECTION"]:
+                current_location = f"Lorry {latest_transaction.lorry_id}"
+            elif latest_transaction.action in ["UNLOAD"]:
+                current_location = "Warehouse"
+            elif latest_transaction.action in ["DELIVERY"]:
+                current_location = "Delivered"
+        
+        results.append({
+            "uid": item.uid,
+            "sku_code": sku.code,
+            "sku_name": sku.name,
+            "status": item.status.value,
+            "current_location": current_location,
+            "created_at": item.created_at.isoformat()
+        })
+    
+    return envelope({
+        "query": query,
+        "results": results,
+        "total_found": len(results),
+        "limit_applied": limit
+    })
+
+
+@router.post("/bulk-generate", response_model=dict)
+async def bulk_generate_uids(
+    request: dict,  # Use dict to handle flexible input
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Generate multiple UIDs in bulk for a specific SKU and driver"""
+    try:
+        # Extract request data
+        sku_id = request.get('sku_id')
+        driver_id = request.get('driver_id')
+        item_type = request.get('item_type', 'RENTAL')
+        quantity = request.get('quantity', 1)
+        generation_date = request.get('generation_date')
+        notes = request.get('notes', '')
+        
+        # Validation
+        if not sku_id or not driver_id:
+            raise HTTPException(status_code=400, detail="SKU ID and Driver ID are required")
+        
+        if quantity < 1 or quantity > 100:
+            raise HTTPException(status_code=400, detail="Quantity must be between 1 and 100")
+        
+        # Get SKU and Driver info
+        sku = db.get(SKU, sku_id)
+        if not sku:
+            raise HTTPException(status_code=404, detail="SKU not found")
+        
+        driver = db.get(Driver, driver_id)
+        if not driver:
+            raise HTTPException(status_code=404, detail="Driver not found")
+        
+        # Parse generation date
+        if generation_date:
+            try:
+                gen_date = datetime.strptime(generation_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+        else:
+            gen_date = date.today()
+        
+        # Use inventory service for UID generation
+        service = InventoryService(db)
+        generated_uids = []
+        errors = []
+        
+        # Generate UIDs for each item
+        for i in range(quantity):
+            try:
+                # Create a temporary item type enum
+                from ..models.item import ItemType
+                item_type_enum = ItemType.NEW if item_type == 'NEW' else ItemType.RENTAL
+                
+                # Generate UID(s) for this item
+                uids = service.generate_uid_for_item(
+                    sku_id=sku_id,
+                    driver_id=driver_id,
+                    item_type=item_type_enum,
+                    generation_date=gen_date
+                )
+                
+                if isinstance(uids, list):
+                    generated_uids.extend(uids)
+                else:
+                    generated_uids.append(uids)
+                    
+            except Exception as e:
+                errors.append(f"Failed to generate UID for item {i+1}: {str(e)}")
+        
+        # Log audit action
+        from ..services.audit_service import log_action
+        log_action(
+            db,
+            user_id=current_user.id,
+            action="BULK_UID_GENERATION",
+            resource_type="inventory",
+            resource_id=sku_id,
+            details={
+                "sku_code": sku.code,
+                "driver_id": driver_id,
+                "driver_name": driver.name,
+                "item_type": item_type,
+                "quantity_requested": quantity,
+                "quantity_generated": len(generated_uids),
+                "generation_date": gen_date.isoformat(),
+                "notes": notes
+            }
+        )
+        
+        return envelope({
+            "success": len(errors) == 0,
+            "generated_uids": generated_uids,
+            "total_generated": len(generated_uids),
+            "errors": errors,
+            "generation_details": {
+                "sku_code": sku.code,
+                "driver_name": driver.name,
+                "item_type": item_type,
+                "quantity": quantity,
+                "date": gen_date.isoformat()
+            }
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Bulk UID generation failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/skus", response_model=dict)
+async def get_skus(
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get all available SKUs for UID generation"""
+    skus = db.execute(select(SKU).order_by(SKU.code)).scalars().all()
+    
+    sku_list = []
+    for sku in skus:
+        sku_list.append({
+            "id": sku.id,
+            "code": sku.code,
+            "name": sku.name,
+            "type": sku.type.value if sku.type else None,
+            "description": sku.description
+        })
+    
+    return envelope({
+        "skus": sku_list,
+        "total": len(sku_list)
+    })
 
 
 class QRCodeRequest(BaseModel):
