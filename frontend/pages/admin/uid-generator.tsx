@@ -143,42 +143,219 @@ export default function UIDGeneratorPage() {
       <!DOCTYPE html>
       <html>
       <head>
-        <title>UID Labels</title>
+        <title>UID Labels - A6 Format</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-          .label { 
-            display: inline-block; 
-            border: 1px solid #333; 
-            padding: 10px; 
-            margin: 5px; 
-            width: 300px;
-            text-align: center;
-            page-break-inside: avoid;
+          @page {
+            size: A6 portrait; /* 105mm × 148mm */
+            margin: 3mm;
           }
-          .uid { font-weight: bold; font-size: 14px; margin-bottom: 5px; }
-          .details { font-size: 11px; color: #666; }
-          .qr { margin: 5px 0; }
-          .qr img { width: 80px; height: 80px; }
+          
+          body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            margin: 0; 
+            padding: 0;
+            font-size: 12px;
+            line-height: 1.2;
+          }
+          
+          .label-container {
+            display: flex;
+            flex-direction: column;
+            width: 99mm; /* A6 width minus margins */
+            height: 142mm; /* A6 height minus margins */
+            border: 2px solid #000;
+            padding: 4mm;
+            box-sizing: border-box;
+            page-break-after: always;
+            background: white;
+          }
+          
+          .label-container:last-child {
+            page-break-after: auto;
+          }
+          
+          .header {
+            text-align: center;
+            border-bottom: 1px solid #333;
+            padding-bottom: 3mm;
+            margin-bottom: 3mm;
+          }
+          
+          .company-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #1a365d;
+            margin-bottom: 1mm;
+          }
+          
+          .label-title {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+          }
+          
+          .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+          }
+          
+          .uid-section {
+            margin-bottom: 4mm;
+          }
+          
+          .uid-label {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 1mm;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+          }
+          
+          .uid-value {
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #000;
+            background: #f8f9fa;
+            padding: 2mm;
+            border: 1px solid #ddd;
+            border-radius: 2mm;
+            word-break: break-all;
+          }
+          
+          .qr-section {
+            margin: 3mm 0;
+          }
+          
+          .qr-code {
+            width: 35mm;
+            height: 35mm;
+            border: 1px solid #ddd;
+            background: white;
+          }
+          
+          .product-info {
+            margin-top: 3mm;
+            padding-top: 3mm;
+            border-top: 1px solid #eee;
+            width: 100%;
+          }
+          
+          .sku-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 2mm;
+          }
+          
+          .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2mm;
+            font-size: 9px;
+            color: #4a5568;
+          }
+          
+          .detail-item {
+            text-align: left;
+          }
+          
+          .detail-label {
+            font-weight: bold;
+            color: #2d3748;
+          }
+          
+          .footer {
+            margin-top: auto;
+            padding-top: 2mm;
+            border-top: 1px solid #eee;
+            font-size: 8px;
+            color: #666;
+            text-align: center;
+          }
+          
+          .generated-date {
+            font-style: italic;
+          }
+          
+          /* Malaysian printing optimization */
           @media print {
-            body { margin: 0; }
-            .label { margin: 2px; }
+            body { -webkit-print-color-adjust: exact; }
+            .label-container { break-inside: avoid; }
           }
         </style>
       </head>
       <body>
         ${generatedUIDs.map(uid => `
-          <div class="label">
-            <div class="uid">${uid.uid}</div>
-            ${uid.qr_code ? `<div class="qr"><img src="${uid.qr_code.startsWith('data:') ? uid.qr_code : `data:image/png;base64,${uid.qr_code}`}" /></div>` : ''}
-            <div class="details">
-              ${selectedSKUData ? selectedSKUData.name : ''}<br/>
-              Type: ${uid.type}${uid.copy_number ? ` (Copy ${uid.copy_number})` : ''}<br/>
-              ${uid.serial ? `Serial: ${uid.serial}<br/>` : ''}
-              Generated: ${new Date().toLocaleDateString()}
+          <div class="label-container">
+            <div class="header">
+              <div class="company-name">OrderOps</div>
+              <div class="label-title">Product Identification Label</div>
+            </div>
+            
+            <div class="main-content">
+              <div class="uid-section">
+                <div class="uid-label">Unique ID</div>
+                <div class="uid-value">${uid.uid}</div>
+              </div>
+              
+              ${uid.qr_code ? `
+                <div class="qr-section">
+                  <img src="${uid.qr_code.startsWith('data:') ? uid.qr_code : `data:image/png;base64,${uid.qr_code}`}" 
+                       class="qr-code" 
+                       alt="QR Code for ${uid.uid}" />
+                </div>
+              ` : ''}
+              
+              <div class="product-info">
+                ${selectedSKUData ? `<div class="sku-name">${selectedSKUData.name}</div>` : ''}
+                
+                <div class="details-grid">
+                  <div class="detail-item">
+                    <span class="detail-label">Type:</span><br/>
+                    ${uid.type}${uid.copy_number ? ` (Copy ${uid.copy_number})` : ''}
+                  </div>
+                  ${uid.serial ? `
+                    <div class="detail-item">
+                      <span class="detail-label">Serial:</span><br/>
+                      ${uid.serial}
+                    </div>
+                  ` : `
+                    <div class="detail-item">
+                      <span class="detail-label">Generated:</span><br/>
+                      ${new Date().toLocaleDateString('en-MY')}
+                    </div>
+                  `}
+                </div>
+              </div>
+            </div>
+            
+            <div class="footer">
+              <div class="generated-date">
+                Printed: ${new Date().toLocaleDateString('en-MY', { 
+                  year: 'numeric', 
+                  month: 'short', 
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
+              </div>
             </div>
           </div>
         `).join('')}
-        <script>window.print(); window.close();</script>
+        
+        <script>
+          window.onload = function() {
+            setTimeout(() => {
+              window.print();
+              setTimeout(() => window.close(), 1000);
+            }, 500);
+          };
+        </script>
       </body>
       </html>
     `);
@@ -303,10 +480,15 @@ export default function UIDGeneratorPage() {
         {/* Generated UIDs */}
         <Card>
           <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Generated UIDs</h3>
+            <div>
+              <h3 className="text-lg font-semibold">Generated UIDs</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Professional labels formatted for A6 printing (105mm × 148mm)
+              </p>
+            </div>
             {generatedUIDs.length > 0 && (
               <button className="btn secondary text-sm" onClick={printUIDLabels}>
-                Print Labels
+                🖨️ Print A6 Labels
               </button>
             )}
           </div>

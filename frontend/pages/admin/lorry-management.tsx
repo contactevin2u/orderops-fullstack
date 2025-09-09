@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { request } from '../../utils/api';
 import AdminLayout from '@/components/Layout/AdminLayout';
+import QRScanner from '../../components/QRScanner';
 
 // Types
 type Assignment = {
@@ -117,6 +118,7 @@ function LorryManagementPage() {
   const [scannedUIDs, setScannedUIDs] = useState<string[]>([]);
   const [scanNotes, setScanNotes] = useState('');
   const [scanLoading, setScanLoading] = useState(false);
+  const [showQRScanner, setShowQRScanner] = useState(false);
 
   // Lorry management states
   const [showCreateLorry, setShowCreateLorry] = useState(false);
@@ -239,6 +241,24 @@ function LorryManagementPage() {
 
   const removeScannedUID = (uid: string) => {
     setScannedUIDs(scannedUIDs.filter(u => u !== uid));
+  };
+
+  const handleQRScan = (scannedText: string) => {
+    const trimmed = scannedText.trim();
+    if (trimmed && !scannedUIDs.includes(trimmed)) {
+      setScannedUIDs([...scannedUIDs, trimmed]);
+      setShowQRScanner(false);
+      // Optional: Show success feedback
+      alert(`UID ${trimmed} scanned successfully!`);
+    } else if (scannedUIDs.includes(trimmed)) {
+      alert(`UID ${trimmed} already scanned!`);
+    }
+  };
+
+  const handleQRScanError = (error: string) => {
+    console.error('QR Scanner error:', error);
+    setShowQRScanner(false);
+    alert('QR scanning failed. Please try again or enter the UID manually.');
   };
 
   // Lorry creation handler
@@ -932,6 +952,16 @@ function LorryManagementPage() {
                             disabled={scanLoading}
                           />
                           <button
+                            type="button"
+                            onClick={() => setShowQRScanner(true)}
+                            disabled={scanLoading || !selectedLorry}
+                            className="px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2 transition-colors"
+                            title={!selectedLorry ? "Please select a lorry first" : "Scan UID with Camera"}
+                          >
+                            <span>📷</span>
+                            <span className="font-medium">Scan</span>
+                          </button>
+                          <button
                             type="submit"
                             disabled={!scanInput.trim() || scanLoading}
                             className="px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
@@ -1217,6 +1247,15 @@ function LorryManagementPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          onScan={handleQRScan}
+          onError={handleQRScanError}
+          onClose={() => setShowQRScanner(false)}
+        />
       )}
     </div>
   );
