@@ -1064,22 +1064,43 @@ function LorryManagementPage() {
                       📦 Current Stock for {selectedLorry} ({transactionDateFilter})
                     </h3>
                     <div className="space-y-2 max-h-64 overflow-y-auto">
-                      {stockTransactions
-                        .filter(t => t.lorry_id === selectedLorry && t.action === 'LOAD')
-                        .map((transaction, index) => (
-                          <div key={index} className="flex items-center justify-between p-2 bg-green-50 rounded border-l-4 border-green-400">
-                            <span className="font-mono text-sm">{transaction.uid}</span>
-                            <div className="text-xs text-gray-500">
-                              Loaded: {new Date(transaction.transaction_date).toLocaleString()}
+                      {(() => {
+                        // Calculate current stock by processing all transactions
+                        const currentStock = new Set<string>();
+                        stockTransactions
+                          .filter(t => t.lorry_id === selectedLorry)
+                          .sort((a, b) => new Date(a.transaction_date).getTime() - new Date(b.transaction_date).getTime())
+                          .forEach(transaction => {
+                            if (transaction.action === 'LOAD') {
+                              currentStock.add(transaction.uid);
+                            } else if (transaction.action === 'UNLOAD') {
+                              currentStock.delete(transaction.uid);
+                            }
+                          });
+                        
+                        const stockArray = Array.from(currentStock);
+                        
+                        return stockArray.length > 0 ? (
+                          <>
+                            <div className="mb-2 text-sm font-medium text-gray-700">
+                              Current Stock: {stockArray.length} items
                             </div>
+                            {stockArray.map((uid, index) => (
+                              <div key={index} className="flex items-center justify-between p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+                                <span className="font-mono text-sm">{uid}</span>
+                                <div className="text-xs text-blue-600 font-medium">
+                                  ✅ In Stock
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="text-center py-4 text-gray-500">
+                            <div className="text-2xl mb-1">📭</div>
+                            <p>No current stock - all items have been unloaded</p>
                           </div>
-                        ))}
-                      {stockTransactions.filter(t => t.lorry_id === selectedLorry && t.action === 'LOAD').length === 0 && (
-                        <div className="text-center py-4 text-gray-500">
-                          <div className="text-2xl mb-1">📭</div>
-                          <p>No stock loaded for this date</p>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
