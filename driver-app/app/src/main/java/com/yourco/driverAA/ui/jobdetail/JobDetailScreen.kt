@@ -175,7 +175,8 @@ fun JobDetailScreen(
                     onUpsellItem = viewModel::showUpsellDialog,
                     uploadingPhotos = uploadingPhotos,
                     uploadedPhotos = uploadedPhotos,
-                    uploadedPhotoFiles = uploadedPhotoFiles
+                    uploadedPhotoFiles = uploadedPhotoFiles,
+                    onShowDeliveryCompletion = { showDeliveryCompletion = true }
                 )
             }
         }
@@ -254,7 +255,8 @@ private fun JobDetailContent(
     onUpsellItem: ((JobItemDto) -> Unit)? = null,
     uploadingPhotos: Set<Int> = emptySet(),
     uploadedPhotos: Set<Int> = emptySet(),
-    uploadedPhotoFiles: Map<Int, File> = emptyMap()
+    uploadedPhotoFiles: Map<Int, File> = emptyMap(),
+    onShowDeliveryCompletion: () -> Unit = {}
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -473,7 +475,7 @@ private fun JobDetailContent(
                 currentStatus = job.status ?: "assigned",
                 onStatusUpdate = onStatusUpdate,
                 onNavigateToActiveOrders = onNavigateToActiveOrders,
-                onShowDeliveryCompletion = { showDeliveryCompletion = true }
+                onShowDeliveryCompletion = onShowDeliveryCompletion
             )
         }
     }
