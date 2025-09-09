@@ -472,7 +472,8 @@ private fun JobDetailContent(
             StatusActionButtons(
                 currentStatus = job.status ?: "assigned",
                 onStatusUpdate = onStatusUpdate,
-                onNavigateToActiveOrders = onNavigateToActiveOrders
+                onNavigateToActiveOrders = onNavigateToActiveOrders,
+                onShowDeliveryCompletion = { showDeliveryCompletion = true }
             )
         }
     }
@@ -578,7 +579,8 @@ private fun ItemCard(
 private fun StatusActionButtons(
     currentStatus: String,
     onStatusUpdate: (String) -> Unit,
-    onNavigateToActiveOrders: () -> Unit = {}
+    onNavigateToActiveOrders: () -> Unit = {},
+    onShowDeliveryCompletion: () -> Unit = {}
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -625,7 +627,7 @@ private fun StatusActionButtons(
                         }
                         Button(
                             onClick = { 
-                                showDeliveryCompletion = true
+                                onShowDeliveryCompletion()
                             },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(
