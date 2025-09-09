@@ -822,11 +822,15 @@ class AssignmentStatusResponse(BaseModel):
 @router.post("/stock/{lorry_id}/load", response_model=dict)
 async def load_lorry_stock(
     lorry_id: str,
-    request: LoadStockRequest,
+    raw_request: Request,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Admin loads UIDs into a lorry"""
+    # Parse JSON with robust handling
+    body = await parse_json_request(raw_request)
+    request = LoadStockRequest(**body)
+    
     inventory_service = LorryInventoryService(db)
     
     result = inventory_service.load_uids(
@@ -856,11 +860,15 @@ async def load_lorry_stock(
 @router.post("/stock/{lorry_id}/unload", response_model=dict)
 async def unload_lorry_stock(
     lorry_id: str,
-    request: UnloadStockRequest,
+    raw_request: Request,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Admin unloads UIDs from a lorry"""
+    # Parse JSON with robust handling
+    body = await parse_json_request(raw_request)
+    request = UnloadStockRequest(**body)
+    
     inventory_service = LorryInventoryService(db)
     
     result = inventory_service.unload_uids(
