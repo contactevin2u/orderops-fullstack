@@ -475,7 +475,7 @@ private fun JobDetailContent(
                 currentStatus = job.status ?: "assigned",
                 onStatusUpdate = onStatusUpdate,
                 onNavigateToActiveOrders = onNavigateToActiveOrders,
-                onShowDeliveryCompletion = onShowDeliveryCompletion
+                onShowDeliveryCompletion = onShowDeliveryCompletion // Fixed: use callback parameter
             )
         }
     }
