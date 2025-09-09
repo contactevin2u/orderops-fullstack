@@ -191,6 +191,13 @@ function LorryManagementPage() {
     };
   }, []);
 
+  // Reload transactions when lorry or date filter changes (for stock scanner tab)
+  useEffect(() => {
+    if (selectedLorry || transactionDateFilter !== new Date().toISOString().split('T')[0]) {
+      loadTransactions(transactionDateFilter, false);
+    }
+  }, [selectedLorry, transactionDateFilter]);
+
   const handleScanSubmit = async () => {
     if (!selectedLorry || scannedUIDs.length === 0) {
       setError('Please select a lorry and scan at least one UID');
@@ -218,8 +225,8 @@ function LorryManagementPage() {
       setLorryInventories((inventoryResult as any)?.lorries || []);
       
       // Refresh transactions (with current filter)
-      const transactionDateParam = showTodayOnly ? `&date=${new Date().toISOString().split('T')[0]}` : '';
-      const transactionsResult = await api<StockTransaction[]>(`/lorry-management/stock/transactions?limit=50${transactionDateParam}`);
+      const dateParam = transactionDateFilter ? `&date=${transactionDateFilter}` : '';
+      const transactionsResult = await api<StockTransaction[]>(`/lorry-management/stock/transactions?limit=50${dateParam}`);
       setStockTransactions(asArray<StockTransaction>(transactionsResult));
 
       alert(`Successfully ${scanMode}ed ${scannedUIDs.length} UIDs ${scanMode === 'load' ? 'into' : 'from'} ${selectedLorry}`);
@@ -909,6 +916,22 @@ function LorryManagementPage() {
 
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Date Filter
+                      </label>
+                      <input
+                        type="date"
+                        value={transactionDateFilter}
+                        onChange={(e) => handleDateFilterChange(e.target.value)}
+                        className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                        title="Filter transactions by date"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        Shows transactions and stock data for the selected date
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         Scan Mode
                       </label>
                       <div className="flex space-x-4">
@@ -1033,6 +1056,33 @@ function LorryManagementPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Current Stock Display */}
+                {selectedLorry && (
+                  <div className="bg-white rounded-lg border p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center">
+                      📦 Current Stock for {selectedLorry} ({transactionDateFilter})
+                    </h3>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {stockTransactions
+                        .filter(t => t.lorry_id === selectedLorry && t.action === 'LOAD')
+                        .map((transaction, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-green-50 rounded border-l-4 border-green-400">
+                            <span className="font-mono text-sm">{transaction.uid}</span>
+                            <div className="text-xs text-gray-500">
+                              Loaded: {new Date(transaction.transaction_date).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      {stockTransactions.filter(t => t.lorry_id === selectedLorry && t.action === 'LOAD').length === 0 && (
+                        <div className="text-center py-4 text-gray-500">
+                          <div className="text-2xl mb-1">📭</div>
+                          <p>No stock loaded for this date</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
