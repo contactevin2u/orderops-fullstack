@@ -134,6 +134,10 @@ function LorryManagementPage() {
   const [assignmentDate, setAssignmentDate] = useState(new Date().toISOString().split('T')[0]);
   const [autoAssignLoading, setAutoAssignLoading] = useState(false);
 
+  // Transaction filter states
+  const [transactionDateFilter, setTransactionDateFilter] = useState(new Date().toISOString().split('T')[0]);
+  const [showTodayOnly, setShowTodayOnly] = useState(true);
+
   const driverById = useMemo(() => {
     const m = new Map<number, Driver>();
     for (const dr of drivers) m.set(dr.id as number, dr);
@@ -153,7 +157,7 @@ function LorryManagementPage() {
           api<{ drivers: Driver[] }>('/lorry-management/drivers'),
           api<{ lorries: Lorry[] }>('/lorry-management/lorries'),
           api<{ lorries: LorryInventory[] }>('/lorry-management/stock/summary'),
-          api<StockTransaction[]>('/lorry-management/stock/transactions?limit=50'),
+          api<StockTransaction[]>(`/lorry-management/stock/transactions?limit=50&date=${new Date().toISOString().split('T')[0]}`),
           api<AssignmentStatus>('/lorry-management/assignment-status'),
         ]);
 
@@ -211,8 +215,9 @@ function LorryManagementPage() {
       const inventoryResult = await api<{ lorries: LorryInventory[] }>('/lorry-management/stock/summary');
       setLorryInventories((inventoryResult as any)?.lorries || []);
       
-      // Refresh transactions
-      const transactionsResult = await api<StockTransaction[]>('/lorry-management/stock/transactions?limit=50');
+      // Refresh transactions (with current filter)
+      const transactionDateParam = showTodayOnly ? `&date=${new Date().toISOString().split('T')[0]}` : '';
+      const transactionsResult = await api<StockTransaction[]>(`/lorry-management/stock/transactions?limit=50${transactionDateParam}`);
       setStockTransactions(asArray<StockTransaction>(transactionsResult));
 
       alert(`Successfully ${scanMode}ed ${scannedUIDs.length} UIDs ${scanMode === 'load' ? 'into' : 'from'} ${selectedLorry}`);
@@ -334,6 +339,37 @@ function LorryManagementPage() {
       alert(`Updated priority lorry for driver`);
     } catch (e: any) {
       setError(e.message || 'Failed to update priority lorry');
+    }
+  };
+
+  // Load transactions with filter
+  const loadTransactions = async (dateFilter?: string, todayOnly?: boolean) => {
+    try {
+      const useTodayOnly = todayOnly !== undefined ? todayOnly : showTodayOnly;
+      const useDate = dateFilter || (useTodayOnly ? new Date().toISOString().split('T')[0] : '');
+      const transactionDateParam = useDate ? `&date=${useDate}` : '';
+      const transactionsResult = await api<StockTransaction[]>(`/lorry-management/stock/transactions?limit=50${transactionDateParam}`);
+      setStockTransactions(asArray<StockTransaction>(transactionsResult));
+    } catch (e: any) {
+      setError(e.message || 'Failed to load transactions');
+    }
+  };
+
+  // Handle filter changes
+  const handleDateFilterChange = (date: string) => {
+    setTransactionDateFilter(date);
+    setShowTodayOnly(false);
+    loadTransactions(date, false);
+  };
+
+  const handleTodayOnlyToggle = (enabled: boolean) => {
+    setShowTodayOnly(enabled);
+    if (enabled) {
+      const today = new Date().toISOString().split('T')[0];
+      setTransactionDateFilter(today);
+      loadTransactions(today, true);
+    } else {
+      loadTransactions('', false);
     }
   };
 
@@ -1091,12 +1127,40 @@ function LorryManagementPage() {
             <div className="space-y-6">
               <div className="bg-white rounded-lg border">
                 <div className="p-4 border-b">
-                  <h2 className="text-lg font-semibold flex items-center">
-                    📜 Stock Transaction History & Audit Trail
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    All stock movements are logged for accountability and audit purposes
-                  </p>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h2 className="text-lg font-semibold flex items-center">
+                        📜 Stock Transaction History & Audit Trail
+                      </h2>
+                      <p className="text-sm text-gray-600 mt-1">
+                        All stock movements are logged for accountability and audit purposes
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center">
+                        <input
+                          type="checkbox"
+                          id="todayOnly"
+                          checked={showTodayOnly}
+                          onChange={(e) => handleTodayOnlyToggle(e.target.checked)}
+                          className="mr-2"
+                        />
+                        <label htmlFor="todayOnly" className="text-sm font-medium text-gray-700">
+                          Today Only
+                        </label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <label className="text-sm font-medium text-gray-700">Date:</label>
+                        <input
+                          type="date"
+                          value={transactionDateFilter}
+                          onChange={(e) => handleDateFilterChange(e.target.value)}
+                          disabled={showTodayOnly}
+                          className="p-2 border rounded focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">

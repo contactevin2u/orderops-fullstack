@@ -153,7 +153,8 @@ data class JobItemDto(
     val id: String? = null,
     val name: String? = null,
     val qty: Int? = null,
-    val unit_price: String? = null
+    val unit_price: String? = null,
+    val uid: String? = null // Add uid property for UID tracking
 )
 
 @Serializable

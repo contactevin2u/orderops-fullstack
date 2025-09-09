@@ -4,9 +4,12 @@ from datetime import date, datetime, timedelta
 from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
+import logging
 
 from app.models.driver import Driver
 from app.models.driver_schedule import DriverSchedule, DriverAvailabilityPattern
+
+logger = logging.getLogger(__name__)
 
 
 class DriverScheduleService:
@@ -183,7 +186,8 @@ class DriverScheduleService:
         schedule_date: date,
         is_scheduled: bool = True,
         shift_type: str = "FULL_DAY",
-        notes: str = None
+        notes: str = None,
+        admin_user_id: Optional[int] = None
     ) -> DriverSchedule:
         """
         Set explicit schedule for a driver on a specific date
@@ -197,11 +201,13 @@ class DriverScheduleService:
             )
         ).first()
         
+        was_scheduled_before = existing.is_scheduled if existing else False
+        
         if existing:
             existing.is_scheduled = is_scheduled
             existing.shift_type = shift_type
             existing.notes = notes
-            existing.status = "SCHEDULED"
+            existing.status = "SCHEDULED" if is_scheduled else "UNSCHEDULED"
             existing.updated_at = datetime.utcnow()
             schedule = existing
         else:
@@ -211,12 +217,17 @@ class DriverScheduleService:
                 is_scheduled=is_scheduled,
                 shift_type=shift_type,
                 notes=notes,
-                status="SCHEDULED"
+                status="SCHEDULED" if is_scheduled else "UNSCHEDULED"
             )
             self.db.add(schedule)
         
         self.db.commit()
         self.db.refresh(schedule)
+        
+        # Trigger lorry assignment/reassignment if schedule changed
+        if is_scheduled != was_scheduled_before and admin_user_id:
+            self._trigger_lorry_assignment(schedule_date, admin_user_id, 
+                                         driver_id, is_scheduled)
         
         return schedule
 
@@ -288,3 +299,147 @@ class DriverScheduleService:
             "shift_type_breakdown": shift_type_counts,
             "weekday": target_date.strftime("%A")
         }
+
+    def _trigger_lorry_assignment(
+        self, 
+        schedule_date: date, 
+        admin_user_id: int, 
+        driver_id: int, 
+        is_scheduled: bool
+    ):
+        """
+        Trigger automatic lorry assignment/reassignment when driver schedule changes
+        """
+        try:
+            from app.services.lorry_assignment_service import LorryAssignmentService
+            from app.models.lorry import LorryAssignment
+            
+            lorry_service = LorryAssignmentService(self.db)
+            
+            if is_scheduled:
+                # Driver was scheduled - attempt to assign a lorry
+                logger.info(f"Driver {driver_id} scheduled for {schedule_date}, triggering lorry assignment")
+                
+                # Check if driver already has assignment
+                existing_assignment = self.db.query(LorryAssignment).filter(
+                    and_(
+                        LorryAssignment.driver_id == driver_id,
+                        LorryAssignment.assignment_date == schedule_date
+                    )
+                ).first()
+                
+                if not existing_assignment:
+                    # Auto-assign for this specific driver
+                    result = self._assign_single_driver(driver_id, schedule_date, admin_user_id)
+                    logger.info(f"Lorry assignment result for driver {driver_id}: {result}")
+                else:
+                    logger.info(f"Driver {driver_id} already has lorry assignment for {schedule_date}")
+            
+            else:
+                # Driver was unscheduled - remove lorry assignment
+                logger.info(f"Driver {driver_id} unscheduled for {schedule_date}, removing lorry assignment")
+                
+                assignment = self.db.query(LorryAssignment).filter(
+                    and_(
+                        LorryAssignment.driver_id == driver_id,
+                        LorryAssignment.assignment_date == schedule_date
+                    )
+                ).first()
+                
+                if assignment:
+                    # Cancel the assignment
+                    assignment.status = "CANCELLED"
+                    assignment.notes = f"{assignment.notes or ''} - Driver unscheduled".strip()
+                    self.db.commit()
+                    
+                    logger.info(f"Cancelled lorry assignment for unscheduled driver {driver_id}")
+                    
+                    # Trigger reassignment for remaining scheduled drivers
+                    self._trigger_reassignment_for_date(schedule_date, admin_user_id)
+                
+        except Exception as e:
+            logger.error(f"Error triggering lorry assignment for driver {driver_id}: {e}")
+            # Don't raise - schedule operation should still succeed
+    
+    def _assign_single_driver(self, driver_id: int, schedule_date: date, admin_user_id: int) -> Dict[str, Any]:
+        """
+        Assign a lorry to a single scheduled driver
+        """
+        try:
+            from app.services.lorry_assignment_service import LorryAssignmentService
+            from app.models.lorry import Lorry, LorryAssignment
+            
+            # Get the driver
+            driver = self.db.query(Driver).filter(Driver.id == driver_id).first()
+            if not driver:
+                return {"success": False, "message": "Driver not found"}
+            
+            # Get available lorries
+            assigned_lorries = self.db.query(LorryAssignment.lorry_id).filter(
+                LorryAssignment.assignment_date == schedule_date
+            ).subquery()
+            
+            available_lorries = self.db.query(Lorry).filter(
+                and_(
+                    Lorry.is_active == True,
+                    Lorry.is_available == True,
+                    ~Lorry.lorry_id.in_(assigned_lorries)
+                )
+            ).all()
+            
+            if not available_lorries:
+                return {"success": False, "message": "No available lorries"}
+            
+            # Try priority lorry first
+            assigned_lorry_id = None
+            if driver.priority_lorry_id:
+                priority_lorry = next(
+                    (l for l in available_lorries if l.lorry_id == driver.priority_lorry_id), 
+                    None
+                )
+                if priority_lorry:
+                    assigned_lorry_id = priority_lorry.lorry_id
+            
+            # Fall back to first available lorry
+            if not assigned_lorry_id:
+                assigned_lorry_id = available_lorries[0].lorry_id
+            
+            # Create assignment
+            assignment = LorryAssignment(
+                driver_id=driver_id,
+                lorry_id=assigned_lorry_id,
+                assignment_date=schedule_date,
+                assigned_by=admin_user_id,
+                status="ASSIGNED",
+                notes="Auto-assigned when driver was scheduled"
+            )
+            
+            self.db.add(assignment)
+            self.db.commit()
+            
+            return {
+                "success": True,
+                "message": f"Assigned lorry {assigned_lorry_id} to driver {driver_id}",
+                "lorry_id": assigned_lorry_id
+            }
+            
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Error assigning single driver {driver_id}: {e}")
+            return {"success": False, "message": f"Error: {str(e)}"}
+    
+    def _trigger_reassignment_for_date(self, schedule_date: date, admin_user_id: int):
+        """
+        Trigger reassignment for all scheduled drivers on a date
+        (when a driver is unscheduled and their lorry becomes available)
+        """
+        try:
+            from app.services.lorry_assignment_service import LorryAssignmentService
+            
+            lorry_service = LorryAssignmentService(self.db)
+            result = lorry_service.auto_assign_lorries_for_date(schedule_date, admin_user_id)
+            
+            logger.info(f"Triggered reassignment for {schedule_date}: {result}")
+            
+        except Exception as e:
+            logger.error(f"Error triggering reassignment for {schedule_date}: {e}")

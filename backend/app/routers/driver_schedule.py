@@ -1,7 +1,7 @@
 """Driver schedule management endpoints"""
 
 from datetime import date, timedelta
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -29,6 +29,12 @@ class DailyScheduleRequest(BaseModel):
     is_scheduled: bool = True
     shift_type: str = "FULL_DAY"
     notes: Optional[str] = None
+
+
+class BulkScheduleRequest(BaseModel):
+    schedule_date: date
+    driver_schedules: List[Dict[str, Any]]  # [{"driver_id": int, "is_scheduled": bool, "shift_type": str, "notes": str}]
+    trigger_auto_assignment: bool = True
 
 
 @router.get("/weekly/{start_date}")
@@ -101,7 +107,8 @@ def set_daily_schedule(
         schedule_date=request.schedule_date,
         is_scheduled=request.is_scheduled,
         shift_type=request.shift_type,
-        notes=request.notes
+        notes=request.notes,
+        admin_user_id=current_user.id  # Pass admin user ID for lorry assignment
     )
     
     return envelope({
@@ -109,7 +116,8 @@ def set_daily_schedule(
         "driver_id": schedule.driver_id,
         "schedule_date": schedule.schedule_date.isoformat(),
         "is_scheduled": schedule.is_scheduled,
-        "status": schedule.status
+        "status": schedule.status,
+        "lorry_assignment_triggered": True  # Indicate that lorry assignment was processed
     })
 
 
@@ -180,4 +188,67 @@ def update_driver_status(
         "driver_id": driver_id,
         "status": status,
         "schedule_date": schedule_date.isoformat()
+    })
+
+
+@router.post("/bulk-schedule")
+def bulk_set_schedule(
+    request: BulkScheduleRequest,
+    current_user = Depends(require_roles(Role.ADMIN)),
+    db: Session = Depends(get_session)
+):
+    """Bulk update driver schedules for a date with automatic lorry assignment"""
+    schedule_service = DriverScheduleService(db)
+    results = []
+    
+    # Process individual schedules first (without triggering assignment)
+    for schedule_data in request.driver_schedules:
+        try:
+            schedule = schedule_service.set_daily_schedule(
+                driver_id=schedule_data["driver_id"],
+                schedule_date=request.schedule_date,
+                is_scheduled=schedule_data.get("is_scheduled", True),
+                shift_type=schedule_data.get("shift_type", "FULL_DAY"),
+                notes=schedule_data.get("notes"),
+                admin_user_id=None  # Don't trigger individual assignment yet
+            )
+            
+            results.append({
+                "driver_id": schedule.driver_id,
+                "success": True,
+                "schedule_id": schedule.id,
+                "status": schedule.status
+            })
+            
+        except Exception as e:
+            results.append({
+                "driver_id": schedule_data["driver_id"],
+                "success": False,
+                "error": str(e)
+            })
+    
+    # Trigger bulk lorry assignment after all schedules are set
+    assignment_result = None
+    if request.trigger_auto_assignment:
+        try:
+            from app.services.lorry_assignment_service import LorryAssignmentService
+            lorry_service = LorryAssignmentService(db)
+            assignment_result = lorry_service.auto_assign_lorries_for_date(
+                request.schedule_date, current_user.id
+            )
+        except Exception as e:
+            assignment_result = {
+                "success": False,
+                "message": f"Schedule updates succeeded but lorry assignment failed: {str(e)}"
+            }
+    
+    success_count = sum(1 for r in results if r["success"])
+    
+    return envelope({
+        "schedule_date": request.schedule_date.isoformat(),
+        "schedules_processed": len(results),
+        "schedules_successful": success_count,
+        "schedules_failed": len(results) - success_count,
+        "schedule_results": results,
+        "lorry_assignment": assignment_result
     })

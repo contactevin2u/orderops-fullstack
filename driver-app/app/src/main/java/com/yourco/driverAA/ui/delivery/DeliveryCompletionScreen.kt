@@ -1,5 +1,6 @@
 package com.yourco.driverAA.ui.delivery
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -35,10 +36,10 @@ fun DeliveryCompletionScreen(
     
     // Calculate expected UIDs from job items
     val expectedUIDs = remember(job) {
-        job.items.mapNotNull { item -> 
+        job.items?.mapNotNull { item -> 
             // Extract UIDs from item if available, or generate placeholder
             item.uid?.let { listOf(it) } ?: emptyList()
-        }.flatten()
+        }?.flatten() ?: emptyList()
     }
     
     Column(
@@ -94,7 +95,7 @@ fun DeliveryCompletionScreen(
                     modifier = Modifier.heightIn(max = 200.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(job.items) { item ->
+                    items(job.items ?: emptyList()) { item ->
                         OrderItemRow(
                             item = item,
                             isScanned = item.uid?.let { scannedUIDs.contains(it) } ?: false
@@ -121,9 +122,9 @@ fun DeliveryCompletionScreen(
                     )
                     
                     Text(
-                        text = "${uidActions.size} / ${job.items.size} completed",
+                        text = "${uidActions.size} / ${job.items?.size ?: 0} completed",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (uidActions.size == job.items.size) AppColors.success else AppColors.warning,
+                        color = if (uidActions.size == job.items?.size ?: 0) AppColors.success else AppColors.warning,
                         fontWeight = FontWeight.Medium
                     )
                 }
@@ -206,16 +207,17 @@ fun DeliveryCompletionScreen(
         // Status message
         Spacer(modifier = Modifier.height(8.dp))
         
+        val itemCount = job.items?.size ?: 0
         val statusMessage = when {
             uidActions.isEmpty() -> "Scan items and set their actions to complete delivery"
-            uidActions.size < job.items.size -> "Warning: ${job.items.size - uidActions.size} items still need actions"
+            uidActions.size < itemCount -> "Warning: ${itemCount - uidActions.size} items still need actions"
             scannedUIDs.any { uidActions[it] == null } -> "Some scanned items need actions assigned"
             else -> "All items processed - ready to complete delivery"
         }
         
         val statusColor = when {
             uidActions.isEmpty() -> AppColors.error
-            uidActions.size < job.items.size || scannedUIDs.any { uidActions[it] == null } -> AppColors.warning
+            uidActions.size < itemCount || scannedUIDs.any { uidActions[it] == null } -> AppColors.warning
             else -> AppColors.success
         }
         
@@ -250,7 +252,7 @@ fun DeliveryCompletionScreen(
         UIDActionSelectorDialog(
             uid = selectedUIDForAction!!,
             currentAction = uidActions[selectedUIDForAction!!],
-            jobItems = job.items,
+            jobItems = job.items ?: emptyList(),
             onDismiss = {
                 showActionSelector = false
                 selectedUIDForAction = null
@@ -276,7 +278,7 @@ private fun OrderItemRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = item.name,
+                text = item.name ?: "Unknown Item",
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.Medium
             )

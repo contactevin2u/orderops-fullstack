@@ -203,9 +203,10 @@ fun JobDetailScreen(
     }
     
     // Delivery Completion Screen
-    if (showDeliveryCompletion && job != null) {
+    val currentJob = job
+    if (showDeliveryCompletion && currentJob != null) {
         DeliveryCompletionScreen(
-            job = job,
+            job = currentJob,
             onCompleteDelivery = { uidActions ->
                 showDeliveryCompletion = false
                 // Use the UID-aware completion method
