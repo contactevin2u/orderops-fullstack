@@ -22,6 +22,7 @@ export default function QRScanner({ onScan, onError, onClose }: QRScannerProps) 
     return () => {
       stopCamera();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const startCamera = async () => {
@@ -291,7 +292,7 @@ export default function QRScanner({ onScan, onError, onClose }: QRScannerProps) 
               {isScanning ? (
                 <>Make sure the QR code is clearly visible and well-lit</>
               ) : (
-                <>Use "Test Scan" button for testing or manual entry</>
+                <>Use &quot;Test Scan&quot; button for testing or manual entry</>
               )}
             </div>
           </div>
