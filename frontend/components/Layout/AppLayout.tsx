@@ -21,6 +21,9 @@ import {
   Route,
   UserCheck,
   Settings,
+  Package,
+  QrCode,
+  Zap,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -63,6 +66,7 @@ export const navGroups: NavGroup[] = [
       { href: '/admin/driver-schedule', label: 'Driver Schedule', Icon: Calendar, requiresAuth: true },
       { href: '/admin/lorry-management', label: 'Lorry Management', Icon: Truck, requiresAuth: true },
       { href: '/admin/assign', label: 'Assign Orders', Icon: UserCheck, requiresAuth: true },
+      { href: '/admin/assignments', label: 'Order Assignments', Icon: Zap, requiresAuth: true },
       { href: '/admin/routes', label: 'Routes', Icon: Route, requiresAuth: true },
     ]
   },
@@ -70,6 +74,7 @@ export const navGroups: NavGroup[] = [
     title: 'Monitoring & Control',
     items: [
       { href: '/admin/uid-management', label: 'UID Tracker', Icon: BarChart2, requiresAuth: true },
+      { href: '/admin/driver-stock', label: 'Driver Stock', Icon: Package, requiresAuth: true },
       { href: '/admin/holds', label: 'Driver Holds', Icon: Shield, requiresAuth: true },
       { href: '/admin/driver-commissions', label: 'Driver Commissions', Icon: CircleDollarSign, requiresAuth: true },
       { href: '/admin/drivers', label: 'Driver Management', Icon: Users, requiresAuth: true },
@@ -79,6 +84,8 @@ export const navGroups: NavGroup[] = [
     title: 'System Settings',
     items: [
       { href: '/admin', label: 'Admin Dashboard', Icon: Settings, requiresAuth: true },
+      { href: '/admin/sku-management', label: 'SKU Management', Icon: Package, requiresAuth: true },
+      { href: '/admin/uid-generator', label: 'UID Generator', Icon: QrCode, requiresAuth: true },
       { href: '/admin/users', label: 'User Management', Icon: Users, requiresAuth: true },
     ]
   }

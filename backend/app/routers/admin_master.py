@@ -1,3 +1,4 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -19,11 +20,23 @@ def verify_admin_access(current_user: User = Depends(get_current_user)) -> User:
     return current_user
 
 
+def verify_development_environment() -> None:
+    """Prevent dangerous operations in production"""
+    app_version = os.getenv("APP_VERSION", "").lower()
+    if app_version == "production" or app_version == "prod":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Destructive operations disabled in production environment"
+        )
+
+
 @router.delete("/delete-all-orders")
 async def delete_all_orders(
     db: Session = Depends(get_session),
     current_user: User = Depends(verify_admin_access)
 ) -> Dict[str, Any]:
+    """PRODUCTION SAFETY: Verify development environment"""
+    verify_development_environment()
     """
     DANGER: Delete ALL orders and related data
     This will permanently remove:
@@ -87,6 +100,8 @@ async def delete_all_drivers(
     db: Session = Depends(get_session),
     current_user: User = Depends(verify_admin_access)
 ) -> Dict[str, Any]:
+    """PRODUCTION SAFETY: Verify development environment"""
+    verify_development_environment()
     """
     DANGER: Delete ALL drivers and related data
     This will permanently remove:
@@ -137,6 +152,8 @@ async def delete_all_routes(
     db: Session = Depends(get_session),
     current_user: User = Depends(verify_admin_access)
 ) -> Dict[str, Any]:
+    """PRODUCTION SAFETY: Verify development environment"""
+    verify_development_environment()
     """
     DANGER: Delete ALL routes
     This will permanently remove:
@@ -176,6 +193,8 @@ async def reset_database(
     db: Session = Depends(get_session),
     current_user: User = Depends(verify_admin_access)
 ) -> Dict[str, Any]:
+    """PRODUCTION SAFETY: Verify development environment"""
+    verify_development_environment()
     """
     NUCLEAR OPTION: Reset entire database to factory state
     This will permanently remove ALL DATA except:
