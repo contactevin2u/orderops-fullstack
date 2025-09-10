@@ -413,11 +413,15 @@ async def get_lorry_stock(
     if not settings.UID_INVENTORY_ENABLED:
         return envelope({
             "date": datetime.utcnow().date().isoformat(),
-            "driver_id": driver_id,
+            "driver_id": driver_id,      # Backend snake_case
+            "driverId": driver_id,       # Driver app camelCase
             "items": [],
-            "total_expected": 0,
-            "total_scanned": 0,
-            "total_variance": 0,
+            "total_expected": 0,         # Backend snake_case
+            "totalExpected": 0,          # Driver app camelCase
+            "total_scanned": 0,          # Backend snake_case
+            "totalScanned": 0,           # Driver app camelCase
+            "total_variance": 0,         # Backend snake_case
+            "totalVariance": 0,          # Driver app camelCase
             "message": "UID inventory system disabled"
         })
     
@@ -444,11 +448,15 @@ async def get_lorry_stock(
         # No assignment found, return empty stock
         response_data = {
             "date": target_date.isoformat(),
-            "driver_id": driver_id,
+            "driver_id": driver_id,  # Keep backend snake_case for consistency
+            "driverId": driver_id,   # Add camelCase for driver app compatibility
             "items": [],
-            "totalExpected": 0,
-            "totalScanned": 0,
-            "totalVariance": 0,
+            "total_expected": 0,     # Backend snake_case
+            "totalExpected": 0,      # Driver app camelCase
+            "total_scanned": 0,      # Backend snake_case  
+            "totalScanned": 0,       # Driver app camelCase
+            "total_variance": 0,     # Backend snake_case
+            "totalVariance": 0,      # Driver app camelCase
             "message": "No lorry assignment found for this date"
         }
         return envelope(response_data)
@@ -488,12 +496,16 @@ async def get_lorry_stock(
     # Convert to items format expected by driver app
     for sku_data in sku_counts.values():
         items.append({
-            "sku_id": sku_data["sku_id"],
-            "sku_name": sku_data["sku_name"],
-            "expected_count": sku_data["count"],  # Current stock is what's expected
-            "scanned_count": sku_data["count"],   # Assume all current stock is verified
-            "variance": 0,  # No variance for current stock view
-            "uids": sku_data["uids"]  # Include UIDs for scanning
+            "sku_id": sku_data["sku_id"],        # Backend snake_case
+            "skuId": sku_data["sku_id"],         # Driver app camelCase
+            "sku_name": sku_data["sku_name"],    # Backend snake_case
+            "skuName": sku_data["sku_name"],     # Driver app camelCase
+            "expected_count": sku_data["count"], # Backend snake_case
+            "expectedCount": sku_data["count"],  # Driver app camelCase
+            "scanned_count": sku_data["count"],  # Backend snake_case
+            "scannedCount": sku_data["count"],   # Driver app camelCase
+            "variance": 0,                       # No variance for current stock view
+            "uids": sku_data["uids"]             # Include UIDs for scanning
         })
     
     total_scanned = len(current_uids)
@@ -501,13 +513,17 @@ async def get_lorry_stock(
     # Match the LorryStockResponse structure expected by the driver app
     response_data = {
         "date": target_date.isoformat(),
-        "driver_id": driver_id,
+        "driver_id": driver_id,      # Backend snake_case
+        "driverId": driver_id,       # Driver app camelCase
         "lorry_id": assignment.lorry_id,
         "items": items,
-        "totalExpected": len(current_uids),  # Total UID count
-        "totalScanned": len(current_uids),   # All current UIDs considered scanned
-        "totalVariance": 0,  # No variance for current stock view
-        "current_uids": current_uids,  # Include for verification workflow
+        "total_expected": len(current_uids),  # Backend snake_case
+        "totalExpected": len(current_uids),   # Driver app camelCase
+        "total_scanned": len(current_uids),   # Backend snake_case
+        "totalScanned": len(current_uids),    # Driver app camelCase
+        "total_variance": 0,                  # Backend snake_case
+        "totalVariance": 0,                   # Driver app camelCase
+        "current_uids": current_uids,         # Include for verification workflow
         "message": f"Current stock for lorry {assignment.lorry_id}"
     }
     

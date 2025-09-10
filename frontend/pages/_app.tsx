@@ -1,5 +1,4 @@
 import type { AppProps } from 'next/app';
-import { SessionProvider } from 'next-auth/react';
 import { Inter } from 'next/font/google';
 import '@/styles/globals.css';
 import '@/i18n';
@@ -16,12 +15,10 @@ export default function App({ Component, pageProps }: AppProps) {
   const content = <Component {...pageProps} />;
   const queryClient = React.useMemo(() => new QueryClient(), []);
   return (
-    <SessionProvider session={(pageProps as any).session}>
-      <QueryClientProvider client={queryClient}>
-        <div className={inter.className}>
-          {noLayout.includes(router.pathname) ? content : <Layout>{content}</Layout>}
-        </div>
-      </QueryClientProvider>
-    </SessionProvider>
+    <QueryClientProvider client={queryClient}>
+      <div className={inter.className}>
+        {noLayout.includes(router.pathname) ? content : <Layout>{content}</Layout>}
+      </div>
+    </QueryClientProvider>
   );
 }

@@ -128,6 +128,14 @@ class InventoryService:
         self.session.add(uid_record)
         self.session.commit()
 
+        # UNIFIED: Also sync with lorry inventory system
+        try:
+            self._sync_to_lorry_system(order_id, uid, action, scanned_by, item.sku_id, notes)
+        except Exception as e:
+            # Don't fail the main operation if sync fails
+            import logging
+            logging.warning(f"Lorry system sync failed for UID {uid}: {e}")
+
         return {
             "success": True,
             "uid": uid,
@@ -135,6 +143,111 @@ class InventoryService:
             "sku_name": item.sku.name if item.sku else None,
             "message": f"UID {uid} {action.value.lower()} processed successfully"
         }
+    
+    def _sync_to_lorry_system(self, order_id: int, uid: str, action: UIDAction, scanned_by: int, sku_id: int, notes: str = None):
+        """Sync legacy inventory actions to the lorry transaction system"""
+        try:
+            from ..models import LorryAssignment, LorryStockTransaction, Driver
+            from datetime import date, datetime
+            
+            # Get driver's current lorry assignment
+            driver = self.session.get(Driver, scanned_by)
+            if not driver:
+                return
+                
+            today = date.today()
+            assignment = self.session.execute(
+                select(LorryAssignment).where(
+                    and_(
+                        LorryAssignment.driver_id == scanned_by,
+                        LorryAssignment.assignment_date <= today
+                    )
+                ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
+            ).scalar_one_or_none()
+            
+            if not assignment:
+                # Create virtual lorry for this driver if no assignment
+                lorry_id = f"DRIVER_{scanned_by}"
+            else:
+                lorry_id = assignment.lorry_id
+            
+            # Map legacy actions to lorry actions
+            lorry_action_map = {
+                UIDAction.DELIVER: "DELIVERY",
+                UIDAction.RETURN: "COLLECTION", 
+                UIDAction.REPAIR: "REPAIR",
+                UIDAction.SWAP: "DELIVERY",  # Swap is treated as delivery + collection
+                UIDAction.LOAD_OUT: "LOAD",
+                UIDAction.LOAD_IN: "UNLOAD"
+            }
+            
+            if action not in lorry_action_map:
+                return
+                
+            lorry_action = lorry_action_map[action]
+            
+            # Check if transaction already exists (avoid duplicates)
+            existing = self.session.execute(
+                select(LorryStockTransaction).where(
+                    and_(
+                        LorryStockTransaction.uid == uid,
+                        LorryStockTransaction.action == lorry_action,
+                        LorryStockTransaction.order_id == order_id
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if existing:
+                return  # Already synced
+            
+            # Create lorry transaction(s)
+            now = datetime.now()
+            transactions_to_add = []
+            
+            if action == UIDAction.SWAP:
+                # SWAP requires two transactions: delivery of old item + collection of returned item
+                # For simplicity, we'll create a single DELIVERY transaction with SWAP notes
+                swap_transaction = LorryStockTransaction(
+                    lorry_id=lorry_id,
+                    action="DELIVERY",
+                    uid=uid,
+                    sku_id=sku_id,
+                    order_id=order_id,
+                    driver_id=scanned_by,
+                    admin_user_id=scanned_by,
+                    notes=f"SWAP transaction - Auto-sync from legacy: {notes or 'Item swapped'}",
+                    transaction_date=now
+                )
+                transactions_to_add.append(swap_transaction)
+            else:
+                # Regular single transaction
+                transaction = LorryStockTransaction(
+                    lorry_id=lorry_id,
+                    action=lorry_action,
+                    uid=uid,
+                    sku_id=sku_id,
+                    order_id=order_id,
+                    driver_id=scanned_by,
+                    admin_user_id=scanned_by,
+                    notes=f"Auto-sync from legacy system: {notes or action.value}",
+                    transaction_date=now
+                )
+                transactions_to_add.append(transaction)
+            
+            # Add all transactions
+            for transaction in transactions_to_add:
+                self.session.add(transaction)
+            
+            self.session.commit()
+            
+            import logging
+            logging.info(f"Synced legacy action {action.value} to lorry system: {uid} -> {lorry_id}")
+            
+        except Exception as e:
+            import logging
+            logging.error(f"Lorry system sync error: {e}")
+            self.session.rollback()
+            raise
 
     def get_order_uids(self, order_id: int) -> Dict[str, Any]:
         """Get all UID scans for an order"""

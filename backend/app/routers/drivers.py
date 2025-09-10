@@ -401,9 +401,9 @@ def _process_uid_actions(
     db: Session
 ) -> tuple[int, list[str]]:
     """
-    Process UID actions during order completion.
+    Process UID actions during order completion - UNIFIED INVENTORY SYSTEM
     Returns (success_count, error_messages).
-    Reuses existing UID validation logic.
+    Syncs both legacy and lorry inventory systems.
     """
     if not settings.UID_INVENTORY_ENABLED:
         return 0, ["UID inventory system disabled"]
@@ -411,67 +411,146 @@ def _process_uid_actions(
     success_count = 0
     errors = []
     
-    for uid_action in uid_actions:
-        try:
-            # Validate UID exists
-            item = db.get(Item, uid_action.uid)
-            if not item:
-                errors.append(f"UID {uid_action.uid} not found in inventory")
-                continue
-            
-            # Check for duplicate scans (idempotent)
-            existing = db.execute(
-                select(OrderItemUID).where(
-                    and_(
-                        OrderItemUID.order_id == order_id,
-                        OrderItemUID.uid == uid_action.uid,
-                        OrderItemUID.action == uid_action.action
-                    )
+    try:
+        # Initialize unified inventory service
+        from ..services.lorry_inventory_service import LorryInventoryService
+        lorry_service = LorryInventoryService(db)
+        
+        # Get driver's lorry assignment
+        assignment = db.execute(
+            select(LorryAssignment).where(
+                and_(
+                    LorryAssignment.driver_id == driver_id,
+                    LorryAssignment.assignment_date <= date.today()
                 )
-            ).scalar_one_or_none()
+            ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
+        ).scalar_one_or_none()
+        
+        lorry_id = assignment.lorry_id if assignment else f"DRIVER_{driver_id}"
+        print(f"DEBUG: Processing UID actions for lorry {lorry_id}")
+        
+        # Convert to lorry action format
+        lorry_actions = []
+        for uid_action in uid_actions:
+            lorry_actions.append({
+                "action": uid_action.action.upper(),  # Ensure uppercase
+                "uid": uid_action.uid,
+                "notes": uid_action.notes or f"Order {order_id} completion"
+            })
+        
+        # Process through unified lorry system
+        lorry_result = lorry_service.process_delivery_actions(
+            lorry_id=lorry_id,
+            order_id=order_id,
+            driver_id=driver_id,
+            admin_user_id=driver_id,  # Driver as admin for their actions
+            uid_actions=lorry_actions
+        )
+        
+        if lorry_result.get("success", False):
+            success_count = lorry_result.get("processed_count", 0)
+            print(f"DEBUG: Lorry system processed {success_count} UID actions successfully")
             
-            if existing:
-                # Already processed - idempotent behavior
-                success_count += 1
-                continue
-            
-            # Create scan record
-            scan_record = OrderItemUID(
-                order_id=order_id,
-                uid=uid_action.uid,
-                scanned_by=driver_id,
-                action=uid_action.action,
-                scanned_at=datetime.now(timezone.utc),
-                notes=uid_action.notes
-            )
-            db.add(scan_record)
-            success_count += 1
-            
-        except Exception as e:
-            errors.append(f"Failed to process UID {uid_action.uid}: {str(e)}")
-    
-    # Commit UID actions
-    if success_count > 0:
-        try:
-            db.commit()
+            # Also process legacy system for backward compatibility
+            for uid_action in uid_actions:
+                try:
+                    # Check for duplicate scans (idempotent)
+                    existing = db.execute(
+                        select(OrderItemUID).where(
+                            and_(
+                                OrderItemUID.order_id == order_id,
+                                OrderItemUID.uid == uid_action.uid,
+                                OrderItemUID.action == uid_action.action
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    
+                    if not existing:
+                        # Create legacy scan record for compatibility
+                        scan_record = OrderItemUID(
+                            order_id=order_id,
+                            uid=uid_action.uid,
+                            scanned_by=driver_id,
+                            action=uid_action.action,
+                            scanned_at=datetime.now(timezone.utc),
+                            notes=uid_action.notes
+                        )
+                        db.add(scan_record)
+                        
+                except Exception as e:
+                    print(f"DEBUG: Legacy system sync warning for UID {uid_action.uid}: {e}")
+                    # Don't fail for legacy sync issues
             
             # Log audit action
             log_action(
                 db, 
                 user_id=driver_id, 
-                action="UID_INTEGRATED_SCAN", 
+                action="UID_UNIFIED_SCAN", 
                 resource_type="order", 
                 resource_id=order_id,
                 details={
                     "uid_actions": [{"action": ua.action, "uid": ua.uid} for ua in uid_actions],
-                    "success_count": success_count
+                    "success_count": success_count,
+                    "lorry_id": lorry_id,
+                    "system": "unified_inventory"
                 }
             )
             
-        except Exception as e:
-            db.rollback()
-            errors.append(f"Database commit failed: {str(e)}")
-            success_count = 0
+        else:
+            # Fallback to legacy system if lorry system fails
+            print(f"DEBUG: Lorry system failed, falling back to legacy: {lorry_result.get('message', 'Unknown error')}")
+            errors.extend(lorry_result.get("errors", []))
+            
+            # Process with legacy system
+            for uid_action in uid_actions:
+                try:
+                    # Validate UID exists
+                    item = db.get(Item, uid_action.uid)
+                    if not item:
+                        errors.append(f"UID {uid_action.uid} not found in inventory")
+                        continue
+                    
+                    # Check for duplicate scans (idempotent)
+                    existing = db.execute(
+                        select(OrderItemUID).where(
+                            and_(
+                                OrderItemUID.order_id == order_id,
+                                OrderItemUID.uid == uid_action.uid,
+                                OrderItemUID.action == uid_action.action
+                            )
+                        )
+                    ).scalar_one_or_none()
+                    
+                    if existing:
+                        # Already processed - idempotent behavior
+                        success_count += 1
+                        continue
+                    
+                    # Create scan record
+                    scan_record = OrderItemUID(
+                        order_id=order_id,
+                        uid=uid_action.uid,
+                        scanned_by=driver_id,
+                        action=uid_action.action,
+                        scanned_at=datetime.now(timezone.utc),
+                        notes=uid_action.notes
+                    )
+                    db.add(scan_record)
+                    success_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Failed to process UID {uid_action.uid}: {str(e)}")
+        
+        # Commit all changes
+        if success_count > 0:
+            db.commit()
+            print(f"DEBUG: Successfully committed {success_count} UID actions to unified system")
+        
+    except Exception as e:
+        print(f"DEBUG: UID processing error: {e}")
+        errors.append(f"UID processing system error: {str(e)}")
+        db.rollback()
+        success_count = 0
     
     return success_count, errors
 
@@ -519,6 +598,7 @@ def update_order_status(
                 f"You already have an order in transit ({order_info}). Please put it on hold or complete it first."
             )
     
+
     trip.status = payload.status
     now = datetime.now(timezone.utc)
     if payload.status == "IN_TRANSIT":
