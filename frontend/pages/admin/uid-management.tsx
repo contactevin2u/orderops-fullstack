@@ -73,7 +73,7 @@ export default function UIDManagement() {
     setError(null);
     
     try {
-      const response = await request<{ results: UIDSearchResult[] }>(`/inventory/uid/search?query=${encodeURIComponent(searchQuery)}`);
+      const response = await request<{ query: string; results: UIDSearchResult[]; total_found: number }>(`/inventory/uid/search?query=${encodeURIComponent(searchQuery)}`);
       setSearchResults(response.results || []);
     } catch (err: any) {
       setError(err.message || 'Search failed');

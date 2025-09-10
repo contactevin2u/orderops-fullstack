@@ -17,6 +17,10 @@ import {
   Smartphone,
   Truck,
   ChevronDown,
+  Users,
+  Route,
+  UserCheck,
+  Settings,
 } from 'lucide-react';
 import { useRouter } from 'next/router';
 import useSWR from 'swr';
@@ -45,33 +49,37 @@ export const navGroups: NavGroup[] = [
     ]
   },
   {
-    title: 'Mobile & Delivery',
-    items: [
-      { href: '/mobile/delivery-status', label: 'Mobile Status', Icon: Smartphone },
-    ]
-  },
-  {
     title: 'Financial Operations',
     items: [
       { href: '/cashier', label: 'nav.cashier', Icon: CircleDollarSign },
       { href: '/adjustments', label: 'nav.adjustments', Icon: Wrench },
       { href: '/export', label: 'nav.export', Icon: FileDown },
-    ]
-  },
-  {
-    title: 'Analytics',
-    items: [
       { href: '/reports/outstanding', label: 'nav.reports', Icon: BarChart2 },
     ]
   },
   {
-    title: 'Administration',
+    title: 'Operations Management',
     items: [
-      { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
       { href: '/admin/driver-schedule', label: 'Driver Schedule', Icon: Calendar, requiresAuth: true },
       { href: '/admin/lorry-management', label: 'Lorry Management', Icon: Truck, requiresAuth: true },
+      { href: '/admin/assign', label: 'Assign Orders', Icon: UserCheck, requiresAuth: true },
+      { href: '/admin/routes', label: 'Routes', Icon: Route, requiresAuth: true },
+    ]
+  },
+  {
+    title: 'Monitoring & Control',
+    items: [
       { href: '/admin/uid-management', label: 'UID Tracker', Icon: BarChart2, requiresAuth: true },
       { href: '/admin/holds', label: 'Driver Holds', Icon: Shield, requiresAuth: true },
+      { href: '/admin/driver-commissions', label: 'Driver Commissions', Icon: CircleDollarSign, requiresAuth: true },
+      { href: '/admin/drivers', label: 'Driver Management', Icon: Users, requiresAuth: true },
+    ]
+  },
+  {
+    title: 'System Settings',
+    items: [
+      { href: '/admin', label: 'Admin Dashboard', Icon: Settings, requiresAuth: true },
+      { href: '/admin/users', label: 'User Management', Icon: Users, requiresAuth: true },
     ]
   }
 ];
@@ -189,16 +197,25 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <header ref={headerRef} className="header">
         <div className="header-inner">
           <h1>OrderOps</h1>
-          <button
-            type="button"
-            className="nav-link nav-toggle"
-            aria-expanded={mobileOpen}
-            aria-controls="primary-nav"
-            onClick={() => setMobileOpen((o) => !o)}
-          >
-            <Menu style={{ width: 20, height: 20 }} />
-            <span className="sr-only">{t('nav.menu')}</span>
-          </button>
+          <div className="header-actions">
+            <Link 
+              href="/mobile/delivery-status" 
+              className="mobile-status-btn"
+              title="Mobile Status"
+            >
+              <Smartphone style={{ width: 16, height: 16 }} />
+            </Link>
+            <button
+              type="button"
+              className="nav-link nav-toggle"
+              aria-expanded={mobileOpen}
+              aria-controls="primary-nav"
+              onClick={() => setMobileOpen((o) => !o)}
+            >
+              <Menu style={{ width: 20, height: 20 }} />
+              <span className="sr-only">{t('nav.menu')}</span>
+            </button>
+          </div>
           <nav
             id="primary-nav"
             ref={menuRef}

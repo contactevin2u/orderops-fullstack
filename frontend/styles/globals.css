@@ -127,6 +127,34 @@ h6 {
   contain: none; /* Disable containment */
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-status-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  color: var(--color-surface);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.mobile-status-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.mobile-status-btn:active {
+  transform: translateY(0);
+}
+
 .nav {
   display: flex;
   align-items: center;
@@ -163,6 +191,7 @@ h6 {
   background: none;
   border: none;
   padding: 8px;
+  color: var(--color-surface);
 }
 
 .nav-separator {
@@ -814,6 +843,12 @@ form .error {
   .table td:first-child {
     background: var(--color-surface-raised);
     box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Admin content styling */
+  .admin-content {
+    padding: 0;
+    background: transparent;
   }
   
   /* Form error states in dark mode */
