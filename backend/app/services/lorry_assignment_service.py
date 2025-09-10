@@ -177,7 +177,7 @@ class LorryAssignmentService:
                 ).where(
                     and_(
                         DriverSchedule.schedule_date == assignment_date,
-                        DriverSchedule.status == "SCHEDULED",
+                        DriverSchedule.status.in_(["SCHEDULED", "CONFIRMED"]),
                         Driver.is_active == True
                     )
                 )
@@ -326,7 +326,7 @@ class LorryAssignmentService:
             select(func.count(DriverSchedule.id)).where(
                 and_(
                     DriverSchedule.schedule_date == assignment_date,
-                    DriverSchedule.status == "SCHEDULED"
+                    DriverSchedule.status.in_(["SCHEDULED", "CONFIRMED"])
                 )
             )
         ).scalar()
