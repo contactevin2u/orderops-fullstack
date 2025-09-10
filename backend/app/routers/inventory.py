@@ -1109,7 +1109,7 @@ async def get_driver_stock_status(
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
-    """Get current items with driver - for load-out/load-in workflow"""
+    """Get current items with driver - UNIFIED: Uses lorry stock system"""
     if not settings.UID_INVENTORY_ENABLED:
         return envelope({
             "driver_id": driver_id,
@@ -1118,12 +1118,69 @@ async def get_driver_stock_status(
         })
     
     try:
-        service = InventoryService(db)
-        result = service.get_driver_stock_status(driver_id)
-        return envelope(result)
+        # UNIFIED APPROACH: Get driver's assigned lorry and check lorry stock
+        from ..models.lorry_assignment import LorryAssignment
+        from ..models.driver import Driver
+        from ..services.lorry_inventory_service import LorryInventoryService
+        from datetime import date
+        
+        # Get driver's current lorry assignment
+        today = date.today()
+        assignment = db.query(LorryAssignment).filter(
+            LorryAssignment.driver_id == driver_id,
+            LorryAssignment.assignment_date == today,
+            LorryAssignment.is_active == True
+        ).first()
+        
+        if not assignment:
+            # No lorry assignment = no stock
+            return envelope({
+                "driver_id": driver_id,
+                "stock_items": [],
+                "total_items": 0,
+                "message": "No active lorry assignment for today"
+            })
+        
+        # Get current stock in the assigned lorry
+        lorry_service = LorryInventoryService(db)
+        current_uids = lorry_service.get_current_stock(assignment.lorry_id)
+        
+        # Group by SKU for legacy compatibility
+        from collections import defaultdict
+        stock_by_sku = defaultdict(lambda: {"sku_name": "Unknown", "count": 0, "items": []})
+        
+        for uid in current_uids:
+            # Extract SKU info from UID if possible
+            sku_info = uid.split('|')[1] if '|' in uid and len(uid.split('|')) > 1 else "UNKNOWN"
+            sku_key = sku_info.replace('SKU:', '') if ':' in sku_info else sku_info
+            
+            stock_by_sku[sku_key]["sku_name"] = sku_key
+            stock_by_sku[sku_key]["count"] += 1
+            stock_by_sku[sku_key]["items"].append({
+                "uid": uid,
+                "serial": "N/A",
+                "type": "RENTAL",
+                "copy_number": stock_by_sku[sku_key]["count"]
+            })
+        
+        return envelope({
+            "driver_id": driver_id,
+            "lorry_id": assignment.lorry_id,
+            "stock_items": list(stock_by_sku.values()),
+            "total_items": len(current_uids),
+            "message": f"Stock from lorry {assignment.lorry_id}"
+        })
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Fallback to legacy system if lorry system fails
+        try:
+            service = InventoryService(db)
+            result = service.get_driver_stock_status(driver_id)
+            result["fallback"] = True
+            result["message"] = "Using legacy inventory system"
+            return envelope(result)
+        except:
+            raise HTTPException(status_code=500, detail=f"Both unified and legacy systems failed: {str(e)}")
 
 
 @router.post("/lorry-stock/upload", response_model=dict)
