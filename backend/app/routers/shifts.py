@@ -130,7 +130,8 @@ async def clock_in(
         today = date.today()
         print(f"DEBUG: Checking for existing shift for driver {current_driver.id} on {today}")
         
-        existing_shift = db.execute(
+        # Get all active shifts for this driver today to handle MultipleResultsFound error
+        active_shifts_result = db.execute(
             select(DriverShift).where(
                 and_(
                     DriverShift.driver_id == current_driver.id,
@@ -138,12 +139,30 @@ async def clock_in(
                     DriverShift.status == "ACTIVE"
                 )
             )
-        ).scalar_one_or_none()
+        ).fetchall()
         
-        print(f"DEBUG: Existing shift: {existing_shift}")
+        active_shifts = [row[0] for row in active_shifts_result]
+        print(f"DEBUG: Found {len(active_shifts)} active shifts")
         
+        # Clean up duplicate active shifts if any (defensive programming)
+        if len(active_shifts) > 1:
+            print(f"DEBUG: Cleaning up {len(active_shifts) - 1} duplicate active shifts")
+            # Keep the most recent, mark others as completed
+            active_shifts.sort(key=lambda s: s.clock_in_at, reverse=True)
+            for duplicate_shift in active_shifts[1:]:
+                duplicate_shift.status = "COMPLETED"
+                duplicate_shift.clock_out_at = duplicate_shift.clock_in_at
+                print(f"DEBUG: Marked duplicate shift {duplicate_shift.id} as completed")
+            db.commit()
+            active_shift = active_shifts[0] if active_shifts else None
+        elif len(active_shifts) == 1:
+            active_shift = active_shifts[0]
+        else:
+            active_shift = None
         
-        if existing_shift:
+        print(f"DEBUG: Active shift after cleanup: {active_shift.id if active_shift else 'None'}")
+        
+        if active_shift:
             raise HTTPException(status_code=409, detail="Already clocked in today")
 
         # Check for lorry assignment
@@ -156,13 +175,19 @@ async def clock_in(
             )
         ).scalar_one_or_none()
 
-        # If assignment exists and not yet stock verified, handle stock verification
-        if assignment and not assignment.stock_verified:
+        # Determine if this should be stock verification or regular clock-in
+        has_scanned_uids = request.scanned_uids is not None and len(request.scanned_uids) >= 0
+        print(f"DEBUG: Has scanned UIDs: {has_scanned_uids}, Assignment: {assignment is not None}, Stock verified: {assignment.stock_verified if assignment else 'N/A'}")
+        
+        # If assignment exists and not yet stock verified, and has scanned UIDs, do stock verification
+        if assignment and not assignment.stock_verified and has_scanned_uids:
+            print(f"DEBUG: Routing to stock verification clock-in")
             return await _clock_in_with_stock_verification(
                 request, current_driver, assignment, db
             )
         else:
-            # Regular clock in (no assignment or already verified)
+            # Regular clock in
+            print(f"DEBUG: Routing to regular clock-in") 
             return await _regular_clock_in(request, current_driver, db)
             
     except HTTPException:
