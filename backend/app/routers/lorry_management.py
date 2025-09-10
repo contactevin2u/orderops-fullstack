@@ -1175,7 +1175,7 @@ async def auto_assign_lorries(
 
 
 @router.get("/assignment-status", response_model=dict)
-async def get_assignment_status(
+async def get_lorry_assignment_status(
     date: Optional[str] = None,  # YYYY-MM-DD, defaults to today
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
@@ -1367,63 +1367,4 @@ async def debug_table_check(
         )
 
 
-@router.post("/clock-in-with-stock", response_model=dict)
-async def clock_in_with_stock(
-    request: Request,
-    driver = Depends(driver_auth),
-    db: Session = Depends(get_session)
-):
-    """Driver clock-in with stock verification - simplified version without complex database dependencies"""
-    try:
-        # Parse JSON with robust handling
-        body = await parse_json_request(request)
-        
-        # Extract required fields
-        lat = body.get("lat")
-        lng = body.get("lng") 
-        location_name = body.get("location_name")
-        scanned_uids = body.get("scanned_uids", [])
-        
-        if lat is None or lng is None:
-            raise HTTPException(status_code=400, detail="lat and lng are required")
-            
-        # Get today's lorry assignment
-        today = datetime.now().date()
-        assignment = db.query(Lorry).filter(
-            Lorry.is_active == True,
-            Lorry.is_available == True
-        ).first()
-        
-        # For now, return a simplified successful response
-        # This allows the driver app to complete stock verification without complex database dependencies
-        response = {
-            "shift_id": 1,  # Placeholder
-            "clock_in_at": datetime.now().isoformat(),
-            "assignment_id": 1,  # Placeholder
-            "lorry_id": assignment.lorry_id if assignment else "LORRY001",
-            "stock_verification_required": True,
-            "stock_verification_completed": True,
-            "variance_detected": len(scanned_uids) > 10,  # Simple heuristic
-            "message": f"Clocked in successfully. Scanned {len(scanned_uids)} items."
-        }
-        
-        # Log the action for audit
-        log_action(
-            db=db,
-            user_id=driver.id,
-            action="DRIVER_CLOCK_IN_WITH_STOCK",
-            resource_type="driver_shift",
-            resource_id=1,  # Placeholder
-            details={
-                "location_name": location_name,
-                "scanned_uids_count": len(scanned_uids),
-                "lat": lat,
-                "lng": lng
-            }
-        )
-        
-        return envelope(response)
-        
-    except Exception as e:
-        print(f"ERROR in clock_in_with_stock: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Clock-in failed: {str(e)}")
+# REMOVED: Duplicate clock-in-with-stock endpoint (line 313 is the primary)

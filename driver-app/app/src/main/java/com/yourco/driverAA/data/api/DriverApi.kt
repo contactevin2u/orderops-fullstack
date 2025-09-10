@@ -85,22 +85,7 @@ interface DriverApi {
     @POST("inventory/sku/resolve")
     suspend fun resolveSKU(@Body request: SKUResolveRequest): SKUResolveResponse
     
-    // Admin endpoints
-    @GET("ai-assignments/suggestions")
-    suspend fun getAIAssignmentSuggestions(): AssignmentSuggestionsResponse
-    
-    @POST("ai-assignments/apply")
-    suspend fun applyAssignment(@Body request: ApplyAssignmentRequest): AssignmentApplyResponse
-    
-    @POST("ai-assignments/accept-all")
-    suspend fun acceptAllAssignments(): AcceptAllResponse
-    
-    @GET("ai-assignments/available-drivers")
-    suspend fun getAvailableDrivers(): AvailableDriversResponse
-    
-    @GET("ai-assignments/pending-orders")
-    suspend fun getPendingOrders(): PendingOrdersResponse
-    
+    // Orders are automatically assigned by backend AI - no manual assignment needed
     @POST("orders/simple")
     suspend fun createOrder(@Body request: CreateOrderRequest): OrderDto
     

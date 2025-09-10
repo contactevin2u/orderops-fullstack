@@ -1029,13 +1029,13 @@ async def generate_uid(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/orders/{order_id}/uids", response_model=dict)
-async def get_order_uids(
+@router.get("/orders/{order_id}/uid-summary", response_model=dict)
+async def get_order_uid_summary(
     order_id: int,
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
-    """Get all UID scans for an order - integrates with commission checking"""
+    """Get UID scan summary for an order - integrates with commission checking"""
     if not settings.UID_INVENTORY_ENABLED:
         return envelope({
             "order_id": order_id,
@@ -1053,8 +1053,8 @@ async def get_order_uids(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/sku/resolve", response_model=dict)
-async def resolve_sku(
+@router.post("/sku/resolve-v2", response_model=dict)
+async def resolve_sku_v2(
     request: SKUResolveRequest,
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
@@ -1074,8 +1074,8 @@ async def resolve_sku(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/sku/alias", response_model=dict)
-async def add_sku_alias(
+@router.post("/sku/alias-v2", response_model=dict)
+async def add_sku_alias_v2(
     request: dict,  # {sku_id: int, alias: str}
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
@@ -1127,7 +1127,7 @@ async def get_driver_stock_status(
 
 
 @router.post("/lorry-stock/upload", response_model=dict)
-async def upload_lorry_stock(
+async def upload_lorry_stock_v2(
     request: LorryStockUploadRequest,
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)

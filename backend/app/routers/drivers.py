@@ -872,7 +872,7 @@ def driver_commissions(driver_id: int, db: Session = Depends(get_session)):
 
 
 @router.get("/{driver_id}/lorry-stock/{date}", response_model=dict)
-def get_lorry_stock(
+def get_driver_lorry_stock(
     driver_id: int,
     date: str,  # YYYY-MM-DD format
     db: Session = Depends(get_session),

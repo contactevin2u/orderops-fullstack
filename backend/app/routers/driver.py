@@ -10,7 +10,7 @@ router = APIRouter(prefix="/driver", tags=["driver"])
 
 
 @router.get("/me")
-def get_me(driver=Depends(driver_auth)):
+def get_driver_profile(driver=Depends(driver_auth)):
     """Get current driver information - Firebase authenticated"""
     return {
         "id": driver.id,

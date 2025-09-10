@@ -41,7 +41,7 @@ export default function Assignments() {
   const { data: status, isLoading: statusLoading } = useQuery({
     queryKey: ['assignment-status'],
     queryFn: async () => {
-      const response = await fetch('/api/assignment/status');
+      const response = await fetch('/_api/assignment/status');
       if (!response.ok) throw new Error('Failed to get status');
       const result = await response.json();
       return result.data as StatusResponse;
@@ -52,7 +52,7 @@ export default function Assignments() {
   // Auto-assign mutation
   const autoAssignMutation = useMutation({
     mutationFn: async () => {
-      const response = await fetch('/api/assignment/auto-assign', {
+      const response = await fetch('/_api/assignment/auto-assign', {
         method: 'POST',
       });
       if (!response.ok) throw new Error('Assignment failed');
