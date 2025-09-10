@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/utils/api';
-import { Admin } from '@/components/Layout/Admin';
+import { request } from '../../utils/api';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 interface SKU {
   id: number;
@@ -53,11 +53,11 @@ export default function BulkUIDGenerator() {
   const loadInitialData = async () => {
     try {
       // Load SKUs
-      const skuResponse = await api<{ skus: SKU[] }>('/inventory/skus');
+      const skuResponse = await request<{ skus: SKU[] }>('/inventory/skus');
       setSKUs(skuResponse.skus || []);
       
       // Load Drivers
-      const driverResponse = await api<{ drivers: Driver[] }>('/lorry-management/drivers');
+      const driverResponse = await request<{ drivers: Driver[] }>('/lorry-management/drivers');
       setDrivers(driverResponse.drivers?.filter(d => d.name) || []);
       
       // Load recent generation history (mock for now)
@@ -92,7 +92,7 @@ export default function BulkUIDGenerator() {
     
     try {
       // Note: This endpoint would need to be created
-      const response = await api<GenerationResult>('/inventory/bulk-generate', {
+      const response = await request<GenerationResult>('/inventory/bulk-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,21 +177,40 @@ export default function BulkUIDGenerator() {
   };
   
   return (
-    <Admin>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">🏭 Bulk UID Generator</h1>
-        </div>
-        
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+    <AdminLayout>
+      <div className="container">
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">🏭 Bulk UID Generator</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">Generate multiple UIDs efficiently with automatic formatting and export capabilities</p>
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Bulk generation system
+            </div>
           </div>
-        )}
         
-        {/* Generation Form */}
-        <div className="bg-white rounded-lg border p-6">
-          <h2 className="text-lg font-semibold mb-4">⚡ Generate New UIDs</h2>
+          {error && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 flex items-start space-x-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <div className="font-medium">Generation Error</div>
+                <div>{error}</div>
+              </div>
+            </div>
+          )}
+          
+          {/* Generation Form */}
+          <div className="card">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
+                <span className="text-xl">⚡</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Generate New UIDs</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Create multiple UIDs with custom parameters</p>
+              </div>
+            </div>
           
           <form onSubmit={handleGenerate} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -432,7 +451,8 @@ export default function BulkUIDGenerator() {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </Admin>
+    </AdminLayout>
   );
 }

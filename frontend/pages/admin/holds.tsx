@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/utils/api';
-import { Admin } from '@/components/Layout/Admin';
+import { request } from '../../utils/api';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 interface DriverHold {
   id: number;
@@ -49,7 +49,7 @@ export default function HoldManagement() {
   const loadHolds = async () => {
     try {
       const statusFilter = selectedStatus === 'ALL' ? '' : `?status=${selectedStatus}`;
-      const response = await api<{ holds: DriverHold[] }>(`/lorry-management/holds${statusFilter}`);
+      const response = await request<{ holds: DriverHold[] }>(`/lorry-management/holds${statusFilter}`);
       setHolds(response.holds);
     } catch (err: any) {
       setError(err.message || 'Failed to load holds');
@@ -58,7 +58,7 @@ export default function HoldManagement() {
   
   const loadDrivers = async () => {
     try {
-      const response = await api<{ drivers: Driver[] }>('/lorry-management/drivers');
+      const response = await request<{ drivers: Driver[] }>('/lorry-management/drivers');
       setDrivers(response.drivers.filter(d => d.is_active));
     } catch (err: any) {
       console.error('Failed to load drivers:', err);
@@ -76,7 +76,7 @@ export default function HoldManagement() {
     }
     
     try {
-      await api('/lorry-management/holds', {
+      await request('/lorry-management/holds', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -103,7 +103,7 @@ export default function HoldManagement() {
     }
     
     try {
-      await api(`/lorry-management/holds/${showResolveModal.id}/resolve`, {
+      await request(`/lorry-management/holds/${showResolveModal.id}/resolve`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -135,52 +135,70 @@ export default function HoldManagement() {
   
   if (loading) {
     return (
-      <Admin>
+      <AdminLayout>
         <div className="flex items-center justify-center h-64">
           <div className="text-lg">⏳ Loading holds...</div>
         </div>
-      </Admin>
+      </AdminLayout>
     );
   }
   
   return (
-    <Admin>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">🚫 Driver Hold Management</h1>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium"
-          >
-            ➕ Create Hold
-          </button>
-        </div>
-        
-        {error && (
-          <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-            {error}
+    <AdminLayout>
+      <div className="container">
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">🚫 Driver Hold Management</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">Manage driver holds for stock variance, disciplinary, and training purposes</p>
+            </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
+            >
+              <span>➕</span>
+              <span>Create Hold</span>
+            </button>
           </div>
-        )}
         
-        {/* Status Filter */}
-        <div className="bg-white rounded-lg border p-4">
-          <div className="flex space-x-4">
-            {(['ALL', 'ACTIVE', 'RESOLVED'] as const).map((status) => (
-              <button
-                key={status}
-                onClick={() => setSelectedStatus(status)}
-                className={`px-4 py-2 rounded-lg font-medium ${
-                  selectedStatus === status
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                {status} {status === 'ACTIVE' && holds.filter(h => h.status === 'ACTIVE').length > 0 && 
-                  `(${holds.filter(h => h.status === 'ACTIVE').length})`}
-              </button>
-            ))}
+          {error && (
+            <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 flex items-start space-x-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <div className="font-medium">Error</div>
+                <div>{error}</div>
+              </div>
+            </div>
+          )}
+          
+          {/* Status Filter */}
+          <div className="card">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                <span className="text-xl">🔍</span>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Holds</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">View holds by status</p>
+              </div>
+            </div>
+            <div className="flex space-x-4">
+              {(['ALL', 'ACTIVE', 'RESOLVED'] as const).map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setSelectedStatus(status)}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all duration-200 ${
+                    selectedStatus === status
+                      ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {status} {status === 'ACTIVE' && holds.filter(h => h.status === 'ACTIVE').length > 0 && 
+                    `(${holds.filter(h => h.status === 'ACTIVE').length})`}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
         
         {/* Holds List */}
         <div className="bg-white rounded-lg border">
@@ -406,7 +424,8 @@ export default function HoldManagement() {
             </div>
           </div>
         )}
+        </div>
       </div>
-    </Admin>
+    </AdminLayout>
   );
 }

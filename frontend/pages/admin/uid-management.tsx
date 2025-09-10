@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { api } from '@/utils/api';
-import { Admin } from '@/components/Layout/Admin';
+import { request } from '../../utils/api';
+import AdminLayout from '@/components/Layout/AdminLayout';
 
 interface UIDSearchResult {
   uid: string;
@@ -73,7 +73,7 @@ export default function UIDManagement() {
     setError(null);
     
     try {
-      const response = await api<{ results: UIDSearchResult[] }>(`/inventory/uid/search?query=${encodeURIComponent(searchQuery)}`);
+      const response = await request<{ results: UIDSearchResult[] }>(`/inventory/uid/search?query=${encodeURIComponent(searchQuery)}`);
       setSearchResults(response.results);
     } catch (err: any) {
       setError(err.message || 'Search failed');
@@ -87,7 +87,7 @@ export default function UIDManagement() {
     setError(null);
     
     try {
-      const response = await api<UIDDetails>(`/inventory/uid/${encodeURIComponent(uid)}/details`);
+      const response = await request<UIDDetails>(`/inventory/uid/${encodeURIComponent(uid)}/details`);
       setSelectedUID(response);
     } catch (err: any) {
       setError(err.message || 'Failed to load UID details');
@@ -122,39 +122,65 @@ export default function UIDManagement() {
   };
   
   return (
-    <Admin>
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-900">UID Management & Tracking</h1>
-        </div>
-        
-        {/* Search Section */}
-        <div className="bg-white rounded-lg border p-6">
-          <h2 className="text-lg font-semibold mb-4">🔍 Search UIDs</h2>
-          <div className="flex space-x-4">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Enter UID or partial UID to search..."
-              className="flex-1 p-3 border rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-            <button
-              onClick={handleSearch}
-              disabled={loading || searchQuery.trim().length < 2}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-medium disabled:opacity-50"
-            >
-              {loading ? '⏳ Searching...' : '🔍 Search'}
-            </button>
-          </div>
-          
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
+    <AdminLayout>
+      <div className="container">
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">🔍 UID Management & Tracking</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">Search, track, and manage UIDs across the entire system lifecycle</p>
             </div>
-          )}
-        </div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">
+              Real-time UID tracking system
+            </div>
+          </div>
+        
+          {/* Search Section */}
+          <div className="card">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                <span className="text-xl">🔍</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Search UIDs</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Find UIDs by exact match or partial search</p>
+              </div>
+            </div>
+            
+            <div className="flex space-x-4">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  placeholder="Enter UID or partial UID to search..."
+                  className="w-full p-4 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-lg"
+                />
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Minimum 2 characters required
+                </div>
+              </div>
+              <button
+                onClick={handleSearch}
+                disabled={loading || searchQuery.trim().length < 2}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-xl transition-all duration-200 flex items-center space-x-2"
+              >
+                <span>{loading ? '⏳' : '🔍'}</span>
+                <span>{loading ? 'Searching...' : 'Search'}</span>
+              </button>
+            </div>
+            
+            {error && (
+              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl text-red-700 dark:text-red-400 flex items-start space-x-3">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <div className="font-medium">Search Error</div>
+                  <div>{error}</div>
+                </div>
+              </div>
+            )}
+          </div>
         
         {/* Search Results */}
         {searchResults.length > 0 && (
@@ -381,7 +407,8 @@ export default function UIDManagement() {
             <p className="text-sm">Try a different search term or partial UID</p>
           </div>
         )}
+        </div>
       </div>
-    </Admin>
+    </AdminLayout>
   );
 }
