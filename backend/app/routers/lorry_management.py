@@ -137,84 +137,8 @@ class ClockInResponse(BaseModel):
     message: str
 
 
-# Admin endpoints for lorry assignment
-@router.post("/assignments", response_model=dict)
-async def create_lorry_assignment(
-    request: LorryAssignmentRequest,
-    db: Session = Depends(get_session),
-    current_user = Depends(require_roles(Role.ADMIN))
-):
-    """Assign a lorry to a driver for a specific date"""
-    try:
-        assignment_date = datetime.strptime(request.assignment_date, "%Y-%m-%d").date()
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    
-    # Check if driver exists
-    driver = db.get(Driver, request.driver_id)
-    if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found")
-    
-    # Check for existing assignment for this driver on this date
-    existing = db.execute(
-        select(LorryAssignment).where(
-            and_(
-                LorryAssignment.driver_id == request.driver_id,
-                LorryAssignment.assignment_date == assignment_date
-            )
-        )
-    ).scalar_one_or_none()
-    
-    if existing:
-        raise HTTPException(
-            status_code=409, 
-            detail=f"Driver already has lorry assignment for {request.assignment_date}"
-        )
-    
-    # Create assignment
-    assignment = LorryAssignment(
-        driver_id=request.driver_id,
-        lorry_id=request.lorry_id,
-        assignment_date=assignment_date,
-        assigned_by=current_user.id,
-        notes=request.notes,
-        status="ASSIGNED"
-    )
-    
-    db.add(assignment)
-    db.commit()
-    db.refresh(assignment)
-    
-    # Log audit action
-    log_action(
-        db, 
-        user_id=current_user.id, 
-        action="LORRY_ASSIGN", 
-        resource_type="lorry_assignment", 
-        resource_id=assignment.id,
-        details={
-            "driver_id": request.driver_id,
-            "lorry_id": request.lorry_id,
-            "assignment_date": request.assignment_date
-        }
-    )
-    
-    response = LorryAssignmentResponse(
-        id=assignment.id,
-        driver_id=assignment.driver_id,
-        driver_name=driver.name or f"Driver {driver.id}",
-        lorry_id=assignment.lorry_id,
-        assignment_date=assignment.assignment_date.strftime("%Y-%m-%d"),
-        status=assignment.status,
-        stock_verified=assignment.stock_verified,
-        stock_verified_at=assignment.stock_verified_at.isoformat() if assignment.stock_verified_at else None,
-        shift_id=assignment.shift_id,
-        assigned_by=assignment.assigned_by,
-        assigned_at=assignment.assigned_at.isoformat(),
-        notes=assignment.notes
-    )
-    
-    return envelope(response.model_dump())
+# REMOVED: Manual assignment endpoint
+# Use /auto-assign endpoint instead for all lorry assignments
 
 
 @router.get("/assignments", response_model=dict)

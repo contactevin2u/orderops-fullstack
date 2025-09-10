@@ -163,7 +163,7 @@ class InventoryService:
                         LorryAssignment.assignment_date <= today
                     )
                 ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
-            ).scalar_one_or_none()
+            ).first()
             
             if not assignment:
                 # Create virtual lorry for this driver if no assignment

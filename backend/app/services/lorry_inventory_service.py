@@ -60,7 +60,7 @@ class LorryInventoryService:
                         LorryAssignment.assignment_date <= target_date
                     )
                 ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
-            ).scalar_one_or_none()
+            ).first()
             
             if driver_assignment:
                 from ..models.item import Item, ItemStatus
@@ -207,7 +207,7 @@ class LorryInventoryService:
                                 LorryAssignment.assignment_date <= date.today()
                             )
                         ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
-                    ).scalar_one_or_none()
+                    ).first()
                     
                     if driver_assignment:
                         legacy_item.current_driver_id = driver_assignment.driver_id

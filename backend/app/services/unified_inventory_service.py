@@ -425,7 +425,7 @@ class UnifiedInventoryService:
                                     LorryAssignment.assignment_date <= date.today()
                                 )
                             ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
-                        ).scalar_one_or_none()
+                        ).first()
                         
                         lorry_id = assignment.lorry_id if assignment else f"DRIVER_{item.current_driver_id}"
                         
@@ -478,7 +478,7 @@ class UnifiedInventoryService:
                                 LorryAssignment.assignment_date <= uid_action.scanned_at.date()
                             )
                         ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
-                    ).scalar_one_or_none()
+                    ).first()
                     
                     lorry_id = driver_assignment.lorry_id if driver_assignment else f"DRIVER_{uid_action.scanned_by}"
                     
