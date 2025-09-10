@@ -962,12 +962,13 @@ async def get_stock_transactions(
     lorry_id: Optional[str] = None,
     start_date: Optional[str] = None,  # YYYY-MM-DD
     end_date: Optional[str] = None,    # YYYY-MM-DD
+    date: Optional[str] = None,        # YYYY-MM-DD (single date filter for convenience)
     limit: int = 100,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Get stock transaction history"""
-    logger.info(f"=== STOCK TRANSACTIONS DEBUG START === lorry_id: {lorry_id}, start_date: {start_date}, end_date: {end_date}, limit: {limit}")
+    logger.info(f"=== STOCK TRANSACTIONS DEBUG START === lorry_id: {lorry_id}, start_date: {start_date}, end_date: {end_date}, date: {date}, limit: {limit}")
     
     try:
         inventory_service = LorryInventoryService(db)
@@ -978,6 +979,16 @@ async def get_stock_transactions(
     
     start_date_obj = None
     end_date_obj = None
+    
+    # Handle single date parameter (convenience for frontend)
+    if date and not start_date and not end_date:
+        try:
+            date_obj = datetime.strptime(date, "%Y-%m-%d").date()
+            start_date_obj = date_obj
+            end_date_obj = date_obj
+            logger.info(f"DEBUG: Using single date filter: {date_obj}")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
     if start_date:
         try:
