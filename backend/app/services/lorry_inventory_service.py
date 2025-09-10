@@ -70,19 +70,29 @@ class LorryInventoryService:
         notes: Optional[str] = None
     ) -> Dict[str, any]:
         """Admin loads UIDs into a lorry"""
+        logger.info(f"=== LORRY INVENTORY SERVICE load_uids DEBUG START ===")
+        logger.info(f"DEBUG: lorry_id={lorry_id}, uids_count={len(uids)}, admin_user_id={admin_user_id}, notes={notes}")
+        
         now = datetime.now()
         transactions_added = []
         errors = []
         
-        for uid in uids:
+        logger.info(f"DEBUG: Processing {len(uids)} UIDs: {uids[:5]}{'...' if len(uids) > 5 else ''}")
+        
+        for i, uid in enumerate(uids):
+            logger.info(f"DEBUG: Processing UID {i+1}/{len(uids)}: {uid}")
             try:
                 # Check if UID already exists in lorry
                 existing_stock = self.get_current_stock(lorry_id)
+                logger.info(f"DEBUG: Current stock check - existing count: {len(existing_stock)}")
+                
                 if uid in existing_stock:
+                    logger.warning(f"DEBUG: UID {uid} already exists in lorry {lorry_id}")
                     errors.append(f"UID {uid} already exists in lorry {lorry_id}")
                     continue
                 
                 # Create load transaction
+                logger.info(f"DEBUG: Creating LorryStockTransaction for UID {uid}")
                 transaction = LorryStockTransaction(
                     lorry_id=lorry_id,
                     action="LOAD",
@@ -91,20 +101,31 @@ class LorryInventoryService:
                     notes=notes,
                     transaction_date=now
                 )
+                logger.info(f"DEBUG: LorryStockTransaction created - {transaction}")
                 
                 self.db.add(transaction)
+                logger.info(f"DEBUG: Transaction added to session")
                 transactions_added.append(transaction)
+                logger.info(f"DEBUG: Transaction appended to list - total added: {len(transactions_added)}")
                 
             except Exception as e:
                 errors.append(f"Failed to load UID {uid}: {str(e)}")
                 logger.error(f"Error loading UID {uid}: {e}")
         
         # Commit all successful transactions
+        logger.info(f"DEBUG: About to commit {len(transactions_added)} transactions")
         try:
             self.db.commit()
-            for transaction in transactions_added:
+            logger.info(f"DEBUG: Database commit successful")
+            
+            for i, transaction in enumerate(transactions_added):
+                logger.info(f"DEBUG: Refreshing transaction {i+1}/{len(transactions_added)}")
                 self.db.refresh(transaction)
+                logger.info(f"DEBUG: Transaction {i+1} refreshed - ID: {transaction.id}")
+                
         except Exception as e:
+            logger.error(f"DEBUG: Database commit failed: {e}")
+            logger.error(f"DEBUG: Exception type: {type(e)}")
             self.db.rollback()
             logger.error(f"Failed to commit load transactions: {e}")
             return {
@@ -116,12 +137,15 @@ class LorryInventoryService:
         
         logger.info(f"Loaded {len(transactions_added)} UIDs into lorry {lorry_id}")
         
-        return {
+        result = {
             "success": True,
             "message": f"Successfully loaded {len(transactions_added)} UIDs into lorry {lorry_id}",
             "loaded_count": len(transactions_added),
             "errors": errors
         }
+        
+        logger.info(f"=== LORRY INVENTORY SERVICE load_uids DEBUG END === returning: {result}")
+        return result
     
     def unload_uids(
         self, 
@@ -285,39 +309,69 @@ class LorryInventoryService:
         limit: int = 100
     ) -> List[Dict[str, any]]:
         """Get stock transaction history"""
-        query = select(LorryStockTransaction, User).join(
-            User, LorryStockTransaction.admin_user_id == User.id
-        ).order_by(LorryStockTransaction.transaction_date.desc())
+        logger.info(f"=== LORRY INVENTORY SERVICE get_stock_transactions DEBUG START ===")
+        logger.info(f"DEBUG: lorry_id={lorry_id}, start_date={start_date}, end_date={end_date}, limit={limit}")
         
-        if lorry_id:
-            query = query.where(LorryStockTransaction.lorry_id == lorry_id)
+        try:
+            query = select(LorryStockTransaction, User).join(
+                User, LorryStockTransaction.admin_user_id == User.id
+            ).order_by(LorryStockTransaction.transaction_date.desc())
+            logger.info(f"DEBUG: Base query created")
+        except Exception as e:
+            logger.error(f"DEBUG: Error creating base query: {e}")
+            raise
         
-        if start_date:
-            query = query.where(func.date(LorryStockTransaction.transaction_date) >= start_date)
-        
-        if end_date:
-            query = query.where(func.date(LorryStockTransaction.transaction_date) <= end_date)
-        
-        query = query.limit(limit)
-        
-        results = self.db.execute(query).all()
+        try:
+            if lorry_id:
+                logger.info(f"DEBUG: Adding lorry_id filter: {lorry_id}")
+                query = query.where(LorryStockTransaction.lorry_id == lorry_id)
+            
+            if start_date:
+                logger.info(f"DEBUG: Adding start_date filter: {start_date}")
+                query = query.where(func.date(LorryStockTransaction.transaction_date) >= start_date)
+            
+            if end_date:
+                logger.info(f"DEBUG: Adding end_date filter: {end_date}")
+                query = query.where(func.date(LorryStockTransaction.transaction_date) <= end_date)
+            
+            logger.info(f"DEBUG: Adding limit: {limit}")
+            query = query.limit(limit)
+            
+            logger.info(f"DEBUG: About to execute query")
+            results = self.db.execute(query).all()
+            logger.info(f"DEBUG: Query executed - got {len(results)} results")
+            
+        except Exception as e:
+            logger.error(f"DEBUG: Error executing query: {e}")
+            logger.error(f"DEBUG: Exception type: {type(e)}")
+            raise
         
         transactions = []
-        for transaction, user in results:
-            transactions.append({
-                "id": transaction.id,
-                "lorry_id": transaction.lorry_id,
-                "action": transaction.action,
-                "uid": transaction.uid,
-                "sku_id": transaction.sku_id,
-                "order_id": transaction.order_id,
-                "driver_id": transaction.driver_id,
-                "admin_user": user.username if user else "Unknown",
-                "notes": transaction.notes,
-                "transaction_date": transaction.transaction_date.isoformat(),
-                "created_at": transaction.created_at.isoformat()
-            })
+        logger.info(f"DEBUG: Processing {len(results)} results into transaction list")
         
+        for i, (transaction, user) in enumerate(results):
+            logger.info(f"DEBUG: Processing result {i+1}/{len(results)} - Transaction ID: {transaction.id}")
+            try:
+                tx_dict = {
+                    "id": transaction.id,
+                    "lorry_id": transaction.lorry_id,
+                    "action": transaction.action,
+                    "uid": transaction.uid,
+                    "sku_id": transaction.sku_id,
+                    "order_id": transaction.order_id,
+                    "driver_id": transaction.driver_id,
+                    "admin_user": user.username if user else "Unknown",
+                    "notes": transaction.notes,
+                    "transaction_date": transaction.transaction_date.isoformat(),
+                    "created_at": transaction.created_at.isoformat()
+                }
+                transactions.append(tx_dict)
+                logger.info(f"DEBUG: Transaction {i+1} processed: {tx_dict}")
+            except Exception as e:
+                logger.error(f"DEBUG: Error processing transaction {i+1}: {e}")
+                continue
+        
+        logger.info(f"=== LORRY INVENTORY SERVICE get_stock_transactions DEBUG END === returning {len(transactions)} transactions")
         return transactions
     
     def get_lorry_inventory_summary(self) -> Dict[str, any]:

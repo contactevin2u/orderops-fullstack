@@ -3,11 +3,12 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, validator
 from sqlalchemy.orm import Session
 from sqlalchemy import select, and_, func, or_
 from sqlalchemy.exc import IntegrityError
 import json
+from fastapi.exceptions import RequestValidationError
 
 from ..db import get_session
 from ..models import (
@@ -785,6 +786,20 @@ class CreateLorryRequest(BaseModel):
     capacity: Optional[str] = None
     base_warehouse: str = "BATU_CAVES"
     notes: Optional[str] = None
+    
+    @validator('lorry_id')
+    def validate_lorry_id(cls, v):
+        if not v or not v.strip():
+            raise ValueError('lorry_id cannot be empty')
+        if len(v) > 50:
+            raise ValueError('lorry_id cannot exceed 50 characters')
+        return v.strip()
+    
+    @validator('base_warehouse')
+    def validate_base_warehouse(cls, v):
+        if len(v) > 20:
+            raise ValueError('base_warehouse cannot exceed 20 characters')
+        return v
 
 class LorryResponse(BaseModel):
     id: int
@@ -802,6 +817,9 @@ class LorryResponse(BaseModel):
     updated_at: str
 
 class UpdateDriverPriorityRequest(BaseModel):
+    priority_lorry_id: Optional[str] = None
+
+class UpdatePriorityLorryRequest(BaseModel):
     priority_lorry_id: Optional[str] = None
 
 class AutoAssignRequest(BaseModel):
@@ -827,20 +845,33 @@ async def load_lorry_stock(
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Admin loads UIDs into a lorry"""
-    # Parse JSON with robust handling
-    body = await parse_json_request(raw_request)
-    request = LoadStockRequest(**body)
+    logger.info(f"=== STOCK LOAD DEBUG START === lorry_id: {lorry_id}")
     
-    inventory_service = LorryInventoryService(db)
-    
-    result = inventory_service.load_uids(
-        lorry_id=lorry_id,
-        uids=request.uids,
-        admin_user_id=current_user.id,
-        notes=request.notes
-    )
+    try:
+        # Parse JSON with robust handling
+        body = await parse_json_request(raw_request)
+        logger.info(f"DEBUG: Parsed request body: {body}")
+        
+        request = LoadStockRequest(**body)
+        logger.info(f"DEBUG: LoadStockRequest created - uids count: {len(request.uids)}, notes: {request.notes}")
+        
+        inventory_service = LorryInventoryService(db)
+        logger.info(f"DEBUG: LorryInventoryService created")
+        
+        result = inventory_service.load_uids(
+            lorry_id=lorry_id,
+            uids=request.uids,
+            admin_user_id=current_user.id,
+            notes=request.notes
+        )
+        logger.info(f"DEBUG: inventory_service.load_uids result: {result}")
+    except Exception as e:
+        logger.error(f"DEBUG: Exception in load_lorry_stock: {e}")
+        logger.error(f"DEBUG: Exception type: {type(e)}")
+        raise
     
     # Log audit action
+    logger.info(f"DEBUG: About to log audit action")
     log_action(
         db, 
         user_id=current_user.id, 
@@ -853,7 +884,9 @@ async def load_lorry_stock(
             "errors_count": len(result["errors"])
         }
     )
+    logger.info(f"DEBUG: Audit action logged successfully")
     
+    logger.info(f"=== STOCK LOAD DEBUG END === returning result: {result}")
     return envelope(result)
 
 
@@ -934,7 +967,14 @@ async def get_stock_transactions(
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Get stock transaction history"""
-    inventory_service = LorryInventoryService(db)
+    logger.info(f"=== STOCK TRANSACTIONS DEBUG START === lorry_id: {lorry_id}, start_date: {start_date}, end_date: {end_date}, limit: {limit}")
+    
+    try:
+        inventory_service = LorryInventoryService(db)
+        logger.info(f"DEBUG: LorryInventoryService created")
+    except Exception as e:
+        logger.error(f"DEBUG: Error creating inventory service: {e}")
+        raise
     
     start_date_obj = None
     end_date_obj = None
@@ -951,13 +991,21 @@ async def get_stock_transactions(
         except ValueError:
             raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD")
     
-    transactions = inventory_service.get_stock_transactions(
-        lorry_id=lorry_id,
-        start_date=start_date_obj,
-        end_date=end_date_obj,
-        limit=limit
-    )
+    try:
+        transactions = inventory_service.get_stock_transactions(
+            lorry_id=lorry_id,
+            start_date=start_date_obj,
+            end_date=end_date_obj,
+            limit=limit
+        )
+        logger.info(f"DEBUG: get_stock_transactions returned {len(transactions) if isinstance(transactions, list) else type(transactions)} items")
+        logger.info(f"DEBUG: First few transactions: {transactions[:3] if isinstance(transactions, list) and len(transactions) > 0 else transactions}")
+    except Exception as e:
+        logger.error(f"DEBUG: Error getting stock transactions: {e}")
+        logger.error(f"DEBUG: Exception type: {type(e)}")
+        raise
     
+    logger.info(f"=== STOCK TRANSACTIONS DEBUG END === returning {len(transactions) if isinstance(transactions, list) else type(transactions)} transactions")
     return envelope(transactions)
 
 
@@ -967,8 +1015,27 @@ async def get_all_lorries_inventory_summary(
     current_user = Depends(require_roles(Role.ADMIN))
 ):
     """Get summary of all lorry inventories"""
-    inventory_service = LorryInventoryService(db)
-    summary = inventory_service.get_lorry_inventory_summary()
+    logger.info(f"=== STOCK SUMMARY DEBUG START ===")
+    
+    try:
+        inventory_service = LorryInventoryService(db)
+        logger.info(f"DEBUG: LorryInventoryService created")
+        
+        summary = inventory_service.get_lorry_inventory_summary()
+        logger.info(f"DEBUG: get_lorry_inventory_summary returned: {summary}")
+        logger.info(f"DEBUG: Summary type: {type(summary)}")
+        
+        if isinstance(summary, list):
+            logger.info(f"DEBUG: Summary list length: {len(summary)}")
+        elif isinstance(summary, dict):
+            logger.info(f"DEBUG: Summary dict keys: {summary.keys()}")
+            
+    except Exception as e:
+        logger.error(f"DEBUG: Error in stock summary: {e}")
+        logger.error(f"DEBUG: Exception type: {type(e)}")
+        raise
+        
+    logger.info(f"=== STOCK SUMMARY DEBUG END === returning summary")
     return envelope(summary)
 
 
@@ -1153,6 +1220,151 @@ async def get_drivers_with_priority_lorries(
         "drivers": driver_list,
         "total_count": len(driver_list)
     })
+
+
+@router.post("/test-validation")
+async def test_validation(
+    request: CreateLorryRequest,
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Test endpoint to debug validation issues"""
+    return envelope({
+        "message": "Validation successful",
+        "request_data": request.dict(),
+        "user": getattr(current_user, 'username', getattr(current_user, 'email', 'unknown'))
+    })
+
+
+@router.get("/status")
+async def get_status(
+    current_user = Depends(require_roles(Role.ADMIN)),
+    db: Session = Depends(get_session)
+):
+    """Get basic status for lorry management"""
+    try:
+        from ..models import Lorry
+        total_lorries = db.execute(
+            select(func.count(Lorry.id)).where(Lorry.is_active == True)
+        ).scalar()
+        
+        available_lorries = db.execute(
+            select(func.count(Lorry.id)).where(
+                and_(Lorry.is_active == True, Lorry.is_available == True)
+            )
+        ).scalar()
+        
+        return envelope({
+            "total_lorries": total_lorries or 0,
+            "available_lorries": available_lorries or 0,
+            "assigned_lorries": (total_lorries or 0) - (available_lorries or 0)
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching status: {str(e)}"
+        )
+
+
+@router.get("/debug/table-check")
+async def debug_table_check(
+    current_user = Depends(require_roles(Role.ADMIN)),
+    db: Session = Depends(get_session)
+):
+    """Debug endpoint to check if required tables exist"""
+    try:
+        from sqlalchemy import text, inspect
+        
+        logger.info("DEBUG: === POSTGRESQL TABLE CHECK START ===")
+        logger.info(f"DEBUG: Database URL type: {type(db.bind.url)}")
+        logger.info(f"DEBUG: Database dialect: {db.bind.dialect.name}")
+        
+        # Check if lorry_stock_transactions table exists (PostgreSQL version)
+        table_exists = False
+        transaction_count = 0
+        table_columns = []
+        
+        try:
+            # Use PostgreSQL system tables to check if table exists
+            result = db.execute(text(
+                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'lorry_stock_transactions')"
+            )).fetchone()
+            table_exists = result[0] if result else False
+            logger.info(f"DEBUG: lorry_stock_transactions table exists: {table_exists}")
+            
+            if table_exists:
+                # Get table structure
+                columns_result = db.execute(text(
+                    "SELECT column_name, data_type, is_nullable FROM information_schema.columns WHERE table_name = 'lorry_stock_transactions' ORDER BY ordinal_position"
+                )).fetchall()
+                table_columns = [f"{row[0]}:{row[1]}({'NULL' if row[2]=='YES' else 'NOT NULL'})" for row in columns_result]
+                logger.info(f"DEBUG: Table columns: {table_columns}")
+                
+                # Get record count
+                try:
+                    count_result = db.execute(text("SELECT COUNT(*) FROM lorry_stock_transactions")).fetchone()
+                    transaction_count = count_result[0] if count_result else 0
+                    logger.info(f"DEBUG: Transaction count in table: {transaction_count}")
+                    
+                    # Get sample records if any exist
+                    if transaction_count > 0:
+                        sample_result = db.execute(text("SELECT lorry_id, action, uid, admin_user_id, transaction_date FROM lorry_stock_transactions ORDER BY created_at DESC LIMIT 3")).fetchall()
+                        logger.info(f"DEBUG: Sample transactions: {[dict(row._mapping) for row in sample_result]}")
+                    
+                except Exception as e:
+                    logger.error(f"DEBUG: Error querying table data: {e}")
+            
+        except Exception as e:
+            logger.error(f"DEBUG: Error checking table existence: {e}")
+        
+        # Check if LorryStockTransaction model can be imported
+        model_importable = False
+        model_error = None
+        try:
+            from ..models import LorryStockTransaction
+            model_importable = True
+            logger.info("DEBUG: LorryStockTransaction model imported successfully")
+            
+            # Try to create a simple query using the model
+            test_query = db.query(LorryStockTransaction).limit(1)
+            logger.info(f"DEBUG: Model query created: {str(test_query)}")
+            
+        except Exception as e:
+            model_error = str(e)
+            logger.error(f"DEBUG: Error importing/using LorryStockTransaction model: {e}")
+        
+        # List all tables to see what's available
+        all_tables = []
+        try:
+            inspector = inspect(db.bind)
+            all_tables = inspector.get_table_names()
+            logger.info(f"DEBUG: All tables in database: {all_tables[:20]}..." if len(all_tables) > 20 else f"DEBUG: All tables in database: {all_tables}")
+        except Exception as e:
+            logger.error(f"DEBUG: Error listing all tables: {e}")
+        
+        result_data = {
+            "database_type": db.bind.dialect.name,
+            "table_exists": table_exists,
+            "model_importable": model_importable,
+            "model_error": model_error,
+            "transaction_count": transaction_count,
+            "table_columns": table_columns,
+            "total_tables_count": len(all_tables),
+            "sample_table_names": all_tables[:10] if all_tables else [],
+            "message": "PostgreSQL table check completed"
+        }
+        
+        logger.info(f"DEBUG: === POSTGRESQL TABLE CHECK END === Result: {result_data}")
+        return envelope(result_data)
+        
+    except Exception as e:
+        logger.error(f"DEBUG: Error in table check: {e}")
+        logger.error(f"DEBUG: Exception type: {type(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error checking table: {str(e)}"
+        )
 
 
 @router.post("/clock-in-with-stock", response_model=dict)
