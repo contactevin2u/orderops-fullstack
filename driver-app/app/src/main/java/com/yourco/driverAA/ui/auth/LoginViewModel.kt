@@ -16,7 +16,6 @@ data class LoginUiState(
     val password: String = "",
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
-    val isAdmin: Boolean = false,
     val error: String? = null
 )
 
@@ -49,15 +48,11 @@ class LoginViewModel @Inject constructor(
                 currentState.password
             ).fold(
                 onSuccess = {
-                    viewModelScope.launch {
-                        val isAdmin = userRepository.isAdmin()
-                        _uiState.value = _uiState.value.copy(
-                            isLoading = false,
-                            isLoggedIn = true,
-                            isAdmin = isAdmin,
-                            error = null
-                        )
-                    }
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoggedIn = true,
+                        error = null
+                    )
                 },
                 onFailure = { exception ->
                     _uiState.value = _uiState.value.copy(

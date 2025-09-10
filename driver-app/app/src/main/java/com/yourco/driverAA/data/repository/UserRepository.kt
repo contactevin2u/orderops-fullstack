@@ -38,12 +38,5 @@ class UserRepository @Inject constructor(
         }
     }
     
-    suspend fun isAdmin(): Boolean {
-        return try {
-            val userInfo = getCurrentUserInfo().getOrNull()
-            userInfo?.role == "ADMIN"
-        } catch (e: Exception) {
-            false
-        }
-    }
+    // Admin functionality removed - driver app is for drivers only
 }

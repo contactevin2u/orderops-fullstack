@@ -12,7 +12,7 @@ import com.yourco.driverAA.data.auth.AuthService
 import com.yourco.driverAA.data.repository.UserRepository
 import com.yourco.driverAA.ui.auth.LoginScreen
 import com.yourco.driverAA.ui.main.MainScreen
-import com.yourco.driverAA.ui.admin.AdminMainScreen
+// Admin UI removed - drivers only
 import com.yourco.driverAA.ui.jobdetail.JobDetailScreen
 import com.yourco.driverAA.ui.shifts.ClockInOutScreen
 import com.yourco.driverAA.ui.stockverification.StockVerificationScreen
@@ -25,36 +25,17 @@ fun NavGraph() {
     val userRepository: UserRepository = hiltViewModel<AuthViewModel>().userRepository
     val currentUser by authService.currentUser.collectAsState(initial = null)
     
-    var isAdmin by remember { mutableStateOf(false) }
-    
-    LaunchedEffect(currentUser) {
-        if (currentUser != null) {
-            isAdmin = userRepository.isAdmin()
-        }
-    }
-    
     val startDestination = when {
         currentUser == null -> "login"
-        isAdmin -> "admin"
         else -> "jobs"
     }
     
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(
-                onLoginSuccess = { isAdminUser ->
-                    val destination = if (isAdminUser) "admin" else "jobs"
-                    navController.navigate(destination) {
+                onLoginSuccess = { _ ->
+                    navController.navigate("jobs") {
                         popUpTo("login") { inclusive = true }
-                    }
-                }
-            )
-        }
-        composable("admin") {
-            AdminMainScreen(
-                onLogout = {
-                    navController.navigate("login") {
-                        popUpTo("admin") { inclusive = true }
                     }
                 }
             )

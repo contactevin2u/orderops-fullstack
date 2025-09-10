@@ -18,7 +18,7 @@ import com.yourco.driverAA.ui.components.OrderOpsCard
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LoginScreen(
-    onLoginSuccess: (isAdmin: Boolean) -> Unit,
+    onLoginSuccess: () -> Unit,
     viewModel: LoginViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -111,9 +111,9 @@ fun LoginScreen(
         }
     }
     
-    LaunchedEffect(uiState.isLoggedIn, uiState.isAdmin) {
+    LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) {
-            onLoginSuccess(uiState.isAdmin)
+            onLoginSuccess()
         }
     }
 }

@@ -312,7 +312,7 @@ class DriverScheduleService:
         """
         try:
             from app.services.lorry_assignment_service import LorryAssignmentService
-            from app.models.lorry import LorryAssignment
+            from app.models.lorry_assignment import LorryAssignment
             
             lorry_service = LorryAssignmentService(self.db)
             
@@ -367,7 +367,8 @@ class DriverScheduleService:
         """
         try:
             from app.services.lorry_assignment_service import LorryAssignmentService
-            from app.models.lorry import Lorry, LorryAssignment
+            from app.models.lorry import Lorry
+            from app.models.lorry_assignment import LorryAssignment
             
             # Get the driver
             driver = self.db.query(Driver).filter(Driver.id == driver_id).first()
