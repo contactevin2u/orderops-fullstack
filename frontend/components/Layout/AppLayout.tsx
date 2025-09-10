@@ -67,9 +67,11 @@ export const navGroups: NavGroup[] = [
   {
     title: 'Administration',
     items: [
+      { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
       { href: '/admin/driver-schedule', label: 'Driver Schedule', Icon: Calendar, requiresAuth: true },
       { href: '/admin/lorry-management', label: 'Lorry Management', Icon: Truck, requiresAuth: true },
-      { href: '/admin', label: 'nav.admin', Icon: Shield, requiresAuth: true },
+      { href: '/admin/uid-management', label: 'UID Tracker', Icon: BarChart2, requiresAuth: true },
+      { href: '/admin/holds', label: 'Driver Holds', Icon: Shield, requiresAuth: true },
     ]
   }
 ];

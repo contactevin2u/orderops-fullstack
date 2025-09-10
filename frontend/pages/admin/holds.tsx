@@ -49,17 +49,18 @@ export default function HoldManagement() {
   const loadHolds = async () => {
     try {
       const statusFilter = selectedStatus === 'ALL' ? '' : `?status=${selectedStatus}`;
-      const response = await request<{ holds: DriverHold[] }>(`/lorry-management/holds${statusFilter}`);
-      setHolds(response.holds);
+      const response = await request<DriverHold[]>(`/lorry-management/holds${statusFilter}`);
+      setHolds(response || []);
     } catch (err: any) {
       setError(err.message || 'Failed to load holds');
+      console.error('Holds load error:', err);
     }
   };
   
   const loadDrivers = async () => {
     try {
-      const response = await request<{ drivers: Driver[] }>('/lorry-management/drivers');
-      setDrivers(response.drivers.filter(d => d.is_active));
+      const response = await request<Driver[]>('/drivers');
+      setDrivers((response || []).filter(d => d.is_active));
     } catch (err: any) {
       console.error('Failed to load drivers:', err);
     } finally {

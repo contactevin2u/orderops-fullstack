@@ -74,9 +74,10 @@ export default function UIDManagement() {
     
     try {
       const response = await request<{ results: UIDSearchResult[] }>(`/inventory/uid/search?query=${encodeURIComponent(searchQuery)}`);
-      setSearchResults(response.results);
+      setSearchResults(response.results || []);
     } catch (err: any) {
       setError(err.message || 'Search failed');
+      console.error('UID search error:', err);
     } finally {
       setLoading(false);
     }
@@ -91,6 +92,7 @@ export default function UIDManagement() {
       setSelectedUID(response);
     } catch (err: any) {
       setError(err.message || 'Failed to load UID details');
+      console.error('UID details error:', err);
     } finally {
       setLoading(false);
     }
