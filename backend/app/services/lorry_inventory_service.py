@@ -77,18 +77,28 @@ class LorryInventoryService:
         transactions_added = []
         errors = []
         
+        # Get current stock ONCE at the beginning to avoid performance issues
+        existing_stock = set(self.get_current_stock(lorry_id))
+        logger.info(f"DEBUG: Current stock contains {len(existing_stock)} UIDs")
+        
+        # Keep track of UIDs being added in this batch to prevent duplicates within the batch
+        uids_being_added = set()
+        
         logger.info(f"DEBUG: Processing {len(uids)} UIDs: {uids[:5]}{'...' if len(uids) > 5 else ''}")
         
         for i, uid in enumerate(uids):
             logger.info(f"DEBUG: Processing UID {i+1}/{len(uids)}: {uid}")
             try:
-                # Check if UID already exists in lorry
-                existing_stock = self.get_current_stock(lorry_id)
-                logger.info(f"DEBUG: Current stock check - existing count: {len(existing_stock)}")
-                
+                # Check if UID already exists in current stock
                 if uid in existing_stock:
                     logger.warning(f"DEBUG: UID {uid} already exists in lorry {lorry_id}")
                     errors.append(f"UID {uid} already exists in lorry {lorry_id}")
+                    continue
+                
+                # Check if UID is being added in this same batch
+                if uid in uids_being_added:
+                    logger.warning(f"DEBUG: UID {uid} is duplicate within this batch for lorry {lorry_id}")
+                    errors.append(f"UID {uid} is duplicate within this batch")
                     continue
                 
                 # Create load transaction
@@ -106,6 +116,7 @@ class LorryInventoryService:
                 self.db.add(transaction)
                 logger.info(f"DEBUG: Transaction added to session")
                 transactions_added.append(transaction)
+                uids_being_added.add(uid)  # Track this UID as being added
                 logger.info(f"DEBUG: Transaction appended to list - total added: {len(transactions_added)}")
                 
             except Exception as e:

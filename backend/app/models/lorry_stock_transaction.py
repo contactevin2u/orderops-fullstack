@@ -49,9 +49,14 @@ class LorryStockTransaction(Base):
     @property
     def is_stock_addition(self) -> bool:
         """Check if this transaction adds stock to the lorry"""
-        return self.action in ["LOAD", "COLLECTION", "ADMIN_ADJUSTMENT"]
+        return self.action in ["LOAD", "COLLECTION"]
     
     @property
     def is_stock_removal(self) -> bool:
         """Check if this transaction removes stock from the lorry"""
-        return self.action in ["UNLOAD", "DELIVERY", "ADMIN_ADJUSTMENT"]
+        return self.action in ["UNLOAD", "DELIVERY"]
+    
+    @property
+    def is_adjustment(self) -> bool:
+        """Check if this transaction is an admin adjustment (requires special handling)"""
+        return self.action == "ADMIN_ADJUSTMENT"
