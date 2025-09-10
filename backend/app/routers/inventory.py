@@ -1123,14 +1123,24 @@ async def get_driver_stock_status(
         from ..models.driver import Driver
         from ..services.lorry_inventory_service import LorryInventoryService
         from datetime import date
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        logger.info(f"=== DRIVER STOCK STATUS DEBUG === driver_id: {driver_id}")
         
         # Get driver's current lorry assignment
         today = date.today()
+        logger.info(f"DEBUG: Looking for assignment on date: {today}")
+        
         assignment = db.query(LorryAssignment).filter(
             LorryAssignment.driver_id == driver_id,
             LorryAssignment.assignment_date == today,
-            LorryAssignment.is_active == True
+            LorryAssignment.status.in_(["ASSIGNED", "ACTIVE"])
         ).first()
+        
+        logger.info(f"DEBUG: Found assignment: {assignment}")
+        if assignment:
+            logger.info(f"DEBUG: Assignment details - lorry_id: {assignment.lorry_id}, status: {assignment.status}, date: {assignment.assignment_date}")
         
         if not assignment:
             # No lorry assignment = no stock
@@ -1142,8 +1152,10 @@ async def get_driver_stock_status(
             })
         
         # Get current stock in the assigned lorry
+        logger.info(f"DEBUG: Getting stock for lorry: {assignment.lorry_id}")
         lorry_service = LorryInventoryService(db)
         current_uids = lorry_service.get_current_stock(assignment.lorry_id)
+        logger.info(f"DEBUG: Found {len(current_uids)} UIDs in lorry {assignment.lorry_id}: {current_uids}")
         
         # Group by SKU for legacy compatibility
         from collections import defaultdict
