@@ -1,6 +1,6 @@
 """Create lorry_stock_transactions table
 
-Revision ID: 20250910_create_stock_transactions  
+Revision ID: 20250910_stock_transactions  
 Revises: 20250908_stock_txns
 Create Date: 2025-09-10 12:00:00.000000
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import sqlite
 
 # revision identifiers, used by Alembic.
-revision = '20250910_create_stock_transactions'
+revision = '20250910_stock_transactions'
 down_revision = '20250908_stock_txns'
 branch_labels = None
 depends_on = None

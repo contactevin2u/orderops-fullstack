@@ -5,7 +5,7 @@
 """Merge migration heads
 
 Revision ID: 897aabf412f3
-Revises: 20250910_create_stock_transactions, 6d2bfed744a6
+Revises: 20250910_stock_transactions, 6d2bfed744a6
 Create Date: 2025-09-10 15:33:03.868754
 
 """
@@ -16,7 +16,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '897aabf412f3'
-down_revision = ('20250910_create_stock_transactions', '6d2bfed744a6')
+down_revision = ('20250910_stock_transactions', '6d2bfed744a6')
 branch_labels = None
 depends_on = None
 
