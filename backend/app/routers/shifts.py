@@ -488,19 +488,14 @@ async def _clock_in_with_stock_verification(
 
 
 async def _get_expected_lorry_stock(db: Session, lorry_id: str, today: date) -> list:
-    """Get expected stock for lorry from previous verification"""
+    """Get expected stock for lorry from actual transaction records"""
+    from app.services.lorry_inventory_service import LorryInventoryService
+    
+    # Use the unified lorry inventory service to get actual current stock
+    inventory_service = LorryInventoryService(db)
+    
+    # Get stock as of end of previous day (what should be in lorry for morning verification)
     yesterday = today - timedelta(days=1)
+    expected_uids = inventory_service.get_current_stock(lorry_id, yesterday)
     
-    # Get most recent verification for this lorry
-    yesterday_verification = db.execute(
-        select(LorryStockVerification)
-        .where(LorryStockVerification.lorry_id == lorry_id)
-        .where(LorryStockVerification.verification_date <= yesterday)
-        .order_by(LorryStockVerification.created_at.desc())
-    ).scalar_one_or_none()
-    
-    if yesterday_verification:
-        return json.loads(yesterday_verification.scanned_uids)
-    else:
-        # No previous verification found - return empty
-        return []
+    return expected_uids

@@ -1313,9 +1313,9 @@ async def get_uid_details(
     order_actions = db.execute(
         select(OrderItemUID, Order, Driver)
         .join(Order, OrderItemUID.order_id == Order.id)
-        .join(Driver, OrderItemUID.driver_id == Driver.id, isouter=True)
+        .join(Driver, OrderItemUID.scanned_by == Driver.id, isouter=True)
         .where(OrderItemUID.uid == uid)
-        .order_by(OrderItemUID.created_at.desc())
+        .order_by(OrderItemUID.scanned_at.desc())
     ).all()
     
     delivery_history = []
