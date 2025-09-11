@@ -52,7 +52,17 @@ class ShiftService:
         # Check if driver already has an active shift
         active_shift = self.get_active_shift(driver_id)
         if active_shift:
-            raise ValueError(f"Driver already has an active shift started at {active_shift.clock_in_at}")
+            # Auto-close stale shifts older than 24 hours (reasonable limit vs 1 week config)
+            hours_since_clock_in = (datetime.now(timezone.utc) - active_shift.clock_in_at).total_seconds() / 3600
+            if hours_since_clock_in > 24:  # 24 hours is reasonable auto-close threshold
+                print(f"AUTO-CLOSING stale shift for driver {driver_id} - shift was {hours_since_clock_in:.1f} hours old")
+                active_shift.status = "AUTO_COMPLETED"
+                active_shift.clock_out_at = datetime.now(timezone.utc)
+                active_shift.notes = f"Auto-closed after {hours_since_clock_in:.1f} hours (stale shift cleanup)"
+                self.db.commit()
+                print(f"Stale shift auto-closed: {active_shift.id}")
+            else:
+                raise ValueError(f"Driver already has an active shift started at {active_shift.clock_in_at}")
 
         # Determine if location is outstation
         is_outstation, distance_km = is_outstation_location(lat, lng)
