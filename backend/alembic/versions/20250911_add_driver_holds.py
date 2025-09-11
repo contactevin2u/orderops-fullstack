@@ -17,8 +17,13 @@ depends_on = None
 
 
 def upgrade():
-    # Create driver_holds table
-    op.create_table('driver_holds',
+    # Check if table exists before creating it
+    connection = op.get_bind()
+    inspector = sa.inspect(connection)
+    
+    # Create driver_holds table - only if it doesn't exist
+    if not inspector.has_table('driver_holds'):
+        op.create_table('driver_holds',
         sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
         sa.Column('driver_id', sa.Integer(), nullable=False),
         sa.Column('reason', sa.String(length=100), nullable=False),
@@ -37,19 +42,28 @@ def upgrade():
         sa.ForeignKeyConstraint(['related_verification_id'], ['lorry_stock_verifications.id'], ),
         sa.ForeignKeyConstraint(['resolved_by'], ['users.id'], ),
         sa.PrimaryKeyConstraint('id')
-    )
-    
-    # Create indexes for performance
-    op.create_index('ix_driver_holds_driver_id', 'driver_holds', ['driver_id'])
-    op.create_index('ix_driver_holds_status', 'driver_holds', ['status'])
-    op.create_index('ix_driver_holds_created_at', 'driver_holds', ['created_at'])
+        )
+        
+        # Create indexes for performance
+        op.create_index('ix_driver_holds_driver_id', 'driver_holds', ['driver_id'])
+        op.create_index('ix_driver_holds_status', 'driver_holds', ['status'])
+        op.create_index('ix_driver_holds_created_at', 'driver_holds', ['created_at'])
     
 
 def downgrade():
-    # Drop indexes
-    op.drop_index('ix_driver_holds_created_at', table_name='driver_holds')
-    op.drop_index('ix_driver_holds_status', table_name='driver_holds')
-    op.drop_index('ix_driver_holds_driver_id', table_name='driver_holds')
+    # Check if table exists before dropping it
+    connection = op.get_bind()
+    inspector = sa.inspect(connection)
     
-    # Drop table
-    op.drop_table('driver_holds')
+    # Drop driver_holds table - only if it exists
+    if inspector.has_table('driver_holds'):
+        try:
+            # Drop indexes
+            op.drop_index('ix_driver_holds_created_at', table_name='driver_holds')
+            op.drop_index('ix_driver_holds_status', table_name='driver_holds')
+            op.drop_index('ix_driver_holds_driver_id', table_name='driver_holds')
+        except Exception:
+            pass  # Indexes might not exist
+            
+        # Drop table
+        op.drop_table('driver_holds')
