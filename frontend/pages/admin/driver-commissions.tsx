@@ -242,7 +242,7 @@ export default function DriverCommissionsPage() {
                         if (order.trip?.id) {
                           try {
                             const analysis = await analyzeCommissionEligibility(order.trip.id);
-                            results[order.id] = analysis.data;
+                            results[order.id] = analysis;
                             completed++;
                           } catch (error) {
                             console.error(`AI analysis failed for order ${order.id}:`, error);
