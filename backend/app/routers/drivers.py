@@ -655,6 +655,7 @@ def update_order_status(
             print(f"DEBUG: Blocking DELIVERED status - PoD photos required but not found")
             raise HTTPException(400, "At least one Proof of Delivery photo is required before marking order as delivered. Please take photos of the delivered items first.")
         trip.delivered_at = now
+        
     elif payload.status == "ON_HOLD":
         # Driver pausing their own delivery - keep assignment but change status
         print(f"DEBUG: ON_HOLD - Driver {driver.id} pausing their own delivery for trip {trip.id}")
