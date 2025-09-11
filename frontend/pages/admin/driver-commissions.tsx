@@ -398,21 +398,30 @@ function OrderCard({
 }) {
   const [showPodPhotos, setShowPodPhotos] = React.useState(false);
   const [showUidDetails, setShowUidDetails] = React.useState(false);
+  const [showAiVerification, setShowAiVerification] = React.useState(false);
   const [commissionAmount, setCommissionAmount] = React.useState('');
   
-  // Fetch UID data (inventory config is already available from parent scope)
+  const trip = order.trip || {};
+  const isDelivered = trip.status === 'DELIVERED'; // Check trip status, not order status
   
+  // Fetch UID data (inventory config is already available from parent scope)
   const orderUidsQuery = useQuery({
     queryKey: ['order-uids', order.id],
     queryFn: () => getOrderUIDs(order.id),
     enabled: inventoryConfig?.uid_inventory_enabled === true,
   });
+
+  // AI verification query - only run for delivered orders
+  const aiVerificationQuery = useQuery({
+    queryKey: ['ai-verification', trip.id],
+    queryFn: () => analyzeCommissionEligibility(trip.id),
+    enabled: isDelivered && trip.id && !readOnly,
+    retry: false, // Don't retry on error to avoid spam
+  });
   
-  const trip = order.trip || {};
   const currentCommission = trip.commission?.computed_amount || order.commission || 0;
   const podPhotos = trip.pod_photo_urls || (trip.pod_photo_url ? [trip.pod_photo_url] : []);
   const hasPodPhoto = podPhotos.length > 0;
-  const isDelivered = trip.status === 'DELIVERED'; // Check trip status, not order status
   const paymentCollected = order.payment_status === 'PAID' || order.total_paid > 0; // Check if initial payment collected
   const hasUpsells = (order.upsell_amount || 0) > 0; // Check for upsells
   const isReleased = trip.commission?.actualized_at; // Check if already released
@@ -425,6 +434,14 @@ function OrderCard({
   
   // Enhanced verification includes UID scanning if required
   const uidVerificationPassed = !uidScanRequired || hasUidScans;
+
+  // AI verification data
+  const aiData = aiVerificationQuery.data?.data;
+  const aiVerification = aiData?.ai_verification;
+  const hasAiVerification = !aiVerificationQuery.isLoading && !aiVerificationQuery.isError && aiVerification;
+  const paymentMethod = aiVerification?.payment_method || 'Unknown';
+  const confidenceScore = aiVerification?.confidence_score || 0;
+  const cashCollectionRequired = aiVerification?.cash_collection_required || false;
   
   // Full verification requires all steps (with UID if enabled and required)
   const canRelease = isDelivered && hasPodPhoto && paymentCollected && currentCommission > 0 && !isReleased && uidVerificationPassed;
@@ -498,6 +515,33 @@ function OrderCard({
               >
                 🏷️ {showUidDetails ? 'Hide' : 'View'} UIDs ({uidData?.uids?.length || 0})
               </button>
+            )}
+            {hasAiVerification && (
+              <button
+                onClick={() => setShowAiVerification(!showAiVerification)}
+                style={{ 
+                  padding: '0.125rem 0.5rem', 
+                  borderRadius: 'var(--radius-1)',
+                  background: confidenceScore >= 0.8 ? '#dcfce7' : confidenceScore >= 0.6 ? '#fef3c7' : '#fecaca',
+                  color: confidenceScore >= 0.8 ? '#15803d' : confidenceScore >= 0.6 ? '#d97706' : '#dc2626',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.875rem'
+                }}
+              >
+                🤖 {showAiVerification ? 'Hide' : 'View'} AI Analysis ({Math.round(confidenceScore * 100)}%)
+              </button>
+            )}
+            {aiVerificationQuery.isLoading && (
+              <span style={{ 
+                padding: '0.125rem 0.5rem', 
+                borderRadius: 'var(--radius-1)',
+                background: '#f3f4f6',
+                color: '#6b7280',
+                fontSize: '0.875rem'
+              }}>
+                🤖 Analyzing...
+              </span>
             )}
           </div>
         </div>
@@ -592,13 +636,23 @@ function OrderCard({
             <span style={{ color: paymentCollected ? '#15803d' : '#dc2626' }}>
               {paymentCollected ? '✅' : '❌'} 3. Initial Payment Collected
             </span>
+            {hasAiVerification && (
+              <span style={{ color: confidenceScore >= 0.8 ? '#15803d' : confidenceScore >= 0.6 ? '#f59e0b' : '#dc2626' }}>
+                {confidenceScore >= 0.8 ? '✅' : confidenceScore >= 0.6 ? '⚠️' : '❌'} {inventoryEnabled && uidScanRequired ? '4' : '4'}. AI Verification ({Math.round(confidenceScore * 100)}%)
+              </span>
+            )}
+            {aiVerificationQuery.isLoading && (
+              <span style={{ color: '#6b7280' }}>
+                ⏳ {inventoryEnabled && uidScanRequired ? '4' : '4'}. AI Verification (Loading...)
+              </span>
+            )}
             {inventoryEnabled && uidScanRequired && (
               <span style={{ color: hasUidScans ? '#15803d' : '#dc2626' }}>
-                {hasUidScans ? '✅' : '❌'} 4. UID Scanning Complete
+                {hasUidScans ? '✅' : '❌'} 5. UID Scanning Complete
               </span>
             )}
             <span style={{ color: hasUpsells ? '#f59e0b' : '#6b7280' }}>
-              {hasUpsells ? '💰' : '➖'} {inventoryEnabled && uidScanRequired ? '5' : '4'}. Upsells: {hasUpsells ? `RM ${(order.upsell_amount || 0).toFixed(2)}` : 'None'}
+              {hasUpsells ? '💰' : '➖'} {inventoryEnabled && uidScanRequired ? '6' : hasAiVerification || aiVerificationQuery.isLoading ? '5' : '5'}. Upsells: {hasUpsells ? `RM ${(order.upsell_amount || 0).toFixed(2)}` : 'None'}
             </span>
           </div>
         </div>
@@ -715,6 +769,71 @@ function OrderCard({
           <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 'var(--space-2)' }}>
             UID scanning provides detailed inventory tracking for enhanced delivery verification
           </p>
+        </div>
+      )}
+
+      {showAiVerification && hasAiVerification && (
+        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: '#f8fafc', borderRadius: 'var(--radius-2)' }}>
+          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
+            🤖 AI Verification Results
+          </h4>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
+            <div>
+              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Payment Method Detected:</div>
+              <div style={{ 
+                fontWeight: 600, 
+                color: paymentMethod === 'CASH' ? '#dc2626' : paymentMethod === 'BANK_TRANSFER' ? '#059669' : '#6b7280'
+              }}>
+                {paymentMethod === 'CASH' ? '💵 Cash Payment' : 
+                 paymentMethod === 'BANK_TRANSFER' ? '🏦 Bank Transfer' : 
+                 '❓ ' + paymentMethod}
+              </div>
+            </div>
+            
+            <div>
+              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Confidence Score:</div>
+              <div style={{ 
+                fontWeight: 600,
+                color: confidenceScore >= 0.8 ? '#15803d' : confidenceScore >= 0.6 ? '#d97706' : '#dc2626'
+              }}>
+                {Math.round(confidenceScore * 100)}% 
+                <span style={{ fontWeight: 400, fontSize: '0.75rem', marginLeft: 'var(--space-1)' }}>
+                  ({confidenceScore >= 0.8 ? 'High' : confidenceScore >= 0.6 ? 'Medium' : 'Low'})
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {cashCollectionRequired && (
+            <div style={{ 
+              padding: 'var(--space-3)', 
+              background: '#fef3c7', 
+              borderRadius: 'var(--radius-1)', 
+              border: '1px solid #f59e0b',
+              marginBottom: 'var(--space-3)'
+            }}>
+              <div style={{ fontWeight: 600, color: '#d97706', marginBottom: 'var(--space-1)' }}>
+                ⚠️ Cash Collection Required
+              </div>
+              <div style={{ fontSize: '0.875rem', color: '#92400e' }}>
+                AI detected cash payment. Confirm cash has been collected from driver before releasing commission.
+              </div>
+            </div>
+          )}
+
+          {aiVerification?.analysis_details && (
+            <div style={{ marginBottom: 'var(--space-3)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Analysis Details:</div>
+              <div style={{ fontSize: '0.875rem', color: '#374151', fontStyle: 'italic' }}>
+                "{aiVerification.analysis_details}"
+              </div>
+            </div>
+          )}
+
+          <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+            Analysis performed: {aiVerification?.timestamp ? new Date(aiVerification.timestamp).toLocaleString() : 'Unknown'}
+          </div>
         </div>
       )}
     </div>
