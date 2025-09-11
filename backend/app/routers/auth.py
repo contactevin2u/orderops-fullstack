@@ -52,8 +52,7 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
         # Remove hardcoded domain to work with any domain
         domain=None,
     )
-    # Skip audit log for login to avoid JSON data type issues
-    # db.add(AuditLog(user_id=user.id, action="login", details={}))
+    db.add(AuditLog(user_id=user.id, action="login", details={}))
     db.commit()
     return {"id": user.id, "username": user.username, "role": user.role.value}
 
@@ -129,8 +128,7 @@ def logout(
         path="/",
         domain=".aalyx.com" if settings.COOKIE_SECURE else None,
     )
-    # Skip audit log for logout to avoid JSON data type issues
-    # db.add(AuditLog(user_id=current_user.id, action="logout", details={}))
+    db.add(AuditLog(user_id=current_user.id, action="logout", details={}))
     db.commit()
     return {"ok": True}
 

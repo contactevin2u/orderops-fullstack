@@ -21,11 +21,8 @@ def log_action(
     """
     try:
         payload = {"resource_type": resource_type, "resource_id": resource_id, "details": details}
-        # compact JSON string, hard-limit to column size
-        details_str = json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
-        if len(details_str) > 255:
-            details_str = details_str[:252] + "..."
-        db.add(AuditLog(user_id=user_id, action=action, details=details_str))
+        # Store as dict object - PostgreSQL JSON column will handle serialization
+        db.add(AuditLog(user_id=user_id, action=action, details=payload))
         db.commit()
     except Exception:
         db.rollback()
