@@ -42,45 +42,41 @@ def upgrade() -> None:
             # Create the enum type
             op.execute("CREATE TYPE ledgerentrysource AS ENUM ('ADMIN_MANUAL', 'DRIVER_SYNC', 'ORDER_OPERATION', 'INVENTORY_AUDIT', 'MAINTENANCE', 'SYSTEM_IMPORT')")
         
-        # Create UID ledger table for comprehensive medical device traceability
-        # Use existing or newly created enum types
-        uidaction_enum = sa.Enum('LOAD_OUT', 'DELIVER', 'RETURN', 'REPAIR', 'SWAP', 'LOAD_IN', 'ISSUE', name='uidaction', create_type=False)
-        ledgerentrysource_enum = sa.Enum('ADMIN_MANUAL', 'DRIVER_SYNC', 'ORDER_OPERATION', 'INVENTORY_AUDIT', 'MAINTENANCE', 'SYSTEM_IMPORT', name='ledgerentrysource', create_type=False)
-        
-        op.create_table('uid_ledger',
-            sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-            sa.Column('uid', sa.String(), nullable=False),
-            sa.Column('action', uidaction_enum, nullable=False),
-            sa.Column('scanned_at', sa.DateTime(), nullable=False),
-            sa.Column('scanned_by_admin', sa.Integer(), nullable=True),
-            sa.Column('scanned_by_driver', sa.Integer(), nullable=True),
-            sa.Column('scanner_name', sa.String(), nullable=True),
-            sa.Column('order_id', sa.Integer(), nullable=True),
-            sa.Column('sku_id', sa.Integer(), nullable=True),
-            sa.Column('source', ledgerentrysource_enum, nullable=False),
-            sa.Column('lorry_id', sa.String(), nullable=True),
-            sa.Column('location_notes', sa.String(), nullable=True),
-            sa.Column('notes', sa.Text(), nullable=True),
-            sa.Column('customer_name', sa.String(), nullable=True),
-            sa.Column('order_reference', sa.String(), nullable=True),
-            sa.Column('driver_scan_id', sa.String(), nullable=True),
-            sa.Column('sync_status', sa.String(), nullable=False),
-            sa.Column('recorded_by', sa.Integer(), nullable=False),
-            sa.Column('recorded_at', sa.DateTime(), nullable=False),
-            sa.Column('is_deleted', sa.Boolean(), nullable=False),
-            sa.Column('deleted_at', sa.DateTime(), nullable=True),
-            sa.Column('deleted_by', sa.Integer(), nullable=True),
-            sa.Column('deletion_reason', sa.Text(), nullable=True),
-            sa.ForeignKeyConstraint(['deleted_by'], ['users.id'], ),
-            sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ),
-            sa.ForeignKeyConstraint(['recorded_by'], ['users.id'], ),
-            sa.ForeignKeyConstraint(['scanned_by_admin'], ['users.id'], ),
-            sa.ForeignKeyConstraint(['scanned_by_driver'], ['drivers.id'], ),
-            sa.ForeignKeyConstraint(['sku_id'], ['sku.id'], ),
-            sa.ForeignKeyConstraint(['uid'], ['item.uid'], ),
-            sa.PrimaryKeyConstraint('id'),
-            sa.UniqueConstraint('driver_scan_id')
-        )
+        # Create UID ledger table using raw SQL to avoid enum auto-creation issues
+        op.execute("""
+            CREATE TABLE uid_ledger (
+                id SERIAL PRIMARY KEY,
+                uid VARCHAR NOT NULL,
+                action uidaction NOT NULL,
+                scanned_at TIMESTAMP NOT NULL,
+                scanned_by_admin INTEGER,
+                scanned_by_driver INTEGER,
+                scanner_name VARCHAR,
+                order_id INTEGER,
+                sku_id INTEGER,
+                source ledgerentrysource NOT NULL,
+                lorry_id VARCHAR,
+                location_notes VARCHAR,
+                notes TEXT,
+                customer_name VARCHAR,
+                order_reference VARCHAR,
+                driver_scan_id VARCHAR UNIQUE,
+                sync_status VARCHAR NOT NULL,
+                recorded_by INTEGER NOT NULL,
+                recorded_at TIMESTAMP NOT NULL,
+                is_deleted BOOLEAN NOT NULL,
+                deleted_at TIMESTAMP,
+                deleted_by INTEGER,
+                deletion_reason TEXT,
+                FOREIGN KEY (deleted_by) REFERENCES users(id),
+                FOREIGN KEY (order_id) REFERENCES orders(id),
+                FOREIGN KEY (recorded_by) REFERENCES users(id),
+                FOREIGN KEY (scanned_by_admin) REFERENCES users(id),
+                FOREIGN KEY (scanned_by_driver) REFERENCES drivers(id),
+                FOREIGN KEY (sku_id) REFERENCES sku(id),
+                FOREIGN KEY (uid) REFERENCES item(uid)
+            )
+        """)
         
         # Create indexes for better query performance
         op.create_index('idx_uid_ledger_uid', 'uid_ledger', ['uid'])
@@ -98,38 +94,8 @@ def downgrade() -> None:
     inspector = sa.inspect(connection)
     
     if inspector.has_table('uid_ledger'):
-        # Drop indexes first (ignore errors if they don't exist)
-        try:
-            op.drop_index('idx_uid_ledger_not_deleted', table_name='uid_ledger')
-        except Exception:
-            pass
-        try:
-            op.drop_index('idx_uid_ledger_sync_status', table_name='uid_ledger')
-        except Exception:
-            pass
-        try:
-            op.drop_index('idx_uid_ledger_source', table_name='uid_ledger')
-        except Exception:
-            pass
-        try:
-            op.drop_index('idx_uid_ledger_order_id', table_name='uid_ledger')
-        except Exception:
-            pass
-        try:
-            op.drop_index('idx_uid_ledger_action', table_name='uid_ledger')
-        except Exception:
-            pass
-        try:
-            op.drop_index('idx_uid_ledger_scanned_at', table_name='uid_ledger')
-        except Exception:
-            pass
-        try:
-            op.drop_index('idx_uid_ledger_uid', table_name='uid_ledger')
-        except Exception:
-            pass
-        
-        # Drop table
-        op.drop_table('uid_ledger')
+        # Drop table and indexes using raw SQL
+        op.execute("DROP TABLE IF EXISTS uid_ledger CASCADE")
         
         # Only drop enums if no other tables are using them
         # Check if any tables still use uidaction
