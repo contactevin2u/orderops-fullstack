@@ -27,6 +27,16 @@ from ..utils.audit import log_action
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
+# Middleware-style logging to catch ALL requests to drivers router
+@router.middleware("http")
+async def log_all_driver_requests(request, call_next):
+    print(f"🔥 DRIVERS ROUTER REQUEST: {request.method} {request.url}")
+    print(f"🔥 USER AGENT: {request.headers.get('user-agent', 'Unknown')}")
+    print(f"🔥 AUTHORIZATION HEADER: {'Present' if 'authorization' in request.headers else 'Missing'}")
+    response = await call_next(request)
+    print(f"🔥 DRIVERS ROUTER RESPONSE STATUS: {response.status_code}")
+    return response
+
 def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_driver_id: int = None) -> dict:
     # delivery_date may be datetime or date
     dd = None
@@ -619,7 +629,16 @@ def update_order_status(
     driver=Depends(driver_auth),
     db: Session = Depends(get_session),
 ):
-    # Debug logging
+    # COMPREHENSIVE DEBUG LOGGING - START
+    print(f"🚨 DRIVERS ROUTER ENDPOINT HIT: /drivers/orders/{order_id}")
+    print(f"🚨 DRIVER ID: {driver.id}")
+    print(f"🚨 REQUESTED STATUS: '{payload.status}'")
+    print(f"🚨 FULL PAYLOAD: {payload}")
+    print(f"🚨 DRIVER NAME: {getattr(driver, 'name', 'Unknown')}")
+    print(f"🚨 REQUEST TIME: {datetime.now(timezone.utc).isoformat()}")
+    # COMPREHENSIVE DEBUG LOGGING - END
+    
+    # Debug logging (original)
     print(f"DEBUG: Driver {driver.id} attempting to update order {order_id} to status '{payload.status}'")
     
     # Support both primary and secondary drivers
