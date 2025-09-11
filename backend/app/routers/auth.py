@@ -62,8 +62,8 @@ def debug_register_endpoint():
     """Debug endpoint to verify this backend version is deployed"""
     return {
         "message": "✅ Registration fix deployed - this backend has the updated auth logic",
-        "timestamp": "2025-09-11 22:05 UTC",
-        "fix_version": "v2_no_auth_dependency",
+        "timestamp": "2025-09-11 22:25 UTC", 
+        "fix_version": "v3_audit_log_removed",
         "endpoint": "/auth/register should work for first user without authentication"
     }
 
@@ -73,7 +73,7 @@ def register(
     db: Session = Depends(get_session),
 ):
     print(f"🔧 REGISTER DEBUG: Endpoint hit with username='{payload.username}'")
-    print(f"🔧 REGISTER DEBUG: This backend version has NO get_current_user dependency")
+    print(f"🔧 REGISTER DEBUG: This backend version has NO get_current_user dependency - v3 audit fix")
     
     try:
         count = db.query(User).count()
