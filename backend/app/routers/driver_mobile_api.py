@@ -82,7 +82,10 @@ async def update_mobile_order_status(
     driver: Driver = Depends(driver_auth),
     db: Session = Depends(get_session)
 ):
-    """Update order status - mobile app compatible"""
+    """Update order status - mobile app compatible (actually updates trip status)"""
+    print(f"MOBILE API DEBUG: Driver {driver.id} updating order {order_id} to status '{payload.get('status')}'")
+    print(f"MOBILE API DEBUG: Full payload: {payload}")
+    
     # Convert dict to proper schema
     from ..schemas import DriverOrderUpdateIn
     from ..routers.drivers import update_order_status
@@ -93,7 +96,9 @@ async def update_mobile_order_status(
         uid_actions=payload.get("uid_actions", [])
     )
     
-    return update_order_status(order_id, update_payload, driver, db)
+    result = update_order_status(order_id, update_payload, driver, db)
+    print(f"MOBILE API DEBUG: Update result: {result}")
+    return result
 
 @router.post("/orders/{order_id}/pod-photo")
 async def upload_mobile_pod_photo(
@@ -275,6 +280,36 @@ async def mobile_sku_resolve(
     """Resolve SKU - mobile app compatible"""
     from ..routers.inventory import resolve_sku
     return await resolve_sku(request, db)
+
+# Trip status management (more explicit than order status)
+@router.patch("/trips/{trip_id}/status")
+async def update_mobile_trip_status(
+    trip_id: int,
+    payload: Dict[str, Any],
+    driver: Driver = Depends(driver_auth),
+    db: Session = Depends(get_session)
+):
+    """Update trip status directly - mobile app compatible"""
+    from ..schemas import DriverOrderUpdateIn
+    from ..routers.drivers import update_order_status
+    
+    # Get the order_id from trip_id
+    trip = db.query(Trip).filter(Trip.id == trip_id).first()
+    if not trip:
+        raise HTTPException(404, "Trip not found")
+    
+    # Verify driver has access to this trip
+    if trip.driver_id != driver.id and trip.driver_id_2 != driver.id:
+        raise HTTPException(403, "Access denied to this trip")
+    
+    # Convert payload to proper format
+    update_payload = DriverOrderUpdateIn(
+        status=payload.get("status"),
+        uid_actions=payload.get("uid_actions", [])
+    )
+    
+    # Call existing function but with order_id (it actually updates trip status)
+    return update_order_status(trip.order_id, update_payload, driver, db)
 
 # Order management
 @router.post("/orders/simple")
