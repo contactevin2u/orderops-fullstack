@@ -254,7 +254,7 @@ async def mobile_lorry_stock(
 ):
     """Get lorry stock - mobile app compatible"""
     from ..routers.drivers import get_driver_lorry_stock
-    return get_driver_lorry_stock(driver_id, date, driver, db)
+    return get_driver_lorry_stock(driver_id, date, db, driver)
 
 @router.post("/inventory/lorry/{driver_id}/stock/upload")
 async def mobile_lorry_stock_upload(
