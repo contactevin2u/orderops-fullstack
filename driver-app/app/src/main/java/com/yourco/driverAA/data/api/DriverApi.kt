@@ -14,7 +14,7 @@ import retrofit2.http.Query
 
 interface DriverApi {
     @GET("driver/me")
-    suspend fun getCurrentUser(): ApiResponse<UserDto>
+    suspend fun getCurrentUser(): UserDto
     
     @GET("driver/jobs")
     suspend fun getJobs(@Query("status_filter") statusFilter: String = "active"): List<JobDto>
@@ -97,7 +97,7 @@ interface DriverApi {
     suspend fun clockInWithStock(@Body request: ClockInWithStockRequest): ApiResponse<ShiftResponse>
     
     @GET("driver/lorry-management/driver-status")
-    suspend fun getDriverStatus(): ApiResponse<DriverStatusResponse>
+    suspend fun getDriverStatus(): DriverStatusResponse
 }
 
 @Serializable

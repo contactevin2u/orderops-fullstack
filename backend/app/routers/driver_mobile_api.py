@@ -37,11 +37,11 @@ async def get_current_user(
     db: Session = Depends(get_session)
 ):
     """Get current driver user info"""
-    return envelope({
+    return {
         "id": driver.id,
         "username": driver.name,
         "role": "driver"
-    })
+    }
 
 # Re-export drivers endpoints with mobile-friendly routing
 @router.get("/jobs")

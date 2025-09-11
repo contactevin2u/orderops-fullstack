@@ -27,9 +27,9 @@ class UserRepository @Inject constructor(
                 val response = api.getCurrentUser()
                 Result.success(
                     UserInfo(
-                        id = response.data.id,
-                        username = response.data.username,
-                        role = response.data.role
+                        id = response.id,
+                        username = response.username,
+                        role = response.role
                     )
                 )
             }

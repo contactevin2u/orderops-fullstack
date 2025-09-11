@@ -335,7 +335,7 @@ class JobsRepository @Inject constructor(
     
     suspend fun getDriverStatus(): Result<DriverStatusResponse> = try {
         val response = api.getDriverStatus()
-        Result.Success(response.data)
+        Result.Success(response)
     } catch (e: Exception) {
         Result.error(e, "driver_status")
     }
