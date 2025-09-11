@@ -46,7 +46,7 @@ fun OrdersList(
     // Check driver status and load jobs
     LaunchedEffect(statusFilter) {
         // The enhanced JobsListViewModel automatically checks driver status first
-        viewModel.refreshDriverStatus()
+        viewModel.refreshDriverStatus(statusFilter)
     }
 
     // Filter and sort jobs
@@ -132,7 +132,7 @@ fun OrdersList(
             if (errorMessage != null) {
                 ErrorCard(
                     message = errorMessage!!,
-                    onRetry = { viewModel.refreshDriverStatus() },
+                    onRetry = { viewModel.refreshDriverStatus(statusFilter) },
                     modifier = Modifier.padding(16.dp)
                 )
             }

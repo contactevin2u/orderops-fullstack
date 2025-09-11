@@ -42,9 +42,9 @@ class JobsListViewModel @Inject constructor(
         checkDriverStatusAndLoadJobs()
     }
 
-    fun loadJobs() {
+    fun loadJobs(statusFilter: String = "active") {
         viewModelScope.launch {
-            repo.getJobs().collect { result ->
+            repo.getJobs(statusFilter).collect { result ->
                 when (result) {
                     is Result.Loading -> {
                         _loading.value = true
@@ -77,12 +77,12 @@ class JobsListViewModel @Inject constructor(
         _showRetryButton.value = false
     }
     
-    fun retryLoadJobs() {
+    fun retryLoadJobs(statusFilter: String = "active") {
         clearError()
-        loadJobs()
+        loadJobs(statusFilter)
     }
     
-    private fun checkDriverStatusAndLoadJobs() {
+    private fun checkDriverStatusAndLoadJobs(statusFilter: String = "active") {
         viewModelScope.launch {
             _loading.value = true
             
@@ -95,7 +95,7 @@ class JobsListViewModel @Inject constructor(
                         
                         if (status.can_access_orders) {
                             // Driver can access orders, proceed with loading jobs
-                            loadJobs()
+                            loadJobs(statusFilter)
                         } else {
                             // Driver cannot access orders
                             _loading.value = false
@@ -124,7 +124,7 @@ class JobsListViewModel @Inject constructor(
         }
     }
     
-    fun refreshDriverStatus() {
-        checkDriverStatusAndLoadJobs()
+    fun refreshDriverStatus(statusFilter: String = "active") {
+        checkDriverStatusAndLoadJobs(statusFilter)
     }
 }
