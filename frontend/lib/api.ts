@@ -673,6 +673,121 @@ export function getDriverStockStatus(driverId: number) {
   }>(`/inventory/drivers/${driverId}/stock-status`);
 }
 
+// -------- UID Ledger
+export function getUIDLedgerHistory(uid: string) {
+  return request<{
+    uid: string;
+    total_entries: number;
+    history: Array<{
+      id: number;
+      uid: string;
+      action: string;
+      scanned_at: string;
+      scanner: {
+        type: 'admin' | 'driver' | 'manual';
+        id?: number;
+        name: string;
+      };
+      source: string;
+      order_id?: number;
+      order_reference?: string;
+      customer_name?: string;
+      lorry_id?: string;
+      location_notes?: string;
+      notes?: string;
+      recorded_at: string;
+    }>;
+  }>(`/inventory/uid/${uid}/ledger`);
+}
+
+export function getLedgerAuditTrail(params: {
+  start_date?: string;
+  end_date?: string;
+  uid?: string;
+  action?: string;
+  scanner_id?: number;
+  order_id?: number;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) {
+      searchParams.append(key, value.toString());
+    }
+  });
+  
+  const queryString = searchParams.toString();
+  return request<{
+    total_entries: number;
+    entries: Array<{
+      id: number;
+      uid: string;
+      action: string;
+      scanned_at: string;
+      scanner: {
+        type: 'admin' | 'driver' | 'manual';
+        id?: number;
+        name: string;
+      };
+      source: string;
+      order_id?: number;
+      order_reference?: string;
+      customer_name?: string;
+      location: {
+        lorry_id?: string;
+        notes?: string;
+      };
+      notes?: string;
+      item_info?: {
+        uid: string;
+        sku_id?: number;
+        sku_name?: string;
+        item_type: string;
+        status: string;
+        oem_serial?: string;
+      };
+      recorded_at: string;
+    }>;
+    summary: {
+      actions: Record<string, number>;
+      date_range: {
+        start?: string;
+        end?: string;
+      };
+    };
+  }>(`/inventory/ledger/audit-trail${queryString ? `?${queryString}` : ''}`);
+}
+
+export function getLedgerStatistics(days: number = 30) {
+  return request<{
+    period_days: number;
+    total_scans: number;
+    scans_by_action: Record<string, number>;
+    scans_by_source: Record<string, number>;
+  }>(`/inventory/ledger/statistics?days=${days}`);
+}
+
+export function recordUIDScan(uid: string, data: {
+  action: string;
+  order_id?: number;
+  sku_id?: number;
+  source?: string;
+  lorry_id?: string;
+  location_notes?: string;
+  notes?: string;
+  customer_name?: string;
+  order_reference?: string;
+}) {
+  return request<{
+    success: boolean;
+    message: string;
+    entry_id: number;
+    uid: string;
+    action: string;
+    recorded_at: string;
+  }>(`/inventory/uid/${uid}/scan`, { json: data });
+}
+
 // -------- SKU Management
 export function getAllSKUs() {
   return request<Array<{

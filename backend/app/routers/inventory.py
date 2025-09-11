@@ -1634,3 +1634,189 @@ async def generate_qr_code(
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"QR code generation failed: {str(e)}")
+
+
+@router.get("/uid/{uid}/ledger", response_model=dict)
+async def get_uid_ledger_history(
+    uid: str,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN, Role.USER))
+):
+    """Get comprehensive ledger history for a specific UID"""
+    try:
+        from ..services.uid_ledger_service import UIDLedgerService
+        
+        service = UIDLedgerService(db)
+        history = service.get_uid_history(uid)
+        
+        return envelope({
+            "uid": uid,
+            "total_entries": len(history),
+            "history": history
+        })
+        
+    except Exception as e:
+        logger.error(f"Error fetching UID ledger history for {uid}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch UID ledger history: {str(e)}")
+
+
+@router.get("/ledger/audit-trail", response_model=dict)
+async def get_ledger_audit_trail(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    uid: Optional[str] = None,
+    action: Optional[str] = None,
+    scanner_id: Optional[int] = None,
+    order_id: Optional[int] = None,
+    limit: int = 100,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get audit trail for medical device traceability reporting"""
+    try:
+        from ..services.uid_ledger_service import UIDLedgerService
+        from ..models.uid_ledger import UIDAction
+        
+        service = UIDLedgerService(db)
+        
+        # Parse dates
+        parsed_start_date = None
+        parsed_end_date = None
+        
+        if start_date:
+            try:
+                parsed_start_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid start_date format. Use YYYY-MM-DD")
+        
+        if end_date:
+            try:
+                parsed_end_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid end_date format. Use YYYY-MM-DD")
+        
+        # Parse action enum
+        parsed_action = None
+        if action:
+            try:
+                parsed_action = UIDAction(action)
+            except ValueError:
+                valid_actions = [e.value for e in UIDAction]
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Invalid action. Valid actions: {valid_actions}"
+                )
+        
+        # Validate limit
+        if limit > 1000:
+            limit = 1000
+        
+        audit_data = service.get_audit_trail(
+            start_date=parsed_start_date,
+            end_date=parsed_end_date,
+            uid=uid,
+            action=parsed_action,
+            scanner_id=scanner_id,
+            order_id=order_id,
+            limit=limit
+        )
+        
+        return envelope(audit_data)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching audit trail: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch audit trail: {str(e)}")
+
+
+@router.get("/ledger/statistics", response_model=dict)
+async def get_ledger_statistics(
+    days: int = 30,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN, Role.USER))
+):
+    """Get UID ledger statistics for dashboard"""
+    try:
+        from ..services.uid_ledger_service import UIDLedgerService
+        
+        service = UIDLedgerService(db)
+        stats = service.get_statistics(days)
+        
+        return envelope(stats)
+        
+    except Exception as e:
+        logger.error(f"Error fetching ledger statistics: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch ledger statistics: {str(e)}")
+
+
+@router.post("/uid/{uid}/scan", response_model=dict)
+async def record_uid_scan(
+    uid: str,
+    request: dict,
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Record a new UID scan in the ledger"""
+    try:
+        from ..services.uid_ledger_service import UIDLedgerService
+        from ..models.uid_ledger import UIDAction, LedgerEntrySource
+        
+        service = UIDLedgerService(db)
+        
+        # Parse and validate action
+        action_str = request.get('action')
+        if not action_str:
+            raise HTTPException(status_code=400, detail="Action is required")
+        
+        try:
+            action = UIDAction(action_str)
+        except ValueError:
+            valid_actions = [e.value for e in UIDAction]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid action. Valid actions: {valid_actions}"
+            )
+        
+        # Parse source
+        source_str = request.get('source', 'ADMIN_MANUAL')
+        try:
+            source = LedgerEntrySource(source_str)
+        except ValueError:
+            valid_sources = [e.value for e in LedgerEntrySource]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid source. Valid sources: {valid_sources}"
+            )
+        
+        # Record the scan
+        entry = service.record_scan(
+            uid=uid,
+            action=action,
+            recorded_by=current_user.id,
+            scanned_by_admin=current_user.id,
+            scanner_name=current_user.name,
+            order_id=request.get('order_id'),
+            sku_id=request.get('sku_id'),
+            source=source,
+            lorry_id=request.get('lorry_id'),
+            location_notes=request.get('location_notes'),
+            notes=request.get('notes'),
+            customer_name=request.get('customer_name'),
+            order_reference=request.get('order_reference')
+        )
+        
+        return envelope({
+            "success": True,
+            "message": "UID scan recorded successfully",
+            "entry_id": entry.id,
+            "uid": uid,
+            "action": action.value,
+            "recorded_at": entry.recorded_at.isoformat()
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error recording UID scan for {uid}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to record UID scan: {str(e)}")
