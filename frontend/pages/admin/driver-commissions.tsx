@@ -21,6 +21,8 @@ export default function DriverCommissionsPage() {
   const [activeTab, setActiveTab] = React.useState<'pending' | 'past-week' | 'previous' | 'upsells'>('pending');
   const [timeFilter, setTimeFilter] = React.useState<'current' | 'week' | 'month'>('current');
   const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [aiAnalysisResults, setAiAnalysisResults] = React.useState<{ [orderId: string]: any }>({});
+  const [isRunningAiAnalysis, setIsRunningAiAnalysis] = React.useState(false);
 
   const qc = useQueryClient();
   
@@ -196,6 +198,94 @@ export default function DriverCommissionsPage() {
               </div>
             </div>
 
+            {/* AI Verification Actions */}
+            {activeTab === 'pending' && (
+              <div style={{ 
+                marginBottom: 'var(--space-4)', 
+                padding: 'var(--space-3)', 
+                background: '#f8fafc', 
+                borderRadius: 'var(--radius-2)',
+                border: '1px solid #e2e8f0'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>
+                    <h3 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-1)', margin: 0 }}>
+                      🤖 AI Verification
+                    </h3>
+                    <p style={{ fontSize: '0.75rem', color: '#6b7280', margin: 0 }}>
+                      Analyze payment methods for all delivered orders to identify cash collection requirements
+                    </p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      // Run AI analysis for all delivered orders
+                      const deliveredOrders = pendingOrders.filter((order: any) => 
+                        order.trip?.status === 'DELIVERED'
+                      );
+                      if (deliveredOrders.length === 0) {
+                        setMessage({ type: 'error', text: 'No delivered orders found for AI analysis' });
+                        return;
+                      }
+
+                      setIsRunningAiAnalysis(true);
+                      setMessage({ 
+                        type: 'success', 
+                        text: `Running AI analysis on ${deliveredOrders.length} delivered orders...` 
+                      });
+
+                      const results: { [orderId: string]: any } = {};
+                      let completed = 0;
+                      let errors = 0;
+
+                      // Process orders one by one to avoid overwhelming the API
+                      for (const order of deliveredOrders) {
+                        if (order.trip?.id) {
+                          try {
+                            const analysis = await analyzeCommissionEligibility(order.trip.id);
+                            results[order.id] = analysis.data;
+                            completed++;
+                          } catch (error) {
+                            console.error(`AI analysis failed for order ${order.id}:`, error);
+                            errors++;
+                          }
+                        }
+                      }
+
+                      setAiAnalysisResults(prev => ({ ...prev, ...results }));
+                      setIsRunningAiAnalysis(false);
+                      
+                      if (errors === 0) {
+                        setMessage({ 
+                          type: 'success', 
+                          text: `AI analysis completed successfully for ${completed} orders!` 
+                        });
+                      } else {
+                        setMessage({ 
+                          type: 'error', 
+                          text: `AI analysis completed: ${completed} successful, ${errors} failed` 
+                        });
+                      }
+                    }}
+                    disabled={isRunningAiAnalysis}
+                    style={{
+                      padding: 'var(--space-2) var(--space-4)',
+                      border: '1px solid #3b82f6',
+                      borderRadius: 'var(--radius-1)',
+                      background: isRunningAiAnalysis ? '#9ca3af' : '#3b82f6',
+                      color: 'white',
+                      fontSize: '0.875rem',
+                      cursor: isRunningAiAnalysis ? 'not-allowed' : 'pointer',
+                      fontWeight: '500',
+                      whiteSpace: 'nowrap',
+                      opacity: isRunningAiAnalysis ? 0.7 : 1
+                    }}
+                  >
+                    {isRunningAiAnalysis ? '🤖 Analyzing...' : '🤖 Run AI Analysis'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Pending Verification Tab */}
             {activeTab === 'pending' && (
               <div className="card">
@@ -235,6 +325,7 @@ export default function DriverCommissionsPage() {
                     isUpdatingCommission={updateCommissionMutation.isPending}
                     showFullVerification={true}
                     inventoryConfig={inventoryConfigQuery.data}
+                    bulkAiAnalysis={aiAnalysisResults[order.id]}
                   />
                 ))}
               </div>
@@ -385,7 +476,8 @@ function OrderCard({
   isUpdatingCommission,
   showFullVerification = false,
   readOnly = false,
-  inventoryConfig
+  inventoryConfig,
+  bulkAiAnalysis
 }: { 
   order: any; 
   onRelease: () => void;
@@ -395,6 +487,7 @@ function OrderCard({
   showFullVerification?: boolean;
   readOnly?: boolean;
   inventoryConfig?: any;
+  bulkAiAnalysis?: any;
 }) {
   const [showPodPhotos, setShowPodPhotos] = React.useState(false);
   const [showUidDetails, setShowUidDetails] = React.useState(false);
@@ -411,11 +504,11 @@ function OrderCard({
     enabled: inventoryConfig?.uid_inventory_enabled === true,
   });
 
-  // AI verification query - only run for delivered orders
+  // AI verification query - only run for delivered orders if no bulk analysis available
   const aiVerificationQuery = useQuery({
     queryKey: ['ai-verification', trip.id],
     queryFn: () => analyzeCommissionEligibility(trip.id),
-    enabled: isDelivered && trip.id && !readOnly,
+    enabled: isDelivered && trip.id && !readOnly && !bulkAiAnalysis,
     retry: false, // Don't retry on error to avoid spam
   });
   
@@ -435,10 +528,10 @@ function OrderCard({
   // Enhanced verification includes UID scanning if required
   const uidVerificationPassed = !uidScanRequired || hasUidScans;
 
-  // AI verification data
-  const aiData = aiVerificationQuery.data?.data; // Commission release API uses envelope()
+  // AI verification data - use bulk analysis if available, otherwise use individual query
+  const aiData = bulkAiAnalysis || aiVerificationQuery.data?.data; // Commission release API uses envelope()
   const aiVerification = aiData?.ai_verification;
-  const hasAiVerification = !aiVerificationQuery.isLoading && !aiVerificationQuery.isError && aiVerification;
+  const hasAiVerification = (bulkAiAnalysis && aiVerification) || (!aiVerificationQuery.isLoading && !aiVerificationQuery.isError && aiVerification);
   const paymentMethod = aiVerification?.payment_method || 'Unknown';
   const confidenceScore = aiVerification?.confidence_score || 0;
   const cashCollectionRequired = aiVerification?.cash_collection_required || false;
@@ -533,7 +626,7 @@ function OrderCard({
                 🤖 {showAiVerification ? 'Hide' : 'View'} AI Analysis ({Math.round(confidenceScore * 100)}%)
               </button>
             )}
-            {aiVerificationQuery.isLoading && (
+            {!bulkAiAnalysis && aiVerificationQuery.isLoading && (
               <span style={{ 
                 padding: '0.125rem 0.5rem', 
                 borderRadius: 'var(--radius-1)',
@@ -642,7 +735,7 @@ function OrderCard({
                 {confidenceScore >= 0.8 ? '✅' : confidenceScore >= 0.6 ? '⚠️' : '❌'} {inventoryEnabled && uidScanRequired ? '4' : '4'}. AI Verification ({Math.round(confidenceScore * 100)}%)
               </span>
             )}
-            {aiVerificationQuery.isLoading && (
+            {!bulkAiAnalysis && aiVerificationQuery.isLoading && (
               <span style={{ color: '#6b7280' }}>
                 ⏳ {inventoryEnabled && uidScanRequired ? '4' : '4'}. AI Verification (Loading...)
               </span>
