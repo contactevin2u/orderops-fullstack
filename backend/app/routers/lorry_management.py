@@ -270,7 +270,9 @@ async def clock_in_with_stock_verification(
     ).scalar_one_or_none()
     
     if existing_shift:
-        raise HTTPException(status_code=409, detail="Already clocked in today")
+        print(f"🚨 CLOCK-IN BLOCKED: Driver {driver.id} already has active shift {existing_shift.id} from {existing_shift.clock_in_at}")
+        print(f"🚨 SHIFT STATUS: {existing_shift.status}")
+        raise HTTPException(status_code=409, detail=f"Already clocked in today at {existing_shift.clock_in_at}. Shift ID: {existing_shift.id}")
     
     # Create shift record using ShiftService for proper working hours tracking
     from ..services.shift_service import ShiftService
