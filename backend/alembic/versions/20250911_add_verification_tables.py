@@ -1,7 +1,7 @@
-"""Add lorry stock verification tables
+"""Add lorry assignments and stock verification tables
 
 Revision ID: 20250911_add_verification_tables
-Revises: 897aabf412f3_merge_migration_heads
+Revises: 20250910_stock_transactions
 Create Date: 2025-09-11 11:30:00.000000
 
 """
@@ -11,12 +11,36 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '20250911_add_verification_tables'
-down_revision = '897aabf412f3_merge_migration_heads'
+down_revision = '20250910_stock_transactions'
 branch_labels = None
 depends_on = None
 
 
 def upgrade():
+    # Create lorry_assignments table first (required for foreign keys)
+    op.create_table('lorry_assignments',
+        sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
+        sa.Column('driver_id', sa.Integer(), nullable=False),
+        sa.Column('lorry_id', sa.String(length=50), nullable=False),
+        sa.Column('assignment_date', sa.Date(), nullable=False),
+        sa.Column('status', sa.String(length=20), nullable=False),
+        sa.Column('assigned_by', sa.Integer(), nullable=False),
+        sa.Column('stock_verified', sa.Boolean(), nullable=False),
+        sa.Column('verified_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('notes', sa.Text(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
+        sa.ForeignKeyConstraint(['assigned_by'], ['users.id'], ),
+        sa.ForeignKeyConstraint(['driver_id'], ['drivers.id'], ),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    # Create indexes for lorry_assignments
+    op.create_index('ix_lorry_assignments_driver_id', 'lorry_assignments', ['driver_id'])
+    op.create_index('ix_lorry_assignments_lorry_id', 'lorry_assignments', ['lorry_id'])
+    op.create_index('ix_lorry_assignments_assignment_date', 'lorry_assignments', ['assignment_date'])
+    op.create_index('ix_lorry_assignments_status', 'lorry_assignments', ['status'])
+    
     # Create lorry_stock_verifications table
     op.create_table('lorry_stock_verifications',
         sa.Column('id', sa.BigInteger(), autoincrement=True, nullable=False),
@@ -47,11 +71,16 @@ def upgrade():
 
 
 def downgrade():
-    # Drop indexes
+    # Drop lorry_stock_verifications table indexes and table
     op.drop_index('ix_lorry_stock_verifications_verification_date', table_name='lorry_stock_verifications')
     op.drop_index('ix_lorry_stock_verifications_lorry_id', table_name='lorry_stock_verifications')
     op.drop_index('ix_lorry_stock_verifications_driver_id', table_name='lorry_stock_verifications')
     op.drop_index('ix_lorry_stock_verifications_assignment_id', table_name='lorry_stock_verifications')
-    
-    # Drop table
     op.drop_table('lorry_stock_verifications')
+    
+    # Drop lorry_assignments table indexes and table
+    op.drop_index('ix_lorry_assignments_status', table_name='lorry_assignments')
+    op.drop_index('ix_lorry_assignments_assignment_date', table_name='lorry_assignments')
+    op.drop_index('ix_lorry_assignments_lorry_id', table_name='lorry_assignments')
+    op.drop_index('ix_lorry_assignments_driver_id', table_name='lorry_assignments')
+    op.drop_table('lorry_assignments')
