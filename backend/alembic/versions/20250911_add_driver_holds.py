@@ -17,6 +17,11 @@ depends_on = None
 
 
 def upgrade():
+    # Ghost revision - doing nothing (base tables don't exist yet)
+    print("👻 Ghost driver holds migration - doing nothing")
+    return
+
+def upgrade_original():
     # Check if table exists before creating it
     connection = op.get_bind()
     inspector = sa.inspect(connection)
