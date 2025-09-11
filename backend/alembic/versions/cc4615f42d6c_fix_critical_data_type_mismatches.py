@@ -21,7 +21,11 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    """Fix critical data type mismatches between models and database schema"""
+    """DISABLED: Fix critical data type mismatches between models and database schema"""
+    
+    print("⚠️ This migration has been disabled due to transaction issues.")
+    print("✅ Using safer migration d16dcffd0695_safe_data_type_fixes instead.")
+    return  # Skip this migration
     
     # Get database connection to check table/column existence
     connection = op.get_bind()
