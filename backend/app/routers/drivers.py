@@ -203,10 +203,14 @@ def get_driver_jobs(
 ):
     """Get jobs assigned to the current driver"""
     # Query orders through trips (Order -> Trip -> Driver relationship)
+    # Support both primary and secondary drivers
     query = (
         db.query(Order)
         .join(Trip, Order.id == Trip.order_id)
-        .filter(Trip.driver_id == driver.id)
+        .filter(
+            (Trip.driver_id == driver.id) | 
+            (Trip.driver_id_2 == driver.id)
+        )
         .options(joinedload(Order.customer))
     )
     
@@ -224,13 +228,17 @@ def get_driver_jobs(
     
     print(f"DEBUG: Found {len(orders)} orders with status_filter='{status_filter}' for driver {driver.id}")
     
-    # Get trips for proper status
+    # Get trips for proper status (support both primary and secondary drivers)
     trips_dict = {}
     for order in orders:
-        trip = db.query(Trip).filter(Trip.order_id == order.id, Trip.driver_id == driver.id).first()
+        trip = db.query(Trip).filter(
+            Trip.order_id == order.id,
+            (Trip.driver_id == driver.id) | (Trip.driver_id_2 == driver.id)
+        ).first()
         if trip:
             trips_dict[order.id] = trip
-            print(f"DEBUG: Order {order.id} - Order status: {order.status}, Trip status: {trip.status}")
+            driver_role = "primary" if trip.driver_id == driver.id else "secondary"
+            print(f"DEBUG: Order {order.id} - Order status: {order.status}, Trip status: {trip.status}, Driver role: {driver_role}")
     
     return [
         _order_to_driver_out(
@@ -606,9 +614,13 @@ def update_order_status(
     # Debug logging
     print(f"DEBUG: Driver {driver.id} attempting to update order {order_id} to status '{payload.status}'")
     
+    # Support both primary and secondary drivers
     trip = (
         db.query(Trip)
-        .filter(Trip.order_id == order_id, Trip.driver_id == driver.id)
+        .filter(
+            Trip.order_id == order_id,
+            (Trip.driver_id == driver.id) | (Trip.driver_id_2 == driver.id)
+        )
         .one_or_none()
     )
     if not trip:
@@ -624,7 +636,7 @@ def update_order_status(
     # Business rule: Only one trip can be IN_TRANSIT at a time per driver
     if payload.status == "IN_TRANSIT":
         active_trip = db.query(Trip).filter(
-            Trip.driver_id == driver.id,
+            (Trip.driver_id == driver.id) | (Trip.driver_id_2 == driver.id),
             Trip.status == "IN_TRANSIT",
             Trip.id != trip.id  # Exclude current trip
         ).first()
