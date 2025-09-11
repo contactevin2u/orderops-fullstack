@@ -62,7 +62,7 @@ class LorryInventoryService:
                 ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
             ).first()
             
-            if driver_assignment:
+            if driver_assignment and hasattr(driver_assignment, 'driver_id') and driver_assignment.driver_id:
                 from ..models.item import Item, ItemStatus
                 # Get items currently with this driver that aren't in our transaction system yet
                 legacy_items = self.db.execute(

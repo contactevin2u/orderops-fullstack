@@ -1351,7 +1351,8 @@ async def get_uid_details(
             "id": sku.id,
             "code": sku.code,
             "name": sku.name,
-            "type": sku.type.value if sku.type else None
+            "category": sku.category,  # Use category instead of non-existent type field
+            "is_serialized": sku.is_serialized
         },
         "item": {
             "id": item_obj.id,
