@@ -10,8 +10,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision = '20250831_add_driver_schedule_tables'
-down_revision = '20250831_add_driver_clock_system'
+revision = '20250831_driver_schedule'
+down_revision = '20250831_driver_clock'
 branch_labels = None
 depends_on = None
 
