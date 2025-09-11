@@ -215,13 +215,21 @@ def get_driver_jobs(
     )
     
     if status_filter == "active":
-        # Active trips: ASSIGNED, IN_TRANSIT, ON_HOLD (not yet delivered)
-        query = query.filter(Trip.status.in_(["ASSIGNED", "IN_TRANSIT", "ON_HOLD"]))
-        print(f"DEBUG: Filtering active jobs for driver {driver.id} - looking for trip statuses: ASSIGNED, IN_TRANSIT, ON_HOLD")
+        # Active jobs: Orders that are not cancelled/returned/completed AND trips that are not delivered/success
+        query = query.filter(
+            # Order must not be in final states
+            ~Order.status.in_(["CANCELLED", "RETURNED", "COMPLETED"]),
+            # Trip must be in active states
+            Trip.status.in_(["ASSIGNED", "IN_TRANSIT", "ON_HOLD"])
+        )
+        print(f"DEBUG: Filtering active jobs for driver {driver.id} - excluding CANCELLED/RETURNED/COMPLETED orders, looking for trip statuses: ASSIGNED, IN_TRANSIT, ON_HOLD")
     elif status_filter == "completed":
-        # Completed trips: DELIVERED or SUCCESS (commission released)
-        query = query.filter(Trip.status.in_(["DELIVERED", "SUCCESS"]))
-        print(f"DEBUG: Filtering completed jobs for driver {driver.id} - looking for trip statuses: DELIVERED, SUCCESS")
+        # Completed jobs: Orders completed OR trips delivered/success
+        query = query.filter(
+            (Order.status.in_(["COMPLETED", "RETURNED", "CANCELLED"])) |
+            (Trip.status.in_(["DELIVERED", "SUCCESS"]))
+        )
+        print(f"DEBUG: Filtering completed jobs for driver {driver.id} - looking for COMPLETED/RETURNED/CANCELLED orders OR DELIVERED/SUCCESS trips")
     # if "all", no additional filtering
     
     orders = query.order_by(Order.delivery_date.desc().nullslast(), Order.created_at.desc()).all()
