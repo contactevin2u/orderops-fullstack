@@ -121,8 +121,13 @@ def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_d
 
 
 @router.get("", response_model=list[DriverOut])
-def list_drivers(db: Session = Depends(get_session)):
-    return db.query(Driver).filter(Driver.is_active == True).limit(1000).all()
+def list_drivers(
+    db: Session = Depends(get_session),
+    current_user = Depends(require_roles(Role.ADMIN))
+):
+    """Get all active drivers for admin use"""
+    drivers = db.query(Driver).filter(Driver.is_active == True).limit(1000).all()
+    return drivers
 
 
 @router.post("/register", response_model=DriverOut)

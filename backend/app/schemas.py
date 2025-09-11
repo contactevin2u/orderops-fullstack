@@ -174,9 +174,17 @@ class DriverOut(BaseModel):
     name: str | None = None
     phone: str | None = None
     base_warehouse: str = "BATU_CAVES"
+    is_active: bool = True
+    employee_id: str | None = None  # Map from phone or ID for now
 
     class Config:
         from_attributes = True
+        
+    def __init__(self, **data):
+        # Map employee_id from phone if available, otherwise use ID
+        if 'employee_id' not in data:
+            data['employee_id'] = data.get('phone') or str(data.get('id', ''))
+        super().__init__(**data)
 
 
 class DriverOrderOut(BaseModel):

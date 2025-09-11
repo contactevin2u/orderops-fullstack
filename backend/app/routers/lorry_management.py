@@ -523,10 +523,13 @@ async def get_driver_holds(
     return envelope(holds)
 
 
+class ResolveHoldRequest(BaseModel):
+    resolution_notes: str
+
 @router.patch("/holds/{hold_id}/resolve", response_model=dict)
 async def resolve_driver_hold(
     hold_id: int,
-    resolution_notes: str,
+    request: ResolveHoldRequest,
     db: Session = Depends(get_session),
     current_user = Depends(require_roles(Role.ADMIN))
 ):
@@ -541,7 +544,7 @@ async def resolve_driver_hold(
     hold.status = "RESOLVED"
     hold.resolved_by = current_user.id
     hold.resolved_at = datetime.now()
-    hold.resolution_notes = resolution_notes
+    hold.resolution_notes = request.resolution_notes
     
     db.commit()
     
@@ -554,7 +557,7 @@ async def resolve_driver_hold(
         resource_id=hold.id,
         details={
             "driver_id": hold.driver_id,
-            "resolution_notes": resolution_notes
+            "resolution_notes": request.resolution_notes
         }
     )
     
@@ -592,26 +595,31 @@ async def _handle_variance_driver_holds(
     missing_uids: List[str],
     unexpected_uids: List[str]
 ):
-    """Handle driver holds when stock variance is detected"""
+    """Handle driver holds when stock variance is detected - Enhanced Dual-Hold System"""
     
-    # Get yesterday's assignment for this lorry to identify the previous driver
-    yesterday = assignment.assignment_date - timedelta(days=1)
-    yesterday_assignment = db.execute(
-        select(LorryAssignment).where(
+    # ENHANCED: Find the last driver who actually performed stock actions on this lorry
+    # Look for any stock action (LOAD, UNLOAD, DELIVERY, COLLECTION, REPAIR, TRANSFER, etc.)
+    # regardless of how many days ago it occurred
+    last_action_transaction = db.execute(
+        select(LorryStockTransaction).where(
             and_(
-                LorryAssignment.lorry_id == assignment.lorry_id,
-                LorryAssignment.assignment_date == yesterday
+                LorryStockTransaction.lorry_id == assignment.lorry_id,
+                LorryStockTransaction.driver_id.isnot(None),  # Must have a driver
+                LorryStockTransaction.action.in_([
+                    "LOAD", "UNLOAD", "DELIVERY", "COLLECTION", 
+                    "REPAIR", "TRANSFER", "ADMIN_ADJUSTMENT"
+                ])
             )
-        )
-    ).scalar_one_or_none()
+        ).order_by(LorryStockTransaction.transaction_date.desc())
+    ).first()
     
-    # Create hold for current driver
+    # Create hold for current driver (scanner)
     current_driver_hold = DriverHold(
         driver_id=assignment.driver_id,
-        reason="STOCK_VARIANCE",
-        description=f"Stock variance detected during morning verification. "
+        reason="STOCK_VARIANCE_SCANNER",
+        description=f"Stock variance detected during verification scan. "
                    f"Missing: {len(missing_uids)} items, Unexpected: {len(unexpected_uids)} items. "
-                   f"Total variance: {variance_count} items.",
+                   f"Total variance: {variance_count} items. Role: Scanning driver.",
         related_assignment_id=assignment.id,
         related_verification_id=verification.id,
         created_by=1,  # System user
@@ -619,30 +627,53 @@ async def _handle_variance_driver_holds(
     )
     db.add(current_driver_hold)
     
-    # Create hold for yesterday's driver if found
-    if yesterday_assignment:
-        yesterday_driver_hold = DriverHold(
-            driver_id=yesterday_assignment.driver_id,
-            reason="STOCK_VARIANCE",
-            description=f"Stock variance detected in lorry {assignment.lorry_id} the next day. "
-                       f"May be responsible for missing/extra items. "
-                       f"Missing: {len(missing_uids)} items, Unexpected: {len(unexpected_uids)} items.",
-            related_assignment_id=yesterday_assignment.id,
+    # Create hold for last action driver if found and different from current driver
+    last_action_driver_id = None
+    if last_action_transaction and last_action_transaction.driver_id != assignment.driver_id:
+        last_action_driver_id = last_action_transaction.driver_id
+        
+        # Get the assignment that was active when this transaction occurred
+        last_action_assignment = db.execute(
+            select(LorryAssignment).where(
+                and_(
+                    LorryAssignment.lorry_id == assignment.lorry_id,
+                    LorryAssignment.driver_id == last_action_driver_id,
+                    LorryAssignment.assignment_date <= last_action_transaction.transaction_date.date()
+                )
+            ).order_by(LorryAssignment.assignment_date.desc())
+        ).first()
+        
+        last_action_driver_hold = DriverHold(
+            driver_id=last_action_driver_id,
+            reason="STOCK_VARIANCE_LAST_ACTION",
+            description=f"Stock variance detected in lorry {assignment.lorry_id}. "
+                       f"Last performed stock action: {last_action_transaction.action} on "
+                       f"{last_action_transaction.transaction_date.strftime('%Y-%m-%d %H:%M')}. "
+                       f"Missing: {len(missing_uids)} items, Unexpected: {len(unexpected_uids)} items. "
+                       f"Role: Last action driver.",
+            related_assignment_id=last_action_assignment.id if last_action_assignment else None,
             related_verification_id=verification.id,
             created_by=1,  # System user
             status="ACTIVE"
         )
-        db.add(yesterday_driver_hold)
+        db.add(last_action_driver_hold)
         
-        logging.info(f"Created holds for both drivers: current {assignment.driver_id} and yesterday {yesterday_assignment.driver_id}")
+        logging.info(f"Dual-Hold System: Created holds for scanner driver {assignment.driver_id} "
+                    f"and last action driver {last_action_driver_id} "
+                    f"(action: {last_action_transaction.action} on {last_action_transaction.transaction_date})")
     else:
-        logging.info(f"Created hold for current driver {assignment.driver_id} only - no previous assignment found")
+        if last_action_transaction:
+            logging.info(f"Dual-Hold System: Scanner {assignment.driver_id} is same as last action driver "
+                        f"(action: {last_action_transaction.action}), created single hold")
+        else:
+            logging.info(f"Dual-Hold System: No previous stock actions found for lorry {assignment.lorry_id}, "
+                        f"created hold for scanner driver {assignment.driver_id} only")
     
-    # Log the variance for audit
+    # Log the variance for audit with enhanced dual-hold details
     log_action(
         db,
         user_id=1,  # System user
-        action="STOCK_VARIANCE_DETECTED",
+        action="STOCK_VARIANCE_DETECTED_DUAL_HOLD",
         resource_type="lorry_stock_verification",
         resource_id=verification.id,
         details={
@@ -650,8 +681,12 @@ async def _handle_variance_driver_holds(
             "variance_count": variance_count,
             "missing_uids": missing_uids,
             "unexpected_uids": unexpected_uids,
-            "current_driver_id": assignment.driver_id,
-            "yesterday_driver_id": yesterday_assignment.driver_id if yesterday_assignment else None
+            "scanner_driver_id": assignment.driver_id,
+            "last_action_driver_id": last_action_driver_id,
+            "last_action_type": last_action_transaction.action if last_action_transaction else None,
+            "last_action_date": last_action_transaction.transaction_date.isoformat() if last_action_transaction else None,
+            "dual_hold_applied": last_action_driver_id is not None,
+            "hold_system": "ENHANCED_DUAL_HOLD_V2"
         }
     )
 
