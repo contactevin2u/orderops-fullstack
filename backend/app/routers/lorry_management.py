@@ -1,4 +1,4 @@
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import List, Optional, Dict, Any
 import logging
 
@@ -326,7 +326,7 @@ async def clock_in_with_stock_verification(
     
     # Mark assignment as stock verified
     assignment.stock_verified = True
-    assignment.stock_verified_at = now
+    assignment.stock_verified_at = datetime.now(timezone.utc)
     
     # Handle variance detection and driver holds
     if variance_detected and settings.UID_INVENTORY_ENABLED:
