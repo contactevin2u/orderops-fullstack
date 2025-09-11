@@ -170,6 +170,8 @@ class LorryAssignmentService:
     def auto_assign_lorries_for_date(self, assignment_date: date, admin_user_id: int) -> Dict[str, Any]:
         """Automatically assign lorries to scheduled drivers for a specific date"""
         try:
+            logger.info(f"DEBUG: Starting auto-assign for date {assignment_date}")
+            
             # Get all scheduled drivers for the date
             scheduled_drivers = self.db.execute(
                 select(Driver, DriverSchedule).join(
@@ -183,7 +185,12 @@ class LorryAssignmentService:
                 )
             ).all()
             
+            logger.info(f"DEBUG: Found {len(scheduled_drivers)} scheduled drivers for {assignment_date}")
+            for driver, schedule in scheduled_drivers:
+                logger.info(f"DEBUG: Driver {driver.id} ({driver.name}) - Status: {schedule.status}")
+            
             if not scheduled_drivers:
+                logger.info(f"DEBUG: No drivers scheduled for {assignment_date}")
                 return {
                     "success": True,
                     "message": f"No drivers scheduled for {assignment_date}",
@@ -201,7 +208,17 @@ class LorryAssignmentService:
                 ).order_by(Lorry.lorry_id)
             ).scalars().all()
             
+            logger.info(f"DEBUG: Found {len(available_lorries)} available lorries")
+            for lorry in available_lorries:
+                logger.info(f"DEBUG: Available lorry: {lorry.lorry_id} (active={lorry.is_active}, available={lorry.is_available})")
+            
             if not available_lorries:
+                # Log all lorries to see what's wrong
+                all_lorries = self.db.execute(select(Lorry).order_by(Lorry.lorry_id)).scalars().all()
+                logger.info(f"DEBUG: No available lorries found. Total lorries in DB: {len(all_lorries)}")
+                for lorry in all_lorries:
+                    logger.info(f"DEBUG: Lorry {lorry.lorry_id}: is_active={lorry.is_active}, is_available={lorry.is_available}")
+                
                 return {
                     "success": False,
                     "message": "No available lorries found",
@@ -225,25 +242,32 @@ class LorryAssignmentService:
             for driver, schedule in scheduled_drivers:
                 # Skip if driver already has assignment
                 if driver.id in assigned_drivers:
-                    logger.info(f"Driver {driver.id} already has assignment for {assignment_date}")
+                    logger.info(f"DEBUG: Driver {driver.id} already has assignment for {assignment_date}")
                     continue
+                
+                logger.info(f"DEBUG: Processing driver {driver.id} ({driver.name}), priority_lorry: {driver.priority_lorry_id}")
+                logger.info(f"DEBUG: Available lorries for assignment: {available_lorry_ids}")
                 
                 # Try to assign priority lorry first
                 assigned_lorry_id = None
                 
                 if driver.priority_lorry_id and driver.priority_lorry_id in available_lorry_ids:
                     assigned_lorry_id = driver.priority_lorry_id
-                    logger.info(f"Assigned priority lorry {assigned_lorry_id} to driver {driver.id}")
+                    logger.info(f"DEBUG: Assigned priority lorry {assigned_lorry_id} to driver {driver.id}")
                 else:
+                    logger.info(f"DEBUG: Priority lorry {driver.priority_lorry_id} not available, trying pattern matching")
                     # Regex-based automatic assignment (simple pattern matching)
                     assigned_lorry_id = self._find_lorry_by_pattern(driver, available_lorry_ids)
                     
                     # If no pattern match, randomly assign an available lorry
                     if not assigned_lorry_id and available_lorry_ids:
                         assigned_lorry_id = random.choice(available_lorry_ids)
-                        logger.info(f"Randomly assigned lorry {assigned_lorry_id} to driver {driver.id}")
+                        logger.info(f"DEBUG: Randomly assigned lorry {assigned_lorry_id} to driver {driver.id}")
+                    elif not assigned_lorry_id:
+                        logger.warning(f"DEBUG: No lorries available to assign to driver {driver.id}")
                 
                 if assigned_lorry_id:
+                    logger.info(f"DEBUG: Creating assignment - Driver {driver.id} → Lorry {assigned_lorry_id}")
                     # Create assignment
                     assignment = LorryAssignment(
                         driver_id=driver.id,
@@ -266,12 +290,14 @@ class LorryAssignmentService:
                     # Remove lorry from available list
                     available_lorry_ids.remove(assigned_lorry_id)
                     assigned_drivers.add(driver.id)
+                    logger.info(f"DEBUG: Assignment created successfully")
                 else:
-                    logger.warning(f"Could not assign lorry to driver {driver.id} - no available lorries")
+                    logger.warning(f"DEBUG: Could not assign lorry to driver {driver.id} - no available lorries")
             
             self.db.commit()
             
-            logger.info(f"Auto-assigned {len(assignments_created)} lorries for {assignment_date}")
+            logger.info(f"DEBUG: Auto-assigned {len(assignments_created)} lorries for {assignment_date}")
+            logger.info(f"DEBUG: Final assignments created: {assignments_created}")
             
             return {
                 "success": True,
