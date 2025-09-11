@@ -215,12 +215,9 @@ def get_driver_jobs(
         query = query.filter(Trip.status.in_(["ASSIGNED", "IN_TRANSIT", "ON_HOLD"]))
         print(f"DEBUG: Filtering active jobs for driver {driver.id} - looking for trip statuses: ASSIGNED, IN_TRANSIT, ON_HOLD")
     elif status_filter == "completed":
-        # Completed trips: DELIVERED or cancelled/returned orders
-        query = query.filter(
-            (Trip.status == "DELIVERED") |
-            (Order.status.in_(["COMPLETED", "RETURNED", "CANCELLED"]))
-        )
-        print(f"DEBUG: Filtering completed jobs for driver {driver.id} - looking for trip status DELIVERED or order status COMPLETED/RETURNED/CANCELLED")
+        # Completed trips: DELIVERED or SUCCESS (commission released)
+        query = query.filter(Trip.status.in_(["DELIVERED", "SUCCESS"]))
+        print(f"DEBUG: Filtering completed jobs for driver {driver.id} - looking for trip statuses: DELIVERED, SUCCESS")
     # if "all", no additional filtering
     
     orders = query.order_by(Order.delivery_date.desc().nullslast(), Order.created_at.desc()).all()
