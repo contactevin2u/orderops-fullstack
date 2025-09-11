@@ -106,7 +106,7 @@ def register(
         AuditLog(
             user_id=current_user_id,  # None for first user registration
             action="create_user",
-            details=payload.username,
+            details={"username": payload.username, "role": role.value},  # JSON format
         )
     )
     db.commit()
