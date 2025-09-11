@@ -272,20 +272,17 @@ async def clock_in_with_stock_verification(
     if existing_shift:
         raise HTTPException(status_code=409, detail="Already clocked in today")
     
-    # Create shift record
-    now = datetime.now()
-    shift = DriverShift(
+    # Create shift record using ShiftService for proper working hours tracking
+    from ..services.shift_service import ShiftService
+    shift_service = ShiftService(db)
+    shift = shift_service.clock_in(
         driver_id=driver.id,
-        clock_in_at=now,
-        clock_in_lat=request.lat,
-        clock_in_lng=request.lng,
-        clock_in_location_name=request.location_name,
-        is_outstation=False,  # Can be enhanced later
-        status="ACTIVE"
+        lat=request.lat,
+        lng=request.lng,
+        location_name=request.location_name
     )
     
-    db.add(shift)
-    db.flush()  # Get shift ID
+    db.flush()  # Ensure shift ID is available
     
     # Update assignment with shift
     assignment.shift_id = shift.id
@@ -351,18 +348,25 @@ async def clock_in_with_stock_verification(
         }
     )
     
-    response = ClockInResponse(
-        shift_id=shift.id,
-        clock_in_at=shift.clock_in_at.isoformat(),
-        assignment_id=assignment.id,
-        lorry_id=assignment.lorry_id,
-        stock_verification_required=True,
-        stock_verification_completed=True,
-        variance_detected=variance_detected,
-        message="Successfully clocked in with stock verification"
-    )
+    # Return standard ShiftResponse for compatibility with clock-out
+    from ..routers.shifts import ShiftResponse
+    shift_response = ShiftResponse.from_model(shift)
     
-    return envelope(response.model_dump())
+    # Add stock verification info to the response
+    response_data = shift_response.model_dump()
+    response_data.update({
+        "assignment_id": assignment.id,
+        "lorry_id": assignment.lorry_id,
+        "stock_verification_required": True,
+        "stock_verification_completed": True,
+        "variance_detected": variance_detected,
+        "variance_count": variance_count,
+        "total_scanned": len(request.scanned_uids),
+        "total_expected": len(expected_uids),
+        "message": f"Successfully clocked in with stock verification. {variance_count} variance(s) detected." if variance_detected else "Successfully clocked in with stock verification. No variances detected."
+    })
+    
+    return envelope(response_data)
 
 
 @router.get("/driver-status", response_model=dict)
@@ -395,9 +399,11 @@ async def get_driver_status(
         )
     ).scalar_one_or_none()
     
+    # ALL drivers must have lorry assignment and complete stock verification
     can_access_orders = (
         not has_active_holds and 
         assignment is not None and 
+        assignment.status in ["ASSIGNED", "ACTIVE"] and
         assignment.stock_verified
     )
     
@@ -698,7 +704,10 @@ def _get_driver_status_message(has_active_holds: bool, assignment: LorryAssignme
         return f"Access restricted due to: {reasons_text}. Contact your supervisor."
     
     if assignment is None:
-        return "No lorry assignment for today. Contact your dispatcher."
+        return "Please wait for lorry assignment from dispatcher. All drivers require daily lorry assignment."
+    
+    if assignment.status not in ["ASSIGNED", "ACTIVE"]:
+        return f"Lorry assignment status is {assignment.status}. Contact your dispatcher."
     
     if not assignment.stock_verified:
         return "Please complete stock verification before accessing orders."

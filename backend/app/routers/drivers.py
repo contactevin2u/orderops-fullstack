@@ -120,6 +120,18 @@ def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_d
     }
 
 
+@router.get("/me", response_model=dict)
+def get_current_driver(
+    driver=Depends(driver_auth),
+    db: Session = Depends(get_session)
+):
+    """Get current driver details for driver app"""
+    return envelope({
+        "id": driver.id,
+        "username": driver.name,  # Map name to username for compatibility
+        "role": "driver"
+    })
+
 @router.get("", response_model=list[DriverOut])
 def list_drivers(
     db: Session = Depends(get_session),

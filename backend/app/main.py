@@ -22,6 +22,7 @@ from .routers import (
     driver,
     drivers,
     driver_orders,
+    driver_mobile_api,
     routes as routes_router,
     shifts,
     driver_schedule,
@@ -64,6 +65,7 @@ app.include_router(reports.router)
 app.include_router(driver.router)
 app.include_router(drivers.router)
 app.include_router(driver_orders.router)
+app.include_router(driver_mobile_api.router)
 app.include_router(routes_router.router)
 app.include_router(shifts.router)
 app.include_router(driver_schedule.router)

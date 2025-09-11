@@ -48,7 +48,7 @@ class JobsRepository @Inject constructor(
             // Now emit the local data (fresh from sync if online)
             val localJobs = when (statusFilter) {
                 "active" -> jobsDao.getActiveJobs().first()
-                "completed" -> jobsDao.getJobsByStatus("delivered").first()
+                "completed" -> jobsDao.getCompletedJobs().first()
                 else -> jobsDao.getJobsByStatus(statusFilter).first()
             }
             
@@ -58,7 +58,7 @@ class JobsRepository @Inject constructor(
             // Continue observing local database changes
             when (statusFilter) {
                 "active" -> jobsDao.getActiveJobs()
-                "completed" -> jobsDao.getJobsByStatus("delivered")
+                "completed" -> jobsDao.getCompletedJobs()
                 else -> jobsDao.getJobsByStatus(statusFilter)
             }.collect { entities ->
                 emit(Result.Success(entities.map { it.toDto() }))
@@ -312,7 +312,7 @@ class JobsRepository @Inject constructor(
         Result.error(e, "load_assignment")
     }
     
-    suspend fun clockInWithStock(request: ClockInWithStockRequest): Result<ClockInResponse> = try {
+    suspend fun clockInWithStock(request: ClockInWithStockRequest): Result<ShiftResponse> = try {
         val response = api.clockInWithStock(request)
         Result.Success(response.data)
     } catch (e: Exception) {
@@ -324,6 +324,13 @@ class JobsRepository @Inject constructor(
         Result.Success(response)
     } catch (e: Exception) {
         Result.error(e, "clock_in")
+    }
+    
+    suspend fun clockOut(request: ClockOutRequest): Result<ShiftResponse> = try {
+        val response = api.clockOut(request)
+        Result.Success(response)
+    } catch (e: Exception) {
+        Result.error(e, "clock_out")
     }
     
     suspend fun getDriverStatus(): Result<DriverStatusResponse> = try {

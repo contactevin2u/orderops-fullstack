@@ -14,18 +14,18 @@ import retrofit2.http.Query
 
 interface DriverApi {
     @GET("driver/me")
-    suspend fun getCurrentUser(): UserDto
+    suspend fun getCurrentUser(): ApiResponse<UserDto>
     
-    @GET("drivers/jobs")
+    @GET("driver/jobs")
     suspend fun getJobs(@Query("status_filter") statusFilter: String = "active"): List<JobDto>
 
-    @GET("drivers/jobs/{id}")
+    @GET("driver/jobs/{id}")
     suspend fun getJob(@Path("id") id: String): JobDto
 
-    @POST("drivers/locations")
+    @POST("driver/locations")
     suspend fun postLocations(@Body locations: List<LocationPingDto>)
     
-    @PATCH("drivers/orders/{id}")
+    @PATCH("driver/orders/{id}")
     suspend fun updateOrderStatus(@Path("id") orderId: String, @Body update: OrderStatusUpdateDto): JobDto
     
     @PATCH("orders/{id}/driver-update")
@@ -35,68 +35,68 @@ interface DriverApi {
     suspend fun upsellOrder(@Path("id") orderId: String, @Body request: UpsellRequest): ApiResponse<UpsellResponse>
     
     @Multipart
-    @POST("drivers/orders/{id}/pod-photo")
+    @POST("driver/orders/{id}/pod-photo")
     suspend fun uploadPodPhoto(
         @Path("id") orderId: String, 
         @Part file: MultipartBody.Part,
         @Query("photo_number") photoNumber: Int = 1
     ): PodUploadResponse
     
-    @GET("drivers/orders")
+    @GET("driver/orders")
     suspend fun getDriverOrders(@Query("month") month: String? = null): List<JobDto>
     
-    @GET("drivers/commissions")
+    @GET("driver/commissions")
     suspend fun getCommissions(): List<CommissionMonthDto>
     
-    @GET("drivers/upsell-incentives")
+    @GET("driver/upsell-incentives")
     suspend fun getUpsellIncentives(
         @Query("month") month: String? = null,
         @Query("status") status: String? = null
     ): UpsellIncentivesDto
     
-    @POST("drivers/shifts/clock-in")
+    @POST("driver/shifts/clock-in")
     suspend fun clockIn(@Body request: ClockInRequest): ShiftResponse
     
-    @POST("drivers/shifts/clock-out")
+    @POST("driver/shifts/clock-out")
     suspend fun clockOut(@Body request: ClockOutRequest): ShiftResponse
     
-    @GET("drivers/shifts/status")
+    @GET("driver/shifts/status")
     suspend fun getShiftStatus(): ShiftStatusResponse
     
-    @GET("drivers/shifts/active")
+    @GET("driver/shifts/active")
     suspend fun getActiveShift(): ShiftResponse?
     
-    @GET("drivers/shifts/history")
+    @GET("driver/shifts/history")
     suspend fun getShiftHistory(@Query("limit") limit: Int = 10): List<ShiftResponse>
     
     // UID Inventory endpoints
-    @GET("inventory/config")
+    @GET("driver/inventory/config")
     suspend fun getInventoryConfig(): InventoryConfigResponse
     
-    @POST("inventory/uid/scan")
+    @POST("driver/inventory/uid/scan")
     suspend fun scanUID(@Body request: UIDScanRequest): UIDScanResponse
     
-    @GET("inventory/lorry/{driver_id}/stock")
+    @GET("driver/inventory/lorry/{driver_id}/stock")
     suspend fun getLorryStock(@Path("driver_id") driverId: Int, @Query("date") date: String): ApiResponse<LorryStockResponse>
     
-    @POST("inventory/lorry/{driver_id}/stock/upload")
+    @POST("driver/inventory/lorry/{driver_id}/stock/upload")
     suspend fun uploadLorryStock(@Path("driver_id") driverId: Int, @Body body: LorryStockUploadRequest): ApiResponse<Unit>
     
-    @POST("inventory/sku/resolve")
+    @POST("driver/inventory/sku/resolve")
     suspend fun resolveSKU(@Body request: SKUResolveRequest): SKUResolveResponse
     
     // Orders are automatically assigned by backend AI - no manual assignment needed
-    @POST("orders/simple")
+    @POST("driver/orders/simple")
     suspend fun createOrder(@Body request: CreateOrderRequest): OrderDto
     
     // Lorry Management endpoints
-    @GET("lorry-management/my-assignment")
+    @GET("driver/lorry-management/my-assignment")
     suspend fun getMyLorryAssignment(@Query("date") date: String? = null): ApiResponse<MyAssignmentResponse>
     
-    @POST("lorry-management/clock-in-with-stock")
-    suspend fun clockInWithStock(@Body request: ClockInWithStockRequest): ApiResponse<ClockInResponse>
+    @POST("driver/lorry-management/clock-in-with-stock")
+    suspend fun clockInWithStock(@Body request: ClockInWithStockRequest): ApiResponse<ShiftResponse>
     
-    @GET("lorry-management/driver-status")
+    @GET("driver/lorry-management/driver-status")
     suspend fun getDriverStatus(): ApiResponse<DriverStatusResponse>
 }
 
