@@ -27,15 +27,8 @@ from ..utils.audit import log_action
 
 router = APIRouter(prefix="/drivers", tags=["drivers"])
 
-# Middleware-style logging to catch ALL requests to drivers router
-@router.middleware("http")
-async def log_all_driver_requests(request, call_next):
-    print(f"🔥 DRIVERS ROUTER REQUEST: {request.method} {request.url}")
-    print(f"🔥 USER AGENT: {request.headers.get('user-agent', 'Unknown')}")
-    print(f"🔥 AUTHORIZATION HEADER: {'Present' if 'authorization' in request.headers else 'Missing'}")
-    response = await call_next(request)
-    print(f"🔥 DRIVERS ROUTER RESPONSE STATUS: {response.status_code}")
-    return response
+# Note: APIRouter doesn't support middleware decorator - that's only for FastAPI app
+# Using dependency-based logging instead in individual endpoints
 
 def _order_to_driver_out(order: Order, status: str, trip: Trip = None, current_driver_id: int = None) -> dict:
     # delivery_date may be datetime or date
