@@ -8,7 +8,7 @@ interface JobsDao {
     @Query("SELECT * FROM jobs WHERE status IN ('assigned', 'in_transit', 'on_hold') ORDER BY lastModified DESC")
     fun getActiveJobs(): Flow<List<JobEntity>>
     
-    @Query("SELECT * FROM jobs WHERE status IN ('delivered', 'completed', 'returned', 'cancelled') ORDER BY lastModified DESC")
+    @Query("SELECT * FROM jobs WHERE status IN ('delivered', 'success') ORDER BY lastModified DESC")
     fun getCompletedJobs(): Flow<List<JobEntity>>
     
     @Query("SELECT * FROM jobs WHERE status = :status ORDER BY lastModified DESC")
