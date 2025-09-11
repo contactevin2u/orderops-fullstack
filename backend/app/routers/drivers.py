@@ -9,7 +9,7 @@ import datetime as dt
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU, OrderItemUID, Item
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU, OrderItemUID, Item, User
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
@@ -486,6 +486,33 @@ def _process_uid_actions(
                     print(f"DEBUG: Legacy system sync warning for UID {uid_action.uid}: {e}")
                     # Don't fail for legacy sync issues
             
+            # LEDGER: Record in comprehensive UID ledger for medical device traceability
+            try:
+                from ..services.uid_ledger_service import UIDLedgerService
+                ledger_service = UIDLedgerService(db)
+                
+                # Record each UID action in the ledger
+                # Get system admin for recording driver sync operations
+                system_admin = db.query(User).filter(User.role == "admin").first()
+                recorder_id = system_admin.id if system_admin else 1  # Fallback to user ID 1
+                
+                for uid_action in uid_actions:
+                    ledger_service.record_from_driver_sync(
+                        uid=uid_action.uid,
+                        action=uid_action.action,
+                        driver_id=driver_id,
+                        recorded_by=recorder_id,  # System admin recording driver sync
+                        order_id=order_id,
+                        notes=uid_action.notes,
+                        scanned_at=datetime.now(timezone.utc)
+                    )
+                
+                print(f"DEBUG: Recorded {len(uid_actions)} UID actions in ledger for traceability")
+                
+            except Exception as e:
+                print(f"DEBUG: UID ledger recording failed: {e}")
+                # Don't fail the main operation for ledger issues
+
             # Log audit action
             log_action(
                 db, 

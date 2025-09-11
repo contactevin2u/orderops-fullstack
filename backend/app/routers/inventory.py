@@ -137,48 +137,51 @@ async def scan_uids_for_delivery(
     errors = []
     scanned_count = 0
     
-    # Validate each UID
+    # Initialize inventory service for proper ledger integration
+    service = InventoryService(db)
+    
+    # Process each UID through the inventory service
     for uid in request.uids:
-        # Check if UID exists
-        item = db.get(Item, uid)
-        if not item:
-            errors.append(f"UID {uid} not found in inventory")
-            continue
-        
-        # Check if already scanned for this order (idempotent)
-        existing = db.execute(
-            select(OrderItemUID).where(
-                and_(
-                    OrderItemUID.order_id == order_id,
-                    OrderItemUID.uid == uid,
-                    OrderItemUID.action == "ISSUE"
-                )
-            )
-        ).scalar_one_or_none()
-        
-        if existing:
-            # Idempotent - already scanned
-            scanned_count += 1
-            continue
-        
-        # Create new scan record
         try:
-            scan_record = OrderItemUID(
+            # Check if already scanned for this order (idempotent)
+            existing = db.execute(
+                select(OrderItemUID).where(
+                    and_(
+                        OrderItemUID.order_id == order_id,
+                        OrderItemUID.uid == uid,
+                        OrderItemUID.action == UIDAction.ISSUE
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if existing:
+                # Idempotent - already scanned
+                scanned_count += 1
+                continue
+            
+            # Use inventory service to process scan (includes ledger recording)
+            # For driver scans, recorded_by will be determined by the service (system admin)
+            result = service.scan_uid_action(
                 order_id=order_id,
                 uid=uid,
+                action=UIDAction.ISSUE,
                 scanned_by=request.driver_id,
-                action="ISSUE",
-                scanned_at=datetime.utcnow()
+                notes=f"Driver delivery scan"
+                # recorded_by will be auto-determined for driver scans
             )
-            db.add(scan_record)
-            scanned_count += 1
+            
+            if result.get("success"):
+                scanned_count += 1
+            else:
+                errors.append(f"Failed to process UID {uid}: {result.get('message', 'Unknown error')}")
+                
         except Exception as e:
-            errors.append(f"Failed to record UID {uid}: {str(e)}")
+            errors.append(f"Failed to process UID {uid}: {str(e)}")
     
+    # Database commit is handled by inventory service
+    
+    # Log audit action
     try:
-        db.commit()
-        
-        # Log audit action
         log_action(
             db, 
             user_id=request.driver_id, 
@@ -187,10 +190,9 @@ async def scan_uids_for_delivery(
             resource_id=order_id,
             details={"uids": request.uids, "scanned_count": scanned_count}
         )
-        
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        # Don't fail if audit log fails
+        pass
     
     # Check if delivery can be completed
     if settings.UID_SCAN_REQUIRED_AFTER_POD and scanned_count < required_count:
@@ -229,42 +231,48 @@ async def scan_uids_for_return(
     errors = []
     scanned_count = 0
     
+    # Initialize inventory service for proper ledger integration
+    service = InventoryService(db)
+    
+    # Process each UID through the inventory service
     for uid in request.uids:
-        item = db.get(Item, uid)
-        if not item:
-            errors.append(f"UID {uid} not found in inventory")
-            continue
-        
-        # Check if already returned (idempotent)
-        existing = db.execute(
-            select(OrderItemUID).where(
-                and_(
-                    OrderItemUID.order_id == order_id,
-                    OrderItemUID.uid == uid,
-                    OrderItemUID.action == "RETURN"
-                )
-            )
-        ).scalar_one_or_none()
-        
-        if existing:
-            scanned_count += 1
-            continue
-        
         try:
-            scan_record = OrderItemUID(
+            # Check if already returned (idempotent)
+            existing = db.execute(
+                select(OrderItemUID).where(
+                    and_(
+                        OrderItemUID.order_id == order_id,
+                        OrderItemUID.uid == uid,
+                        OrderItemUID.action == UIDAction.RETURN
+                    )
+                )
+            ).scalar_one_or_none()
+            
+            if existing:
+                scanned_count += 1
+                continue
+            
+            # Use inventory service to process scan (includes ledger recording)
+            # For driver scans, recorded_by will be determined by the service (system admin)
+            result = service.scan_uid_action(
                 order_id=order_id,
                 uid=uid,
+                action=UIDAction.RETURN,
                 scanned_by=request.driver_id,
-                action="RETURN",
-                scanned_at=datetime.utcnow()
+                notes=f"Driver return scan"
+                # recorded_by will be auto-determined for driver scans
             )
-            db.add(scan_record)
-            scanned_count += 1
+            
+            if result.get("success"):
+                scanned_count += 1
+            else:
+                errors.append(f"Failed to process UID {uid}: {result.get('message', 'Unknown error')}")
+                
         except Exception as e:
-            errors.append(f"Failed to record UID {uid}: {str(e)}")
+            errors.append(f"Failed to process UID {uid}: {str(e)}")
     
+    # Log audit action (database commit is handled by inventory service)
     try:
-        db.commit()
         log_action(
             db, 
             user_id=request.driver_id, 
@@ -274,8 +282,8 @@ async def scan_uids_for_return(
             details={"uids": request.uids, "scanned_count": scanned_count}
         )
     except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+        # Don't fail if audit log fails
+        pass
     
     response = UIDScanResponse(
         success=True,
@@ -853,7 +861,8 @@ async def scan_uid(
             action=action_enum,
             scanned_by=current_user.id,
             sku_id=request.sku_id,
-            notes=request.notes
+            notes=request.notes,
+            recorded_by=current_user.id  # Admin who is recording this scan
         )
         
         # Enhanced: Also update lorry inventory for real-time variance detection
@@ -1355,10 +1364,10 @@ async def get_uid_details(
             "is_serialized": sku.is_serialized
         },
         "item": {
-            "id": item_obj.id,
+            "uid": item_obj.uid,
             "status": item_obj.status.value,
             "item_type": item_obj.item_type.value,
-            "oem_serial_number": item_obj.oem_serial_number,
+            "oem_serial": item_obj.oem_serial,
             "created_at": item_obj.created_at.isoformat()
         },
         "current_location": current_location,

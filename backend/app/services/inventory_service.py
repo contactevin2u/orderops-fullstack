@@ -74,7 +74,7 @@ class InventoryService:
         
         return items
 
-    def scan_uid_action(self, order_id: int, uid: str, action: UIDAction, scanned_by: int, sku_id: Optional[int] = None, notes: Optional[str] = None) -> Dict[str, Any]:
+    def scan_uid_action(self, order_id: int, uid: str, action: UIDAction, scanned_by: int, sku_id: Optional[int] = None, notes: Optional[str] = None, recorded_by: Optional[int] = None) -> Dict[str, Any]:
         """Process UID scanning action and update item status"""
         # Find or create item
         item = self.session.query(Item).filter(Item.uid == uid).first()
@@ -127,6 +127,15 @@ class InventoryService:
         
         self.session.add(uid_record)
         self.session.commit()
+
+        # LEDGER: Record in comprehensive UID ledger for medical device traceability
+        try:
+            # recorded_by will be set by the calling endpoint with current_user.id
+            self._record_in_ledger(order_id, uid, action, scanned_by, item.sku_id, notes, recorded_by)
+        except Exception as e:
+            # Don't fail the main operation if ledger recording fails
+            import logging
+            logging.warning(f"UID ledger recording failed for UID {uid}: {e}")
 
         # UNIFIED: Also sync with lorry inventory system
         try:
@@ -248,6 +257,71 @@ class InventoryService:
             logging.error(f"Lorry system sync error: {e}")
             self.session.rollback()
             raise
+
+    def _record_in_ledger(self, order_id: int, uid: str, action: UIDAction, scanned_by: int, sku_id: int, notes: str = None, recorded_by: int = None):
+        """Record UID scan in comprehensive ledger for medical device traceability"""
+        try:
+            # Import at module level to avoid circular imports
+            from ..models import Driver, Order, User
+            
+            # Lazy import of ledger service to avoid circular dependency
+            from .uid_ledger_service import UIDLedgerService
+            from ..models.uid_ledger import LedgerEntrySource
+            
+            # Initialize ledger service
+            ledger_service = UIDLedgerService(self.session)
+            
+            # Determine scanner info - check if scanned_by is a driver or admin
+            driver = self.session.query(Driver).filter(Driver.id == scanned_by).first()
+            order = self.session.query(Order).filter(Order.id == order_id).first()
+            
+            # Get order reference and customer info
+            order_reference = order.code if order else None
+            customer_name = order.customer_name if order and hasattr(order, 'customer_name') else None
+            
+            # Determine who is recording this entry - handle driver vs admin scenarios
+            if recorded_by:
+                # Explicit recorder provided (admin user)
+                recorder_id = recorded_by
+            elif driver:
+                # Driver scan - find system admin user or create system entry
+                system_admin = self.session.query(User).filter(User.role == "admin").first()
+                recorder_id = system_admin.id if system_admin else 1  # Fallback to user ID 1
+            else:
+                # Admin scan without explicit recorder
+                recorder_id = scanned_by
+            
+            if driver:
+                # Scan performed by driver - record as order operation
+                ledger_service.record_from_order_operation(
+                    uid=uid,
+                    action=action,
+                    order_id=order_id,
+                    scanned_by=scanned_by,
+                    recorded_by=recorder_id,
+                    notes=notes,
+                    is_driver=True
+                )
+            else:
+                # Scan performed by admin user
+                ledger_service.record_from_order_operation(
+                    uid=uid,
+                    action=action,
+                    order_id=order_id,
+                    scanned_by=scanned_by,
+                    recorded_by=recorder_id,
+                    notes=notes,
+                    is_driver=False
+                )
+            
+            import logging
+            logging.info(f"Recorded UID scan in ledger: {uid} {action.value} for order {order_id}")
+            
+        except Exception as e:
+            import logging
+            logging.error(f"UID ledger recording error: {e}")
+            # Don't re-raise to avoid breaking the main operation
+            pass
 
     def get_order_uids(self, order_id: int) -> Dict[str, Any]:
         """Get all UID scans for an order"""

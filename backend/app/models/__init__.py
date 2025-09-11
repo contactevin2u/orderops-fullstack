@@ -18,12 +18,13 @@ from .audit_log import AuditLog
 from .upsell_record import UpsellRecord
 from .sku import SKU
 from .item import Item
-from .order_item_uid import OrderItemUID
+from .order_item_uid import OrderItemUID, UIDAction
 from .lorry_stock import LorryStock
 from .sku_alias import SKUAlias
 from .lorry import Lorry
 from .lorry_assignment import LorryAssignment, LorryStockVerification, DriverHold
 from .lorry_stock_transaction import LorryStockTransaction
+from .uid_ledger import UIDLedgerEntry, LedgerEntrySource
 
 __all__ = [
     "Base",
@@ -51,6 +52,7 @@ __all__ = [
     "SKU",
     "Item",
     "OrderItemUID",
+    "UIDAction",
     "LorryStock",
     "SKUAlias",
     "Lorry",
@@ -58,4 +60,6 @@ __all__ = [
     "LorryStockVerification", 
     "DriverHold",
     "LorryStockTransaction",
+    "UIDLedgerEntry",
+    "LedgerEntrySource",
 ]
