@@ -436,12 +436,13 @@ function OrderCard({
   const uidVerificationPassed = !uidScanRequired || hasUidScans;
 
   // AI verification data
-  const aiData = aiVerificationQuery.data;
+  const aiData = aiVerificationQuery.data?.data; // Commission release API uses envelope()
   const aiVerification = aiData?.ai_verification;
   const hasAiVerification = !aiVerificationQuery.isLoading && !aiVerificationQuery.isError && aiVerification;
   const paymentMethod = aiVerification?.payment_method || 'Unknown';
   const confidenceScore = aiVerification?.confidence_score || 0;
   const cashCollectionRequired = aiVerification?.cash_collection_required || false;
+  const analysisDetails = aiVerification?.verification_notes?.join('. ') || 'No details available';
   
   // Full verification requires all steps (with UID if enabled and required)
   const canRelease = isDelivered && hasPodPhoto && paymentCollected && currentCommission > 0 && !isReleased && uidVerificationPassed;
@@ -822,11 +823,11 @@ function OrderCard({
             </div>
           )}
 
-          {aiVerification?.analysis_details && (
+          {analysisDetails && analysisDetails !== 'No details available' && (
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Analysis Details:</div>
               <div style={{ fontSize: '0.875rem', color: '#374151', fontStyle: 'italic' }}>
-                &ldquo;{aiVerification.analysis_details}&rdquo;
+                &ldquo;{analysisDetails}&rdquo;
               </div>
             </div>
           )}
