@@ -364,12 +364,19 @@ class LorryAssignmentService:
             )
         ).scalar()
         
-        # Get available lorries
+        # Get total available lorries (not assigned for this date)
+        assigned_lorry_ids = self.db.execute(
+            select(LorryAssignment.lorry_id).where(
+                LorryAssignment.assignment_date == assignment_date
+            )
+        ).scalars().all()
+        
         available_lorries = self.db.execute(
             select(func.count(Lorry.id)).where(
                 and_(
                     Lorry.is_active == True,
-                    Lorry.is_available == True
+                    Lorry.is_available == True,
+                    ~Lorry.lorry_id.in_(assigned_lorry_ids) if assigned_lorry_ids else True
                 )
             )
         ).scalar()
