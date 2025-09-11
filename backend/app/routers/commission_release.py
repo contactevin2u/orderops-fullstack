@@ -58,19 +58,43 @@ async def analyze_commission_eligibility(
         if trip.status != "DELIVERED":
             raise HTTPException(400, "Trip must be DELIVERED before commission analysis")
 
-        # Run AI verification
+        # Run AI verification with rate limiting
         ai_service = AIVerificationService(db)
-        verification_result = ai_service.verify_commission_release(trip_id)
+        verification_result = ai_service.verify_commission_release(trip_id, current_user.id if hasattr(current_user, 'id') else None)
 
         # Get existing commission entries
         commission_entries = db.query(CommissionEntry).filter(
             CommissionEntry.trip_id == trip_id
         ).all()
 
+        # Build detailed response with success/failure messages
+        analysis_success = len(verification_result.errors) == 0
+        
+        # Get rate limit status
+        rate_limit_info = ai_service.check_rate_limit(trip_id)
+        
+        # Build status message
+        if analysis_success:
+            status_message = f"✅ AI analysis completed successfully. Payment method: {verification_result.payment_method or 'Unknown'}"
+            if verification_result.cash_collection_required:
+                status_message += " - Cash collection required before commission release"
+            else:
+                status_message += " - Commission eligible for release"
+        else:
+            status_message = f"❌ Analysis failed: {'; '.join(verification_result.errors)}"
+        
         return envelope({
             "trip_id": trip_id,
             "trip_status": trip.status,
             "ai_verification": verification_result.to_dict(),
+            "analysis_success": analysis_success,
+            "status_message": status_message,
+            "rate_limit": {
+                "calls_made": rate_limit_info[1],
+                "max_calls": ai_service.MAX_AI_CALLS_PER_TRIP,
+                "calls_remaining": ai_service.MAX_AI_CALLS_PER_TRIP - rate_limit_info[1],
+                "can_analyze_again": rate_limit_info[0]
+            },
             "existing_commissions": len(commission_entries),
             "commission_entries": [
                 {

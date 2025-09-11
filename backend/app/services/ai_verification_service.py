@@ -4,13 +4,15 @@ import base64
 import json
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+import time
 import openai
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, desc
 
 from app.models.trip import Trip
 from app.models.order import Order
 from app.models.order_item_uid import OrderItemUID
+from app.models.ai_verification_log import AIVerificationLog
 from app.core.config import Settings
 
 settings = Settings()
@@ -57,6 +59,7 @@ class AIVerificationResult:
 class AIVerificationService:
     def __init__(self, db: Session):
         self.db = db
+        self.MAX_AI_CALLS_PER_TRIP = 2
         
         # Robust OpenAI client initialization with error handling
         try:
@@ -73,15 +76,79 @@ class AIVerificationService:
             print(f"OpenAI client initialization failed: {e}")
             self.openai_client = None
 
-    def verify_commission_release(self, trip_id: int) -> AIVerificationResult:
+    def check_rate_limit(self, trip_id: int) -> Tuple[bool, int, str]:
         """
-        Simplified AI verification focused on payment method detection
+        Check if AI analysis rate limit has been exceeded for this trip
+        Returns: (can_analyze, current_count, message)
+        """
+        current_count = self.db.query(AIVerificationLog).filter(
+            AIVerificationLog.trip_id == trip_id
+        ).count()
+        
+        can_analyze = current_count < self.MAX_AI_CALLS_PER_TRIP
+        
+        if can_analyze:
+            remaining = self.MAX_AI_CALLS_PER_TRIP - current_count
+            message = f"AI analysis allowed. {remaining} calls remaining for this trip."
+        else:
+            message = f"Rate limit exceeded. Maximum {self.MAX_AI_CALLS_PER_TRIP} AI analyses per trip reached."
+        
+        return can_analyze, current_count, message
+
+    def log_verification_attempt(
+        self, 
+        trip_id: int, 
+        result: AIVerificationResult, 
+        user_id: int = None,
+        tokens_used: int = None,
+        processing_time_ms: int = None
+    ) -> AIVerificationLog:
+        """Log AI verification attempt for auditing and rate limiting"""
+        log_entry = AIVerificationLog(
+            trip_id=trip_id,
+            user_id=user_id,
+            payment_method=result.payment_method,
+            confidence_score=result.confidence_score,
+            cash_collection_required=result.cash_collection_required,
+            analysis_result=result.to_dict(),
+            verification_notes=result.verification_notes,
+            errors=result.errors,
+            success=len(result.errors) == 0,
+            tokens_used=tokens_used,
+            processing_time_ms=processing_time_ms
+        )
+        
+        self.db.add(log_entry)
+        self.db.commit()
+        self.db.refresh(log_entry)
+        
+        return log_entry
+
+    def verify_commission_release(self, trip_id: int, user_id: int = None) -> AIVerificationResult:
+        """
+        Simplified AI verification focused on payment method detection with rate limiting
         
         Main goal: Detect if payment was CASH or BANK TRANSFER
         - If CASH: Require cash collection before commission release
         - If BANK TRANSFER: Commission can be released immediately
+        
+        Rate limited to maximum 2 calls per trip to control token usage
         """
+        start_time = time.time()
         result = AIVerificationResult()
+        tokens_used = 0
+        
+        # Check rate limit first
+        can_analyze, current_count, rate_limit_message = self.check_rate_limit(trip_id)
+        if not can_analyze:
+            result.errors.append(rate_limit_message)
+            result.verification_notes.append(f"Analysis blocked: {current_count}/{self.MAX_AI_CALLS_PER_TRIP} calls already made")
+            # Still log this failed attempt
+            processing_time = int((time.time() - start_time) * 1000)
+            self.log_verification_attempt(trip_id, result, user_id, tokens_used, processing_time)
+            return result
+        
+        result.verification_notes.append(rate_limit_message)
         
         try:
             trip = self.db.query(Trip).filter(Trip.id == trip_id).first()
@@ -111,6 +178,10 @@ class AIVerificationService:
 
         except Exception as e:
             result.errors.append(f"AI verification failed: {str(e)}")
+        finally:
+            # Log the verification attempt
+            processing_time = int((time.time() - start_time) * 1000)
+            self.log_verification_attempt(trip_id, result, user_id, tokens_used, processing_time)
 
         return result
 

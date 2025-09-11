@@ -872,6 +872,21 @@ function OrderCard({
             🤖 AI Verification Results
           </h4>
           
+          {/* Status Message */}
+          {aiData?.status_message && (
+            <div style={{ 
+              marginBottom: 'var(--space-3)', 
+              padding: 'var(--space-2)', 
+              borderRadius: 'var(--radius-1)',
+              fontSize: '0.875rem',
+              background: aiData.analysis_success ? '#dcfce7' : '#fee2e2',
+              color: aiData.analysis_success ? '#15803d' : '#dc2626',
+              border: `1px solid ${aiData.analysis_success ? '#bbf7d0' : '#fecaca'}`
+            }}>
+              {aiData.status_message}
+            </div>
+          )}
+
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
             <div>
               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Payment Method Detected:</div>
@@ -898,6 +913,27 @@ function OrderCard({
               </div>
             </div>
           </div>
+
+          {/* Rate Limit Information */}
+          {aiData?.rate_limit && (
+            <div style={{ 
+              marginBottom: 'var(--space-3)', 
+              padding: 'var(--space-2)', 
+              background: '#f1f5f9', 
+              borderRadius: 'var(--radius-1)',
+              fontSize: '0.75rem',
+              color: '#64748b'
+            }}>
+              <div style={{ fontWeight: 600, marginBottom: 'var(--space-1)' }}>Rate Limiting Info:</div>
+              AI analysis calls: {aiData.rate_limit.calls_made} / {aiData.rate_limit.max_calls} used 
+              {aiData.rate_limit.calls_remaining > 0 && (
+                <span style={{ color: '#059669' }}> • {aiData.rate_limit.calls_remaining} remaining</span>
+              )}
+              {aiData.rate_limit.calls_remaining === 0 && (
+                <span style={{ color: '#dc2626' }}> • Rate limit reached</span>
+              )}
+            </div>
+          )}
 
           {cashCollectionRequired && (
             <div style={{ 

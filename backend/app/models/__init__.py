@@ -25,6 +25,7 @@ from .lorry import Lorry
 from .lorry_assignment import LorryAssignment, LorryStockVerification, DriverHold
 from .lorry_stock_transaction import LorryStockTransaction
 from .uid_ledger import UIDLedgerEntry, LedgerEntrySource
+from .ai_verification_log import AIVerificationLog
 
 __all__ = [
     "Base",
@@ -62,4 +63,5 @@ __all__ = [
     "LorryStockTransaction",
     "UIDLedgerEntry",
     "LedgerEntrySource",
+    "AIVerificationLog",
 ]
