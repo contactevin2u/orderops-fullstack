@@ -70,13 +70,20 @@ class SyncManager @Inject constructor(
     private suspend fun syncJobsFromServer(statusFilter: String = "active") {
         try {
             Log.d(TAG, "Syncing jobs from server with statusFilter=$statusFilter...")
-            val serverJobs = api.getJobs(statusFilter)
+            
+            // Always sync both active and completed jobs to prevent data loss when switching tabs
+            // This ensures IN_TRANSIT orders don't disappear when user switches to completed tab
+            val activeJobs = api.getJobs("active")
+            val completedJobs = api.getJobs("completed")
+            
+            // Combine both sets of jobs
+            val allServerJobs = (activeJobs + completedJobs).distinctBy { it.id }
             
             // Convert to entities and insert/update locally
-            val jobEntities = serverJobs.map { JobEntity.fromDto(it).copy(syncStatus = "SYNCED") }
+            val jobEntities = allServerJobs.map { JobEntity.fromDto(it).copy(syncStatus = "SYNCED") }
             jobsDao.insertAll(jobEntities)
             
-            Log.d(TAG, "Synced ${jobEntities.size} jobs from server with statusFilter=$statusFilter")
+            Log.d(TAG, "Synced ${activeJobs.size} active + ${completedJobs.size} completed = ${jobEntities.size} total jobs (requested filter: $statusFilter)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to sync jobs from server", e)
             throw e
