@@ -1,7 +1,7 @@
 """Add AI verification log table for rate limiting and auditing
 
 Revision ID: 20250911_ai_verification_log
-Revises: 8d6e613b90ed
+Revises: 20250911_add_uid_ledger
 Create Date: 2024-09-11 20:30:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '20250911_ai_verification_log'
-down_revision = '8d6e613b90ed'
+down_revision = '20250911_add_uid_ledger'
 branch_labels = None
 depends_on = None
 
