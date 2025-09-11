@@ -21,6 +21,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Ghost revision - doing nothing (base tables don't exist yet)
+    print("👻 Ghost UID ledger migration - doing nothing")
+    return
+
+def upgrade_original() -> None:
     # Check if table already exists to prevent errors
     connection = op.get_bind()
     inspector = sa.inspect(connection)
