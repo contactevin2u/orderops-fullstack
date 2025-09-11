@@ -436,7 +436,7 @@ function OrderCard({
   const uidVerificationPassed = !uidScanRequired || hasUidScans;
 
   // AI verification data
-  const aiData = aiVerificationQuery.data?.data;
+  const aiData = aiVerificationQuery.data;
   const aiVerification = aiData?.ai_verification;
   const hasAiVerification = !aiVerificationQuery.isLoading && !aiVerificationQuery.isError && aiVerification;
   const paymentMethod = aiVerification?.payment_method || 'Unknown';
