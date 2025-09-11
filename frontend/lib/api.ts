@@ -872,7 +872,7 @@ export function analyzeCommissionEligibility(tripId: number) {
       driver_role: string;
       status: string;
     }>;
-  }>(`/commission-release/analyze/${tripId}`);
+  }>(`/commission-release/analyze/${tripId}`, { method: 'POST' });
 }
 
 export function releaseCommission(data: {
