@@ -826,7 +826,7 @@ function OrderCard({
             <div style={{ marginBottom: 'var(--space-3)' }}>
               <div style={{ fontSize: '0.75rem', color: '#6b7280', marginBottom: 'var(--space-1)' }}>Analysis Details:</div>
               <div style={{ fontSize: '0.875rem', color: '#374151', fontStyle: 'italic' }}>
-                "{aiVerification.analysis_details}"
+                &ldquo;{aiVerification.analysis_details}&rdquo;
               </div>
             </div>
           )}
