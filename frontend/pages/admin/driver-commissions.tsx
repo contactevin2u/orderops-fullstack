@@ -219,7 +219,7 @@ export default function DriverCommissionsPage() {
                   <button
                     onClick={async () => {
                       // Run AI analysis for all delivered orders
-                      const deliveredOrders = pendingOrders.filter((order: any) => 
+                      const deliveredOrders = orders.filter((order: any) => 
                         order.trip?.status === 'DELIVERED'
                       );
                       if (deliveredOrders.length === 0) {
