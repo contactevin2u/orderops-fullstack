@@ -529,7 +529,7 @@ function OrderCard({
   const uidVerificationPassed = !uidScanRequired || hasUidScans;
 
   // AI verification data - use bulk analysis if available, otherwise use individual query
-  const aiData = bulkAiAnalysis || aiVerificationQuery.data?.data; // Commission release API uses envelope()
+  const aiData = bulkAiAnalysis || aiVerificationQuery.data; // Commission release API already unwrapped
   const aiVerification = aiData?.ai_verification;
   const hasAiVerification = (bulkAiAnalysis && aiVerification) || (!aiVerificationQuery.isLoading && !aiVerificationQuery.isError && aiVerification);
   const paymentMethod = aiVerification?.payment_method || 'Unknown';
