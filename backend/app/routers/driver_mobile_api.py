@@ -264,8 +264,8 @@ async def mobile_lorry_stock_upload(
     db: Session = Depends(get_session)
 ):
     """Upload lorry stock - mobile app compatible"""
-    from ..routers.lorry_management import upload_lorry_stock_data
-    return await upload_lorry_stock_data(driver_id, body, db)
+    # TODO: Implement stock upload functionality
+    return {"error": "Stock upload functionality not implemented", "status": "not_implemented"}
 
 @router.post("/inventory/sku/resolve")
 async def mobile_sku_resolve(
@@ -300,8 +300,8 @@ async def mobile_my_assignment(
     db: Session = Depends(get_session)
 ):
     """Get my lorry assignment - mobile app compatible"""
-    from ..routers.lorry_management import get_my_assignment
-    return await get_my_assignment(date, driver, db)
+    from ..routers.lorry_management import get_my_lorry_assignment
+    return await get_my_lorry_assignment(date, db, driver)
 
 @router.post("/lorry-management/clock-in-with-stock")
 async def mobile_clock_in_with_stock(
@@ -319,5 +319,5 @@ async def mobile_driver_status(
     db: Session = Depends(get_session)
 ):
     """Get driver status - mobile app compatible"""
-    from ..routers.lorry_management import get_driver_access_status
-    return await get_driver_access_status(driver, db)
+    from ..routers.lorry_management import get_driver_status
+    return await get_driver_status(db, driver)
