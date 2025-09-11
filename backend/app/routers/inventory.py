@@ -1640,7 +1640,7 @@ async def generate_qr_code(
 async def get_uid_ledger_history(
     uid: str,
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles(Role.ADMIN, Role.USER))
+    current_user = Depends(require_roles(Role.ADMIN, Role.CASHIER))
 ):
     """Get comprehensive ledger history for a specific UID"""
     try:
@@ -1734,7 +1734,7 @@ async def get_ledger_audit_trail(
 async def get_ledger_statistics(
     days: int = 30,
     db: Session = Depends(get_session),
-    current_user = Depends(require_roles(Role.ADMIN, Role.USER))
+    current_user = Depends(require_roles(Role.ADMIN, Role.CASHIER))
 ):
     """Get UID ledger statistics for dashboard"""
     try:
