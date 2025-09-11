@@ -37,6 +37,13 @@ def driver_auth(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_session),
 ) -> Driver:
+    # Ensure session is in clean state
+    if db.in_transaction():
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+    
     if credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid authorization scheme")
     try:
@@ -55,16 +62,25 @@ def driver_auth(
     try:
         user = db.query(User).filter(User.username == firebase_uid).one_or_none()
         if not user:
-            user = User(
-                username=firebase_uid,
-                password_hash=hash_password(firebase_uid),
-                role=Role.DRIVER,
-            )
-            db.add(user)
-            db.commit()
-            db.refresh(user)
+            try:
+                user = User(
+                    username=firebase_uid,
+                    password_hash=hash_password(firebase_uid),
+                    role=Role.DRIVER,
+                )
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            except Exception as e:
+                db.rollback()
+                # Check if user was created by another request (race condition)
+                user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+                if not user:
+                    # If still no user after rollback, re-raise the original error
+                    raise e
         request.state.user = user
     except Exception:  # pragma: no cover - user table may not exist
+        db.rollback()
         request.state.user = None
     request.state.driver = driver
     return driver
@@ -107,15 +123,23 @@ def admin_firebase_auth(
     # Find or create admin user
     user = db.query(User).filter(User.username == firebase_uid).one_or_none()
     if not user:
-        # Create admin user from Firebase
-        user = User(
-            username=firebase_uid,
-            password_hash=hash_password(firebase_uid),  # Dummy password hash
-            role=Role.ADMIN,
-        )
-        db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            # Create admin user from Firebase
+            user = User(
+                username=firebase_uid,
+                password_hash=hash_password(firebase_uid),  # Dummy password hash
+                role=Role.ADMIN,
+            )
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        except Exception as e:
+            db.rollback()
+            # Check if user was created by another request (race condition)
+            user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+            if not user:
+                # If still no user after rollback, re-raise the original error
+                raise HTTPException(status_code=500, detail=f"Failed to create admin user: {str(e)}")
     
     # Ensure user is admin
     if user.role != Role.ADMIN:
@@ -132,6 +156,13 @@ def get_current_admin_user(
     db: Session = Depends(get_session),
 ) -> User:
     """Get current admin user - supports both web cookies and Firebase tokens"""
+    
+    # Ensure session is in clean state
+    if db.in_transaction():
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
     
     # Try web authentication first (cookie-based)
     if token:
@@ -166,14 +197,22 @@ def get_current_admin_user(
                 # Find or create admin user
                 user = db.query(User).filter(User.username == firebase_uid).one_or_none()
                 if not user:
-                    user = User(
-                        username=firebase_uid,
-                        password_hash=hash_password(firebase_uid),
-                        role=Role.ADMIN,
-                    )
-                    db.add(user)
-                    db.commit()
-                    db.refresh(user)
+                    try:
+                        user = User(
+                            username=firebase_uid,
+                            password_hash=hash_password(firebase_uid),
+                            role=Role.ADMIN,
+                        )
+                        db.add(user)
+                        db.commit()
+                        db.refresh(user)
+                    except Exception:
+                        db.rollback()
+                        # Check if user was created by another request (race condition)
+                        user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+                        if not user:
+                            # If still no user after rollback, fall through to error
+                            pass
                 
                 # Ensure user is admin
                 if user.role == Role.ADMIN:
