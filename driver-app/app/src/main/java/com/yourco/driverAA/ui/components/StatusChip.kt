@@ -19,9 +19,9 @@ fun OrderStatusChip(
     modifier: Modifier = Modifier
 ) {
     val (backgroundColor, textColor) = when (status.uppercase()) {
-        "ACTIVE", "ASSIGNED", "IN_PROGRESS" -> StatusActive to Color.White
+        "ACTIVE", "ASSIGNED", "IN_PROGRESS", "IN_TRANSIT" -> StatusActive to Color.White
         "PENDING", "NEW" -> StatusPending to Color.White  
-        "COMPLETED", "DELIVERED" -> StatusCompleted to Color.White
+        "COMPLETED", "DELIVERED", "SUCCESS" -> StatusCompleted to Color.White
         "CANCELLED" -> StatusCancelled to Color.White
         "ON_HOLD" -> StatusOnHold to Color.White
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
