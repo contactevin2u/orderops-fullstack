@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
-from app.auth.firebase import require_roles
+from app.auth.deps import require_roles
 from app.db import get_session
 from app.models.user import Role
 from app.models.trip import Trip

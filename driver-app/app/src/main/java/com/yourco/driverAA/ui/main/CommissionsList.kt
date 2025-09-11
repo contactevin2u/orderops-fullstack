@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.yourco.driverAA.data.api.CommissionMonthDto
 import com.yourco.driverAA.data.api.JobDto
@@ -134,6 +135,71 @@ fun CommissionsList(viewModel: CommissionsViewModel = hiltViewModel()) {
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
                             )
+                        }
+                    }
+                    
+                    item {
+                        // New AI Commission System Info Card
+                        OrderOpsCard(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            text = "🎥 New Commission System",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        Text(
+                                            text = "AI-powered verification & instant tracking",
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    
+                                    Text(
+                                        text = "RM30",
+                                        style = MaterialTheme.typography.headlineLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(12.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    StatusChip(
+                                        status = "📸 POD Photos",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    StatusChip(
+                                        status = "🤖 AI Analysis",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    StatusChip(
+                                        status = "⚡ Instant Release",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(8.dp))
+                                
+                                Text(
+                                    text = "• Flat RM30 per delivery (RM15 for dual drivers)\n• Smart payment detection (cash vs bank)\n• Automatic release for bank transfers\n• Cash collection confirmation for cash payments",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    lineHeight = 16.sp
+                                )
+                            }
                         }
                     }
                     
@@ -416,30 +482,111 @@ private fun UpsellIncentiveCard(incentive: com.yourco.driverAA.data.api.UpsellIn
 @Composable
 private fun DetailedOrderCard(order: JobDto) {
     OrderOpsCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = "Order #${order.code ?: order.id}",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = order.customer_name ?: "Unknown Customer",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+        Column {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Order #${order.code ?: order.id}",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = order.customer_name ?: "Unknown Customer",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                order.commission?.let { commission ->
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "RM ${DecimalFormat("#,##0.00").format(commission.amount?.toDoubleOrNull() ?: 30.0)}",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (commission.status == "PAID" || commission.status == "actualized") 
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary
+                        )
+                        Text(
+                            text = when (commission.status) {
+                                "PAID" -> "✅ Released"
+                                "EARNED" -> "⏳ Pending"
+                                "actualized" -> "✅ Released" // Legacy support
+                                "pending" -> "⏳ Pending" // Legacy support
+                                else -> commission.status
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = if (commission.status == "PAID" || commission.status == "actualized") 
+                                MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
             }
+            
+            // AI Details Row (if available)
             order.commission?.let { commission ->
-                Text(
-                    text = "RM ${DecimalFormat("#,##0.00").format(commission.amount?.toDoubleOrNull() ?: 0.0)}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                if (commission.ai_verified == true || commission.payment_method != null || 
+                    commission.role != null || commission.cash_collection_required == true) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    // Status chips row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        // Payment Method Chip
+                        commission.payment_method?.let { method ->
+                            StatusChip(
+                                status = when (method.lowercase()) {
+                                    "cash" -> "💰 Cash"
+                                    "bank_transfer" -> "🏦 Bank"
+                                    else -> method.uppercase()
+                                }
+                            )
+                        }
+                        
+                        // AI Verification Badge
+                        if (commission.ai_verified == true) {
+                            StatusChip(status = "🤖 AI")
+                        }
+                        
+                        // Cash Collection Required
+                        if (commission.cash_collection_required == true) {
+                            StatusChip(status = "⚠️ Cash Collection")
+                        }
+                        
+                        // Driver Role (for dual driver trips)
+                        commission.role?.let { role ->
+                            if (role != "primary") {
+                                StatusChip(status = "👥 ${role.replaceFirstChar { it.uppercase() }}")
+                            }
+                        }
+                    }
+                }
+                
+                // Release Notes
+                commission.notes?.takeIf { it.isNotBlank() }?.let { notes ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "💬 $notes",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                    )
+                }
+                
+                // Release date
+                commission.released_at?.let { releasedAt ->
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Released: $releasedAt",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

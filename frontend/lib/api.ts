@@ -851,3 +851,74 @@ export function generateQRCode(data: {
     message: string;
   }>('/inventory/generate-qr', { json: data });
 }
+
+// -------- Commission Release Management
+export function analyzeCommissionEligibility(tripId: number) {
+  return request<{
+    trip_id: number;
+    trip_status: string;
+    ai_verification: {
+      payment_method: string;
+      confidence_score: number;
+      cash_collection_required: boolean;
+      analysis_details: string;
+      timestamp: string;
+    };
+    existing_commissions: number;
+    commission_entries: Array<{
+      id: number;
+      driver_id: number;
+      amount: number;
+      driver_role: string;
+      status: string;
+    }>;
+  }>(`/commission-release/analyze/${tripId}`);
+}
+
+export function releaseCommission(data: {
+  trip_id: number;
+  manual_override?: boolean;
+  cash_collected?: boolean;
+  notes?: string;
+}) {
+  return request<{
+    success: boolean;
+    trip_id: number;
+    payment_method: string;
+    cash_collection_required: boolean;
+    commission_released: boolean;
+    released_entries: number;
+    ai_verification: any;
+    message: string;
+  }>('/commission-release/release', { json: data });
+}
+
+export function getPendingCommissions() {
+  return request<{
+    pending_commissions: Array<{
+      trip_id: number;
+      order_id: number;
+      order_code: string;
+      customer_name: string;
+      total_amount: number;
+      delivered_at: string | null;
+      primary_driver_id: number;
+      secondary_driver_id: number | null;
+      pending_commission_entries: number;
+      has_pod_photos: boolean;
+      pod_photo_count: number;
+    }>;
+    total_count: number;
+  }>('/commission-release/pending');
+}
+
+export function markCashCollected(tripId: number, notes?: string) {
+  return request<{
+    success: boolean;
+    trip_id: number;
+    message: string;
+  }>(`/commission-release/mark-cash-collected/${tripId}`, { 
+    method: 'POST',
+    json: { notes: notes || '' }
+  });
+}

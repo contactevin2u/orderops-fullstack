@@ -145,10 +145,15 @@ data class JobItemDto(
 @Serializable
 data class CommissionDto(
     val amount: String,
-    val status: String, // "pending" or "actualized"
+    val status: String, // "EARNED" or "PAID" (new AI system) / "pending" or "actualized" (legacy)
     val scheme: String,
     val rate: String,
-    val role: String? = null // "primary" or "secondary"
+    val role: String? = null, // "primary" or "secondary"
+    val payment_method: String? = null, // "cash" or "bank_transfer" (detected by AI)
+    val ai_verified: Boolean? = null, // Whether AI verified the payment method
+    val cash_collection_required: Boolean? = null, // Whether cash needs to be collected
+    val released_at: String? = null, // When commission was released
+    val notes: String? = null // Release notes or AI analysis details
 )
 
 @Serializable

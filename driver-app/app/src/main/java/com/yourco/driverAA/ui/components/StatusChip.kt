@@ -98,10 +98,19 @@ fun StatusChip(
     status: String,
     modifier: Modifier = Modifier
 ) {
-    val (backgroundColor, textColor) = when (status.uppercase()) {
-        "PENDING" -> StatusPending to Color.White
-        "RELEASED" -> StatusCompleted to Color.White
-        "CANCELLED" -> StatusCancelled to Color.White
+    val (backgroundColor, textColor) = when {
+        status.contains("🤖") -> MaterialTheme.colorScheme.primary to Color.White // AI badges
+        status.contains("💰") -> WarningOrange to Color.White // Cash related
+        status.contains("🏦") -> SuccessGreen to Color.White // Bank transfer
+        status.contains("⚠️") -> ErrorRed to Color.White // Warning/Required
+        status.contains("👥") -> MaterialTheme.colorScheme.tertiary to Color.White // Dual driver
+        status.contains("📸") -> MaterialTheme.colorScheme.secondary to Color.White // Photos
+        status.contains("⚡") -> SuccessGreen to Color.White // Instant
+        status.uppercase().contains("PENDING") -> StatusPending to Color.White
+        status.uppercase().contains("RELEASED") -> StatusCompleted to Color.White
+        status.uppercase().contains("CANCELLED") -> StatusCancelled to Color.White
+        status.uppercase().contains("EARNED") -> StatusPending to Color.White // New AI system
+        status.uppercase().contains("PAID") -> StatusCompleted to Color.White // New AI system
         else -> MaterialTheme.colorScheme.surfaceVariant to MaterialTheme.colorScheme.onSurfaceVariant
     }
     
