@@ -375,29 +375,56 @@ async def get_driver_status(
     driver = Depends(driver_auth)
 ):
     """Check if driver has any active holds that prevent work"""
-    # Check for active holds
-    active_holds = db.execute(
-        select(DriverHold).where(
-            and_(
-                DriverHold.driver_id == driver.id,
-                DriverHold.status == "ACTIVE"
+    
+    # Ensure session is in clean state
+    if db.in_transaction():
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+    
+    try:
+        # Check for active holds
+        active_holds = db.execute(
+            select(DriverHold).where(
+                and_(
+                    DriverHold.driver_id == driver.id,
+                    DriverHold.status == "ACTIVE"
+                )
             )
-        )
-    ).scalars().all()
+        ).scalars().all()
+    except Exception as e:
+        # If driver object access fails, rollback and retry
+        db.rollback()
+        # Refresh driver object
+        db.refresh(driver)
+        active_holds = db.execute(
+            select(DriverHold).where(
+                and_(
+                    DriverHold.driver_id == driver.id,
+                    DriverHold.status == "ACTIVE"
+                )
+            )
+        ).scalars().all()
     
     has_active_holds = len(active_holds) > 0
     hold_reasons = [hold.reason for hold in active_holds]
     
     # Check today's assignment and stock verification status
     today = date.today()
-    assignment = db.execute(
-        select(LorryAssignment).where(
-            and_(
-                LorryAssignment.driver_id == driver.id,
-                LorryAssignment.assignment_date == today
+    try:
+        assignment = db.execute(
+            select(LorryAssignment).where(
+                and_(
+                    LorryAssignment.driver_id == driver.id,
+                    LorryAssignment.assignment_date == today
+                )
             )
-        )
-    ).scalar_one_or_none()
+        ).scalar_one_or_none()
+    except Exception:
+        # Fallback with session recovery
+        db.rollback()
+        assignment = None
     
     # ALL drivers must have lorry assignment and complete stock verification
     can_access_orders = (
