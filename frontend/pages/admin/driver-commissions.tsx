@@ -9,7 +9,10 @@ import {
   listUpsellRecords, 
   releaseUpsellIncentive,
   getInventoryConfig,
-  getOrderUIDs
+  getOrderUIDs,
+  analyzeCommissionEligibility,
+  releaseCommission,
+  getPendingCommissions
 } from '@/lib/api';
 
 export default function DriverCommissionsPage() {
@@ -220,19 +223,22 @@ export default function DriverCommissionsPage() {
 
             {!ordersQuery.isLoading && orders.length > 0 && (
               <div className="stack">
-                {orders.filter((order: any) => 
-                  order.trip?.status === 'DELIVERED' && !order.trip?.commission?.actualized_at
-                ).map((order: any) => (
-                  <EnhancedOrderCard 
+                {orders.filter((order: any) => !order.trip?.commission?.actualized_at).map((order: any) => (
+                  <OrderCard 
                     key={order.id} 
                     order={order}
-                    onRelease={(data: any) => releaseCommissionMutation.mutate(data)}
-                    onMarkCashCollected={(data: any) => markCashCollectedMutation.mutate(data)}
+                    onRelease={() => releaseCommissionMutation.mutate(order.id)}
                     isReleasing={releaseCommissionMutation.isPending}
-                    isMarkingCash={markCashCollectedMutation.isPending}
+                    onUpdateCommission={(amount: number) => 
+                      updateCommissionMutation.mutate({ orderId: order.id, amount })
+                    }
+                    isUpdatingCommission={updateCommissionMutation.isPending}
+                    showFullVerification={true}
                     inventoryConfig={inventoryConfigQuery.data}
                   />
                 ))}
+              </div>
+                )}
               </div>
             )}
 
@@ -253,12 +259,13 @@ export default function DriverCommissionsPage() {
                       <OrderCard 
                         key={order.id} 
                         order={order}
-                        onRelease={() => {}}
-                        isReleasing={false}
-                        onUpdateCommission={() => {}}
-                        isUpdatingCommission={false}
-                        showFullVerification={false}
-                        readOnly={true}
+                        onRelease={() => releaseCommissionMutation.mutate(order.id)}
+                        isReleasing={releaseCommissionMutation.isPending}
+                        onUpdateCommission={(amount: number) => 
+                          updateCommissionMutation.mutate({ orderId: order.id, amount })
+                        }
+                        isUpdatingCommission={updateCommissionMutation.isPending}
+                        showFullVerification={true}
                         inventoryConfig={inventoryConfigQuery.data}
                       />
                     ))}
@@ -280,10 +287,12 @@ export default function DriverCommissionsPage() {
                       <OrderCard 
                         key={order.id} 
                         order={order}
-                        onRelease={() => {}}
-                        isReleasing={false}
-                        onUpdateCommission={() => {}}
-                        isUpdatingCommission={false}
+                        onRelease={() => releaseCommissionMutation.mutate(order.id)}
+                        isReleasing={releaseCommissionMutation.isPending}
+                        onUpdateCommission={(amount: number) => 
+                          updateCommissionMutation.mutate({ orderId: order.id, amount })
+                        }
+                        isUpdatingCommission={updateCommissionMutation.isPending}
                         readOnly={true}
                         inventoryConfig={inventoryConfigQuery.data}
                       />
@@ -338,60 +347,29 @@ export default function DriverCommissionsPage() {
         <div style={{
           marginTop: 'var(--space-6)',
           padding: 'var(--space-4)',
-          background: 'linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%)',
+          background: '#eff6ff',
           borderRadius: 'var(--radius-2)',
-          border: '1px solid #bae6fd'
+          border: '1px solid #dbeafe'
         }}>
           <h3 style={{ fontWeight: 600, color: '#0c4a6e', marginBottom: 'var(--space-3)', fontSize: '1.1rem' }}>
             🤖 AI-Powered Commission System (RM30 Flat Rate)
           </h3>
-          <div className="stack" style={{ fontSize: '0.875rem', color: '#0c4a6e' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-4)' }}>
-              <div>
-                <p style={{ fontWeight: 600, marginBottom: 'var(--space-2)', color: '#1d4ed8' }}>📋 Automated Verification:</p>
-                <ul style={{ margin: 0, paddingLeft: 'var(--space-4)' }}>
-                  <li><strong>POD Photo Analysis</strong> - AI scans delivery photos</li>
-                  <li><strong>Payment Detection</strong> - Identifies cash vs bank transfer</li>
-                  <li><strong>Smart Cash Collection</strong> - Flags when cash retrieval needed</li>
-                  <li><strong>Dual Driver Support</strong> - Automatic RM15 split for 2 drivers</li>
-                </ul>
-              </div>
-              <div>
-                <p style={{ fontWeight: 600, marginBottom: 'var(--space-2)', color: '#1d4ed8' }}>⚡ Release Options:</p>
-                <ul style={{ margin: 0, paddingLeft: 'var(--space-4)' }}>
-                  <li><strong>🤖 AI Release</strong> - 70% confidence auto-approval</li>
-                  <li><strong>💰 Cash Confirmation</strong> - For cash payment orders</li>
-                  <li><strong>⚠️ Manual Override</strong> - Skip AI for edge cases</li>
-                  <li><strong>📊 All Activity</strong> - View pending across all drivers</li>
-                </ul>
-              </div>
-            </div>
-            
-            <div style={{ 
-              marginTop: 'var(--space-3)', 
-              padding: 'var(--space-3)', 
-              background: 'rgba(59, 130, 246, 0.1)', 
-              borderRadius: 'var(--radius-1)',
-              border: '1px solid rgba(59, 130, 246, 0.2)'
-            }}>
-              <p style={{ margin: 0, fontWeight: 500 }}>
-                <strong>🎯 How it works:</strong> When an order is DELIVERED, AI analyzes POD photos to detect payment method. 
-                For <strong>cash payments</strong>, system requires confirmation that cash was collected from driver before releasing commission. 
-                For <strong>bank transfers</strong>, commission releases automatically. 
-                <strong>30% of cases</strong> still require manual review for quality assurance.
-              </p>
-            </div>
-            
-            <div style={{ 
-              marginTop: 'var(--space-2)',
-              fontSize: '0.75rem',
-              opacity: 0.8,
-              fontStyle: 'italic',
-              textAlign: 'center'
-            }}>
-              💡 Trip status changes: DELIVERED → SUCCESS (after commission release) | 
-              Commission entries: EARNED → PAID
-            </div>
+          <div className="stack" style={{ fontSize: '0.875rem', color: '#1e40af' }}>
+            <p><strong>1. POD Available & Correct</strong> - Verify delivery proof photos are uploaded and valid</p>
+            <p><strong>2. Order Delivered</strong> - Confirm order status is DELIVERED</p>
+            <p><strong>3. Initial Payment Collected</strong> - Ensure customer payment was received</p>
+            {inventoryConfigQuery.data?.uid_inventory_enabled && inventoryConfigQuery.data?.uid_scan_required_after_pod && (
+              <p><strong>4. UID Scanning Complete</strong> - Verify driver scanned required UIDs for inventory tracking</p>
+            )}
+            <p><strong>{inventoryConfigQuery.data?.uid_inventory_enabled && inventoryConfigQuery.data?.uid_scan_required_after_pod ? '5' : '4'}. Check for Upsells</strong> - Review any additional items sold (affects commission)</p>
+            <p><strong>{inventoryConfigQuery.data?.uid_inventory_enabled && inventoryConfigQuery.data?.uid_scan_required_after_pod ? '6' : '5'}. Enter Commission & Release</strong> - Set amount and release payment to driver</p>
+            <p style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2)', background: 'rgba(59, 130, 246, 0.1)', borderRadius: 'var(--radius-1)' }}>
+              <strong>Note:</strong> All verification steps must be completed before commission can be released. 
+              {inventoryConfigQuery.data?.uid_inventory_enabled && (
+                <span> UID inventory tracking is now integrated for enhanced delivery verification.</span>
+              )}
+              Commission is released immediately when entered (if all conditions are met).
+            </p>
           </div>
         </div>
       </div>
@@ -840,595 +818,6 @@ function UpsellCard({
       >
         {isReleasing ? 'Releasing...' : canRelease ? 'Release Incentive' : isPending ? 'Pending Review' : 'Already Released'}
       </button>
-    </div>
-  );
-}
-
-// AI-Enhanced Order Card with commission release functionality
-function EnhancedOrderCard({ 
-  order, 
-  onRelease,
-  onMarkCashCollected,
-  isReleasing,
-  isMarkingCash,
-  inventoryConfig
-}: { 
-  order: any;
-  onRelease: (data: any) => void;
-  onMarkCashCollected: (data: any) => void;
-  isReleasing: boolean;
-  isMarkingCash: boolean;
-  inventoryConfig?: any;
-}) {
-  const [showPodPhotos, setShowPodPhotos] = React.useState(false);
-  const [showAiAnalysis, setShowAiAnalysis] = React.useState(false);
-  const [releaseNotes, setReleaseNotes] = React.useState('');
-  const [aiAnalysis, setAiAnalysis] = React.useState<any>(null);
-  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
-
-  const trip = order.trip || {};
-  const tripId = trip.id;
-  const podPhotos = trip.pod_photo_urls || (trip.pod_photo_url ? [trip.pod_photo_url] : []);
-  const hasPodPhoto = podPhotos.length > 0;
-  const isDelivered = trip.status === 'DELIVERED';
-  const paymentCollected = order.payment_status === 'PAID' || order.total_paid > 0;
-  const isReleased = trip.status === 'SUCCESS';
-
-  // AI Analysis function
-  const runAiAnalysis = React.useCallback(async () => {
-    if (!tripId || isAnalyzing) return;
-    
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeCommissionEligibility(tripId);
-      setAiAnalysis(result);
-      setShowAiAnalysis(true);
-    } catch (error: any) {
-      console.error('AI analysis failed:', error);
-      setAiAnalysis({ 
-        error: true, 
-        message: error.message || 'AI analysis failed - manual verification required' 
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [tripId, isAnalyzing]);
-
-  const handleRelease = (manualOverride = false, cashCollected = false) => {
-    onRelease({
-      trip_id: tripId,
-      manual_override: manualOverride,
-      cash_collected: cashCollected,
-      notes: releaseNotes
-    });
-  };
-
-  const handleMarkCashCollected = () => {
-    onMarkCashCollected({
-      tripId: tripId,
-      notes: releaseNotes || 'Cash collected confirmation'
-    });
-  };
-
-  return (
-    <div style={{
-      padding: 'var(--space-4)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-2)',
-      background: 'var(--color-background)'
-    }}>
-      {/* Header Row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
-        <div>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-1)', margin: 0 }}>
-            Order #{order.code || order.id} {trip.has_dual_drivers ? '(Dual Driver)' : ''}
-          </h3>
-          <div className="cluster" style={{ gap: 'var(--space-2)', fontSize: '0.875rem' }}>
-            <span style={{ 
-              padding: '0.125rem 0.5rem', 
-              borderRadius: 'var(--radius-1)',
-              background: isDelivered ? '#dcfce7' : isReleased ? '#dbeafe' : '#fef3c7',
-              color: isDelivered ? '#15803d' : isReleased ? '#1d4ed8' : '#d97706'
-            }}>
-              {trip.status || 'UNKNOWN'}
-            </span>
-            {hasPodPhoto && (
-              <button
-                onClick={() => setShowPodPhotos(!showPodPhotos)}
-                style={{ 
-                  padding: '0.125rem 0.5rem', 
-                  borderRadius: 'var(--radius-1)',
-                  background: '#dcfce7',
-                  color: '#15803d',
-                  border: 'none',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem'
-                }}
-              >
-                📸 {showPodPhotos ? 'Hide' : 'View'} POD ({podPhotos.length})
-              </button>
-            )}
-          </div>
-        </div>
-        
-        {/* AI Analysis Button */}
-        {isDelivered && !isReleased && (
-          <button
-            onClick={runAiAnalysis}
-            disabled={isAnalyzing}
-            style={{
-              padding: '0.5rem 1rem',
-              borderRadius: 'var(--radius-2)',
-              border: '1px solid #3b82f6',
-              background: isAnalyzing ? '#f3f4f6' : '#eff6ff',
-              color: '#1d4ed8',
-              fontSize: '0.875rem',
-              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            {isAnalyzing ? '🔄 Analyzing...' : '🤖 AI Analysis'}
-          </button>
-        )}
-      </div>
-
-      {/* Customer & Order Details */}
-      <div style={{ marginBottom: 'var(--space-3)', fontSize: '0.875rem', color: '#6b7280' }}>
-        <div><strong>Customer:</strong> {order.customer_name}</div>
-        <div><strong>Amount:</strong> RM {Number(order.total || 0).toFixed(2)}</div>
-        {trip.delivered_at && (
-          <div><strong>Delivered:</strong> {new Date(trip.delivered_at).toLocaleString()}</div>
-        )}
-      </div>
-
-      {/* AI Analysis Results */}
-      {aiAnalysis && showAiAnalysis && (
-        <div style={{
-          marginBottom: 'var(--space-4)',
-          padding: 'var(--space-4)',
-          background: aiAnalysis.error ? '#fef2f2' : '#f0f9ff',
-          border: `1px solid ${aiAnalysis.error ? '#fecaca' : '#bae6fd'}`,
-          borderRadius: 'var(--radius-2)'
-        }}>
-          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
-            🤖 AI Payment Analysis {!aiAnalysis.error && `(${Math.round(aiAnalysis.ai_verification?.confidence_score * 100 || 0)}% confidence)`}
-          </h4>
-          
-          {aiAnalysis.error ? (
-            <p style={{ color: '#dc2626', fontSize: '0.875rem' }}>
-              {aiAnalysis.message}
-            </p>
-          ) : (
-            <div style={{ fontSize: '0.875rem' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
-                <div>
-                  <strong>Payment Method:</strong> 
-                  <span style={{
-                    marginLeft: 'var(--space-1)',
-                    padding: '0.125rem 0.375rem',
-                    borderRadius: 'var(--radius-1)',
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    background: aiAnalysis.ai_verification?.payment_method === 'cash' ? '#fef3c7' : '#dcfce7',
-                    color: aiAnalysis.ai_verification?.payment_method === 'cash' ? '#d97706' : '#15803d'
-                  }}>
-                    {aiAnalysis.ai_verification?.payment_method?.toUpperCase() || 'UNKNOWN'}
-                  </span>
-                </div>
-                <div>
-                  <strong>Cash Collection Required:</strong> 
-                  <span style={{ color: aiAnalysis.ai_verification?.cash_collection_required ? '#dc2626' : '#15803d' }}>
-                    {aiAnalysis.ai_verification?.cash_collection_required ? ' Yes' : ' No'}
-                  </span>
-                </div>
-              </div>
-              
-              {aiAnalysis.ai_verification?.analysis_details && (
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', fontStyle: 'italic' }}>
-                  <strong>Analysis:</strong> {aiAnalysis.ai_verification.analysis_details}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Commission Release Actions */}
-      {isDelivered && !isReleased && (
-        <div style={{
-          marginBottom: 'var(--space-3)',
-          padding: 'var(--space-3)',
-          background: '#f8fafc',
-          borderRadius: 'var(--radius-1)',
-          border: '1px solid #e2e8f0'
-        }}>
-          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
-            Commission Release (RM30 flat rate)
-          </h4>
-          
-          <div style={{ marginBottom: 'var(--space-3)' }}>
-            <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, marginBottom: 'var(--space-1)' }}>
-              Notes (optional):
-            </label>
-            <textarea
-              value={releaseNotes}
-              onChange={(e) => setReleaseNotes(e.target.value)}
-              placeholder="Add any notes about the commission release..."
-              style={{
-                width: '100%',
-                minHeight: '60px',
-                padding: 'var(--space-2)',
-                border: '1px solid #d1d5db',
-                borderRadius: 'var(--radius-1)',
-                fontSize: '0.875rem',
-                resize: 'vertical'
-              }}
-            />
-          </div>
-          
-          <div className="cluster" style={{ gap: 'var(--space-2)' }}>
-            {/* Auto Release Button */}
-            <button
-              onClick={() => handleRelease(false, false)}
-              disabled={!hasPodPhoto || isReleasing || isMarkingCash}
-              style={{
-                background: hasPodPhoto && !isReleasing ? '#10b981' : '#9ca3af',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: 'var(--radius-2)',
-                fontSize: '0.875rem',
-                cursor: hasPodPhoto && !isReleasing ? 'pointer' : 'not-allowed',
-                fontWeight: '500'
-              }}
-              title={!hasPodPhoto ? 'POD photo required' : 'Release with AI verification'}
-            >
-              {isReleasing ? '🔄 Releasing...' : '🤖 AI Release'}
-            </button>
-            
-            {/* Cash Collection Button */}
-            {aiAnalysis?.ai_verification?.cash_collection_required && (
-              <button
-                onClick={handleMarkCashCollected}
-                disabled={isMarkingCash || isReleasing}
-                style={{
-                  background: '#f59e0b',
-                  color: 'white',
-                  border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: 'var(--radius-2)',
-                  fontSize: '0.875rem',
-                  cursor: isMarkingCash ? 'not-allowed' : 'pointer',
-                  fontWeight: '500'
-                }}
-              >
-                {isMarkingCash ? '💰 Confirming...' : '💰 Confirm Cash Collected'}
-              </button>
-            )}
-            
-            {/* Manual Override Button */}
-            <button
-              onClick={() => {
-                const confirmed = window.confirm(
-                  'Manual override will bypass AI verification.\n\nAre you sure you want to proceed?'
-                );
-                if (confirmed) {
-                  handleRelease(true, true);
-                }
-              }}
-              disabled={isReleasing || isMarkingCash}
-              style={{
-                background: '#6b7280',
-                color: 'white',
-                border: 'none',
-                padding: '0.5rem 1rem',
-                borderRadius: 'var(--radius-2)',
-                fontSize: '0.875rem',
-                cursor: isReleasing || isMarkingCash ? 'not-allowed' : 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              ⚠️ Manual Override
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Status Indicators */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)', fontSize: '0.875rem', flexWrap: 'wrap' }}>
-        <span style={{ color: isDelivered ? '#15803d' : '#6b7280' }}>
-          {isDelivered ? '✅' : '⏳'} Delivered
-        </span>
-        <span style={{ color: hasPodPhoto ? '#15803d' : '#d97706' }}>
-          {hasPodPhoto ? '✅' : '⚠️'} POD Photo ({podPhotos.length})
-        </span>
-        <span style={{ color: paymentCollected ? '#15803d' : '#dc2626' }}>
-          {paymentCollected ? '✅' : '❌'} Payment Collected
-        </span>
-        {isReleased && (
-          <span style={{ color: '#1d4ed8', fontWeight: 600 }}>
-            ✅ Commission Released
-          </span>
-        )}
-      </div>
-
-      {/* POD Photos Display */}
-      {showPodPhotos && podPhotos.length > 0 && (
-        <div style={{ marginTop: 'var(--space-4)', padding: 'var(--space-4)', background: '#f9fafb', borderRadius: 'var(--radius-2)' }}>
-          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: 'var(--space-2)', color: '#374151' }}>
-            📸 Proof of Delivery & Payment Photos
-          </h4>
-          <div className="cluster" style={{ gap: 'var(--space-2)' }}>
-            {podPhotos.map((url: string, index: number) => (
-              <div key={index} style={{ position: 'relative' }}>
-                <img
-                  src={url}
-                  alt={`POD/Payment Photo ${index + 1}`}
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    objectFit: 'cover',
-                    borderRadius: 'var(--radius-2)',
-                    border: '1px solid #d1d5db',
-                    cursor: 'pointer'
-                  }}
-                  onClick={() => window.open(url, '_blank')}
-                />
-                <div style={{
-                  position: 'absolute',
-                  top: '4px',
-                  right: '4px',
-                  background: 'rgba(0,0,0,0.7)',
-                  color: 'white',
-                  fontSize: '0.75rem',
-                  padding: '2px 6px',
-                  borderRadius: '12px'
-                }}>
-                  {index + 1}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: 'var(--space-2)' }}>
-            💡 Click on any photo to view full size. AI analyzes these photos to detect payment method.
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// Pending Commission Card for cross-driver overview
-function PendingCommissionCard({ 
-  commission, 
-  drivers,
-  onRelease,
-  onMarkCashCollected,
-  isReleasing,
-  isMarkingCash
-}: { 
-  commission: any;
-  drivers: any[];
-  onRelease: (data: any) => void;
-  onMarkCashCollected: (data: any) => void;
-  isReleasing: boolean;
-  isMarkingCash: boolean;
-}) {
-  const [showDetails, setShowDetails] = React.useState(false);
-  const [releaseNotes, setReleaseNotes] = React.useState('');
-  const [aiAnalysis, setAiAnalysis] = React.useState<any>(null);
-  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
-
-  const primaryDriver = drivers.find(d => d.id === commission.primary_driver_id);
-  const secondaryDriver = commission.secondary_driver_id ? 
-    drivers.find(d => d.id === commission.secondary_driver_id) : null;
-
-  const runAiAnalysis = async () => {
-    if (!commission.trip_id || isAnalyzing) return;
-    
-    setIsAnalyzing(true);
-    try {
-      const result = await analyzeCommissionEligibility(commission.trip_id);
-      setAiAnalysis(result);
-    } catch (error: any) {
-      console.error('AI analysis failed:', error);
-      setAiAnalysis({ 
-        error: true, 
-        message: error.message || 'AI analysis failed' 
-      });
-    } finally {
-      setIsAnalyzing(false);
-    }
-  };
-
-  const handleRelease = (manualOverride = false, cashCollected = false) => {
-    onRelease({
-      trip_id: commission.trip_id,
-      manual_override: manualOverride,
-      cash_collected: cashCollected,
-      notes: releaseNotes
-    });
-  };
-
-  return (
-    <div style={{
-      padding: 'var(--space-4)',
-      border: '1px solid var(--color-border)',
-      borderRadius: 'var(--radius-2)',
-      background: 'var(--color-background)'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--space-3)' }}>
-        <div>
-          <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-1)', margin: 0 }}>
-            Order #{commission.order_code}
-          </h3>
-          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-            <div><strong>Customer:</strong> {commission.customer_name}</div>
-            <div><strong>Amount:</strong> RM {Number(commission.total_amount).toFixed(2)}</div>
-            <div><strong>Primary Driver:</strong> {primaryDriver?.name || `Driver ${commission.primary_driver_id}`}</div>
-            {secondaryDriver && (
-              <div><strong>Secondary Driver:</strong> {secondaryDriver.name}</div>
-            )}
-            <div><strong>Delivered:</strong> {commission.delivered_at ? 
-              new Date(commission.delivered_at).toLocaleString() : 'Recently'}
-            </div>
-          </div>
-        </div>
-        
-        <div className="cluster" style={{ gap: 'var(--space-2)' }}>
-          <span style={{
-            padding: '0.125rem 0.5rem',
-            borderRadius: 'var(--radius-1)',
-            background: commission.has_pod_photos ? '#dcfce7' : '#fef3c7',
-            color: commission.has_pod_photos ? '#15803d' : '#d97706',
-            fontSize: '0.75rem',
-            fontWeight: 600
-          }}>
-            {commission.has_pod_photos ? '✅ POD' : '⚠️ No POD'} ({commission.pod_photo_count})
-          </span>
-          
-          <button
-            onClick={runAiAnalysis}
-            disabled={isAnalyzing}
-            style={{
-              padding: '0.25rem 0.5rem',
-              borderRadius: 'var(--radius-1)',
-              border: '1px solid #3b82f6',
-              background: isAnalyzing ? '#f3f4f6' : '#eff6ff',
-              color: '#1d4ed8',
-              fontSize: '0.75rem',
-              cursor: isAnalyzing ? 'not-allowed' : 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            {isAnalyzing ? '🔄' : '🤖'}
-          </button>
-        </div>
-      </div>
-
-      {/* AI Analysis Results */}
-      {aiAnalysis && (
-        <div style={{
-          marginBottom: 'var(--space-3)',
-          padding: 'var(--space-3)',
-          background: aiAnalysis.error ? '#fef2f2' : '#f0f9ff',
-          border: `1px solid ${aiAnalysis.error ? '#fecaca' : '#bae6fd'}`,
-          borderRadius: 'var(--radius-1)',
-          fontSize: '0.875rem'
-        }}>
-          {aiAnalysis.error ? (
-            <p style={{ color: '#dc2626' }}>
-              🚨 {aiAnalysis.message}
-            </p>
-          ) : (
-            <div>
-              <strong>Payment Method:</strong> 
-              <span style={{
-                marginLeft: 'var(--space-1)',
-                padding: '0.125rem 0.375rem',
-                borderRadius: 'var(--radius-1)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                background: aiAnalysis.ai_verification?.payment_method === 'cash' ? '#fef3c7' : '#dcfce7',
-                color: aiAnalysis.ai_verification?.payment_method === 'cash' ? '#d97706' : '#15803d'
-              }}>
-                {aiAnalysis.ai_verification?.payment_method?.toUpperCase() || 'UNKNOWN'}
-              </span>
-              {aiAnalysis.ai_verification?.cash_collection_required && (
-                <span style={{ color: '#dc2626', marginLeft: 'var(--space-2)', fontSize: '0.75rem' }}>
-                  ⚠️ Cash collection required
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Release Actions */}
-      <div style={{
-        padding: 'var(--space-3)',
-        background: '#f8fafc',
-        borderRadius: 'var(--radius-1)',
-        border: '1px solid #e2e8f0'
-      }}>
-        <div style={{ marginBottom: 'var(--space-2)' }}>
-          <textarea
-            value={releaseNotes}
-            onChange={(e) => setReleaseNotes(e.target.value)}
-            placeholder="Release notes (optional)..."
-            style={{
-              width: '100%',
-              minHeight: '50px',
-              padding: 'var(--space-2)',
-              border: '1px solid #d1d5db',
-              borderRadius: 'var(--radius-1)',
-              fontSize: '0.875rem',
-              resize: 'vertical'
-            }}
-          />
-        </div>
-        
-        <div className="cluster" style={{ gap: 'var(--space-2)' }}>
-          <button
-            onClick={() => handleRelease(false, false)}
-            disabled={!commission.has_pod_photos || isReleasing}
-            style={{
-              background: commission.has_pod_photos && !isReleasing ? '#10b981' : '#9ca3af',
-              color: 'white',
-              border: 'none',
-              padding: '0.375rem 0.75rem',
-              borderRadius: 'var(--radius-1)',
-              fontSize: '0.875rem',
-              cursor: commission.has_pod_photos && !isReleasing ? 'pointer' : 'not-allowed',
-              fontWeight: '500'
-            }}
-          >
-            {isReleasing ? '🔄' : '🤖'} AI Release
-          </button>
-          
-          {aiAnalysis?.ai_verification?.cash_collection_required && (
-            <button
-              onClick={() => onMarkCashCollected({ 
-                tripId: commission.trip_id, 
-                notes: releaseNotes || 'Cash collection confirmed' 
-              })}
-              disabled={isMarkingCash || isReleasing}
-              style={{
-                background: '#f59e0b',
-                color: 'white',
-                border: 'none',
-                padding: '0.375rem 0.75rem',
-                borderRadius: 'var(--radius-1)',
-                fontSize: '0.875rem',
-                cursor: isMarkingCash ? 'not-allowed' : 'pointer',
-                fontWeight: '500'
-              }}
-            >
-              {isMarkingCash ? '💰' : '💰'} Cash Collected
-            </button>
-          )}
-          
-          <button
-            onClick={() => {
-              const confirmed = window.confirm('Manual override bypasses AI verification. Continue?');
-              if (confirmed) handleRelease(true, true);
-            }}
-            disabled={isReleasing || isMarkingCash}
-            style={{
-              background: '#6b7280',
-              color: 'white',
-              border: 'none',
-              padding: '0.375rem 0.75rem',
-              borderRadius: 'var(--radius-1)',
-              fontSize: '0.875rem',
-              cursor: isReleasing || isMarkingCash ? 'not-allowed' : 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            ⚠️ Manual
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
