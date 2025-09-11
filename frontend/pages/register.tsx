@@ -10,7 +10,7 @@ export default function RegisterPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
-    const res = await fetch('/_api/auth/register', {
+    const res = await fetch('https://orderops-api-v1.onrender.com/auth/register', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },

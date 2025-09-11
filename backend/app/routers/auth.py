@@ -57,14 +57,29 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
     return {"id": user.id, "username": user.username, "role": user.role.value}
 
 
+@router.get("/debug-register")
+def debug_register_endpoint():
+    """Debug endpoint to verify this backend version is deployed"""
+    return {
+        "message": "✅ Registration fix deployed - this backend has the updated auth logic",
+        "timestamp": "2025-09-11 22:05 UTC",
+        "fix_version": "v2_no_auth_dependency",
+        "endpoint": "/auth/register should work for first user without authentication"
+    }
+
 @router.post("/register")
 def register(
     payload: RegisterIn,
     db: Session = Depends(get_session),
 ):
+    print(f"🔧 REGISTER DEBUG: Endpoint hit with username='{payload.username}'")
+    print(f"🔧 REGISTER DEBUG: This backend version has NO get_current_user dependency")
+    
     try:
         count = db.query(User).count()
-    except Exception:  # pragma: no cover - tables may not exist yet
+        print(f"🔧 REGISTER DEBUG: Current user count = {count}")
+    except Exception as e:
+        print(f"🔧 REGISTER DEBUG: Database query failed, creating tables: {e}")
         User.__table__.create(bind=db.get_bind(), checkfirst=True)
         AuditLog.__table__.create(bind=db.get_bind(), checkfirst=True)
         count = 0
