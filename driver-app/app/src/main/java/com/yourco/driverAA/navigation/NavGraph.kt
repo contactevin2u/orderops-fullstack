@@ -33,7 +33,7 @@ fun NavGraph() {
     NavHost(navController = navController, startDestination = startDestination) {
         composable("login") {
             LoginScreen(
-                onLoginSuccess = { _ ->
+                onLoginSuccess = {
                     navController.navigate("jobs") {
                         popUpTo("login") { inclusive = true }
                     }
