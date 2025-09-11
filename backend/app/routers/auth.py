@@ -61,7 +61,6 @@ def login(payload: LoginIn, response: Response, db: Session = Depends(get_sessio
 def register(
     payload: RegisterIn,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user),
 ):
     try:
         count = db.query(User).count()
@@ -69,8 +68,18 @@ def register(
         User.__table__.create(bind=db.get_bind(), checkfirst=True)
         AuditLog.__table__.create(bind=db.get_bind(), checkfirst=True)
         count = 0
-    if count > 0 and current_user.role != Role.ADMIN:
-        raise HTTPException(403, "Forbidden")
+    
+    # Allow first user registration without authentication  
+    if count == 0:
+        print("🎯 Creating first admin user - no authentication required")
+        current_user_id = None
+    else:
+        # For subsequent registrations, this endpoint should not be used
+        # Admin users should be created through the admin panel with proper authentication
+        raise HTTPException(
+            status_code=403, 
+            detail="Registration closed. First admin user already exists. Use admin panel to create additional users."
+        )
     role = payload.role or (Role.ADMIN if count == 0 else Role.CASHIER)
     user = User(
         username=payload.username,
@@ -80,7 +89,7 @@ def register(
     db.add(user)
     db.add(
         AuditLog(
-            user_id=None if count == 0 else current_user.id,
+            user_id=current_user_id,  # None for first user registration
             action="create_user",
             details=payload.username,
         )
