@@ -248,6 +248,9 @@ class OrderItemPatch(BaseModel):
 
 
 class OrderPatch(BaseModel):
+    code: str | None = None
+    type: str | None = None
+    customer_id: int | None = None
     notes: str | None = None
     status: str | None = None
     delivery_date: str | None = None
@@ -258,6 +261,7 @@ class OrderPatch(BaseModel):
     penalty_fee: float | None = None
     total: float | None = None
     balance: float | None = None
+    paid_amount: float | None = None
     plan: PlanPatch | None = None
     items: list[OrderItemPatch] | None = None
     delete_items: list[int] | None = None
@@ -416,10 +420,38 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
     data = body.model_dump(exclude_none=True)
     print(f"DEBUG: Processing update data: {data}")
 
+    # Handle order code with uniqueness validation
+    if "code" in data:
+        new_code = data["code"].strip().upper() if data["code"] else ""
+        if new_code and new_code != order.code:
+            # Check if code already exists for another order
+            existing = db.query(Order).filter(Order.code == new_code, Order.id != order.id).first()
+            if existing:
+                raise HTTPException(400, f"Order code '{new_code}' already exists")
+            order.code = new_code
+    
+    # Handle order type with validation
+    if "type" in data:
+        valid_types = ["OUTRIGHT", "INSTALLMENT", "RENTAL", "MIXED"]
+        new_type = data["type"].strip().upper() if data["type"] else ""
+        if new_type and new_type not in valid_types:
+            raise HTTPException(400, f"Invalid order type '{new_type}'. Must be one of: {', '.join(valid_types)}")
+        order.type = new_type
+    
+    # Handle customer_id (integer field)
+    if "customer_id" in data:
+        # Validate customer exists
+        customer = db.get(Customer, data["customer_id"])
+        if not customer:
+            raise HTTPException(400, f"Customer with ID {data['customer_id']} not found")
+        order.customer_id = data["customer_id"]
+    
+    # Handle basic string/text fields
     for k in ["notes", "status", "delivery_date"]:
         if k in data:
             setattr(order, k, data[k])
 
+    # Handle money fields
     money_fields = [
         "subtotal",
         "discount",
@@ -428,6 +460,7 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
         "penalty_fee",
         "total",
         "balance",
+        "paid_amount",
     ]
     for k in money_fields:
         if k in data:
