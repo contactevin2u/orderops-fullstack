@@ -28,54 +28,28 @@ export default function IntakePage() {
   const [termsOpen, setTermsOpen] = React.useState(false);
   const [accepted, setAccepted] = React.useState(false);
   
-  // Background processing state
+  // True non-blocking processing state
   const [useBackground, setUseBackground] = React.useState(true);
-  const [currentJob, setCurrentJob] = React.useState<Job | null>(null);
-  const [recentJobs, setRecentJobs] = React.useState<Job[]>([]);
+  const [allJobs, setAllJobs] = React.useState<Job[]>([]);
   const [sessionId] = React.useState(() => crypto.randomUUID());
 
-  // Load recent jobs on mount
+  // Load recent jobs on mount and poll for updates
   React.useEffect(() => {
     loadRecentJobs();
+    
+    // Poll all jobs every 3 seconds to show real-time updates
+    const interval = setInterval(loadRecentJobs, 3000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadRecentJobs = React.useCallback(async () => {
     try {
-      const response = await listJobs(sessionId, 5);
-      setRecentJobs(response.jobs || []);
+      const response = await listJobs(sessionId, 10);
+      setAllJobs(response.jobs || []);
     } catch (e) {
-      console.error('Failed to load recent jobs:', e);
+      console.error('Failed to load jobs:', e);
     }
   }, [sessionId]);
-
-  // Poll current job status
-  React.useEffect(() => {
-    if (!currentJob || (currentJob.status !== 'pending' && currentJob.status !== 'processing')) {
-      return;
-    }
-
-    const pollJob = async () => {
-      try {
-        const updatedJob = await getJobStatus(currentJob.id);
-        setCurrentJob(updatedJob);
-        
-        if (updatedJob.status === 'completed' || updatedJob.status === 'failed') {
-          loadRecentJobs(); // Refresh recent jobs list
-          
-          if (updatedJob.status === 'completed') {
-            setMsg(getJobResultMessage(updatedJob));
-          } else {
-            setErr(updatedJob.error_message || 'Processing failed');
-          }
-        }
-      } catch (e) {
-        console.error('Failed to poll job status:', e);
-      }
-    };
-
-    const interval = setInterval(pollJob, 2000);
-    return () => clearInterval(interval);
-  }, [currentJob, loadRecentJobs]);
 
   const getJobResultMessage = (job: Job) => {
     if (!job.result_data) return 'Processing completed';
@@ -96,32 +70,32 @@ export default function IntakePage() {
     return result.message || 'Processing completed';
   };
 
-  async function onParse() {
+  async function onSubmit() {
+    if (!text.trim()) return;
+    
     setBusy(true); setErr(''); setMsg('');
     
     if (useBackground) {
-      // Use background processing
+      // True non-blocking: Submit and forget
       try {
         const response = await createParseJob(text.trim(), sessionId);
         
-        const newJob: Job = {
-          id: response.job_id,
-          status: 'pending',
-          progress: 0,
-          progress_message: 'Queued for processing...',
-          created_at: new Date().toISOString()
-        };
+        // Clear input immediately - user can continue with next message
+        setText('');
+        setMsg(`✅ Message submitted! Processing in background...`);
         
-        setCurrentJob(newJob);
-        setMsg('Processing in background...');
-        setText(''); // Clear input for next message
+        // Refresh jobs list to show new submission
+        setTimeout(loadRecentJobs, 500);
+        
       } catch (e: any) {
-        setErr(e?.message || 'Failed to queue processing');
+        setErr(e?.message || 'Failed to submit message');
       } finally {
         setBusy(false);
+        // Clear success message after 3 seconds
+        setTimeout(() => setMsg(''), 3000);
       }
     } else {
-      // Use original synchronous parsing
+      // Legacy synchronous parsing (kept for compatibility)
       try {
         const res = await parseAdvancedMessage(text);
         setParsed(res);
@@ -183,14 +157,14 @@ export default function IntakePage() {
           </label>
           {useBackground && (
             <span style={{ fontSize: 12, color: '#6b7280' }}>
-              Orders created automatically • Handles returns & adjustments
+              Submit & continue • Results appear below • Orders created automatically
             </span>
           )}
         </div>
 
         <div className="cluster" style={{ justifyContent: 'flex-end' }}>
-          <Button disabled={busy || !text} onClick={onParse}>
-            {useBackground ? 'Process Message' : t('intake.parse')}
+          <Button disabled={busy || !text.trim()} onClick={onSubmit}>
+            {useBackground ? 'Submit Message' : t('intake.parse')}
           </Button>
           {!useBackground && (
             <Button variant="secondary" disabled={busy || !toPost} onClick={onCreate}>
@@ -200,47 +174,6 @@ export default function IntakePage() {
         </div>
         {err && <p style={{ fontSize: '0.875rem', color: '#ff4d4f' }}>{err}</p>}
         {msg && <p style={{ fontSize: '0.875rem', color: '#16a34a' }}>{msg}</p>}
-
-        {/* Current job processing status */}
-        {useBackground && currentJob && (currentJob.status === 'pending' || currentJob.status === 'processing') && (
-          <div style={{ 
-            marginTop: 16, 
-            padding: 12, 
-            backgroundColor: '#f8fafc', 
-            borderRadius: 6,
-            border: '1px solid #e2e8f0'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-              <span style={{ fontSize: 16 }}>
-                {currentJob.status === 'pending' ? '⏳' : '⚙️'}
-              </span>
-              <span style={{ fontSize: 14, fontWeight: 500, textTransform: 'capitalize' }}>
-                {currentJob.status}
-              </span>
-            </div>
-            
-            {/* Progress bar */}
-            <div style={{
-              width: '100%',
-              height: 6,
-              backgroundColor: '#e5e7eb',
-              borderRadius: 3,
-              overflow: 'hidden',
-              marginBottom: 8
-            }}>
-              <div style={{
-                width: `${Math.max(currentJob.progress, 5)}%`,
-                height: '100%',
-                backgroundColor: currentJob.status === 'processing' ? '#3b82f6' : '#fbbf24',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-            
-            <div style={{ fontSize: 13, color: '#6b7280' }}>
-              {currentJob.progress_message}
-            </div>
-          </div>
-        )}
       </Card>
       
       {/* Show parsed JSON in legacy mode */}
@@ -250,12 +183,30 @@ export default function IntakePage() {
         </Card>
       )}
 
-      {/* Recent processing results */}
-      {useBackground && recentJobs.length > 0 && (
+      {/* Processing Queue - All Jobs */}
+      {useBackground && (
         <Card>
-          <h3 style={{ margin: '0 0 12px 0' }}>Recent Processing</h3>
-          <div className="stack" style={{ gap: 8 }}>
-            {recentJobs.slice(0, 3).map((job) => {
+          <h3 style={{ margin: '0 0 16px 0', fontSize: '1.25rem', fontWeight: 600 }}>
+            Processing Queue
+            {allJobs.length > 0 && (
+              <span style={{ fontSize: '0.875rem', fontWeight: 400, color: '#6b7280', marginLeft: 8 }}>
+                ({allJobs.filter(j => j.status === 'pending' || j.status === 'processing').length} processing, {allJobs.filter(j => j.status === 'completed').length} completed)
+              </span>
+            )}
+          </h3>
+          
+          {allJobs.length === 0 ? (
+            <div style={{ 
+              padding: '24px', 
+              textAlign: 'center', 
+              color: '#6b7280',
+              fontSize: '0.875rem'
+            }}>
+              No messages submitted yet. Submit a WhatsApp message above to get started.
+            </div>
+          ) : (
+            <div className="stack" style={{ gap: 8 }}>
+              {allJobs.map((job) => {
               const getStatusColor = (status: JobStatus) => {
                 switch (status) {
                   case 'completed': return '#10b981';
@@ -280,18 +231,29 @@ export default function IntakePage() {
                 <div
                   key={job.id}
                   style={{
-                    padding: 8,
+                    padding: 12,
                     backgroundColor: job.status === 'failed' ? '#fef2f2' : 
-                                      job.status === 'completed' ? '#f0fdf4' : '#f8fafc',
-                    borderRadius: 4,
-                    border: '1px solid #e5e7eb'
+                                      job.status === 'completed' ? '#f0fdf4' : 
+                                      job.status === 'processing' ? '#eff6ff' : '#fefce8',
+                    borderRadius: 6,
+                    border: '1px solid #e5e7eb',
+                    borderLeft: `4px solid ${getStatusColor(job.status)}`
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <span>{getStatusIcon(job.status)}</span>
-                    <span style={{ fontSize: 13, color: getStatusColor(job.status), fontWeight: 500 }}>
-                      {job.status === 'completed' ? getJobResultMessage(job) : job.progress_message}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 18 }}>{getStatusIcon(job.status)}</span>
+                      <span style={{ fontSize: 14, color: getStatusColor(job.status), fontWeight: 600, textTransform: 'capitalize' }}>
+                        {job.status}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      {new Date(job.created_at).toLocaleTimeString()}
                     </span>
+                  </div>
+                  
+                  <div style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
+                    {job.status === 'completed' ? getJobResultMessage(job) : job.progress_message}
                   </div>
 
                   {/* Show order links for completed jobs */}
