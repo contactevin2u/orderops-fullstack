@@ -482,34 +482,65 @@ def _process_uid_actions(
         
         # Get current stock via the unified service
         unified_service = UnifiedInventoryService(db)
-        current_stock = unified_service.get_lorry_current_stock(lorry_id)
-        
-        print(f"📦 LORRY {lorry_id} CURRENT STOCK via UnifiedService: {len(current_stock)} items")
-        for uid, stock_info in list(current_stock.items())[:5]:  # Show first 5 items
-            qty = stock_info.get('current_quantity', 0)
-            sku_name = stock_info.get('sku_name', 'Unknown')
-            print(f"   - {uid}: {sku_name} (Qty: {qty})")
+        try:
+            lorry_inventory = unified_service.get_lorry_inventory(lorry_id)
+            items = lorry_inventory.get('items', [])
+            print(f"📦 LORRY {lorry_id} CURRENT INVENTORY: {len(items)} items")
+            
+            # Show first 5 items for debugging
+            for item in items[:5]:
+                uid = item.get('uid', 'N/A')
+                sku_name = item.get('sku_name', 'Unknown')
+                current_qty = item.get('current_quantity', 0)
+                print(f"   - {uid}: {sku_name} (Qty: {current_qty})")
+                
+        except Exception as inventory_error:
+            print(f"⚠️ Could not get lorry inventory via UnifiedService: {inventory_error}")
+            items = []
         
         # Debug: Check if requested UIDs are in current stock
         for uid_action in uid_actions:
             uid = uid_action.uid
-            if uid in current_stock:
-                qty = current_stock[uid].get('current_quantity', 0)
-                sku_name = current_stock[uid].get('sku_name', 'Unknown')
-                print(f"✅ UID {uid} FOUND in lorry stock - {sku_name} (Qty: {qty})")
+            found_item = None
+            
+            # Look for the UID in the inventory items
+            for item in items:
+                if item.get('uid') == uid:
+                    found_item = item
+                    break
+            
+            if found_item:
+                qty = found_item.get('current_quantity', 0)
+                sku_name = found_item.get('sku_name', 'Unknown')
+                print(f"✅ UID {uid} FOUND in lorry inventory - {sku_name} (Qty: {qty})")
             else:
-                print(f"❌ UID {uid} NOT FOUND in lorry {lorry_id} - THIS WILL CAUSE FAILURE!")
+                print(f"❌ UID {uid} NOT FOUND in lorry {lorry_id} inventory - THIS WILL CAUSE FAILURE!")
                 
                 # Check if UID exists in any lorry stock transactions
-                any_transactions = db.execute(
-                    select(LorryStockTransaction).where(LorryStockTransaction.uid == uid)
-                ).scalars().all()
-                if any_transactions:
-                    print(f"   ℹ️ UID {uid} has {len(any_transactions)} transactions in other lorries:")
-                    for trans in any_transactions[-3:]:  # Show last 3 transactions
-                        print(f"      - {trans.action} in {trans.lorry_id} on {trans.transaction_date}")
-                else:
-                    print(f"   ℹ️ UID {uid} has NO transactions in any lorry - may not be in system")
+                try:
+                    any_transactions = db.execute(
+                        select(LorryStockTransaction).where(LorryStockTransaction.uid == uid)
+                    ).scalars().all()
+                    if any_transactions:
+                        print(f"   ℹ️ UID {uid} has {len(any_transactions)} transactions in system:")
+                        for trans in any_transactions[-3:]:  # Show last 3 transactions
+                            print(f"      - {trans.action} in {trans.lorry_id} on {trans.transaction_date}")
+                    else:
+                        print(f"   ℹ️ UID {uid} has NO transactions in any lorry - may not exist in system")
+                except Exception as trans_error:
+                    print(f"   ℹ️ Could not check transaction history: {trans_error}")
+                    
+                # Also check if UID exists in Item table
+                try:
+                    item_record = db.execute(
+                        select(Item).where(Item.uid == uid)
+                    ).scalar_one_or_none()
+                    if item_record:
+                        print(f"   ℹ️ UID {uid} EXISTS in Item table - Status: {item_record.status}, Current Driver: {item_record.current_driver_id}")
+                    else:
+                        print(f"   ℹ️ UID {uid} NOT FOUND in Item table - UID may be invalid")
+                except Exception as item_error:
+                    print(f"   ℹ️ Could not check Item table: {item_error}")
         
         # Convert to lorry action format
         lorry_actions = []
