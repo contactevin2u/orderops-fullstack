@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.ui.model.LorryStockUi
+import com.yourco.driverAA.ui.model.LorrySkuUi
+import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -28,13 +30,39 @@ class VerificationViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             try {
-                val stockRes = repo.getTodayLorryStock()
-                val stock = stockRes.getOrNull()
-                _state.value = _state.value.copy(
-                    loading = false,
-                    stock = stock,
-                    error = if (stock == null) "Failed to load stock data" else null
-                )
+                when (val stockRes = repo.getTodayLorryStock()) {
+                    is Result.Success -> {
+                        val stockResponse = stockRes.data
+                        val lorryStockUi = LorryStockUi(
+                            dateIso = stockResponse.date,
+                            driverId = stockResponse.driverId,
+                            lorryId = null, // Will be populated by assignment
+                            skus = stockResponse.items.map { item ->
+                                LorrySkuUi(
+                                    skuId = item.skuId,
+                                    skuName = item.skuName,
+                                    expected = item.expectedCount,
+                                    counted = item.scannedCount ?: 0
+                                )
+                            },
+                            totalExpected = stockResponse.totalExpected
+                        )
+                        _state.value = _state.value.copy(
+                            loading = false,
+                            stock = lorryStockUi,
+                            error = null
+                        )
+                    }
+                    is Result.Error -> {
+                        _state.value = _state.value.copy(
+                            loading = false,
+                            error = stockRes.throwable.message ?: "Failed to load stock data"
+                        )
+                    }
+                    is Result.Loading -> {
+                        // Keep loading state
+                    }
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(
                     loading = false,
@@ -60,21 +88,25 @@ class VerificationViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(uploading = true, error = null)
             try {
-                val uploadRes = repo.uploadStockCount(
+                when (val uploadRes = repo.uploadStockCount(
                     asOfDate = stock.dateIso,
                     skuCounts = stock.skus.associate { it.skuId to it.counted }
-                )
-                
-                if (uploadRes.isSuccess) {
-                    _state.value = _state.value.copy(
-                        uploading = false,
-                        uploadComplete = true
-                    )
-                } else {
-                    _state.value = _state.value.copy(
-                        uploading = false,
-                        error = "Upload failed: ${uploadRes.exceptionOrNull()?.message}"
-                    )
+                )) {
+                    is Result.Success -> {
+                        _state.value = _state.value.copy(
+                            uploading = false,
+                            uploadComplete = true
+                        )
+                    }
+                    is Result.Error -> {
+                        _state.value = _state.value.copy(
+                            uploading = false,
+                            error = "Upload failed: ${uploadRes.throwable.message}"
+                        )
+                    }
+                    is Result.Loading -> {
+                        // Keep uploading state
+                    }
                 }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(

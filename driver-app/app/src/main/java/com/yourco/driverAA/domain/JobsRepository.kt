@@ -371,8 +371,8 @@ class JobsRepository @Inject constructor(
                 StockCountLine(sku_id = skuId, counted = count)
             }
             val request = StockCountUpload(as_of_date = asOfDate, lines = lines)
-            api.uploadStockCount(me.id, request)
-            Result.Success(Unit)
+            val response = api.uploadStockCount(me.id, request)
+            Result.Success(response.data)
         } catch (e: Exception) {
             Result.error(e, "upload_stock")
         }

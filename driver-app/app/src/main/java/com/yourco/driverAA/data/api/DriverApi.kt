@@ -93,6 +93,9 @@ interface DriverApi {
     @POST("driver/inventory/sku/resolve")
     suspend fun resolveSKU(@Body request: SKUResolveRequest): SKUResolveResponse
     
+    @POST("inventory/lorry/{driver_id}/stock/upload")
+    suspend fun uploadStockCount(@Path("driver_id") driverId: Int, @Body request: StockCountUpload): ApiResponse<Unit>
+    
     // Orders are automatically assigned by backend AI - no manual assignment needed
     @POST("driver/orders/simple")
     suspend fun createOrder(@Body request: CreateOrderRequest): OrderDto
@@ -558,4 +561,16 @@ data class DriverHold(
     val id: Int,
     val reason: String,
     val description: String
+)
+
+@Serializable
+data class StockCountLine(
+    val sku_id: Int,
+    val counted: Int
+)
+
+@Serializable
+data class StockCountUpload(
+    val as_of_date: String,
+    val lines: List<StockCountLine>
 )
