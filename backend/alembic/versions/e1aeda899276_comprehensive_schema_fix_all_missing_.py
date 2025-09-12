@@ -116,6 +116,30 @@ def upgrade() -> None:
                 """))
                 print(f"✅ Populated {null_count} missing SKU codes")
         
+        # Fix idempotent_requests table - critical for void orders
+        print("🔧 Checking idempotent_requests table...")
+        result = connection.execute(sa.text("""
+            SELECT column_name FROM information_schema.columns 
+            WHERE table_name = 'idempotent_requests' AND column_name = 'id'
+        """))
+        
+        if result.fetchone() is None:
+            # Missing primary key - recreate table with correct structure
+            print("⚠️ idempotent_requests table missing id column, recreating...")
+            connection.execute(sa.text("""
+                DROP TABLE IF EXISTS idempotent_requests CASCADE
+            """))
+            connection.execute(sa.text("""
+                CREATE TABLE idempotent_requests (
+                    id SERIAL PRIMARY KEY,
+                    key VARCHAR(255) UNIQUE NOT NULL,
+                    order_id INTEGER REFERENCES orders(id),
+                    action VARCHAR(50) NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                )
+            """))
+            print("✅ Recreated idempotent_requests table with correct schema")
+        
         connection.commit()
         print("✅ Comprehensive schema fix completed successfully")
         
