@@ -767,9 +767,15 @@ def void_order(
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
 ):
+    import uuid
+    
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
+
+    # Generate idempotency key if not provided
+    if idempotency_key is None:
+        idempotency_key = f"void_order_{order_id}_{uuid.uuid4().hex[:8]}"
 
     existing = db.query(IdempotentRequest).filter_by(key=idempotency_key).one_or_none()
     if existing:
