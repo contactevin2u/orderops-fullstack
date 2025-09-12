@@ -285,16 +285,23 @@ def create_order(
         db.refresh(order)
         log_action(db, current_user, "order.create", f"order_id={order.id}")
         
-        # Trigger auto-assignment after order creation
+        # Trigger auto-assignment after order creation (use AssignmentService directly)
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"About to trigger auto-assignment for order {order.id}")
         print(f"About to trigger auto-assignment for order {order.id}")
         
-        trigger_result = trigger_auto_assignment(db, order.id)
-        
-        logger.info(f"Auto-assignment trigger completed for order {order.id}: {trigger_result}")
-        print(f"Auto-assignment trigger completed for order {order.id}: {trigger_result}")
+        try:
+            from ..services.assignment_service import AssignmentService
+            assignment_service = AssignmentService(db)
+            trigger_result = assignment_service.auto_assign_all()
+            logger.info(f"Auto-assignment completed for order {order.id}: {trigger_result}")
+            print(f"Auto-assignment completed for order {order.id}: {trigger_result}")
+        except Exception as e:
+            logger.error(f"Auto-assignment failed for order {order.id}: {e}")
+            print(f"Auto-assignment failed for order {order.id}: {e}")
+            # Don't fail order creation if assignment fails
+            trigger_result = {"success": False, "error": str(e)}
         
         return envelope(OrderOut.model_validate(order))
     except Exception as e:
@@ -977,16 +984,23 @@ def create_simple_order(
         
         log_action(db, current_user.id, "create_simple_order", f"Order #{order.id}")
         
-        # Trigger auto-assignment after order creation
+        # Trigger auto-assignment after order creation (use AssignmentService directly)
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"About to trigger auto-assignment for simple order {order.id}")
         print(f"About to trigger auto-assignment for simple order {order.id}")
         
-        trigger_result = trigger_auto_assignment(db, order.id)
-        
-        logger.info(f"Auto-assignment trigger completed for simple order {order.id}: {trigger_result}")
-        print(f"Auto-assignment trigger completed for simple order {order.id}: {trigger_result}")
+        try:
+            from ..services.assignment_service import AssignmentService
+            assignment_service = AssignmentService(db)
+            trigger_result = assignment_service.auto_assign_all()
+            logger.info(f"Auto-assignment completed for simple order {order.id}: {trigger_result}")
+            print(f"Auto-assignment completed for simple order {order.id}: {trigger_result}")
+        except Exception as e:
+            logger.error(f"Auto-assignment failed for simple order {order.id}: {e}")
+            print(f"Auto-assignment failed for simple order {order.id}: {e}")
+            # Don't fail order creation if assignment fails
+            trigger_result = {"success": False, "error": str(e)}
         
         return {
             "id": order.id,
