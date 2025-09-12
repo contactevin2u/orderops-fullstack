@@ -369,4 +369,17 @@ class JobsRepository @Inject constructor(
         } catch (e: Exception) {
             Result.error(e, "stock_status")
         }
+
+    suspend fun uploadStockCount(asOfDate: String, skuCounts: Map<Int, Int>): Result<Unit> =
+        try {
+            val me = userRepository.getCurrentUserInfo().getOrThrow()
+            val lines = skuCounts.map { (skuId, count) ->
+                StockCountLine(sku_id = skuId, counted = count)
+            }
+            val request = StockCountUpload(as_of_date = asOfDate, lines = lines)
+            api.uploadStockCount(me.id, request)
+            Result.Success(Unit)
+        } catch (e: Exception) {
+            Result.error(e, "upload_stock")
+        }
 }
