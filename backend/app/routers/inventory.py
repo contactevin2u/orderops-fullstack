@@ -473,33 +473,41 @@ async def get_lorry_stock(
     inventory_service = LorryInventoryService(db)
     current_uids = inventory_service.get_current_stock(assignment.lorry_id, target_date)
     
-    # Group UIDs by SKU for display
+    # Group UIDs by SKU for display - parse UID format directly
     sku_counts = {}
     items = []
     
     for uid in current_uids:
-        # Get item details for this UID
-        item = db.execute(
-            select(Item, SKU)
-            .join(SKU, Item.sku_id == SKU.id)
-            .where(Item.uid == uid)
-        ).first()
+        # Parse SKU info from UID format (like frontend endpoint)
+        sku_info = uid.split('|')[1] if '|' in uid and len(uid.split('|')) > 1 else "UNKNOWN"
+        sku_key = sku_info.replace('SKU:', '') if ':' in sku_info else sku_info
         
-        if item:
-            item_obj, sku = item
-            sku_key = f"{sku.id}_{sku.code}"
-            
-            if sku_key not in sku_counts:
-                sku_counts[sku_key] = {
-                    "sku_id": sku.id,
-                    "sku_name": sku.name,
-                    "sku_code": sku.code,
-                    "count": 0,
-                    "uids": []
-                }
-            
-            sku_counts[sku_key]["count"] += 1
-            sku_counts[sku_key]["uids"].append(uid)
+        # Try to get actual SKU details from database
+        sku_id = None
+        sku_name = sku_key
+        sku_code = sku_key
+        
+        try:
+            if sku_key.isdigit():
+                sku = db.get(SKU, int(sku_key))
+                if sku:
+                    sku_id = sku.id
+                    sku_name = sku.name
+                    sku_code = sku.code
+        except:
+            pass  # Use parsed values as fallback
+        
+        if sku_key not in sku_counts:
+            sku_counts[sku_key] = {
+                "sku_id": sku_id or 0,
+                "sku_name": sku_name,
+                "sku_code": sku_code,
+                "count": 0,
+                "uids": []
+            }
+        
+        sku_counts[sku_key]["count"] += 1
+        sku_counts[sku_key]["uids"].append(uid)
     
     # Convert to items format expected by driver app
     for sku_data in sku_counts.values():
