@@ -254,14 +254,13 @@ class OrderPatch(BaseModel):
     notes: str | None = None
     status: str | None = None
     delivery_date: str | None = None
-    subtotal: float | None = None
+    # Settable money fields (fees and charges)
     discount: float | None = None
     delivery_fee: float | None = None
     return_delivery_fee: float | None = None
     penalty_fee: float | None = None
-    total: float | None = None
-    balance: float | None = None
     paid_amount: float | None = None
+    # Note: subtotal, total, and balance are calculated automatically
     plan: PlanPatch | None = None
     items: list[OrderItemPatch] | None = None
     delete_items: list[int] | None = None
@@ -458,20 +457,20 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
         if k in data:
             setattr(order, k, data[k])
 
-    # Handle money fields
-    money_fields = [
-        "subtotal",
+    # Handle money fields that can be set directly (fees and charges)
+    settable_money_fields = [
         "discount",
-        "delivery_fee",
+        "delivery_fee", 
         "return_delivery_fee",
         "penalty_fee",
-        "total",
-        "balance",
         "paid_amount",
     ]
-    for k in money_fields:
+    for k in settable_money_fields:
         if k in data:
             setattr(order, k, Decimal(str(data[k])))
+    
+    # Note: subtotal, total, and balance are calculated by recompute_financials()
+    # Don't allow direct setting to prevent inconsistencies
 
     if "plan" in data and order.plan:
         plan_patch = data["plan"]
@@ -538,9 +537,9 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
 
     # Recompute monetary totals based on current state
     if order.plan:
-        ensure_plan_first_month_fee(order)
-    else:
-        recompute_financials(order)
+        ensure_plan_first_month_fee(order)  # Currently a no-op
+    # Always recompute financials after changes to ensure totals are correct
+    recompute_financials(order)
     
     try:
         print(f"DEBUG: About to commit changes for order {order_id}")
