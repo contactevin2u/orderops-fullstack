@@ -17,6 +17,7 @@ interface SKU {
   name: string;
   category?: string;
   description?: string;
+  price: number;
   is_serialized: boolean;
   is_active: boolean;
   created_at: string;
@@ -27,6 +28,7 @@ interface SKUFormData {
   name: string;
   category: string;
   description: string;
+  price: number;
   is_serialized: boolean;
   is_active: boolean;
 }
@@ -48,6 +50,7 @@ export default function SKUManagementPage() {
     name: '',
     category: '',
     description: '',
+    price: 0,
     is_serialized: false,
     is_active: true
   });
@@ -68,6 +71,7 @@ export default function SKUManagementPage() {
       name: '',
       category: '',
       description: '',
+      price: 0,
       is_serialized: false,
       is_active: true
     });
@@ -127,6 +131,7 @@ export default function SKUManagementPage() {
       name: sku.name,
       category: sku.category || '',
       description: sku.description || '',
+      price: sku.price || 0,
       is_serialized: sku.is_serialized,
       is_active: sku.is_active
     });
@@ -138,6 +143,11 @@ export default function SKUManagementPage() {
     
     if (!formData.code.trim() || !formData.name.trim()) {
       setError('Code and Name are required');
+      return;
+    }
+
+    if (formData.price < 0) {
+      setError('Price must be 0 or greater');
       return;
     }
 
@@ -318,6 +328,7 @@ export default function SKUManagementPage() {
                       <th>Code</th>
                       <th>Name</th>
                       <th>Category</th>
+                      <th>Price</th>
                       <th>Type</th>
                       <th>Status</th>
                       <th>Actions</th>
@@ -341,6 +352,9 @@ export default function SKUManagementPage() {
                               {sku.category}
                             </span>
                           )}
+                        </td>
+                        <td className="font-medium">
+                          ${sku.price?.toFixed(2) || '0.00'}
                         </td>
                         <td>
                           {sku.is_serialized ? (
@@ -505,6 +519,20 @@ export default function SKUManagementPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
                   placeholder="Enter descriptive product name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Price *</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="input"
+                  value={formData.price}
+                  onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value) || 0})}
+                  placeholder="0.00"
                   required
                 />
               </div>
