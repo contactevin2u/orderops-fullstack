@@ -203,6 +203,7 @@ def upsell_order_items(
                         plan_type="INSTALLMENT",
                         months=installment_item.installment_months,
                         monthly_amount=monthly_amount,
+                        upfront_billed_amount=monthly_amount,
                         start_date=datetime.now().date(),
                         status="ACTIVE"
                     )

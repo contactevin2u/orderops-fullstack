@@ -348,6 +348,7 @@ def create_from_parsed(db: Session, payload: Dict[str, Any], idempotency_key: st
                 start_date=start_date,
                 months=months,
                 monthly_amount=monthly_amount,
+                upfront_billed_amount=monthly_amount,
                 status="ACTIVE",
             )
         )
