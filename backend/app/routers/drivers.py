@@ -449,7 +449,7 @@ def _process_uid_actions(
         from ..services.lorry_inventory_service import LorryInventoryService
         lorry_service = LorryInventoryService(db)
         
-        # Get driver's lorry assignment
+        # Get driver's lorry assignment with detailed debugging
         assignment = db.execute(
             select(LorryAssignment).where(
                 and_(
@@ -459,8 +459,46 @@ def _process_uid_actions(
             ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
         ).scalar_one_or_none()
         
-        lorry_id = assignment.lorry_id if assignment else f"DRIVER_{driver_id}"
-        print(f"DEBUG: Processing UID actions for lorry {lorry_id}")
+        print(f"🚨 LORRY DEBUG: Driver {driver_id} assignment lookup")
+        if assignment:
+            print(f"✅ FOUND ASSIGNMENT: Lorry {assignment.lorry_id}, Date {assignment.assignment_date}, Status {assignment.status}, Stock Verified: {assignment.stock_verified}")
+            lorry_id = assignment.lorry_id
+        else:
+            print(f"⚠️ NO ASSIGNMENT: Using fallback DRIVER_{driver_id}")
+            # Check if driver has any assignments at all
+            all_assignments = db.execute(
+                select(LorryAssignment).where(LorryAssignment.driver_id == driver_id)
+            ).scalars().all()
+            print(f"⚠️ TOTAL ASSIGNMENTS FOR DRIVER {driver_id}: {len(all_assignments)}")
+            for a in all_assignments:
+                print(f"   - Lorry {a.lorry_id}, Date {a.assignment_date}, Status {a.status}")
+            lorry_id = f"DRIVER_{driver_id}"
+        
+        print(f"🔍 PROCESSING UID ACTIONS for lorry {lorry_id}")
+        
+        # Debug: Check lorry stock contents
+        from ..models import LorryStock
+        lorry_stock = db.execute(
+            select(LorryStock).where(LorryStock.lorry_id == lorry_id)
+        ).scalars().all()
+        print(f"📦 LORRY {lorry_id} CURRENT STOCK: {len(lorry_stock)} items")
+        for stock in lorry_stock[:5]:  # Show first 5 items
+            print(f"   - {stock.uid} (Qty: {stock.quantity}, Status: {stock.status})")
+        
+        # Debug: Check if requested UIDs are in lorry stock
+        for uid_action in uid_actions:
+            stock_item = db.execute(
+                select(LorryStock).where(
+                    and_(
+                        LorryStock.lorry_id == lorry_id,
+                        LorryStock.uid == uid_action.uid
+                    )
+                )
+            ).scalar_one_or_none()
+            if stock_item:
+                print(f"✅ UID {uid_action.uid} FOUND in lorry stock - Qty: {stock_item.quantity}")
+            else:
+                print(f"❌ UID {uid_action.uid} NOT FOUND in lorry {lorry_id} - THIS WILL CAUSE FAILURE!")
         
         # Convert to lorry action format
         lorry_actions = []
@@ -472,6 +510,7 @@ def _process_uid_actions(
             })
         
         # Process through unified lorry system
+        print(f"🚀 CALLING LORRY SERVICE with actions: {lorry_actions}")
         lorry_result = lorry_service.process_delivery_actions(
             lorry_id=lorry_id,
             order_id=order_id,
@@ -479,6 +518,12 @@ def _process_uid_actions(
             admin_user_id=driver_id,  # Driver as admin for their actions
             uid_actions=lorry_actions
         )
+        
+        print(f"📋 LORRY SERVICE RESULT: {lorry_result}")
+        print(f"   - Success: {lorry_result.get('success', False)}")
+        print(f"   - Message: {lorry_result.get('message', 'No message')}")
+        print(f"   - Processed Count: {lorry_result.get('processed_count', 0)}")
+        print(f"   - Errors: {lorry_result.get('errors', [])}")
         
         if lorry_result.get("success", False):
             success_count = lorry_result.get("processed_count", 0)
@@ -558,8 +603,18 @@ def _process_uid_actions(
             
         else:
             # Fallback to legacy system if lorry system fails
-            print(f"DEBUG: Lorry system failed, falling back to legacy: {lorry_result.get('message', 'Unknown error')}")
-            errors.extend(lorry_result.get("errors", []))
+            failure_msg = lorry_result.get('message', 'Unknown error')
+            lorry_errors = lorry_result.get("errors", [])
+            print(f"❌ LORRY SYSTEM FAILED: {failure_msg}")
+            print(f"❌ LORRY ERRORS: {lorry_errors}")
+            
+            # Add detailed error messages for user
+            if not lorry_errors:
+                errors.append(f"UID not found in lorry {lorry_id} stock. Driver may need to verify stock loading.")
+            else:
+                errors.extend([f"Lorry stock error: {err}" for err in lorry_errors])
+            
+            errors.append(f"Lorry system failure: {failure_msg}")
             
             # Process with legacy system
             for uid_action in uid_actions:
