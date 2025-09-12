@@ -495,19 +495,17 @@ export default function SKUManagementPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">Category</label>
-                  <select
+                  <label className="block text-sm font-medium mb-1">Price (RM) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
                     className="input"
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  >
-                    <option value="">Select Category</option>
-                    <option value="BED">Bed</option>
-                    <option value="WHEELCHAIR">Wheelchair</option>
-                    <option value="OXYGEN">Oxygen Equipment</option>
-                    <option value="ACCESSORY">Accessory</option>
-                    <option value="OTHER">Other</option>
-                  </select>
+                    value={formData.price}
+                    onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value) || 0})}
+                    placeholder="0.00"
+                    required
+                  />
                 </div>
               </div>
 
@@ -524,17 +522,19 @@ export default function SKUManagementPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Price *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
+                <label className="block text-sm font-medium mb-1">Category</label>
+                <select
                   className="input"
-                  value={formData.price}
-                  onChange={(e) => setFormData({...formData, price: parseFloat(e.target.value) || 0})}
-                  placeholder="0.00"
-                  required
-                />
+                  value={formData.category}
+                  onChange={(e) => setFormData({...formData, category: e.target.value})}
+                >
+                  <option value="">Select Category</option>
+                  <option value="BED">Bed</option>
+                  <option value="WHEELCHAIR">Wheelchair</option>
+                  <option value="OXYGEN">Oxygen Equipment</option>
+                  <option value="ACCESSORY">Accessory</option>
+                  <option value="OTHER">Other</option>
+                </select>
               </div>
 
               <div>
