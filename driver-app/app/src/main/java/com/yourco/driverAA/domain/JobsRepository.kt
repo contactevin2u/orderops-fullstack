@@ -314,12 +314,6 @@ class JobsRepository @Inject constructor(
         Result.error(e, "load_assignment")
     }
     
-    suspend fun clockInWithStock(request: ClockInWithStockRequest): Result<ShiftResponse> = try {
-        val response = api.clockInWithStock(request)
-        Result.Success(response.data)
-    } catch (e: Exception) {
-        Result.error(e, "clock_in_stock")
-    }
     
     suspend fun clockIn(request: ClockInRequest): Result<ShiftResponse> = try {
         val response = api.clockIn(request)

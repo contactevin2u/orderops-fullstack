@@ -101,8 +101,6 @@ interface DriverApi {
     @GET("driver/lorry-management/my-assignment")
     suspend fun getMyLorryAssignment(@Query("date") date: String? = null): ApiResponse<MyAssignmentResponse>
     
-    @POST("driver/lorry-management/clock-in-with-stock")
-    suspend fun clockInWithStock(@Body request: ClockInWithStockRequest): ApiResponse<ShiftResponse>
     
     @GET("driver/lorry-management/driver-status")
     suspend fun getDriverStatus(): DriverStatusResponse
@@ -491,13 +489,6 @@ data class MyAssignmentResponse(
     val assignment: LorryAssignmentResponse? = null
 )
 
-@Serializable
-data class ClockInWithStockRequest(
-    val lat: Double,
-    val lng: Double,
-    val location_name: String? = null,
-    val scanned_uids: List<String>
-)
 
 @Serializable
 data class ClockInResponse(
