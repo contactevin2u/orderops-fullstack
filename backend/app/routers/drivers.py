@@ -9,7 +9,7 @@ import datetime as dt
 from ..auth.firebase import driver_auth, firebase_auth, _get_app
 from ..auth.deps import require_roles
 from ..db import get_session
-from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU, OrderItemUID, Item, User
+from ..models import Driver, DriverDevice, Trip, Order, TripEvent, Role, Commission, Customer, UpsellRecord, LorryStock, SKU, OrderItemUID, Item, User, LorryAssignment
 from ..schemas import (
     DeviceRegisterIn,
     DriverOut,
