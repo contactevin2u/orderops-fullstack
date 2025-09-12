@@ -40,4 +40,7 @@ interface PhotosDao {
     
     @Query("DELETE FROM photos WHERE uploadStatus = 'UPLOADED' AND createdAt < :olderThan")
     suspend fun deleteUploadedOlderThan(olderThan: Long)
+    
+    @Query("DELETE FROM photos")
+    suspend fun deleteAll()
 }

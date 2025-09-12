@@ -52,4 +52,7 @@ interface OutboxDao {
     
     @Query("SELECT MAX(createdAt) FROM outbox WHERE status = 'COMPLETED'")
     fun getLastSyncTime(): Flow<Long?>
+    
+    @Query("DELETE FROM outbox")
+    suspend fun deleteAll()
 }

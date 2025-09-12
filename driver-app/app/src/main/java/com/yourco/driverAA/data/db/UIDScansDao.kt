@@ -40,4 +40,7 @@ interface UIDScansDao {
     
     @Query("DELETE FROM uid_scans WHERE syncStatus = 'SYNCED' AND createdAt < :olderThan")
     suspend fun deleteSyncedOlderThan(olderThan: Long)
+    
+    @Query("DELETE FROM uid_scans")
+    suspend fun deleteAll()
 }

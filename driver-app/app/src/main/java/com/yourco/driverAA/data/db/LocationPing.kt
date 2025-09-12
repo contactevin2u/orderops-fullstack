@@ -27,4 +27,7 @@ interface LocationPingDao {
 
     @Query("UPDATE LocationPing SET uploaded = 1 WHERE id IN (:ids)")
     suspend fun markUploaded(ids: List<Long>)
+    
+    @Query("DELETE FROM LocationPing")
+    suspend fun deleteAll()
 }

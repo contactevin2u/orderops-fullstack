@@ -2,6 +2,7 @@ package com.yourco.driverAA.data.auth
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.yourco.driverAA.data.repository.DataClearingService
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
@@ -11,7 +12,8 @@ import javax.inject.Singleton
 
 @Singleton
 class AuthService @Inject constructor(
-    private val firebaseAuth: FirebaseAuth
+    private val firebaseAuth: FirebaseAuth,
+    private val dataClearingService: DataClearingService
 ) {
     
     val currentUser: Flow<FirebaseUser?> = callbackFlow {
@@ -24,6 +26,10 @@ class AuthService @Inject constructor(
     
     suspend fun signInWithEmailAndPassword(email: String, password: String): Result<FirebaseUser> {
         return try {
+            // Clear any existing local data before signing in new driver
+            // This prevents data leakage between different drivers
+            dataClearingService.clearAllLocalData()
+            
             val result = firebaseAuth.signInWithEmailAndPassword(email, password).await()
             result.user?.let { user ->
                 Result.success(user)
@@ -41,8 +47,17 @@ class AuthService @Inject constructor(
         }
     }
     
-    fun signOut() {
-        firebaseAuth.signOut()
+    suspend fun signOut() {
+        try {
+            // Clear all local data before signing out
+            // This ensures no data persists for the next driver
+            dataClearingService.clearAllLocalData()
+            firebaseAuth.signOut()
+        } catch (e: Exception) {
+            // Even if data clearing fails, sign out the user
+            firebaseAuth.signOut()
+            throw e
+        }
     }
     
     fun getCurrentUser(): FirebaseUser? = firebaseAuth.currentUser
