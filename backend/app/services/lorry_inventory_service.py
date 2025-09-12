@@ -50,9 +50,8 @@ class LorryInventoryService:
             elif transaction.is_stock_removal:
                 current_stock.discard(transaction.uid)
         
-        # UNIFIED: Also check legacy Item system for items assigned to this lorry's driver
+        # Check legacy Item system for items that might not be in transaction system yet
         try:
-            # Get current driver assignment for this lorry
             driver_assignment = self.db.execute(
                 select(LorryAssignment).where(
                     and_(
@@ -64,7 +63,6 @@ class LorryInventoryService:
             
             if driver_assignment and hasattr(driver_assignment, 'driver_id') and driver_assignment.driver_id:
                 from ..models.item import Item, ItemStatus
-                # Get items currently with this driver that aren't in our transaction system yet
                 legacy_items = self.db.execute(
                     select(Item.uid).where(
                         and_(
@@ -74,10 +72,8 @@ class LorryInventoryService:
                     )
                 ).scalars().all()
                 
-                # Add legacy items that aren't already tracked in transactions
                 for uid in legacy_items:
                     if uid not in current_stock:
-                        # Check if this UID has any transactions (if not, it's legacy-only)
                         has_transactions = self.db.execute(
                             select(func.count(LorryStockTransaction.id)).where(
                                 LorryStockTransaction.uid == uid
@@ -91,7 +87,7 @@ class LorryInventoryService:
         except Exception as e:
             logger.warning(f"Legacy data integration error for lorry {lorry_id}: {e}")
         
-        logger.info(f"Unified stock for lorry {lorry_id}: {len(current_stock)} items (including legacy)")
+        logger.info(f"Current stock for lorry {lorry_id}: {len(current_stock)} items")
         return list(current_stock)
     
     def has_transaction_history(self, lorry_id: str) -> bool:
@@ -187,39 +183,8 @@ class LorryInventoryService:
                 "errors": errors + [str(e)]
             }
         
-        # UNIFIED: Also update legacy Item system for consistency
-        try:
-            from ..models.item import Item, ItemStatus
-            for transaction in transactions_added:
-                # Check if item exists in legacy system
-                legacy_item = self.db.execute(
-                    select(Item).where(Item.uid == transaction.uid)
-                ).scalar_one_or_none()
-                
-                if legacy_item:
-                    # Update legacy item to reflect loaded state
-                    legacy_item.status = ItemStatus.WITH_DRIVER
-                    # Get driver ID from lorry assignment
-                    driver_assignment = self.db.execute(
-                        select(LorryAssignment).where(
-                            and_(
-                                LorryAssignment.lorry_id == lorry_id,
-                                LorryAssignment.assignment_date <= date.today()
-                            )
-                        ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
-                    ).first()
-                    
-                    if driver_assignment:
-                        legacy_item.current_driver_id = driver_assignment.driver_id
-                    
-                    logger.info(f"Updated legacy Item {transaction.uid} to WITH_DRIVER status")
-                    
-            # Commit legacy updates
-            self.db.commit()
-            
-        except Exception as e:
-            logger.warning(f"Legacy system sync warning: {e}")
-            # Don't fail the whole operation for legacy sync issues
+        # Legacy sync removed - using unified LorryStockTransaction system only
+        logger.info("Using unified transaction system - legacy sync disabled")
         
         logger.info(f"Loaded {len(transactions_added)} UIDs into lorry {lorry_id}")
         
@@ -287,27 +252,8 @@ class LorryInventoryService:
                 "errors": errors + [str(e)]
             }
         
-        # UNIFIED: Also update legacy Item system for consistency
-        try:
-            from ..models.item import Item, ItemStatus
-            for transaction in transactions_added:
-                # Check if item exists in legacy system
-                legacy_item = self.db.execute(
-                    select(Item).where(Item.uid == transaction.uid)
-                ).scalar_one_or_none()
-                
-                if legacy_item:
-                    # Update legacy item to reflect unloaded state (back to warehouse)
-                    legacy_item.status = ItemStatus.WAREHOUSE
-                    legacy_item.current_driver_id = None
-                    logger.info(f"Updated legacy Item {transaction.uid} to WAREHOUSE status")
-                    
-            # Commit legacy updates
-            self.db.commit()
-            
-        except Exception as e:
-            logger.warning(f"Legacy system sync warning: {e}")
-            # Don't fail the whole operation for legacy sync issues
+        # Legacy sync removed - using unified LorryStockTransaction system only
+        logger.info("Using unified transaction system - legacy sync disabled")
         
         logger.info(f"Unloaded {len(transactions_added)} UIDs from lorry {lorry_id}")
         
@@ -400,65 +346,8 @@ class LorryInventoryService:
                 "errors": errors + [str(e)]
             }
         
-        # UNIFIED: Also update legacy Item system for consistency
-        try:
-            from ..models.item import Item, ItemStatus
-            from ..models.order_item_uid import OrderItemUID, UIDAction
-            
-            for transaction in transactions_added:
-                # Update legacy Item status
-                legacy_item = self.db.execute(
-                    select(Item).where(Item.uid == transaction.uid)
-                ).scalar_one_or_none()
-                
-                if legacy_item:
-                    if transaction.action == "DELIVERY":
-                        legacy_item.status = ItemStatus.DELIVERED
-                        legacy_item.current_driver_id = None
-                    elif transaction.action == "COLLECTION":
-                        legacy_item.status = ItemStatus.WITH_DRIVER
-                        legacy_item.current_driver_id = driver_id
-                    
-                    logger.info(f"Updated legacy Item {transaction.uid} status to {legacy_item.status.value}")
-                
-                # Also create legacy OrderItemUID record for compatibility
-                if transaction.action == "DELIVERY":
-                    uid_action = UIDAction.DELIVER
-                elif transaction.action == "COLLECTION":
-                    uid_action = UIDAction.RETURN
-                else:
-                    continue  # Skip other actions
-                
-                # Check if this record already exists
-                existing_uid_record = self.db.execute(
-                    select(OrderItemUID).where(
-                        and_(
-                            OrderItemUID.order_id == order_id,
-                            OrderItemUID.uid == transaction.uid,
-                            OrderItemUID.action == uid_action
-                        )
-                    )
-                ).scalar_one_or_none()
-                
-                if not existing_uid_record:
-                    # Create legacy OrderItemUID record
-                    legacy_uid_record = OrderItemUID(
-                        order_id=order_id,
-                        uid=transaction.uid,
-                        scanned_by=driver_id,
-                        action=uid_action,
-                        sku_id=transaction.sku_id,
-                        notes=f"Auto-sync from lorry transaction: {transaction.notes}"
-                    )
-                    self.db.add(legacy_uid_record)
-                    logger.info(f"Created legacy OrderItemUID record for {transaction.uid}")
-                    
-            # Commit legacy updates
-            self.db.commit()
-            
-        except Exception as e:
-            logger.warning(f"Legacy system sync warning: {e}")
-            # Don't fail the whole operation for legacy sync issues
+        # Legacy sync removed - using unified LorryStockTransaction system only
+        logger.info("Using unified transaction system - legacy sync disabled")
         
         logger.info(f"Processed {len(transactions_added)} delivery actions for lorry {lorry_id}")
         
