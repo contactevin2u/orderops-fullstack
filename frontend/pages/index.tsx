@@ -207,25 +207,25 @@ export default function IntakePage() {
           ) : (
             <div className="stack" style={{ gap: 8 }}>
               {allJobs.map((job) => {
-              const getStatusColor = (status: JobStatus) => {
-                switch (status) {
-                  case 'completed': return '#10b981';
-                  case 'failed': return '#ef4444';
-                  case 'processing': return '#3b82f6';
-                  case 'pending': return '#fbbf24';
-                  default: return '#6b7280';
-                }
-              };
+                const getStatusColor = (status: JobStatus) => {
+                  switch (status) {
+                    case 'completed': return '#10b981';
+                    case 'failed': return '#ef4444';
+                    case 'processing': return '#3b82f6';
+                    case 'pending': return '#fbbf24';
+                    default: return '#6b7280';
+                  }
+                };
 
-              const getStatusIcon = (status: JobStatus) => {
-                switch (status) {
-                  case 'completed': return '✅';
-                  case 'failed': return '❌';
-                  case 'processing': return '⚙️';
-                  case 'pending': return '⏳';
-                  default: return '❓';
-                }
-              };
+                const getStatusIcon = (status: JobStatus) => {
+                  switch (status) {
+                    case 'completed': return '✅';
+                    case 'failed': return '❌';
+                    case 'processing': return '⚙️';
+                    case 'pending': return '⏳';
+                    default: return '❓';
+                  }
+                };
 
               return (
                 <div
