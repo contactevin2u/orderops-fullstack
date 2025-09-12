@@ -169,14 +169,7 @@ def process_one(row, sess: Session, max_attempts: int):
     
     logger.info("process_dispatch id=%s kind=%s attempt=%s", jid, kind, row["attempts"])
     
-    # Mark job as running immediately 
-    retry_db(
-        sess,
-        sess.execute,
-        update(Job)
-        .where(Job.id == jid)
-        .values(started_at=None),  # Keep it as "running" status from fetch_jobs
-    )
+    # Job is already marked as "running" by fetch_jobs - no additional update needed
     
     # Dispatch to background thread - NON-BLOCKING!
     future = executor.submit(process_job_background, jid, kind, payload, max_attempts)
