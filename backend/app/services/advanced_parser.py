@@ -63,7 +63,7 @@ class AdvancedParserService:
             order_data = parse_whatsapp_text(text)
             order = create_from_parsed(db, order_data)
             
-            # Trigger auto-assignment after order creation
+            # Trigger auto-assignment after order creation (use same function as other endpoints)
             import logging
             logger = logging.getLogger(__name__)
             logger.info(f"Parser: About to trigger auto-assignment for order {order.id} ({order.code})")
@@ -71,9 +71,9 @@ class AdvancedParserService:
             
             assignment_result = None
             try:
-                from ..services.assignment_service import AssignmentService
-                assignment_service = AssignmentService(db)
-                assignment_result = assignment_service.auto_assign_all()
+                # Use the same trigger function as other order creation endpoints
+                from ..routers.orders import trigger_auto_assignment
+                assignment_result = trigger_auto_assignment(db, order.id)
                 logger.info(f"Parser: Auto-assignment completed for order {order.id}: {assignment_result}")
                 print(f"Parser: Auto-assignment completed for order {order.id}: {assignment_result}")
             except Exception as e:
