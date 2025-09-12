@@ -21,8 +21,8 @@ android {
         applicationId = "com.yourco.driverAA"
         minSdk = 24
         targetSdk = 35
-        versionCode = 58
-        versionName = "1.20.0"
+        versionCode = 62
+        versionName = "1.24.0"
 
         // Priority: Gradle property > local.properties > environment variable > fallback
         val apiBase = (findProperty("API_BASE") as String?)
@@ -80,7 +80,7 @@ android {
             
             // Firebase App Distribution properties
             firebaseAppDistribution {
-                artifactType = "APK"
+                artifactType = "AAB"
                 groups = "testers"
             }
         }
