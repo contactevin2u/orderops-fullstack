@@ -77,36 +77,64 @@ class BackgroundJobService:
     
     def update_job_progress(self, db: Session, job_id: str, progress: int, message: str):
         """Update job progress"""
-        job = self.get_job(db, job_id)
-        if job:
-            job.progress = progress
-            job.progress_message = message
+        try:
+            # Direct update without fetching first to avoid session issues
+            update_data = {
+                'progress': progress,
+                'progress_message': message
+            }
             if progress == 0:
-                job.status = JobStatus.PROCESSING
-                job.started_at = datetime.utcnow()
-            db.commit()
+                update_data['status'] = JobStatus.PROCESSING
+                update_data['started_at'] = datetime.utcnow()
+            
+            updated = db.query(BackgroundJob).filter(BackgroundJob.id == job_id).update(update_data)
+            if updated > 0:
+                db.commit()
+            else:
+                print(f"⚠️ Job {job_id} not found for progress update")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Failed to update progress for job {job_id}: {e}")
     
     def complete_job(self, db: Session, job_id: str, result_data: Dict[str, Any]):
         """Mark job as completed with results"""
-        job = self.get_job(db, job_id)
-        if job:
-            job.status = JobStatus.COMPLETED
-            job.progress = 100
-            job.progress_message = "Processing completed successfully"
-            job.result_data = json.dumps(result_data)
-            job.completed_at = datetime.utcnow()
-            db.commit()
+        try:
+            # Direct update without fetching first to avoid session issues
+            updated = db.query(BackgroundJob).filter(BackgroundJob.id == job_id).update({
+                'status': JobStatus.COMPLETED,
+                'progress': 100,
+                'progress_message': 'Processing completed successfully',
+                'result_data': json.dumps(result_data),
+                'completed_at': datetime.utcnow()
+            })
+            if updated > 0:
+                db.commit()
+                print(f"✅ Job {job_id} marked as completed")
+            else:
+                print(f"⚠️ Job {job_id} not found for completion")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Failed to complete job {job_id}: {e}")
     
     def fail_job(self, db: Session, job_id: str, error_message: str):
         """Mark job as failed"""
-        job = self.get_job(db, job_id)
-        if job:
-            job.status = JobStatus.FAILED
-            job.progress = -1
-            job.progress_message = "Processing failed"
-            job.error_message = error_message
-            job.completed_at = datetime.utcnow()
-            db.commit()
+        try:
+            # Direct update without fetching first to avoid session issues
+            updated = db.query(BackgroundJob).filter(BackgroundJob.id == job_id).update({
+                'status': JobStatus.FAILED,
+                'progress': -1,
+                'progress_message': 'Processing failed',
+                'error_message': error_message,
+                'completed_at': datetime.utcnow()
+            })
+            if updated > 0:
+                db.commit()
+                print(f"✅ Job {job_id} marked as failed")
+            else:
+                print(f"⚠️ Job {job_id} not found for failure marking")
+        except Exception as e:
+            db.rollback()
+            print(f"❌ Failed to mark job {job_id} as failed: {e}")
     
     def process_parse_job(self, db: Session, job_id: str):
         """Process a parsing job in background"""
