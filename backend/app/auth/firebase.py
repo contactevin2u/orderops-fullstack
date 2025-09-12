@@ -7,6 +7,7 @@ from firebase_admin import auth as firebase_auth, credentials
 from fastapi import Cookie, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from ..db import get_session
 from ..models import Driver, User, Role
@@ -43,7 +44,7 @@ def driver_auth(
             db.commit()
         except Exception:
             db.rollback()
-    
+
     if credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid authorization scheme")
     try:
@@ -55,10 +56,22 @@ def driver_auth(
     name = claims.get("name")
     driver = db.query(Driver).filter(Driver.firebase_uid == firebase_uid).one_or_none()
     if not driver:
-        driver = Driver(firebase_uid=firebase_uid, phone=phone, name=name)
-        db.add(driver)
-        db.commit()
-        db.refresh(driver)
+        try:
+            driver = Driver(firebase_uid=firebase_uid, phone=phone, name=name)
+            db.add(driver)
+            db.commit()
+            db.refresh(driver)
+        except IntegrityError as e:
+            db.rollback()
+            # Check if driver was created by another request (race condition)
+            driver = (
+                db.query(Driver)
+                .filter(Driver.firebase_uid == firebase_uid)
+                .one_or_none()
+            )
+            if not driver:
+                # If still no driver after rollback, re-raise the original error
+                raise e
     try:
         user = db.query(User).filter(User.username == firebase_uid).one_or_none()
         if not user:
@@ -71,10 +84,12 @@ def driver_auth(
                 db.add(user)
                 db.commit()
                 db.refresh(user)
-            except Exception as e:
+            except IntegrityError as e:
                 db.rollback()
                 # Check if user was created by another request (race condition)
-                user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+                user = (
+                    db.query(User).filter(User.username == firebase_uid).one_or_none()
+                )
                 if not user:
                     # If still no user after rollback, re-raise the original error
                     raise e
@@ -103,23 +118,23 @@ def admin_firebase_auth(
     """Firebase authentication for admin users (email/password based)"""
     if credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Invalid authorization scheme")
-    
+
     try:
         claims = verify_firebase_id_token(credentials.credentials)
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid Firebase token") from exc
-    
+
     firebase_uid = claims["uid"]
     email = claims.get("email")
     name = claims.get("name")
-    
+
     # Check if this Firebase user should be an admin
     admin_emails = os.environ.get("ADMIN_EMAILS", "").split(",")
     admin_emails = [email.strip().lower() for email in admin_emails if email.strip()]
-    
+
     if email and email.lower() not in admin_emails:
         raise HTTPException(status_code=403, detail="Not authorized as admin")
-    
+
     # Find or create admin user
     user = db.query(User).filter(User.username == firebase_uid).one_or_none()
     if not user:
@@ -133,18 +148,20 @@ def admin_firebase_auth(
             db.add(user)
             db.commit()
             db.refresh(user)
-        except Exception as e:
+        except IntegrityError as e:
             db.rollback()
             # Check if user was created by another request (race condition)
             user = db.query(User).filter(User.username == firebase_uid).one_or_none()
             if not user:
                 # If still no user after rollback, re-raise the original error
-                raise HTTPException(status_code=500, detail=f"Failed to create admin user: {str(e)}")
-    
+                raise HTTPException(
+                    status_code=500, detail=f"Failed to create admin user: {str(e)}"
+                )
+
     # Ensure user is admin
     if user.role != Role.ADMIN:
         raise HTTPException(status_code=403, detail="User is not an admin")
-    
+
     request.state.user = user
     return user
 
@@ -152,22 +169,25 @@ def admin_firebase_auth(
 def get_current_admin_user(
     request: Request,
     token: str | None = Cookie(default=None, alias="token"),
-    credentials: HTTPAuthorizationCredentials | None = Depends(HTTPBearer(auto_error=False)),
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        HTTPBearer(auto_error=False)
+    ),
     db: Session = Depends(get_session),
 ) -> User:
     """Get current admin user - supports both web cookies and Firebase tokens"""
-    
+
     # Ensure session is in clean state
     if db.in_transaction():
         try:
             db.commit()
         except Exception:
             db.rollback()
-    
+
     # Try web authentication first (cookie-based)
     if token:
         try:
             from ..core.security import decode_access_token
+
             payload = decode_access_token(token)
             user_id_str = payload.get("sub")
             if user_id_str:
@@ -178,24 +198,28 @@ def get_current_admin_user(
                     return user
         except Exception:
             pass  # Fall through to Firebase auth
-    
+
     # Try Firebase authentication (mobile app)
     if credentials and credentials.scheme.lower() == "bearer":
         try:
             claims = verify_firebase_id_token(credentials.credentials)
             firebase_uid = claims["uid"]
             email = claims.get("email")
-            
+
             # Check if this Firebase user should be an admin
             admin_emails = os.environ.get("ADMIN_EMAILS", "").split(",")
             admin_emails = [e.strip().lower() for e in admin_emails if e.strip()]
-            
+
             # If no admin emails configured, allow any Firebase user to be admin (dev mode)
-            is_admin_email = not admin_emails or (email and email.lower() in admin_emails)
-            
+            is_admin_email = not admin_emails or (
+                email and email.lower() in admin_emails
+            )
+
             if is_admin_email:
                 # Find or create admin user
-                user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+                user = (
+                    db.query(User).filter(User.username == firebase_uid).one_or_none()
+                )
                 if not user:
                     try:
                         user = User(
@@ -206,21 +230,25 @@ def get_current_admin_user(
                         db.add(user)
                         db.commit()
                         db.refresh(user)
-                    except Exception:
+                    except IntegrityError:
                         db.rollback()
                         # Check if user was created by another request (race condition)
-                        user = db.query(User).filter(User.username == firebase_uid).one_or_none()
+                        user = (
+                            db.query(User)
+                            .filter(User.username == firebase_uid)
+                            .one_or_none()
+                        )
                         if not user:
                             # If still no user after rollback, fall through to error
                             pass
-                
+
                 # Ensure user is admin
-                if user.role == Role.ADMIN:
+                if user and user.role == Role.ADMIN:
                     request.state.user = user
                     return user
-                    
+
         except Exception as exc:
             pass  # Fall through to error
-    
+
     # If no valid authentication found
     raise HTTPException(status_code=401, detail="Admin authentication required")
