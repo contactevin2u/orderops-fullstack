@@ -476,29 +476,40 @@ def _process_uid_actions(
         
         print(f"🔍 PROCESSING UID ACTIONS for lorry {lorry_id}")
         
-        # Debug: Check lorry stock contents
-        from ..models import LorryStock
-        lorry_stock = db.execute(
-            select(LorryStock).where(LorryStock.lorry_id == lorry_id)
-        ).scalars().all()
-        print(f"📦 LORRY {lorry_id} CURRENT STOCK: {len(lorry_stock)} items")
-        for stock in lorry_stock[:5]:  # Show first 5 items
-            print(f"   - {stock.uid} (Qty: {stock.quantity}, Status: {stock.status})")
+        # Debug: Check lorry stock contents using current system (LorryStockTransaction)
+        from ..models import LorryStockTransaction
+        from ..services.unified_inventory_service import UnifiedInventoryService
         
-        # Debug: Check if requested UIDs are in lorry stock
+        # Get current stock via the unified service
+        unified_service = UnifiedInventoryService(db)
+        current_stock = unified_service.get_lorry_current_stock(lorry_id)
+        
+        print(f"📦 LORRY {lorry_id} CURRENT STOCK via UnifiedService: {len(current_stock)} items")
+        for uid, stock_info in list(current_stock.items())[:5]:  # Show first 5 items
+            qty = stock_info.get('current_quantity', 0)
+            sku_name = stock_info.get('sku_name', 'Unknown')
+            print(f"   - {uid}: {sku_name} (Qty: {qty})")
+        
+        # Debug: Check if requested UIDs are in current stock
         for uid_action in uid_actions:
-            stock_item = db.execute(
-                select(LorryStock).where(
-                    and_(
-                        LorryStock.lorry_id == lorry_id,
-                        LorryStock.uid == uid_action.uid
-                    )
-                )
-            ).scalar_one_or_none()
-            if stock_item:
-                print(f"✅ UID {uid_action.uid} FOUND in lorry stock - Qty: {stock_item.quantity}")
+            uid = uid_action.uid
+            if uid in current_stock:
+                qty = current_stock[uid].get('current_quantity', 0)
+                sku_name = current_stock[uid].get('sku_name', 'Unknown')
+                print(f"✅ UID {uid} FOUND in lorry stock - {sku_name} (Qty: {qty})")
             else:
-                print(f"❌ UID {uid_action.uid} NOT FOUND in lorry {lorry_id} - THIS WILL CAUSE FAILURE!")
+                print(f"❌ UID {uid} NOT FOUND in lorry {lorry_id} - THIS WILL CAUSE FAILURE!")
+                
+                # Check if UID exists in any lorry stock transactions
+                any_transactions = db.execute(
+                    select(LorryStockTransaction).where(LorryStockTransaction.uid == uid)
+                ).scalars().all()
+                if any_transactions:
+                    print(f"   ℹ️ UID {uid} has {len(any_transactions)} transactions in other lorries:")
+                    for trans in any_transactions[-3:]:  # Show last 3 transactions
+                        print(f"      - {trans.action} in {trans.lorry_id} on {trans.transaction_date}")
+                else:
+                    print(f"   ℹ️ UID {uid} has NO transactions in any lorry - may not be in system")
         
         # Convert to lorry action format
         lorry_actions = []
