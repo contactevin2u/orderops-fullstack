@@ -103,13 +103,30 @@ def process_job_background(job_id: int, kind: str, payload: dict, max_attempts: 
                 order = retry_db(sess, create_order_from_parsed, sess, parsed)
                 
                 # Trigger auto-assignment after order creation (same as API endpoints)
-                logger.info(f"Worker: About to trigger auto-assignment for order {order.id} ({order.code})")
+                print(f"🚀 WORKER: Starting auto-assignment for order {order.id} ({order.code})")
+                logger.info(f"🚀 WORKER: Starting auto-assignment for order {order.id} ({order.code})")
                 try:
+                    print(f"🔍 WORKER: Creating assignment service...")
                     assignment_service = AssignmentService(sess)
+                    
+                    print(f"🔍 WORKER: Calling auto_assign_all() with retry_db...")
                     assignment_result = retry_db(sess, assignment_service.auto_assign_all)
-                    logger.info(f"Worker: Auto-assignment completed for order {order.id}: {assignment_result}")
+                    
+                    print(f"✅ WORKER: Auto-assignment completed for order {order.id}: {assignment_result}")
+                    logger.info(f"✅ WORKER: Auto-assignment completed for order {order.id}: {assignment_result}")
+                    
+                    if assignment_result.get('success'):
+                        assigned_count = assignment_result.get('total', 0)
+                        print(f"🎯 WORKER: Successfully assigned {assigned_count} orders including {order.id}")
+                    else:
+                        print(f"⚠️ WORKER: Assignment completed but no orders assigned: {assignment_result}")
+                        
                 except Exception as e:
-                    logger.error(f"Worker: Auto-assignment failed for order {order.id}: {e}")
+                    print(f"❌ WORKER: Auto-assignment FAILED for order {order.id}: {type(e).__name__}: {e}")
+                    logger.error(f"❌ WORKER: Auto-assignment FAILED for order {order.id}: {type(e).__name__}: {e}")
+                    import traceback
+                    print(f"🔥 WORKER: Full traceback: {traceback.format_exc()}")
+                    logger.error(f"🔥 WORKER: Full traceback: {traceback.format_exc()}")
                     # Don't fail job if assignment fails
                 
                 result = {
