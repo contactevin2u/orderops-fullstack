@@ -203,6 +203,8 @@ async def get_my_lorry_assignment(
     else:
         target_date = datetime.now().date()
     
+    print(f"🔍 DRIVER ASSIGNMENT DEBUG: Looking for assignment for driver_id={driver.id}, name='{driver.name}', firebase_uid='{driver.firebase_uid}', date={target_date}")
+    
     assignment = db.execute(
         select(LorryAssignment).where(
             and_(
@@ -211,6 +213,16 @@ async def get_my_lorry_assignment(
             )
         )
     ).scalar_one_or_none()
+    
+    # Also check if there are ANY assignments for today to help debugging
+    all_assignments_today = db.execute(
+        select(LorryAssignment).where(
+            LorryAssignment.assignment_date == target_date
+        )
+    ).scalars().all()
+    
+    print(f"🔍 ALL ASSIGNMENTS TODAY ({target_date}): {[(a.id, a.driver_id, a.lorry_id) for a in all_assignments_today]}")
+    print(f"🔍 FOUND ASSIGNMENT FOR DRIVER {driver.id}: {assignment.id if assignment else 'None'}")
     
     if not assignment:
         return envelope({"message": "No lorry assignment found for today", "assignment": None})
@@ -377,6 +389,8 @@ async def get_driver_status(
     driver = Depends(driver_auth)
 ):
     """Check if driver has any active holds that prevent work"""
+    
+    print(f"🔍 DRIVER STATUS DEBUG: Checking status for driver_id={driver.id}, name='{driver.name}', firebase_uid='{driver.firebase_uid}'")
     
     # Check for active holds
     active_holds = db.query(DriverHold).filter(
