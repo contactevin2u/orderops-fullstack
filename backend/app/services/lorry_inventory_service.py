@@ -324,7 +324,7 @@ class LorryInventoryService:
         order_id: int,
         driver_id: int,
         uid_actions: List[Dict[str, any]],
-        admin_user_id: int = 1  # System user for automatic actions
+        admin_user_id: Optional[int] = None  # Optional - not needed for driver deliveries
     ) -> Dict[str, any]:
         """Process UID actions from delivery and update lorry inventory"""
         now = datetime.now()
@@ -345,7 +345,7 @@ class LorryInventoryService:
                         uid=uid,
                         order_id=order_id,
                         driver_id=driver_id,
-                        admin_user_id=admin_user_id,
+                        admin_user_id=admin_user_id,  # Can be None for driver deliveries
                         notes=notes,
                         transaction_date=now
                     )
@@ -357,7 +357,7 @@ class LorryInventoryService:
                         uid=uid,
                         order_id=order_id,
                         driver_id=driver_id,
-                        admin_user_id=admin_user_id,
+                        admin_user_id=admin_user_id,  # Can be None for driver deliveries
                         notes=notes,
                         transaction_date=now
                     )
@@ -370,7 +370,7 @@ class LorryInventoryService:
                         uid=uid,
                         order_id=order_id,
                         driver_id=driver_id,
-                        admin_user_id=admin_user_id,
+                        admin_user_id=admin_user_id,  # Can be None for driver deliveries
                         notes=f"SWAP - {notes}",
                         transaction_date=now
                     )
@@ -482,7 +482,7 @@ class LorryInventoryService:
         
         try:
             query = select(LorryStockTransaction, User).join(
-                User, LorryStockTransaction.admin_user_id == User.id
+                User, LorryStockTransaction.admin_user_id == User.id, isouter=True  # LEFT JOIN since admin_user_id can be NULL
             ).order_by(LorryStockTransaction.transaction_date.desc())
             logger.info(f"DEBUG: Base query created")
         except Exception as e:

@@ -28,8 +28,8 @@ class LorryStockTransaction(Base):
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id"), nullable=True, index=True)  # For delivery actions
     driver_id: Mapped[int | None] = mapped_column(ForeignKey("drivers.id"), nullable=True, index=True)  # For delivery actions
     
-    # Admin control
-    admin_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Admin control (only required for admin-initiated actions)
+    admin_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     # Transaction metadata
