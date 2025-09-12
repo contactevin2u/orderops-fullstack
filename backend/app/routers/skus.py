@@ -4,6 +4,7 @@ from sqlalchemy import select
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel
+from decimal import Decimal
 
 from ..db import get_session
 from ..models import SKU
@@ -24,6 +25,7 @@ class SKUCreateRequest(BaseModel):
     name: str
     category: Optional[str] = None
     description: Optional[str] = None
+    price: Decimal
     is_serialized: Optional[bool] = False
 
 
@@ -32,6 +34,7 @@ class SKUUpdateRequest(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
     description: Optional[str] = None
+    price: Optional[Decimal] = None
     is_serialized: Optional[bool] = None
     is_active: Optional[bool] = None
 
@@ -42,6 +45,7 @@ class SKUResponse(BaseModel):
     name: str
     category: Optional[str]
     description: Optional[str]
+    price: Decimal
     is_serialized: bool
     is_active: bool
     created_at: str
@@ -69,6 +73,7 @@ async def get_all_skus(
                 "name": sku.name,
                 "category": sku.category,
                 "description": sku.description,
+                "price": float(sku.price) if sku.price else 0.0,
                 "is_serialized": sku.is_serialized,
                 "is_active": sku.is_active,
                 "created_at": sku.created_at.isoformat() if sku.created_at else None,
@@ -106,6 +111,7 @@ async def create_sku(
             name=request.name.strip(),
             category=request.category.strip() if request.category else None,
             description=request.description.strip() if request.description else None,
+            price=request.price,
             is_serialized=request.is_serialized or False,
             is_active=True
         )
@@ -125,6 +131,7 @@ async def create_sku(
                 "code": sku.code,
                 "name": sku.name,
                 "category": sku.category,
+                "price": float(sku.price),
                 "is_serialized": sku.is_serialized
             }
         )
@@ -160,6 +167,7 @@ async def get_sku(
             "name": sku.name,
             "category": sku.category,
             "description": sku.description,
+            "price": float(sku.price) if sku.price else 0.0,
             "is_serialized": sku.is_serialized,
             "is_active": sku.is_active,
             "created_at": sku.created_at.isoformat() if sku.created_at else None,
@@ -206,6 +214,8 @@ async def update_sku(
             sku.category = request.category.strip() if request.category else None
         if request.description is not None:
             sku.description = request.description.strip() if request.description else None
+        if request.price is not None:
+            sku.price = request.price
         if request.is_serialized is not None:
             sku.is_serialized = request.is_serialized
         if request.is_active is not None:

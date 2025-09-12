@@ -78,6 +78,7 @@ def upgrade() -> None:
             ('name', 'VARCHAR(200) NOT NULL DEFAULT \'Unknown SKU\''),
             ('category', 'VARCHAR(50)'),
             ('description', 'TEXT'),
+            ('price', 'NUMERIC(10,2) NOT NULL DEFAULT 0.00'),
             ('is_serialized', 'BOOLEAN DEFAULT FALSE'),
             ('is_active', 'BOOLEAN DEFAULT TRUE'),
             ('created_at', 'TIMESTAMP WITH TIME ZONE DEFAULT NOW()'),

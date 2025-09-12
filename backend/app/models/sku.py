@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, func, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, func, Text, Numeric
 from sqlalchemy.orm import relationship
 from .base import Base
 
@@ -11,6 +11,7 @@ class SKU(Base):
     name = Column(String(200), nullable=False)
     category = Column(String(50), nullable=True)  # BED, WHEELCHAIR, OXYGEN, ACCESSORY
     description = Column(Text, nullable=True)
+    price = Column(Numeric(10, 2), nullable=False)  # Price with 2 decimal places
     is_serialized = Column(Boolean, nullable=False, default=False)  # Requires UID scanning
     is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, nullable=False, default=func.current_timestamp())
