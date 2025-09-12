@@ -141,6 +141,26 @@ def upgrade() -> None:
             """))
             print("✅ Recreated idempotent_requests table with correct schema")
         
+        # Fix trip_events table - critical for driver status updates
+        print("🔧 Checking trip_events table...")
+        trip_events_columns = [
+            ('lat', 'NUMERIC(10,6)'),
+            ('lng', 'NUMERIC(10,6)'),
+            ('note', 'TEXT')
+        ]
+        
+        for col_name, col_def in trip_events_columns:
+            result = connection.execute(sa.text(f"""
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'trip_events' AND column_name = '{col_name}'
+            """))
+            
+            if result.fetchone() is None:
+                connection.execute(sa.text(f"""
+                    ALTER TABLE trip_events ADD COLUMN {col_name} {col_def}
+                """))
+                print(f"✅ Added {col_name} to trip_events")
+
         connection.commit()
         print("✅ Comprehensive schema fix completed successfully")
         
