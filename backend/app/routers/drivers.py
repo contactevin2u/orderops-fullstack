@@ -464,15 +464,7 @@ def _process_uid_actions(
             print(f"✅ FOUND ASSIGNMENT: Lorry {assignment.lorry_id}, Date {assignment.assignment_date}, Status {assignment.status}, Stock Verified: {assignment.stock_verified}")
             lorry_id = assignment.lorry_id
         else:
-            print(f"⚠️ NO ASSIGNMENT: Using fallback DRIVER_{driver_id}")
-            # Check if driver has any assignments at all
-            all_assignments = db.execute(
-                select(LorryAssignment).where(LorryAssignment.driver_id == driver_id)
-            ).scalars().all()
-            print(f"⚠️ TOTAL ASSIGNMENTS FOR DRIVER {driver_id}: {len(all_assignments)}")
-            for a in all_assignments:
-                print(f"   - Lorry {a.lorry_id}, Date {a.assignment_date}, Status {a.status}")
-            lorry_id = f"DRIVER_{driver_id}"
+            raise HTTPException(status_code=409, detail=f"No lorry assignment found for driver {driver_id}. Please contact dispatcher.")
         
         print(f"🔍 PROCESSING UID ACTIONS for lorry {lorry_id}")
         

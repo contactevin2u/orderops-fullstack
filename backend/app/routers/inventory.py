@@ -413,7 +413,7 @@ async def upload_lorry_stock(
 @router.get("/lorry/{driver_id}/stock", response_model=dict)
 async def get_lorry_stock(
     driver_id: int,
-    date: str = None,  # Keep optional for backward compatibility but log when missing
+    date: str,  # REQUIRED
     db: Session = Depends(get_session),
     current_user = Depends(driver_auth)
 ):
@@ -433,18 +433,10 @@ async def get_lorry_stock(
             "message": "UID inventory system disabled"
         })
     
-    # Parse date or use today (with logging for debugging)
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    if date:
-        try:
-            target_date = datetime.strptime(date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    else:
-        target_date = datetime.utcnow().date()
-        logger.warning(f"Lorry stock endpoint called without date parameter for driver {driver_id}, defaulting to {target_date}")
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     
     # Get driver's current lorry assignment
     assignment = db.execute(
@@ -888,7 +880,6 @@ async def scan_uid(
             ).scalar_one_or_none()
         
         if driver:
-            # Get current lorry assignment
             today = date.today()
             assignment = db.execute(
                 select(LorryAssignment).where(
@@ -898,35 +889,37 @@ async def scan_uid(
                     )
                 )
             ).scalar_one_or_none()
-            
-            if assignment and assignment.lorry_id:
-                # Process lorry stock transaction for variance tracking
-                try:
-                    uid_actions = [{
-                        "action": request.action,
-                        "uid": request.uid,
-                        "notes": request.notes or f"Order {request.order_id} - {request.action}"
-                    }]
-                    
-                    lorry_result = lorry_service.process_delivery_actions(
-                        lorry_id=assignment.lorry_id,
-                        order_id=request.order_id,
-                        driver_id=driver.id,
-                        admin_user_id=current_user.id,
-                        uid_actions=uid_actions
-                    )
-                    
-                    # Add lorry tracking info to result
-                    result["lorry_tracking"] = {
-                        "lorry_id": assignment.lorry_id,
-                        "transaction_created": lorry_result.get("success", False),
-                        "message": lorry_result.get("message", "")
-                    }
-                except Exception as e:
-                    # Don't fail the main scan if lorry tracking fails
-                    result["lorry_tracking"] = {
-                        "error": f"Lorry tracking failed: {str(e)}"
-                    }
+
+            if not assignment or not assignment.lorry_id:
+                raise HTTPException(status_code=409, detail="No lorry assignment for today. Please contact dispatcher.")
+
+            # Map driver action to lorry actions expected by the service
+            # (Your earlier map already normalized request.action)
+            uid_actions = [{
+                "action": request.action,  # "DELIVER" / "RETURN" / "REPAIR" / "SWAP" etc
+                "uid": request.uid,
+                "notes": request.notes or f"Order {request.order_id} - {request.action}"
+            }]
+
+            lorry_result = lorry_service.process_delivery_actions(
+                lorry_id=assignment.lorry_id,
+                order_id=request.order_id,
+                driver_id=driver.id,
+                admin_user_id=current_user.id,
+                uid_actions=uid_actions,
+                ensure_in_lorry=True
+            )
+
+            result["lorry_tracking"] = {
+                "lorry_id": assignment.lorry_id,
+                "transaction_created": lorry_result.get("success", False),
+                "message": lorry_result.get("message", ""),
+                "errors": lorry_result.get("errors", [])
+            }
+
+            # If delivery failed due to membership, surface 409 so driver can correct
+            if not lorry_result.get("success") and lorry_result.get("errors"):
+                raise HTTPException(status_code=409, detail={"lorry_errors": lorry_result["errors"]})
         
         # Log audit action
         log_action(
@@ -1125,15 +1118,30 @@ async def add_sku_alias_v2(
 
 
 @router.get("/drivers/{driver_id}/stock-status", response_model=dict)
-async def get_driver_stock_status(
+async def stock_status(
     driver_id: int,
-    date: str = None,  # Make date parameter required for consistency
+    date: str,  # REQUIRED
     db: Session = Depends(get_session),
-    current_user = Depends(get_current_user)
+    current_user = Depends(driver_auth)
 ):
-    """Get current items with driver - UNIFIED: Uses same event-sourced data as lorry endpoint"""
-    if not settings.UID_INVENTORY_ENABLED:
+    try:
+        target_date = datetime.strptime(date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date")
+
+    # 1) Find assignment
+    assignment = db.execute(
+        select(LorryAssignment).where(
+            and_(
+                LorryAssignment.driver_id == driver_id,
+                LorryAssignment.assignment_date == target_date
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not assignment:
         return envelope({
+            "date": target_date.isoformat(),
             "driver_id": driver_id,
             "items": [],
             "stock_items": [],  # Backward compatibility
@@ -1141,113 +1149,62 @@ async def get_driver_stock_status(
             "total_scanned": 0,
             "total_variance": 0,
             "total_items": 0,  # Backward compatibility
-            "message": "UID inventory system disabled"
+            "message": "No lorry assignment on this date",
+            "holds": []
         })
-    
-    # Parse and validate date parameter to prevent timezone/implicit date issues
-    if date:
-        try:
-            target_date = datetime.strptime(date, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-    else:
-        target_date = datetime.utcnow().date()
-    
-    try:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"=== DRIVER STOCK STATUS DEBUG === driver_id: {driver_id}, date: {target_date}")
-        
-        # 1) Resolve driver -> lorry assignment for target_date (use same logic as lorry endpoint)
-        assignment = db.execute(
-            select(LorryAssignment).where(
-                and_(
-                    LorryAssignment.driver_id == driver_id,
-                    LorryAssignment.assignment_date == target_date
-                )
+
+    # 2) Event-sourced expected (same as lorry endpoint)
+    lis = LorryInventoryService(db)
+    expected_uids = lis.get_current_stock(assignment.lorry_id, target_date)
+
+    # Group by SKU (reuse your parsing)
+    buckets = {}
+    for uid in expected_uids:
+        sku_info = uid.split('|')[1] if '|' in uid and len(uid.split('|')) > 1 else "UNKNOWN"
+        sku_key = sku_info.replace('SKU:', '') if ':' in sku_info else sku_info
+        key = sku_key or "UNKNOWN"
+        buckets.setdefault(key, {"sku_name": key, "count": 0, "items": []})
+        buckets[key]["count"] += 1
+        buckets[key]["items"].append({"uid": uid, "serial": "N/A", "type": "UNKNOWN", "copy_number": buckets[key]["count"]})
+
+    items = list(buckets.values())
+    total_expected = sum(x["count"] for x in items)
+
+    # 3) Morning verification (if exists on that date)
+    from ..models.lorry_assignment import LorryStockVerification, DriverHold
+    verification = db.execute(
+        select(LorryStockVerification).where(
+            and_(
+                LorryStockVerification.driver_id == driver_id,
+                LorryStockVerification.verification_date == target_date
             )
-        ).scalar_one_or_none()
-        
-        if not assignment:
-            logger.info(f"DEBUG: No lorry assignment found for driver {driver_id} on {target_date}")
-            return envelope({
-                "date": target_date.isoformat(),
-                "driver_id": driver_id,
-                "items": [],
-                "stock_items": [],  # Backward compatibility
-                "total_expected": 0,
-                "total_scanned": 0,
-                "total_variance": 0,
-                "total_items": 0,  # Backward compatibility
-                "message": "No lorry assignment on this date"
-            })
-        
-        # 2) Use same event-sourced truth as the lorry endpoint
-        service = LorryInventoryService(db)
-        current_uids = service.get_current_stock(assignment.lorry_id, target_date)
-        logger.info(f"DEBUG: Found {len(current_uids)} UIDs in lorry {assignment.lorry_id}: {current_uids}")
-        
-        # 3) Parse UIDs and group by SKU/type (same logic as suggested fix)
-        def parse_uid(uid: str):
-            sku_name, type_name = "UNKNOWN", "UNKNOWN"
-            for part in uid.split("|"):
-                if part.startswith("SKU:"):
-                    sku_name = part.split(":", 1)[1] if ":" in part else "UNKNOWN"
-                if part.startswith("TYPE:"):
-                    type_name = part.split(":", 1)[1] if ":" in part else "UNKNOWN"
-            return sku_name, type_name
-        
-        buckets = {}
-        for uid in current_uids:
-            sku_name, type_name = parse_uid(uid)
-            # Normalize type mismatch (e.g., TYPE:NEW vs item.type == RENTAL)
-            if type_name not in ("RENTAL", "NEW", "REPAIR"):
-                type_name = "RENTAL"
-            key = (sku_name, type_name)
-            if key not in buckets:
-                buckets[key] = {"sku_name": sku_name, "type": type_name, "count": 0, "items": []}
-            buckets[key]["count"] += 1
-            buckets[key]["items"].append({
-                "uid": uid, 
-                "serial": "N/A", 
-                "type": type_name, 
-                "copy_number": buckets[key]["count"]
-            })
-        
-        expected_items = list(buckets.values())
-        total_expected = sum(x["count"] for x in expected_items)
-        
-        # 4) For now, set scanned = expected (no variance calculation yet)
-        # This can be enhanced later to compare against LorryStock counts
-        total_scanned = total_expected
-        total_variance = 0
-        
-        logger.info(f"DEBUG: Returning lorry stock response for {assignment.lorry_id}, total_expected={total_expected}")
-        return envelope({
-            "date": target_date.isoformat(),
-            "driver_id": driver_id,
-            "lorry_id": assignment.lorry_id,
-            "items": expected_items,  # New unified structure
-            "stock_items": expected_items,  # Backward compatibility
-            "total_expected": total_expected,
-            "total_scanned": total_scanned,
-            "total_variance": total_variance,
-            "total_items": total_expected,  # Backward compatibility
-            "message": f"Stock from lorry {assignment.lorry_id} (event-sourced)"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in unified stock status: {e}")
-        # Fallback to legacy system if lorry system fails
-        try:
-            service = InventoryService(db)
-            result = service.get_driver_stock_status(driver_id)
-            result["fallback"] = True
-            result["message"] = "Using legacy inventory system"
-            return envelope(result)
-        except Exception as fallback_error:
-            logger.error(f"Fallback also failed: {fallback_error}")
-            raise HTTPException(status_code=500, detail=f"Both unified and legacy systems failed: {str(e)}")
+        )
+    ).scalar_one_or_none()
+
+    total_scanned = verification.total_scanned if verification else 0
+    total_variance = total_scanned - total_expected
+
+    # 4) Holds (active)
+    holds = db.query(DriverHold).filter(
+        DriverHold.driver_id == driver_id,
+        DriverHold.status == "ACTIVE"
+    ).all()
+
+    holds_view = [{"id": h.id, "reason": h.reason, "description": h.description} for h in holds]
+
+    return envelope({
+        "date": target_date.isoformat(),
+        "driver_id": driver_id,
+        "lorry_id": assignment.lorry_id,
+        "items": items,
+        "stock_items": items,  # Backward compatibility
+        "total_expected": total_expected,
+        "total_scanned": total_scanned,
+        "total_variance": total_variance,
+        "total_items": total_expected,  # Backward compatibility
+        "message": f"Stock status for {assignment.lorry_id}",
+        "holds": holds_view
+    })
 
 
 @router.post("/lorry-stock/upload", response_model=dict)

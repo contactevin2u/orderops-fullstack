@@ -1,9 +1,9 @@
 """Lorry Inventory Service for real-time stock tracking"""
 
-from datetime import datetime, date
-from typing import List, Dict, Optional, Tuple
+from datetime import datetime, date, timedelta, timezone
+from typing import List, Dict, Optional, Tuple, Any, Set
 from sqlalchemy.orm import Session
-from sqlalchemy import select, and_, desc, func
+from sqlalchemy import select, and_, desc, func, literal_column
 import json
 import logging
 
@@ -18,6 +18,14 @@ from ..models import (
 
 logger = logging.getLogger(__name__)
 
+IN_ACTIONS = ("LOAD", "COLLECTION")
+OUT_ACTIONS = ("UNLOAD", "DELIVERY")
+
+def _kl_day_bounds(d: date) -> Tuple[datetime, datetime]:
+    # Asia/Kuala_Lumpur is UTC+8 with no DST; compute [start, end) and convert to UTC for DB timestamps
+    start_local = datetime(d.year, d.month, d.day, 0, 0, 0, tzinfo=timezone(timedelta(hours=8)))
+    end_local = start_local + timedelta(days=1)
+    return (start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc))
 
 class LorryInventoryService:
     """Service for managing lorry stock in real-time"""
@@ -26,32 +34,35 @@ class LorryInventoryService:
         self.db = db
     
     def get_current_stock(self, lorry_id: str, as_of_date: Optional[date] = None) -> List[str]:
-        """Get current UIDs in the specified lorry - Transaction system only"""
+        """
+        UID state as-of end of 'as_of_date' business day (KL). Uses latest action per (lorry, uid).
+        """
         target_date = as_of_date or date.today()
-        
-        # Get all transactions for this lorry up to the target date
-        transactions = self.db.execute(
-            select(LorryStockTransaction)
+        start_utc, end_utc = _kl_day_bounds(target_date)
+
+        t = LorryStockTransaction
+
+        # row_number() over (lorry_id, uid) by transaction_date desc, id desc
+        rn = func.row_number().over(
+            partition_by=(t.lorry_id, t.uid),
+            order_by=(t.transaction_date.desc(), t.id.desc())
+        ).label("rn")
+
+        subq = (
+            select(t.lorry_id, t.uid, t.action, rn)
             .where(
                 and_(
-                    LorryStockTransaction.lorry_id == lorry_id,
-                    func.date(LorryStockTransaction.transaction_date) <= target_date
+                    t.lorry_id == lorry_id,
+                    t.transaction_date < end_utc  # half-open: include all events strictly before next day 00:00 KL
                 )
             )
-            .order_by(LorryStockTransaction.transaction_date.asc())
-        ).scalars().all()
-        
-        # Process transactions to determine current stock
-        current_stock = set()
-        
-        for transaction in transactions:
-            if transaction.is_stock_addition:
-                current_stock.add(transaction.uid)
-            elif transaction.is_stock_removal:
-                current_stock.discard(transaction.uid)
-        
-        logger.info(f"Transaction-only stock for lorry {lorry_id}: {len(current_stock)} items")
-        return list(current_stock)
+        ).subquery()
+
+        rows = self.db.execute(
+            select(subq.c.uid, subq.c.action).where(subq.c.rn == 1)
+        ).all()
+
+        return [uid for (uid, action) in rows if action in IN_ACTIONS]
     
     def has_transaction_history(self, lorry_id: str) -> bool:
         """Check if a lorry has any transaction history"""
@@ -232,91 +243,86 @@ class LorryInventoryService:
         lorry_id: str,
         order_id: int,
         driver_id: int,
-        uid_actions: List[Dict[str, any]],
-        admin_user_id: Optional[int] = None  # Optional - not needed for driver deliveries
-    ) -> Dict[str, any]:
-        """Process UID actions from delivery and update lorry inventory"""
-        now = datetime.now()
-        transactions_added = []
-        errors = []
-        
-        for action_data in uid_actions:
-            try:
+        uid_actions: List[Dict[str, Any]],
+        admin_user_id: Optional[int] = None,
+        ensure_in_lorry: bool = True
+    ) -> Dict[str, Any]:
+        """Process UID actions and update lorry inventory atomically"""
+        now = datetime.now(timezone.utc)
+        errors: List[str] = []
+        transactions_added: List[LorryStockTransaction] = []
+
+        # Preload current state once for quick membership checks
+        current_stock: Set[str] = set(self.get_current_stock(lorry_id, now.date()))
+
+        def _add_tx(action: str, uid: str, notes: str):
+            tx = LorryStockTransaction(
+                lorry_id=lorry_id,
+                action=action,
+                uid=uid,
+                order_id=order_id,
+                driver_id=driver_id,
+                admin_user_id=admin_user_id,
+                notes=notes,
+                transaction_date=now
+            )
+            self.db.add(tx)
+            transactions_added.append(tx)
+
+        try:
+            for action_data in uid_actions:
                 action = action_data.get("action")
                 uid = action_data.get("uid")
                 notes = action_data.get("notes", f"Order {order_id} - {action}")
-                
+
+                if not uid or not action:
+                    errors.append("Missing action or uid")
+                    continue
+
                 if action == "DELIVER":
-                    # Remove from lorry (delivered to customer)
-                    transaction = LorryStockTransaction(
-                        lorry_id=lorry_id,
-                        action="DELIVERY",
-                        uid=uid,
-                        order_id=order_id,
-                        driver_id=driver_id,
-                        admin_user_id=admin_user_id,  # Can be None for driver deliveries
-                        notes=notes,
-                        transaction_date=now
-                    )
-                elif action in ["COLLECT", "REPAIR"]:
-                    # Add to lorry (collected from customer)
-                    transaction = LorryStockTransaction(
-                        lorry_id=lorry_id,
-                        action="COLLECTION",
-                        uid=uid,
-                        order_id=order_id,
-                        driver_id=driver_id,
-                        admin_user_id=admin_user_id,  # Can be None for driver deliveries
-                        notes=notes,
-                        transaction_date=now
-                    )
+                    if ensure_in_lorry and uid not in current_stock:
+                        errors.append(f"UID not in lorry: {uid}")
+                        continue
+                    _add_tx("DELIVERY", uid, notes)
+                    current_stock.discard(uid)
+
+                elif action in ("COLLECT", "REPAIR"):
+                    _add_tx("COLLECTION", uid, notes)
+                    current_stock.add(uid)
+
                 elif action == "SWAP":
-                    # Handle swap as both delivery and collection
-                    # This might need special handling for two UIDs
-                    transaction = LorryStockTransaction(
-                        lorry_id=lorry_id,
-                        action="DELIVERY",  # First UID delivered
-                        uid=uid,
-                        order_id=order_id,
-                        driver_id=driver_id,
-                        admin_user_id=admin_user_id,  # Can be None for driver deliveries
-                        notes=f"SWAP - {notes}",
-                        transaction_date=now
-                    )
+                    deliver_uid = action_data.get("deliver_uid") or uid
+                    collect_uid = action_data.get("collect_uid")
+                    if not deliver_uid or not collect_uid:
+                        errors.append("SWAP requires deliver_uid and collect_uid")
+                        continue
+                    if ensure_in_lorry and deliver_uid not in current_stock:
+                        errors.append(f"SWAP deliver UID not in lorry: {deliver_uid}")
+                        continue
+                    _add_tx("DELIVERY", deliver_uid, f"SWAP OUT - {notes}")
+                    current_stock.discard(deliver_uid)
+                    _add_tx("COLLECTION", collect_uid, f"SWAP IN - {notes}")
+                    current_stock.add(collect_uid)
+
                 else:
                     errors.append(f"Unknown action: {action}")
-                    continue
-                
-                self.db.add(transaction)
-                transactions_added.append(transaction)
-                
-            except Exception as e:
-                errors.append(f"Failed to process action {action_data}: {str(e)}")
-                logger.error(f"Error processing delivery action: {e}")
-        
-        # Commit all successful transactions
-        try:
+
             self.db.commit()
-            for transaction in transactions_added:
-                self.db.refresh(transaction)
+            for tx in transactions_added:
+                self.db.refresh(tx)
+
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Failed to commit delivery transactions: {e}")
             return {
                 "success": False,
                 "message": f"Database error: {str(e)}",
                 "processed_count": 0,
                 "errors": errors + [str(e)]
             }
-        
-        # Legacy sync removed - using unified LorryStockTransaction system only
-        logger.info("Using unified transaction system - legacy sync disabled")
-        
-        logger.info(f"Processed {len(transactions_added)} delivery actions for lorry {lorry_id}")
-        
+
         return {
-            "success": True,
-            "message": f"Successfully processed {len(transactions_added)} delivery actions",
+            "success": len(errors) == 0,
+            "message": f"Successfully processed {len(transactions_added)} action(s)",
             "processed_count": len(transactions_added),
             "errors": errors
         }
