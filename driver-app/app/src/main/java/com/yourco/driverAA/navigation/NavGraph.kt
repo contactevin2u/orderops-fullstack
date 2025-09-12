@@ -21,8 +21,9 @@ import com.yourco.driverAA.util.DeepLinks
 @Composable
 fun NavGraph() {
     val navController = rememberNavController()
-    val authService: AuthService = hiltViewModel<AuthViewModel>().authService
-    val userRepository: UserRepository = hiltViewModel<AuthViewModel>().userRepository
+    val authViewModel: AuthViewModel = hiltViewModel()
+    val authService: AuthService = authViewModel.authService
+    val userRepository: UserRepository = authViewModel.userRepository
     val currentUser by authService.currentUser.collectAsState(initial = null)
     
     val startDestination = when {
@@ -45,7 +46,7 @@ fun NavGraph() {
                 onJobClick = { id -> navController.navigate("job/$id") },
                 onClockInOutClick = { navController.navigate("stock_verification") },
                 onSignOut = {
-                    authService.signOut()
+                    authViewModel.signOut()
                     navController.navigate("login") {
                         popUpTo("jobs") { inclusive = true }
                     }
