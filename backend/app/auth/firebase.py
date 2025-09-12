@@ -54,9 +54,30 @@ def driver_auth(
     firebase_uid = claims["uid"]
     phone = claims.get("phone_number")
     name = claims.get("name")
+    # First, try to find driver by Firebase UID
     driver = db.query(Driver).filter(Driver.firebase_uid == firebase_uid).one_or_none()
+    
+    # If not found by Firebase UID, check if there's an existing driver by name (admin-created)
+    if not driver and name:
+        existing_driver = db.query(Driver).filter(
+            Driver.name == name,
+            Driver.firebase_uid.is_(None)
+        ).first()
+        
+        if existing_driver:
+            # Update existing driver with Firebase UID - this preserves existing assignments
+            print(f"🔄 FIREBASE SYNC: Updating existing driver ID {existing_driver.id} '{name}' with Firebase UID")
+            existing_driver.firebase_uid = firebase_uid
+            if phone and not existing_driver.phone:
+                existing_driver.phone = phone
+            db.commit()
+            db.refresh(existing_driver)
+            driver = existing_driver
+    
+    # If still no driver found, create new one
     if not driver:
         try:
+            print(f"➕ FIREBASE SYNC: Creating new driver '{name}' with Firebase UID")
             driver = Driver(firebase_uid=firebase_uid, phone=phone, name=name)
             db.add(driver)
             db.commit()
