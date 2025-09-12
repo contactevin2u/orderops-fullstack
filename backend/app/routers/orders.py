@@ -765,7 +765,7 @@ def update_commission(
 def void_order(
     order_id: int,
     body: dict | None = None,
-    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
 ):
     order = db.get(Order, order_id)
@@ -800,7 +800,7 @@ class ReturnIn(BaseModel):
 def return_order(
     order_id: int,
     body: ReturnIn | None = None,
-    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
 ):
     order = db.get(Order, order_id)
@@ -855,7 +855,7 @@ class BuybackIn(BaseModel):
 def buyback_order(
     order_id: int,
     body: BuybackIn,
-    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
 ):
     order = db.get(Order, order_id)
@@ -897,7 +897,7 @@ class CancelInstallmentIn(BaseModel):
 def cancel_installment_order(
     order_id: int,
     body: CancelInstallmentIn,
-    idempotency_key: str = Header(..., alias="Idempotency-Key"),
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
     db: Session = Depends(get_session),
 ):
     order = db.get(Order, order_id)
