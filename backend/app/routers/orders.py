@@ -407,11 +407,14 @@ def get_order_due(order_id: int, as_of: date_cls | None = None, db: Session = De
 
 @router.patch("/{order_id}", response_model=dict)
 def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_session)):
+    print(f"DEBUG: Updating order {order_id} with data: {body.model_dump(exclude_none=True)}")
+    
     order = db.get(Order, order_id)
     if not order:
         raise HTTPException(404, "Order not found")
 
     data = body.model_dump(exclude_none=True)
+    print(f"DEBUG: Processing update data: {data}")
 
     for k in ["notes", "status", "delivery_date"]:
         if k in data:
@@ -498,8 +501,18 @@ def update_order(order_id: int, body: OrderPatch, db: Session = Depends(get_sess
         ensure_plan_first_month_fee(order)
     else:
         recompute_financials(order)
-    db.commit()
-    db.refresh(order)
+    
+    try:
+        print(f"DEBUG: About to commit changes for order {order_id}")
+        db.commit()
+        print(f"DEBUG: Successfully committed changes for order {order_id}")
+        db.refresh(order)
+        print(f"DEBUG: Order {order_id} after refresh: status={order.status}, notes={order.notes}")
+    except Exception as e:
+        print(f"ERROR: Failed to commit changes for order {order_id}: {e}")
+        db.rollback()
+        raise HTTPException(500, f"Database error: {e}")
+    
     return envelope(OrderOut.model_validate(order))
 
 
