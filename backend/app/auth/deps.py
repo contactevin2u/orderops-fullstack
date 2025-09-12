@@ -1,4 +1,4 @@
-from fastapi import Cookie, Depends, HTTPException, Request
+from fastapi import Cookie, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -52,4 +52,14 @@ def require_roles(*roles: Role):
         return user
 
     return _require
+
+
+def admin_auth(user: User = Depends(get_current_user)) -> User:
+    """Admin authentication dependency"""
+    if user.role != Role.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="Admin privileges required"
+        )
+    return user
 
