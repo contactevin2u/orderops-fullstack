@@ -413,7 +413,7 @@ async def upload_lorry_stock(
 @router.get("/lorry/{driver_id}/stock", response_model=dict)
 async def get_lorry_stock(
     driver_id: int,
-    date: Optional[str] = None,
+    date: str = None,  # Keep optional for backward compatibility but log when missing
     db: Session = Depends(get_session),
     current_user = Depends(driver_auth)
 ):
@@ -433,7 +433,10 @@ async def get_lorry_stock(
             "message": "UID inventory system disabled"
         })
     
-    # Parse date or use today
+    # Parse date or use today (with logging for debugging)
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if date:
         try:
             target_date = datetime.strptime(date, "%Y-%m-%d").date()
@@ -441,6 +444,7 @@ async def get_lorry_stock(
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
     else:
         target_date = datetime.utcnow().date()
+        logger.warning(f"Lorry stock endpoint called without date parameter for driver {driver_id}, defaulting to {target_date}")
     
     # Get driver's current lorry assignment
     assignment = db.execute(
@@ -1123,84 +1127,111 @@ async def add_sku_alias_v2(
 @router.get("/drivers/{driver_id}/stock-status", response_model=dict)
 async def get_driver_stock_status(
     driver_id: int,
+    date: str = None,  # Make date parameter required for consistency
     db: Session = Depends(get_session),
     current_user = Depends(get_current_user)
 ):
-    """Get current items with driver - UNIFIED: Uses lorry stock system"""
+    """Get current items with driver - UNIFIED: Uses same event-sourced data as lorry endpoint"""
     if not settings.UID_INVENTORY_ENABLED:
         return envelope({
             "driver_id": driver_id,
-            "stock_items": [],
-            "total_items": 0
+            "items": [],
+            "total_expected": 0,
+            "total_scanned": 0,
+            "total_variance": 0,
+            "message": "UID inventory system disabled"
         })
     
+    # Parse and validate date parameter to prevent timezone/implicit date issues
+    if date:
+        try:
+            target_date = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
+    else:
+        target_date = datetime.utcnow().date()
+    
     try:
-        # UNIFIED APPROACH: Get driver's assigned lorry and check lorry stock
-        from ..models.lorry_assignment import LorryAssignment
-        from ..models.driver import Driver
-        from ..services.lorry_inventory_service import LorryInventoryService
-        from datetime import date
         import logging
-        
         logger = logging.getLogger(__name__)
-        logger.info(f"=== DRIVER STOCK STATUS DEBUG === driver_id: {driver_id}")
+        logger.info(f"=== DRIVER STOCK STATUS DEBUG === driver_id: {driver_id}, date: {target_date}")
         
-        # Get driver's current lorry assignment
-        today = date.today()
-        logger.info(f"DEBUG: Looking for assignment on date: {today}")
-        
-        assignment = db.query(LorryAssignment).filter(
-            LorryAssignment.driver_id == driver_id,
-            LorryAssignment.assignment_date == today,
-            LorryAssignment.status.in_(["ASSIGNED", "ACTIVE"])
-        ).first()
-        
-        logger.info(f"DEBUG: Found assignment: {assignment}")
-        if assignment:
-            logger.info(f"DEBUG: Assignment details - lorry_id: {assignment.lorry_id}, status: {assignment.status}, date: {assignment.assignment_date}")
+        # 1) Resolve driver -> lorry assignment for target_date (use same logic as lorry endpoint)
+        assignment = db.execute(
+            select(LorryAssignment).where(
+                and_(
+                    LorryAssignment.driver_id == driver_id,
+                    LorryAssignment.assignment_date == target_date
+                )
+            )
+        ).scalar_one_or_none()
         
         if not assignment:
-            # No lorry assignment = no stock
+            logger.info(f"DEBUG: No lorry assignment found for driver {driver_id} on {target_date}")
             return envelope({
+                "date": target_date.isoformat(),
                 "driver_id": driver_id,
-                "stock_items": [],
-                "total_items": 0,
-                "message": "No active lorry assignment for today"
+                "items": [],
+                "total_expected": 0,
+                "total_scanned": 0,
+                "total_variance": 0,
+                "message": "No lorry assignment on this date"
             })
         
-        # Get current stock in the assigned lorry
-        logger.info(f"DEBUG: Getting stock for lorry: {assignment.lorry_id}")
-        lorry_service = LorryInventoryService(db)
-        current_uids = lorry_service.get_current_stock(assignment.lorry_id)
+        # 2) Use same event-sourced truth as the lorry endpoint
+        service = LorryInventoryService(db)
+        current_uids = service.get_current_stock(assignment.lorry_id, target_date)
         logger.info(f"DEBUG: Found {len(current_uids)} UIDs in lorry {assignment.lorry_id}: {current_uids}")
         
-        # Group by SKU for legacy compatibility
-        from collections import defaultdict
-        stock_by_sku = defaultdict(lambda: {"sku_name": "Unknown", "count": 0, "items": []})
+        # 3) Parse UIDs and group by SKU/type (same logic as suggested fix)
+        def parse_uid(uid: str):
+            sku_name, type_name = "UNKNOWN", "UNKNOWN"
+            for part in uid.split("|"):
+                if part.startswith("SKU:"):
+                    sku_name = part.split(":", 1)[1] if ":" in part else "UNKNOWN"
+                if part.startswith("TYPE:"):
+                    type_name = part.split(":", 1)[1] if ":" in part else "UNKNOWN"
+            return sku_name, type_name
         
+        buckets = {}
         for uid in current_uids:
-            # Extract SKU info from UID if possible
-            sku_info = uid.split('|')[1] if '|' in uid and len(uid.split('|')) > 1 else "UNKNOWN"
-            sku_key = sku_info.replace('SKU:', '') if ':' in sku_info else sku_info
-            
-            stock_by_sku[sku_key]["sku_name"] = sku_key
-            stock_by_sku[sku_key]["count"] += 1
-            stock_by_sku[sku_key]["items"].append({
-                "uid": uid,
-                "serial": "N/A",
-                "type": "RENTAL",
-                "copy_number": stock_by_sku[sku_key]["count"]
+            sku_name, type_name = parse_uid(uid)
+            # Normalize type mismatch (e.g., TYPE:NEW vs item.type == RENTAL)
+            if type_name not in ("RENTAL", "NEW", "REPAIR"):
+                type_name = "RENTAL"
+            key = (sku_name, type_name)
+            if key not in buckets:
+                buckets[key] = {"sku_name": sku_name, "type": type_name, "count": 0, "items": []}
+            buckets[key]["count"] += 1
+            buckets[key]["items"].append({
+                "uid": uid, 
+                "serial": "N/A", 
+                "type": type_name, 
+                "copy_number": buckets[key]["count"]
             })
         
+        expected_items = list(buckets.values())
+        total_expected = sum(x["count"] for x in expected_items)
+        
+        # 4) For now, set scanned = expected (no variance calculation yet)
+        # This can be enhanced later to compare against LorryStock counts
+        total_scanned = total_expected
+        total_variance = 0
+        
+        logger.info(f"DEBUG: Returning lorry stock response for {assignment.lorry_id}, total_expected={total_expected}")
         return envelope({
+            "date": target_date.isoformat(),
             "driver_id": driver_id,
             "lorry_id": assignment.lorry_id,
-            "stock_items": list(stock_by_sku.values()),
-            "total_items": len(current_uids),
-            "message": f"Stock from lorry {assignment.lorry_id}"
+            "items": expected_items,
+            "total_expected": total_expected,
+            "total_scanned": total_scanned,
+            "total_variance": total_variance,
+            "message": f"Stock from lorry {assignment.lorry_id} (event-sourced)"
         })
         
     except Exception as e:
+        logger.error(f"Error in unified stock status: {e}")
         # Fallback to legacy system if lorry system fails
         try:
             service = InventoryService(db)
@@ -1208,7 +1239,8 @@ async def get_driver_stock_status(
             result["fallback"] = True
             result["message"] = "Using legacy inventory system"
             return envelope(result)
-        except:
+        except Exception as fallback_error:
+            logger.error(f"Fallback also failed: {fallback_error}")
             raise HTTPException(status_code=500, detail=f"Both unified and legacy systems failed: {str(e)}")
 
 
