@@ -552,6 +552,7 @@ export function getInventoryConfig() {
 
 
 export function getLorryStock(driverId: number, date: string) {
+  const qs = `?date=${encodeURIComponent(date)}`;
   return request<{
     date: string;
     driver_id: number;
@@ -565,22 +566,36 @@ export function getLorryStock(driverId: number, date: string) {
     total_expected: number;
     total_scanned?: number;
     total_variance?: number;
-  }>(`/drivers/${driverId}/lorry-stock/${date}`);
+  }>(`/inventory/lorry/${driverId}/stock${qs}`);
 }
 
-export function uploadLorryStock(data: {
-  date: string;
-  stock_data: Array<{
-    sku_id: number;
-    counted_quantity: number;
-  }>;
-}) {
+export function uploadLorryStock(
+  driverId: number,
+  data: {
+    as_of_date: string;
+    lines: Array<{ sku_id: number; qty_counted: number }>;
+  }
+) {
   return request<{
     success: boolean;
     message: string;
-    upload_id: number;
+    reconciliation?: {
+      as_of_date: string;
+      driver_id: number;
+      skus: Array<{
+        sku_id: number;
+        sku_code: string;
+        yesterday_count: number;
+        issued_yesterday: number;
+        returned_yesterday: number;
+        expected_today: number;
+        counted_today: number;
+        variance: number;
+      }>;
+      total_variance: number;
+    };
     items_processed: number;
-  }>('/inventory/lorry-stock/upload', { json: data });
+  }>(`/inventory/lorry/${driverId}/stock/upload`, { json: data });
 }
 
 export function resolveSKU(name: string, threshold = 0.8) {
@@ -656,7 +671,8 @@ export function scanUID(data: {
   }>('/inventory/uid/scan', { json: data });
 }
 
-export function getDriverStockStatus(driverId: number) {
+export function getDriverStockStatus(driverId: number, date?: string) {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : '';
   return request<{
     driver_id: number;
     stock_items: Array<{
@@ -670,7 +686,7 @@ export function getDriverStockStatus(driverId: number) {
       }>;
     }>;
     total_items: number;
-  }>(`/inventory/drivers/${driverId}/stock-status`);
+  }>(`/inventory/drivers/${driverId}/stock-status${qs}`);
 }
 
 // -------- UID Ledger

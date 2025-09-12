@@ -101,7 +101,7 @@ export default function DriverStockPage() {
 
     try {
       setStockLoading(true);
-      const response = await getDriverStockStatus(parseInt(selectedDriver));
+      const response = await getDriverStockStatus(parseInt(selectedDriver), selectedDate);
       setCurrentStock(response);
     } catch (err: any) {
       setError(err.message || 'Failed to load current stock');
@@ -152,9 +152,9 @@ export default function DriverStockPage() {
       setError('');
       setSuccess('');
 
-      const response = await uploadLorryStock({
-        date: selectedDate,
-        stock_data: stockData
+      const response = await uploadLorryStock(parseInt(selectedDriver), {
+        as_of_date: selectedDate,
+        lines: stockData.map(it => ({ sku_id: it.sku_id, qty_counted: it.counted_quantity }))
       });
 
       if (response.success) {
