@@ -215,10 +215,27 @@ def create_adjustment_order(
 
 
 def recompute_financials(order: Order) -> None:
-    """Simple recompute"""
+    """Recompute subtotal, total, and balance from items and charges"""
+    # Calculate subtotal from all items
+    subtotal = DEC0
+    for item in order.items:
+        subtotal += q2(item.line_total or DEC0)
+    
+    # Calculate total: subtotal + fees - discount
+    total = subtotal
+    total += q2(order.delivery_fee or DEC0)
+    total += q2(order.return_delivery_fee or DEC0) 
+    total += q2(order.penalty_fee or DEC0)
+    total -= q2(order.discount or DEC0)
+    
+    # Update order totals
+    order.subtotal = q2(subtotal)
+    order.total = q2(total)
+    
+    # Update paid amount and balance
     paid = _sum_posted_payments(order)
     order.paid_amount = paid
-    order.balance = q2((order.total or DEC0) - paid)
+    order.balance = q2(total - paid)
 
 
 def ensure_plan_first_month_fee(order: Order) -> None:
