@@ -12,6 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.yourco.driverAA.ui.model.LorrySkuUi
+import com.yourco.driverAA.ui.model.LorryStockUi
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
