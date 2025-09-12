@@ -411,13 +411,29 @@ async def upload_lorry_stock(
 
 
 @router.get("/lorry/{driver_id}/stock", response_model=dict)
-async def get_lorry_stock(
+async def get_lorry_stock_driver(
     driver_id: int,
     date: str,  # REQUIRED
     db: Session = Depends(get_session),
     current_user = Depends(driver_auth)
 ):
-    """Get lorry stock snapshot for a specific date"""
+    """Get lorry stock snapshot for a specific date (driver authentication)"""
+    return _lorry_stock_core(db=db, driver_id=driver_id, date=date)
+
+
+@router.get("/admin/lorry/{driver_id}/stock", response_model=dict)
+async def get_lorry_stock_admin(
+    driver_id: int,
+    date: str,  # REQUIRED
+    db: Session = Depends(get_session),
+    current_user = Depends(admin_auth)
+):
+    """Admin alias for lorry stock snapshot (admin authentication)"""
+    return _lorry_stock_core(db=db, driver_id=driver_id, date=date)
+
+
+def _lorry_stock_core(db: Session, driver_id: int, date: str):
+    """Core lorry stock logic shared by both driver and admin endpoints"""
     if not settings.UID_INVENTORY_ENABLED:
         return envelope({
             "date": datetime.utcnow().date().isoformat(),

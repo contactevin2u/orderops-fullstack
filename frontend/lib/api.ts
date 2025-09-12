@@ -566,7 +566,7 @@ export function getLorryStock(driverId: number, date: string) {
     total_expected: number;
     total_scanned?: number;
     total_variance?: number;
-  }>(`/inventory/lorry/${driverId}/stock${qs}`);
+  }>(`/inventory/admin/lorry/${driverId}/stock${qs}`);
 }
 
 export function uploadLorryStock(
