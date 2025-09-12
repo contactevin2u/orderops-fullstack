@@ -124,6 +124,17 @@ def process_one(row, sess: Session, max_attempts: int):
             .where(Job.id == jid)
             .values(status="done", result=result, last_error=None),
         )
+        
+        # Sync result back to background job if this is a PARSE_CREATE job
+        if kind == "PARSE_CREATE" and "background_job_id" in payload:
+            background_job_id = payload["background_job_id"]
+            try:
+                from .services.background_jobs import job_service
+                job_service.complete_job(sess, background_job_id, result)
+                logger.info("process_sync_success background_job_id=%s", background_job_id)
+            except Exception as e:
+                logger.error("process_sync_failed background_job_id=%s error=%s", background_job_id, e)
+        
         logger.info("process_success id=%s", jid)
     except Exception as e:  # pragma: no cover - runtime error path
         status = "queued" if row["attempts"] < max_attempts else "error"
@@ -134,6 +145,17 @@ def process_one(row, sess: Session, max_attempts: int):
             .where(Job.id == jid)
             .values(status=status, last_error=f"{e}\n{traceback.format_exc()}"),
         )
+        
+        # Sync error back to background job if this is a PARSE_CREATE job and final failure
+        if kind == "PARSE_CREATE" and "background_job_id" in payload and status == "error":
+            background_job_id = payload["background_job_id"]
+            try:
+                from .services.background_jobs import job_service
+                job_service.fail_job(sess, background_job_id, f"Processing failed: {str(e)}")
+                logger.info("process_sync_error background_job_id=%s", background_job_id)
+            except Exception as sync_error:
+                logger.error("process_sync_error_failed background_job_id=%s error=%s", background_job_id, sync_error)
+        
         logger.error("process_error id=%s status=%s error=%s", jid, status, e)
 
 

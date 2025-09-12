@@ -45,7 +45,8 @@ class BackgroundJobService:
     """Service for managing background jobs with real-time status updates"""
     
     def create_parse_job(self, db: Session, text: str, user_id: Optional[int] = None, session_id: Optional[str] = None) -> BackgroundJob:
-        """Create a new parsing job"""
+        """Create a new parsing job and corresponding worker job"""
+        # Create background job for UI tracking
         job = BackgroundJob(
             job_type="parse_message",
             input_data=json.dumps({"text": text}),
@@ -56,6 +57,22 @@ class BackgroundJobService:
         db.add(job)
         db.commit()
         db.refresh(job)
+        
+        # Create corresponding worker job for actual processing
+        try:
+            from ..models import Job
+            worker_job = Job(
+                kind="PARSE_CREATE",
+                status="queued", 
+                payload={"text": text, "background_job_id": job.id}
+            )
+            db.add(worker_job)
+            db.commit()
+            print(f"✅ Created worker job {worker_job.id} for background job {job.id}")
+        except Exception as e:
+            print(f"❌ Failed to create worker job for background job {job.id}: {e}")
+            # Don't fail the background job creation if worker job fails
+        
         return job
     
     def get_job(self, db: Session, job_id: str) -> Optional[BackgroundJob]:

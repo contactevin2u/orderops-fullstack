@@ -58,8 +58,8 @@ def create_parse_job(
         session_id=body.session_id
     )
     
-    # Add to background processing queue
-    background_tasks.add_task(process_job_worker, job.id)
+    # Worker will automatically pick up the job from the jobs table
+    # No need to add to background_tasks anymore
     
     return envelope({
         "job_id": job.id,
