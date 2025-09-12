@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 import firebase_admin
 from firebase_admin import auth as firebase_auth, credentials
@@ -33,6 +33,53 @@ def verify_firebase_id_token(id_token: str) -> Dict[str, Any]:
     return firebase_auth.verify_id_token(id_token, app=app)
 
 
+def get_firebase_user(uid: str) -> Dict[str, Any]:
+    """Fetch complete user data from Firebase Auth by UID"""
+    app = _get_app()
+    try:
+        user_record = firebase_auth.get_user(uid, app=app)
+        return {
+            "uid": user_record.uid,
+            "email": user_record.email,
+            "phone_number": user_record.phone_number,
+            "display_name": user_record.display_name,
+            "disabled": user_record.disabled,
+            "email_verified": user_record.email_verified,
+            "custom_claims": user_record.custom_claims or {},
+        }
+    except Exception as e:
+        print(f"❌ Failed to fetch Firebase user {uid}: {e}")
+        return None
+
+
+def list_all_firebase_users() -> List[Dict[str, Any]]:
+    """Fetch all users from Firebase Auth"""
+    app = _get_app()
+    users = []
+    try:
+        # List users in batches
+        page = firebase_auth.list_users(app=app)
+        while page:
+            for user_record in page.users:
+                users.append(
+                    {
+                        "uid": user_record.uid,
+                        "email": user_record.email,
+                        "phone_number": user_record.phone_number,
+                        "display_name": user_record.display_name,
+                        "disabled": user_record.disabled,
+                        "email_verified": user_record.email_verified,
+                        "custom_claims": user_record.custom_claims or {},
+                    }
+                )
+            # Get next page
+            page = page.get_next_page()
+    except Exception as e:
+        print(f"❌ Failed to fetch Firebase users: {e}")
+
+    return users
+
+
 def driver_auth(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -52,33 +99,53 @@ def driver_auth(
     except Exception as exc:  # pragma: no cover
         raise HTTPException(status_code=401, detail="Invalid token") from exc
     firebase_uid = claims["uid"]
-    phone = claims.get("phone_number")
-    name = claims.get("name")
-    # First, try to find driver by Firebase UID
+
+    # Fetch complete user data from Firebase Auth
+    print(f"🔍 FIREBASE FETCH: Getting complete user data for UID {firebase_uid}")
+    firebase_user = get_firebase_user(firebase_uid)
+
+    if not firebase_user:
+        raise HTTPException(
+            status_code=401, detail="Failed to fetch user data from Firebase"
+        )
+
+    # Extract data from Firebase user record
+    name = firebase_user.get("display_name")
+    phone = firebase_user.get("phone_number")
+    email = firebase_user.get("email")
+
+    print(f"🔍 FIREBASE DATA: name='{name}', phone='{phone}', email='{email}'")
+
+    # Try to find existing driver by Firebase UID
     driver = db.query(Driver).filter(Driver.firebase_uid == firebase_uid).one_or_none()
-    
-    # If not found by Firebase UID, check if there's an existing driver by name (admin-created)
-    if not driver and name:
-        existing_driver = db.query(Driver).filter(
-            Driver.name == name,
-            Driver.firebase_uid.is_(None)
-        ).first()
-        
-        if existing_driver:
-            # Update existing driver with Firebase UID - this preserves existing assignments
-            print(f"🔄 FIREBASE SYNC: Updating existing driver ID {existing_driver.id} '{name}' with Firebase UID")
-            existing_driver.firebase_uid = firebase_uid
-            if phone and not existing_driver.phone:
-                existing_driver.phone = phone
-            db.commit()
-            db.refresh(existing_driver)
-            driver = existing_driver
-    
-    # If still no driver found, create new one
+
+    if not driver:
+        # Check if there's an existing driver by name (admin-created) that we should update
+        if name:
+            existing_driver = (
+                db.query(Driver)
+                .filter(Driver.name == name, Driver.firebase_uid.is_(None))
+                .first()
+            )
+
+            if existing_driver:
+                # Update existing driver with Firebase data - preserves assignments
+                print(
+                    f"🔄 FIREBASE SYNC: Updating existing driver ID {existing_driver.id} '{name}' with Firebase data"
+                )
+                existing_driver.firebase_uid = firebase_uid
+                existing_driver.name = name  # Ensure name is from Firebase
+                if phone and not existing_driver.phone:
+                    existing_driver.phone = phone
+                db.commit()
+                db.refresh(existing_driver)
+                driver = existing_driver
+
+    # If still no driver found, create new one from Firebase data
     if not driver:
         try:
-            print(f"➕ FIREBASE SYNC: Creating new driver '{name}' with Firebase UID")
-            driver = Driver(firebase_uid=firebase_uid, phone=phone, name=name)
+            print(f"➕ FIREBASE SYNC: Creating new driver from Firebase user '{name}'")
+            driver = Driver(firebase_uid=firebase_uid, name=name, phone=phone)
             db.add(driver)
             db.commit()
             db.refresh(driver)
