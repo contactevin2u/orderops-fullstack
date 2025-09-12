@@ -49,6 +49,41 @@ def upgrade() -> None:
                 sa.Column('outstation_allowance_amount', sa.Numeric(8, 2), nullable=False, server_default=sa.text('0'))
             )
             missing_columns.append('outstation_allowance_amount')
+            
+        # Add working hours tracking column
+        if 'total_working_hours' not in columns:
+            op.add_column('driver_shifts',
+                sa.Column('total_working_hours', sa.Numeric(4, 2), nullable=True)
+            )
+            missing_columns.append('total_working_hours')
+            
+        # Add status column
+        if 'status' not in columns:
+            op.add_column('driver_shifts',
+                sa.Column('status', sa.String(20), nullable=False, server_default=sa.text("'ACTIVE'"))
+            )
+            missing_columns.append('status')
+            
+        # Add notes column
+        if 'notes' not in columns:
+            op.add_column('driver_shifts',
+                sa.Column('notes', sa.Text(), nullable=True)
+            )
+            missing_columns.append('notes')
+            
+        # Add created_at column
+        if 'created_at' not in columns:
+            op.add_column('driver_shifts',
+                sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('now()'))
+            )
+            missing_columns.append('created_at')
+            
+        # Add updated_at column
+        if 'updated_at' not in columns:
+            op.add_column('driver_shifts',
+                sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('now()'))
+            )
+            missing_columns.append('updated_at')
         
         if missing_columns:
             print(f"✅ Added missing columns to driver_shifts: {missing_columns}")
@@ -65,11 +100,14 @@ def downgrade() -> None:
     if inspector.has_table('driver_shifts'):
         columns = [col['name'] for col in inspector.get_columns('driver_shifts')]
         
-        if 'outstation_allowance_amount' in columns:
-            op.drop_column('driver_shifts', 'outstation_allowance_amount')
-        if 'outstation_distance_km' in columns:
-            op.drop_column('driver_shifts', 'outstation_distance_km')
-        if 'is_outstation' in columns:
-            op.drop_column('driver_shifts', 'is_outstation')
-            
-        print("✅ Removed outstation columns from driver_shifts")
+        # Remove all columns we added (in reverse order)
+        columns_to_remove = [
+            'updated_at', 'created_at', 'notes', 'status', 'total_working_hours',
+            'outstation_allowance_amount', 'outstation_distance_km', 'is_outstation'
+        ]
+        
+        for column in columns_to_remove:
+            if column in columns:
+                op.drop_column('driver_shifts', column)
+                
+        print("✅ Removed all added columns from driver_shifts")
