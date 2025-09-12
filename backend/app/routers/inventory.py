@@ -1136,9 +1136,11 @@ async def get_driver_stock_status(
         return envelope({
             "driver_id": driver_id,
             "items": [],
+            "stock_items": [],  # Backward compatibility
             "total_expected": 0,
             "total_scanned": 0,
             "total_variance": 0,
+            "total_items": 0,  # Backward compatibility
             "message": "UID inventory system disabled"
         })
     
@@ -1172,9 +1174,11 @@ async def get_driver_stock_status(
                 "date": target_date.isoformat(),
                 "driver_id": driver_id,
                 "items": [],
+                "stock_items": [],  # Backward compatibility
                 "total_expected": 0,
                 "total_scanned": 0,
                 "total_variance": 0,
+                "total_items": 0,  # Backward compatibility
                 "message": "No lorry assignment on this date"
             })
         
@@ -1223,10 +1227,12 @@ async def get_driver_stock_status(
             "date": target_date.isoformat(),
             "driver_id": driver_id,
             "lorry_id": assignment.lorry_id,
-            "items": expected_items,
+            "items": expected_items,  # New unified structure
+            "stock_items": expected_items,  # Backward compatibility
             "total_expected": total_expected,
             "total_scanned": total_scanned,
             "total_variance": total_variance,
+            "total_items": total_expected,  # Backward compatibility
             "message": f"Stock from lorry {assignment.lorry_id} (event-sourced)"
         })
         
