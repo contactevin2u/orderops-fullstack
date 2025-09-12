@@ -796,6 +796,7 @@ export function getAllSKUs() {
     name: string;
     category?: string;
     description?: string;
+    price: number;
     is_serialized: boolean;
     is_active: boolean;
     created_at: string;
@@ -807,6 +808,7 @@ export function createSKU(data: {
   name: string;
   category?: string;
   description?: string;
+  price: number;
   is_serialized?: boolean;
 }) {
   return request<{
@@ -821,6 +823,7 @@ export function updateSKU(skuId: number, data: {
   name?: string;
   category?: string;
   description?: string;
+  price?: number;
   is_serialized?: boolean;
   is_active?: boolean;
 }) {
