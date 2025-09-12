@@ -552,12 +552,16 @@ def _process_uid_actions(
             })
         
         # Process through unified lorry system
-        print(f"🚀 CALLING LORRY SERVICE with actions: {lorry_actions}")
+        # Get a valid admin user ID instead of using driver ID
+        system_admin = db.execute(select(User).where(User.role == "admin")).scalar_one_or_none()
+        admin_user_id = system_admin.id if system_admin else 1  # Fallback to user ID 1
+        print(f"🚀 CALLING LORRY SERVICE with actions: {lorry_actions} (admin_user_id: {admin_user_id})")
+        
         lorry_result = lorry_service.process_delivery_actions(
             lorry_id=lorry_id,
             order_id=order_id,
             driver_id=driver_id,
-            admin_user_id=driver_id,  # Driver as admin for their actions
+            admin_user_id=admin_user_id,  # Use valid admin user ID
             uid_actions=lorry_actions
         )
         
