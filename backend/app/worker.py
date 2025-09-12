@@ -101,6 +101,17 @@ def process_job_background(job_id: int, kind: str, payload: dict, max_attempts: 
                 text = payload.get("text", "")
                 parsed = parse_whatsapp_text(text)
                 order = retry_db(sess, create_order_from_parsed, sess, parsed)
+                
+                # Trigger auto-assignment after order creation (same as API endpoints)
+                logger.info(f"Worker: About to trigger auto-assignment for order {order.id} ({order.code})")
+                try:
+                    assignment_service = AssignmentService(sess)
+                    assignment_result = retry_db(sess, assignment_service.auto_assign_all)
+                    logger.info(f"Worker: Auto-assignment completed for order {order.id}: {assignment_result}")
+                except Exception as e:
+                    logger.error(f"Worker: Auto-assignment failed for order {order.id}: {e}")
+                    # Don't fail job if assignment fails
+                
                 result = {
                     "order_id": order.id,
                     "order_code": order.code,
