@@ -227,64 +227,65 @@ export default function IntakePage() {
                   }
                 };
 
-              return (
-                <div
-                  key={job.id}
-                  style={{
-                    padding: 12,
-                    backgroundColor: job.status === 'failed' ? '#fef2f2' : 
-                                      job.status === 'completed' ? '#f0fdf4' : 
-                                      job.status === 'processing' ? '#eff6ff' : '#fefce8',
-                    borderRadius: 6,
-                    border: '1px solid #e5e7eb',
-                    borderLeft: `4px solid ${getStatusColor(job.status)}`
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 18 }}>{getStatusIcon(job.status)}</span>
-                      <span style={{ fontSize: 14, color: getStatusColor(job.status), fontWeight: 600, textTransform: 'capitalize' }}>
-                        {job.status}
+                return (
+                  <div
+                    key={job.id}
+                    style={{
+                      padding: 12,
+                      backgroundColor: job.status === 'failed' ? '#fef2f2' : 
+                                        job.status === 'completed' ? '#f0fdf4' : 
+                                        job.status === 'processing' ? '#eff6ff' : '#fefce8',
+                      borderRadius: 6,
+                      border: '1px solid #e5e7eb',
+                      borderLeft: `4px solid ${getStatusColor(job.status)}`
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 18 }}>{getStatusIcon(job.status)}</span>
+                        <span style={{ fontSize: 14, color: getStatusColor(job.status), fontWeight: 600, textTransform: 'capitalize' }}>
+                          {job.status}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                        {new Date(job.created_at).toLocaleTimeString()}
                       </span>
                     </div>
-                    <span style={{ fontSize: 11, color: '#6b7280' }}>
-                      {new Date(job.created_at).toLocaleTimeString()}
-                    </span>
-                  </div>
-                  
-                  <div style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
-                    {job.status === 'completed' ? getJobResultMessage(job) : job.progress_message}
-                  </div>
-
-                  {/* Show order links for completed jobs */}
-                  {job.status === 'completed' && job.result_data?.status === 'success' && (
-                    <div style={{ marginTop: 4 }}>
-                      {job.result_data.type === 'delivery' && job.result_data.order_id && (
-                        <Link href={`/orders/${job.result_data.order_id}`}>
-                          <Button variant="secondary" style={{ fontSize: 11, padding: '4px 8px' }}>
-                            View Order {job.result_data.order_code}
-                          </Button>
-                        </Link>
-                      )}
-                      {job.result_data.type === 'return' && job.result_data.mother_order_id && (
-                        <Link href={`/orders/${job.result_data.mother_order_id}`}>
-                          <Button variant="secondary" style={{ fontSize: 11, padding: '4px 8px' }}>
-                            View Order {job.result_data.mother_order_code}
-                          </Button>
-                        </Link>
-                      )}
+                    
+                    <div style={{ fontSize: 13, color: '#374151', marginBottom: 8 }}>
+                      {job.status === 'completed' ? getJobResultMessage(job) : job.progress_message}
                     </div>
-                  )}
 
-                  {job.status === 'failed' && job.error_message && (
-                    <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
-                      Error: {job.error_message}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                    {/* Show order links for completed jobs */}
+                    {job.status === 'completed' && job.result_data?.status === 'success' && (
+                      <div style={{ marginTop: 4 }}>
+                        {job.result_data.type === 'delivery' && job.result_data.order_id && (
+                          <Link href={`/orders/${job.result_data.order_id}`}>
+                            <Button variant="secondary" style={{ fontSize: 11, padding: '4px 8px' }}>
+                              View Order {job.result_data.order_code}
+                            </Button>
+                          </Link>
+                        )}
+                        {job.result_data.type === 'return' && job.result_data.mother_order_id && (
+                          <Link href={`/orders/${job.result_data.mother_order_id}`}>
+                            <Button variant="secondary" style={{ fontSize: 11, padding: '4px 8px' }}>
+                              View Order {job.result_data.mother_order_code}
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    )}
+
+                    {job.status === 'failed' && job.error_message && (
+                      <div style={{ fontSize: 11, color: '#dc2626', marginTop: 4 }}>
+                        Error: {job.error_message}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Card>
       )}
       <TermsModal
