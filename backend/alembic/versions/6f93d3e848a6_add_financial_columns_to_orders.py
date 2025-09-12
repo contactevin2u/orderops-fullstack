@@ -21,21 +21,10 @@ branch_labels = None
 depends_on = None
 
 def upgrade() -> None:
-    # Add financial columns to orders table
-    op.add_column('orders', sa.Column('subtotal', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
-    op.add_column('orders', sa.Column('discount', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
-    op.add_column('orders', sa.Column('delivery_fee', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
-    op.add_column('orders', sa.Column('return_delivery_fee', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
-    op.add_column('orders', sa.Column('penalty_fee', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
-    op.add_column('orders', sa.Column('paid_amount', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
-    op.add_column('orders', sa.Column('balance', sa.Numeric(12, 2), default=sa.text("0.00"), nullable=False))
+    # This migration failed due to duplicate columns - converted to no-op
+    # The actual column additions are handled by 0d81031778d9_add_missing_financial_columns_only
+    pass
 
 def downgrade() -> None:
-    # Drop financial columns from orders table
-    op.drop_column('orders', 'balance')
-    op.drop_column('orders', 'paid_amount')
-    op.drop_column('orders', 'penalty_fee')
-    op.drop_column('orders', 'return_delivery_fee')
-    op.drop_column('orders', 'delivery_fee')
-    op.drop_column('orders', 'discount')
-    op.drop_column('orders', 'subtotal')
+    # No-op downgrade since upgrade does nothing
+    pass
