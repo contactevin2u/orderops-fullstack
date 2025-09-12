@@ -20,7 +20,7 @@ from ..models.item import ItemType, ItemStatus
 from ..models.order_item_uid import UIDAction
 from ..services.inventory_service import InventoryService
 from ..services.lorry_inventory_service import LorryInventoryService
-from ..auth.deps import require_roles, Role, get_current_user
+from ..auth.deps import require_roles, Role, get_current_user, admin_auth
 from ..auth.firebase import driver_auth
 from ..core.config import settings
 from ..utils.responses import envelope
@@ -1118,12 +1118,29 @@ async def add_sku_alias_v2(
 
 
 @router.get("/drivers/{driver_id}/stock-status", response_model=dict)
-async def stock_status(
+async def stock_status_driver(
     driver_id: int,
     date: str,  # REQUIRED
     db: Session = Depends(get_session),
     current_user = Depends(driver_auth)
 ):
+    """Driver-scoped stock status endpoint (driver authentication required)"""
+    return _stock_status_core(db=db, driver_id=driver_id, date=date)
+
+
+@router.get("/admin/drivers/{driver_id}/stock-status", response_model=dict)
+async def stock_status_admin(
+    driver_id: int,
+    date: str,  # REQUIRED
+    db: Session = Depends(get_session),
+    current_user = Depends(admin_auth)
+):
+    """Admin alias for stock status endpoint (admin authentication required)"""
+    return _stock_status_core(db=db, driver_id=driver_id, date=date)
+
+
+def _stock_status_core(db: Session, driver_id: int, date: str):
+    """Core stock status logic shared by both driver and admin endpoints"""
     try:
         target_date = datetime.strptime(date, "%Y-%m-%d").date()
     except ValueError:

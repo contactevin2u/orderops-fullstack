@@ -686,7 +686,7 @@ export function getDriverStockStatus(driverId: number, date?: string) {
       }>;
     }>;
     total_items: number;
-  }>(`/inventory/drivers/${driverId}/stock-status${qs}`);
+  }>(`/inventory/admin/drivers/${driverId}/stock-status${qs}`);
 }
 
 // -------- UID Ledger
