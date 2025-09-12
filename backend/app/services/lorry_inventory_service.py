@@ -26,7 +26,7 @@ class LorryInventoryService:
         self.db = db
     
     def get_current_stock(self, lorry_id: str, as_of_date: Optional[date] = None) -> List[str]:
-        """Get current UIDs in the specified lorry - Transaction system only"""
+        """Get current UIDs in the specified lorry - UNIFIED with legacy data"""
         target_date = as_of_date or date.today()
         
         # Get all transactions for this lorry up to the target date
@@ -50,7 +50,44 @@ class LorryInventoryService:
             elif transaction.is_stock_removal:
                 current_stock.discard(transaction.uid)
         
-        logger.info(f"Transaction-only stock for lorry {lorry_id}: {len(current_stock)} items")
+        # Check legacy Item system for items that might not be in transaction system yet
+        try:
+            driver_assignment = self.db.execute(
+                select(LorryAssignment).where(
+                    and_(
+                        LorryAssignment.lorry_id == lorry_id,
+                        LorryAssignment.assignment_date <= target_date
+                    )
+                ).order_by(LorryAssignment.assignment_date.desc()).limit(1)
+            ).first()
+            
+            if driver_assignment and hasattr(driver_assignment, 'driver_id') and driver_assignment.driver_id:
+                from ..models.item import Item, ItemStatus
+                legacy_items = self.db.execute(
+                    select(Item.uid).where(
+                        and_(
+                            Item.current_driver_id == driver_assignment.driver_id,
+                            Item.status == ItemStatus.WITH_DRIVER
+                        )
+                    )
+                ).scalars().all()
+                
+                for uid in legacy_items:
+                    if uid not in current_stock:
+                        has_transactions = self.db.execute(
+                            select(func.count(LorryStockTransaction.id)).where(
+                                LorryStockTransaction.uid == uid
+                            )
+                        ).scalar() > 0
+                        
+                        if not has_transactions:
+                            current_stock.add(uid)
+                            logger.info(f"Added legacy UID {uid} to lorry {lorry_id} stock")
+                            
+        except Exception as e:
+            logger.warning(f"Legacy data integration error for lorry {lorry_id}: {e}")
+        
+        logger.info(f"Current stock for lorry {lorry_id}: {len(current_stock)} items")
         return list(current_stock)
     
     def has_transaction_history(self, lorry_id: str) -> bool:
