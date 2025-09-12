@@ -143,19 +143,22 @@ class BackgroundJobService:
             self.complete_job(db, job_id, result)
             
         except Exception as e:
-            # Rollback the failed transaction before attempting to record the error
-            db.rollback()
+            # The original session might be corrupted, so use a fresh one for error recording
+            print(f"Job {job_id} processing failed: {str(e)}")
             try:
-                self.fail_job(db, job_id, str(e))
-            except Exception as fail_error:
-                # If fail_job also fails, log it but don't raise
-                print(f"Failed to record job failure: {fail_error}")
-                # Try one more time with a fresh transaction
-                try:
-                    db.rollback()
-                    self.fail_job(db, job_id, f"Processing failed: {str(e)}")
-                except Exception:
-                    print(f"Double failure recording job {job_id} error: {str(e)}")
+                # Close the corrupted session
+                db.close()
+            except Exception:
+                pass
+                
+            # Use completely fresh session for error recording
+            try:
+                from ..db import get_session
+                with next(get_session()) as fresh_db:
+                    self.fail_job(fresh_db, job_id, f"Processing failed: {str(e)}")
+            except Exception as final_error:
+                print(f"Failed to record job failure for {job_id}: {final_error}")
+                print(f"Original error was: {str(e)}")
     
     def cleanup_old_jobs(self, db: Session, days_old: int = 7):
         """Clean up jobs older than specified days"""
@@ -170,14 +173,18 @@ job_service = BackgroundJobService()
 
 def process_job_worker(job_id: str):
     """Worker function for Render background jobs"""
+    db_session = None
     try:
-        with next(get_session()) as db:
-            job_service.process_parse_job(db, job_id)
+        db_session = next(get_session())
+        job_service.process_parse_job(db_session, job_id)
     except Exception as e:
         print(f"Worker failed to process job {job_id}: {str(e)}")
-        # Try to record the failure with a fresh session
-        try:
-            with next(get_session()) as fresh_db:
-                job_service.fail_job(fresh_db, job_id, f"Worker error: {str(e)}")
-        except Exception as final_error:
-            print(f"Final failure recording job {job_id}: {final_error}")
+        # The process_parse_job method now handles its own error recording
+        # with fresh sessions, so we don't need to do it here
+    finally:
+        # Always ensure session is closed
+        if db_session:
+            try:
+                db_session.close()
+            except Exception:
+                pass
