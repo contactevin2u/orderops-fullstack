@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import okhttp3.MultipartBody
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Multipart
 import retrofit2.http.PATCH
@@ -81,6 +82,13 @@ interface DriverApi {
     
     @POST("driver/inventory/lorry/{driver_id}/stock/upload")
     suspend fun uploadLorryStock(@Path("driver_id") driverId: Int, @Body body: LorryStockUploadRequest): ApiResponse<Unit>
+    
+    // Add stock-status (used for variance/hold awareness in UI)
+    @GET("inventory/drivers/{driver_id}/stock-status")
+    suspend fun getStockStatus(
+        @Path("driver_id") driverId: Int,
+        @Query("date") date: String
+    ): ApiResponse<StockStatusResponse>
     
     @POST("driver/inventory/sku/resolve")
     suspend fun resolveSKU(@Body request: SKUResolveRequest): SKUResolveResponse
@@ -517,4 +525,46 @@ data class DriverStatusResponse(
     val hold_reasons: List<String>,
     val assignment_status: AssignmentStatus,
     val message: String
+)
+
+// Additional DTOs for stock-status endpoint
+@Serializable
+data class MyAssignmentEnvelope(
+    val assignment: LorryAssignmentResponse? = null,
+    val message: String? = null
+)
+
+@Serializable
+data class StockItemEntry(
+    val uid: String,
+    val serial: String? = null,
+    val type: String,
+    val copy_number: Int? = null
+)
+
+@Serializable
+data class StockStatusSku(
+    val sku_name: String,
+    val count: Int,
+    val items: List<StockItemEntry> = emptyList()
+)
+
+@Serializable
+data class StockStatusResponse(
+    val driver_id: Int,
+    val lorry_id: String? = null,
+    val stock_items: List<StockStatusSku> = emptyList(),
+    val total_items: Int = 0,
+    val total_expected: Int = 0,
+    val total_scanned: Int = 0,
+    val total_variance: Int = 0,
+    val holds: List<DriverHold> = emptyList(),
+    val message: String? = null
+)
+
+@Serializable
+data class DriverHold(
+    val id: Int,
+    val reason: String,
+    val description: String
 )

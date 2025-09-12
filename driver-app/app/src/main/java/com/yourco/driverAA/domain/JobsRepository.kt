@@ -14,6 +14,8 @@ import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -339,4 +341,32 @@ class JobsRepository @Inject constructor(
     } catch (e: Exception) {
         Result.error(e, "driver_status")
     }
+    
+    // New helper functions for date-scoped operations and hold management
+    private val ISO = DateTimeFormatter.ISO_LOCAL_DATE
+    
+    suspend fun getTodayLorryStock(): Result<LorryStockResponse> =
+        try {
+            val today = LocalDate.now().format(ISO)
+            getLorryStock(today) // you already have getLorryStock(date)
+        } catch (e: Exception) {
+            Result.error(e, "load_stock")
+        }
+    
+    suspend fun getDriverHolds(): Result<DriverStatusResponse> =
+        try {
+            val status = api.getDriverStatus()
+            Result.Success(status)
+        } catch (e: Exception) {
+            Result.error(e, "driver_status")
+        }
+    
+    suspend fun getStockStatusFor(date: String): Result<StockStatusResponse> =
+        try {
+            val me = userRepository.getCurrentUserInfo().getOrThrow()
+            val resp = api.getStockStatus(me.id, date)
+            Result.Success(resp.data ?: StockStatusResponse(driver_id = me.id))
+        } catch (e: Exception) {
+            Result.error(e, "stock_status")
+        }
 }
