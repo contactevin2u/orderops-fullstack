@@ -34,11 +34,17 @@ class AssignmentService:
 
     def auto_assign_all(self) -> Dict[str, Any]:
         """Auto-assign all eligible orders to drivers"""
-        logger.info("Starting auto-assignment")
+        print(f"🔍 ASSIGNMENT: Starting auto-assignment")
+        logger.info("🔍 ASSIGNMENT: Starting auto-assignment")
         
         # Get orders to assign
+        print(f"🔍 ASSIGNMENT: Getting orders to assign...")
         orders = self._get_orders_to_assign()
+        print(f"🔍 ASSIGNMENT: Found {len(orders)} orders to assign")
+        logger.info(f"🔍 ASSIGNMENT: Found {len(orders)} orders to assign")
+        
         if not orders:
+            print(f"⚠️ ASSIGNMENT: No orders to assign")
             return {
                 "success": True,
                 "message": "No orders to assign",
@@ -47,8 +53,13 @@ class AssignmentService:
             }
         
         # Get available drivers
+        print(f"🔍 ASSIGNMENT: Getting available drivers...")
         drivers = self._get_available_drivers()
+        print(f"🔍 ASSIGNMENT: Found {len(drivers)} available drivers")
+        logger.info(f"🔍 ASSIGNMENT: Found {len(drivers)} available drivers")
+        
         if not drivers:
+            print(f"❌ ASSIGNMENT: No available drivers")
             return {
                 "success": False,
                 "message": "No available drivers",
@@ -57,18 +68,34 @@ class AssignmentService:
             }
         
         # Get assignments from OpenAI or simple logic
-        assignments = self._get_assignments(orders, drivers)
+        print(f"🔍 ASSIGNMENT: Getting optimal assignments from OpenAI...")
+        try:
+            assignments = self._get_assignments(orders, drivers)
+            print(f"🔍 ASSIGNMENT: OpenAI returned {len(assignments)} assignments")
+            logger.info(f"🔍 ASSIGNMENT: OpenAI returned {len(assignments)} assignments")
+        except Exception as e:
+            print(f"❌ ASSIGNMENT: OpenAI assignment failed: {e}")
+            logger.error(f"❌ ASSIGNMENT: OpenAI assignment failed: {e}")
+            raise
         
         # Apply assignments
+        print(f"🔍 ASSIGNMENT: Applying {len(assignments)} assignments...")
         assigned = []
-        for assignment in assignments:
+        for i, assignment in enumerate(assignments):
             try:
+                print(f"🔍 ASSIGNMENT: Applying assignment {i+1}/{len(assignments)}: Order {assignment['order_id']} -> Driver {assignment['driver_id']}")
                 result = self._apply_assignment(assignment["order_id"], assignment["driver_id"])
                 assigned.append(result)
+                print(f"✅ ASSIGNMENT: Successfully assigned Order {assignment['order_id']} to Driver {assignment['driver_id']}")
             except Exception as e:
-                logger.error(f"Failed to assign order {assignment['order_id']}: {e}")
+                print(f"❌ ASSIGNMENT: Failed to assign order {assignment['order_id']}: {e}")
+                logger.error(f"❌ ASSIGNMENT: Failed to assign order {assignment['order_id']}: {e}")
         
+        print(f"🔍 ASSIGNMENT: Committing database changes...")
         self.db.commit()
+        
+        print(f"✅ ASSIGNMENT: Auto-assignment completed - assigned {len(assigned)} orders")
+        logger.info(f"✅ ASSIGNMENT: Auto-assignment completed - assigned {len(assigned)} orders")
         
         return {
             "success": True,

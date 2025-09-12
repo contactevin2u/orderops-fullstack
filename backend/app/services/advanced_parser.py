@@ -71,14 +71,34 @@ class AdvancedParserService:
             
             assignment_result = None
             try:
+                print(f"🚀 PARSER: Starting auto-assignment for order {order.id} ({order.code})")
+                logger.info(f"🚀 PARSER: Starting auto-assignment for order {order.id} ({order.code})")
+                
                 from ..services.assignment_service import AssignmentService
                 assignment_service = AssignmentService(db)
+                
+                print(f"🔍 PARSER: Assignment service created, calling auto_assign_all()")
+                logger.info(f"🔍 PARSER: Assignment service created, calling auto_assign_all()")
+                
                 assignment_result = assignment_service.auto_assign_all()
-                logger.info(f"Parser: Auto-assignment completed for order {order.id}: {assignment_result}")
-                print(f"Parser: Auto-assignment completed for order {order.id}: {assignment_result}")
+                
+                print(f"✅ PARSER: Auto-assignment completed for order {order.id}: {assignment_result}")
+                logger.info(f"✅ PARSER: Auto-assignment completed for order {order.id}: {assignment_result}")
+                
+                if assignment_result.get('success'):
+                    assigned_count = assignment_result.get('total', 0)
+                    print(f"🎯 PARSER: Successfully assigned {assigned_count} orders including {order.id}")
+                    logger.info(f"🎯 PARSER: Successfully assigned {assigned_count} orders including {order.id}")
+                else:
+                    print(f"⚠️ PARSER: Assignment completed but no orders assigned: {assignment_result}")
+                    logger.warning(f"⚠️ PARSER: Assignment completed but no orders assigned: {assignment_result}")
+                    
             except Exception as e:
-                logger.error(f"Parser: Auto-assignment failed for order {order.id}: {e}")
-                print(f"Parser: Auto-assignment failed for order {order.id}: {e}")
+                print(f"❌ PARSER: Auto-assignment FAILED for order {order.id}: {type(e).__name__}: {e}")
+                logger.error(f"❌ PARSER: Auto-assignment FAILED for order {order.id}: {type(e).__name__}: {e}")
+                import traceback
+                print(f"🔥 PARSER: Full traceback: {traceback.format_exc()}")
+                logger.error(f"🔥 PARSER: Full traceback: {traceback.format_exc()}")
                 assignment_result = {"success": False, "error": str(e)}
             
             return {
