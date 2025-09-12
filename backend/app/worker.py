@@ -5,6 +5,7 @@ import threading
 import time
 import traceback
 from contextlib import contextmanager
+from concurrent.futures import ThreadPoolExecutor
 
 from sqlalchemy import text, update
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from .services.assignment_service import AssignmentService
 logger = logging.getLogger(__name__)
 
 stop_event = threading.Event()
+executor = ThreadPoolExecutor(max_workers=5, thread_name_prefix="worker-bg")
 
 
 def _setup_logging():
@@ -88,75 +90,99 @@ def fetch_jobs(sess: Session, limit: int):
     return rows
 
 
+def process_job_background(job_id: int, kind: str, payload: dict, max_attempts: int):
+    """Process job in background thread with fresh session"""
+    logger.info("background_start id=%s kind=%s", job_id, kind)
+    
+    with session_scope() as sess:
+        try:
+            result = None
+            if kind == "PARSE_CREATE":
+                text = payload.get("text", "")
+                parsed = parse_whatsapp_text(text)
+                order = retry_db(sess, create_order_from_parsed, sess, parsed)
+                result = {
+                    "order_id": order.id,
+                    "order_code": order.code,
+                    "parsed": parsed,
+                }
+            elif kind == "AUTO_ASSIGN":
+                service = AssignmentService(sess)
+                assignment_result = retry_db(sess, service.auto_assign_all)
+                result = {
+                    "success": assignment_result.get("success", False),
+                    "assigned_count": assignment_result.get("total", 0),
+                    "message": assignment_result.get("message", ""),
+                    "assignments": assignment_result.get("assigned", [])
+                }
+            else:
+                result = {"ok": True}
+            
+            # Mark job as complete
+            retry_db(
+                sess,
+                sess.execute,
+                update(Job)
+                .where(Job.id == job_id)
+                .values(status="done", result=result, last_error=None),
+            )
+            
+            # Sync result back to background job if needed
+            if kind == "PARSE_CREATE" and "background_job_id" in payload:
+                background_job_id = payload["background_job_id"]
+                try:
+                    from .services.background_jobs import job_service
+                    job_service.complete_job(sess, background_job_id, result)
+                    logger.info("background_sync_success job_id=%s background_job_id=%s", job_id, background_job_id)
+                except Exception as e:
+                    logger.error("background_sync_failed job_id=%s background_job_id=%s error=%s", job_id, background_job_id, e)
+            
+            logger.info("background_success id=%s", job_id)
+            
+        except Exception as e:
+            logger.error("background_error id=%s error=%s", job_id, e)
+            # Mark as failed
+            retry_db(
+                sess,
+                sess.execute,
+                update(Job)
+                .where(Job.id == job_id)
+                .values(status="error", last_error=f"{e}\n{traceback.format_exc()}"),
+            )
+            
+            # Sync error back to background job if needed
+            if kind == "PARSE_CREATE" and "background_job_id" in payload:
+                background_job_id = payload["background_job_id"]
+                try:
+                    from .services.background_jobs import job_service
+                    job_service.fail_job(sess, background_job_id, f"Processing failed: {str(e)}")
+                    logger.info("background_sync_error job_id=%s background_job_id=%s", job_id, background_job_id)
+                except Exception as sync_error:
+                    logger.error("background_sync_error_failed job_id=%s background_job_id=%s error=%s", job_id, background_job_id, sync_error)
+
+
 def process_one(row, sess: Session, max_attempts: int):
+    """Non-blocking job dispatcher - immediately dispatches to background thread"""
     jid = row["id"]
     kind = row["kind"]
     payload = row["payload"] or {}
-    logger.info(
-        "process_start id=%s kind=%s attempt=%s", jid, kind, row["attempts"]
+    
+    logger.info("process_dispatch id=%s kind=%s attempt=%s", jid, kind, row["attempts"])
+    
+    # Mark job as running immediately 
+    retry_db(
+        sess,
+        sess.execute,
+        update(Job)
+        .where(Job.id == jid)
+        .values(started_at=None),  # Keep it as "running" status from fetch_jobs
     )
-    try:
-        if kind == "PARSE_CREATE":
-            text = payload.get("text", "")
-            parsed = parse_whatsapp_text(text)
-            order = retry_db(sess, create_order_from_parsed, sess, parsed)
-            result = {
-                "order_id": order.id,
-                "order_code": order.code,
-                "parsed": parsed,
-            }
-        elif kind == "AUTO_ASSIGN":
-            # Background AI assignment - no blocking!
-            service = AssignmentService(sess)
-            assignment_result = retry_db(sess, service.auto_assign_all)
-            result = {
-                "success": assignment_result.get("success", False),
-                "assigned_count": assignment_result.get("total", 0),
-                "message": assignment_result.get("message", ""),
-                "assignments": assignment_result.get("assigned", [])
-            }
-        else:
-            result = {"ok": True}
-        retry_db(
-            sess,
-            sess.execute,
-            update(Job)
-            .where(Job.id == jid)
-            .values(status="done", result=result, last_error=None),
-        )
-        
-        # Sync result back to background job if this is a PARSE_CREATE job
-        if kind == "PARSE_CREATE" and "background_job_id" in payload:
-            background_job_id = payload["background_job_id"]
-            try:
-                from .services.background_jobs import job_service
-                job_service.complete_job(sess, background_job_id, result)
-                logger.info("process_sync_success background_job_id=%s", background_job_id)
-            except Exception as e:
-                logger.error("process_sync_failed background_job_id=%s error=%s", background_job_id, e)
-        
-        logger.info("process_success id=%s", jid)
-    except Exception as e:  # pragma: no cover - runtime error path
-        status = "queued" if row["attempts"] < max_attempts else "error"
-        retry_db(
-            sess,
-            sess.execute,
-            update(Job)
-            .where(Job.id == jid)
-            .values(status=status, last_error=f"{e}\n{traceback.format_exc()}"),
-        )
-        
-        # Sync error back to background job if this is a PARSE_CREATE job and final failure
-        if kind == "PARSE_CREATE" and "background_job_id" in payload and status == "error":
-            background_job_id = payload["background_job_id"]
-            try:
-                from .services.background_jobs import job_service
-                job_service.fail_job(sess, background_job_id, f"Processing failed: {str(e)}")
-                logger.info("process_sync_error background_job_id=%s", background_job_id)
-            except Exception as sync_error:
-                logger.error("process_sync_error_failed background_job_id=%s error=%s", background_job_id, sync_error)
-        
-        logger.error("process_error id=%s status=%s error=%s", jid, status, e)
+    
+    # Dispatch to background thread - NON-BLOCKING!
+    future = executor.submit(process_job_background, jid, kind, payload, max_attempts)
+    logger.info("process_dispatched id=%s", jid)
+    
+    # Worker immediately continues to next job - no waiting!
 
 
 def main_loop(batch_size: int, poll_secs: float, max_attempts: int):
