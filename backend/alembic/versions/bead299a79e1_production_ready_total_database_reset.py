@@ -135,16 +135,17 @@ def upgrade() -> None:
         
         # Fallback: Manual creation of ALL TABLES using proven SQL schemas
         complete_sql = """
-        -- CORE BUSINESS TABLES
+        -- CORE BUSINESS TABLES (CORRECTED FROM ACTUAL MODELS)
         CREATE TABLE IF NOT EXISTS users (
             id BIGSERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
-            email VARCHAR(100),
-            password_hash VARCHAR(255),
-            role VARCHAR(20) DEFAULT 'user',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            password_hash VARCHAR(128) NOT NULL,
+            role VARCHAR(20) NOT NULL CHECK (role IN ('ADMIN', 'CASHIER', 'DRIVER')),
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_users_username ON users(username);
         
         CREATE TABLE IF NOT EXISTS organizations (
             id BIGSERIAL PRIMARY KEY,
@@ -185,7 +186,7 @@ def upgrade() -> None:
             total NUMERIC(12,2) DEFAULT 0,
             paid_amount NUMERIC(12,2) DEFAULT 0,
             balance NUMERIC(12,2) DEFAULT 0,
-            idempotency_key VARCHAR(255),
+            idempotency_key VARCHAR(64),
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
@@ -219,7 +220,7 @@ def upgrade() -> None:
             payment_method VARCHAR(50) NOT NULL,
             status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
             date TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            idempotency_key VARCHAR(255),
+            idempotency_key VARCHAR(64),
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
@@ -237,41 +238,57 @@ def upgrade() -> None:
             UNIQUE(order_id, name)
         );
         
-        -- DRIVER AND LOGISTICS TABLES
+        -- DRIVER AND LOGISTICS TABLES (CORRECTED FROM ACTUAL MODELS)
         CREATE TABLE IF NOT EXISTS drivers (
             id BIGSERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
+            name VARCHAR(100),
             phone VARCHAR(20),
-            email VARCHAR(100),
-            license_number VARCHAR(50),
-            status VARCHAR(20) DEFAULT 'ACTIVE',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            firebase_uid VARCHAR(128) UNIQUE NOT NULL,
+            base_warehouse VARCHAR(20) NOT NULL DEFAULT 'BATU_CAVES' CHECK (base_warehouse IN ('BATU_CAVES', 'KOTA_KINABALU')),
+            priority_lorry_id VARCHAR(50),
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_drivers_phone ON drivers(phone);
+        CREATE INDEX IF NOT EXISTS ix_drivers_firebase_uid ON drivers(firebase_uid);
+        CREATE INDEX IF NOT EXISTS ix_drivers_priority_lorry_id ON drivers(priority_lorry_id);
         
         CREATE TABLE IF NOT EXISTS driver_devices (
             id BIGSERIAL PRIMARY KEY,
             driver_id BIGINT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
-            device_id VARCHAR(255) NOT NULL,
-            firebase_token VARCHAR(255),
-            platform VARCHAR(20),
+            token VARCHAR(255) NOT NULL,
+            platform VARCHAR(20) NOT NULL,
             app_version VARCHAR(20),
-            last_seen TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            model VARCHAR(100),
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            CONSTRAINT uq_driver_devices_driver_id_token UNIQUE (driver_id, token)
         );
+        CREATE INDEX IF NOT EXISTS ix_driver_devices_driver_id ON driver_devices(driver_id);
+        CREATE INDEX IF NOT EXISTS ix_driver_devices_token ON driver_devices(token);
         
         CREATE TABLE IF NOT EXISTS driver_shifts (
             id BIGSERIAL PRIMARY KEY,
             driver_id BIGINT NOT NULL REFERENCES drivers(id),
-            start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-            end_time TIMESTAMP WITH TIME ZONE,
-            status VARCHAR(20) DEFAULT 'ACTIVE',
-            closure_reason VARCHAR(100),
-            total_working_hours NUMERIC(5,2) DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            clock_in_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            clock_in_lat NUMERIC(10,6) NOT NULL,
+            clock_in_lng NUMERIC(10,6) NOT NULL,
+            clock_in_location_name VARCHAR(200),
+            clock_out_at TIMESTAMP WITH TIME ZONE,
+            clock_out_lat NUMERIC(10,6),
+            clock_out_lng NUMERIC(10,6),
+            clock_out_location_name VARCHAR(200),
+            is_outstation BOOLEAN NOT NULL DEFAULT FALSE,
+            outstation_distance_km NUMERIC(6,2),
+            outstation_allowance_amount NUMERIC(8,2) NOT NULL DEFAULT 0,
+            total_working_hours NUMERIC(4,2),
+            status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+            notes TEXT,
+            closure_reason TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_driver_shifts_driver_id ON driver_shifts(driver_id);
         
         CREATE TABLE IF NOT EXISTS driver_schedules (
             id BIGSERIAL PRIMARY KEY,
@@ -335,12 +352,15 @@ def upgrade() -> None:
         -- INVENTORY AND SKU TABLES
         CREATE TABLE IF NOT EXISTS sku (
             id BIGSERIAL PRIMARY KEY,
-            code VARCHAR(50) UNIQUE NOT NULL,
+            code VARCHAR(100) UNIQUE NOT NULL,
             name VARCHAR(200) NOT NULL,
+            category VARCHAR(50),
             description TEXT,
-            unit_price NUMERIC(12,2) DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            price NUMERIC(10,2) NOT NULL,
+            is_serialized BOOLEAN NOT NULL DEFAULT FALSE,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
         
         CREATE TABLE IF NOT EXISTS sku_alias (
@@ -401,46 +421,69 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS lorry_assignments (
             id BIGSERIAL PRIMARY KEY,
             driver_id BIGINT NOT NULL REFERENCES drivers(id),
-            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
-            assigned_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            unassigned_at TIMESTAMP WITH TIME ZONE,
-            status VARCHAR(20) DEFAULT 'ACTIVE',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            lorry_id VARCHAR(50) NOT NULL,
+            assignment_date DATE NOT NULL,
+            shift_id BIGINT REFERENCES driver_shifts(id),
+            stock_verified BOOLEAN NOT NULL DEFAULT FALSE,
+            stock_verified_at TIMESTAMP WITH TIME ZONE,
+            status VARCHAR(20) NOT NULL DEFAULT 'ASSIGNED',
+            notes TEXT,
+            assigned_by BIGINT NOT NULL REFERENCES users(id),
+            assigned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_lorry_assignments_driver_id ON lorry_assignments(driver_id);
+        CREATE INDEX IF NOT EXISTS ix_lorry_assignments_lorry_id ON lorry_assignments(lorry_id);
+        CREATE INDEX IF NOT EXISTS ix_lorry_assignments_assignment_date ON lorry_assignments(assignment_date);
+        CREATE INDEX IF NOT EXISTS ix_lorry_assignments_shift_id ON lorry_assignments(shift_id);
         
         CREATE TABLE IF NOT EXISTS lorry_stock_verifications (
             id BIGSERIAL PRIMARY KEY,
-            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
+            assignment_id BIGINT NOT NULL REFERENCES lorry_assignments(id),
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            lorry_id VARCHAR(50) NOT NULL,
             verification_date DATE NOT NULL,
-            verified_by BIGINT REFERENCES users(id),
+            scanned_uids TEXT NOT NULL,
+            total_scanned INTEGER NOT NULL DEFAULT 0,
+            expected_uids TEXT,
+            total_expected INTEGER DEFAULT 0,
             variance_count INTEGER DEFAULT 0,
+            missing_uids TEXT,
+            unexpected_uids TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'VERIFIED',
             notes TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_lorry_stock_verifications_assignment_id ON lorry_stock_verifications(assignment_id);
+        CREATE INDEX IF NOT EXISTS ix_lorry_stock_verifications_driver_id ON lorry_stock_verifications(driver_id);
+        CREATE INDEX IF NOT EXISTS ix_lorry_stock_verifications_lorry_id ON lorry_stock_verifications(lorry_id);
+        CREATE INDEX IF NOT EXISTS ix_lorry_stock_verifications_verification_date ON lorry_stock_verifications(verification_date);
         
         CREATE TABLE IF NOT EXISTS driver_holds (
             id BIGSERIAL PRIMARY KEY,
             driver_id BIGINT NOT NULL REFERENCES drivers(id),
-            held_by BIGINT NOT NULL REFERENCES users(id),
             reason VARCHAR(100) NOT NULL,
-            hold_start TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            hold_end TIMESTAMP WITH TIME ZONE,
-            is_active BOOLEAN DEFAULT TRUE,
-            notes TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            description TEXT NOT NULL,
+            related_assignment_id BIGINT REFERENCES lorry_assignments(id),
+            related_verification_id BIGINT REFERENCES lorry_stock_verifications(id),
+            status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+            created_by BIGINT NOT NULL REFERENCES users(id),
+            resolved_by BIGINT REFERENCES users(id),
+            resolution_notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            resolved_at TIMESTAMP WITH TIME ZONE
         );
+        CREATE INDEX IF NOT EXISTS ix_driver_holds_driver_id ON driver_holds(driver_id);
         
         CREATE TABLE IF NOT EXISTS lorry_stock (
-            id BIGSERIAL PRIMARY KEY,
-            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            as_of_date DATE NOT NULL,
             sku_id BIGINT NOT NULL REFERENCES sku(id),
-            quantity INTEGER NOT NULL DEFAULT 0,
-            reserved_quantity INTEGER NOT NULL DEFAULT 0,
-            available_quantity INTEGER NOT NULL DEFAULT 0,
-            last_updated TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            UNIQUE(lorry_id, sku_id)
+            qty_counted INTEGER NOT NULL,
+            uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            uploaded_by BIGINT NOT NULL REFERENCES drivers(id),
+            PRIMARY KEY (driver_id, as_of_date, sku_id)
         );
         
         CREATE TABLE IF NOT EXISTS lorry_stock_transactions (
