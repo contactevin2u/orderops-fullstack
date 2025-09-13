@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel, validator
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 from sqlalchemy import select, and_, func, or_
 from sqlalchemy.exc import IntegrityError
 import json
@@ -270,31 +270,20 @@ async def clock_in_with_stock_verification(
     if not assignment:
         raise HTTPException(status_code=404, detail="No lorry assignment found for today")
     
-    # Check if already clocked in today
-    existing_shift = db.execute(
-        select(DriverShift).where(
-            and_(
-                DriverShift.driver_id == driver.id,
-                func.date(DriverShift.clock_in_at) == today,
-                DriverShift.status == "ACTIVE"
-            )
-        )
-    ).scalar_one_or_none()
-    
-    if existing_shift:
-        print(f"🚨 CLOCK-IN BLOCKED: Driver {driver.id} already has active shift {existing_shift.id} from {existing_shift.clock_in_at}")
-        print(f"🚨 SHIFT STATUS: {existing_shift.status}")
-        raise HTTPException(status_code=409, detail=f"Already clocked in today at {existing_shift.clock_in_at}. Shift ID: {existing_shift.id}")
-    
-    # Create shift record using ShiftService for proper working hours tracking
+    # Use ShiftService with idempotent clock-in and 3AM auto-close logic
     from ..services.shift_service import ShiftService
     shift_service = ShiftService(db)
-    shift = shift_service.clock_in(
-        driver_id=driver.id,
-        lat=request.lat,
-        lng=request.lng,
-        location_name=request.location_name
-    )
+    
+    try:
+        shift = shift_service.clock_in(
+            driver_id=driver.id,
+            location_lat=request.lat,
+            location_lng=request.lng,
+            location_name=request.location_name,
+            idempotent=True  # Allow idempotent behavior with 3AM auto-close
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     
     db.flush()  # Ensure shift ID is available
     

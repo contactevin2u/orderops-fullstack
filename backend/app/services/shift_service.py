@@ -8,6 +8,7 @@ from sqlalchemy import and_, func, desc
 from app.models.driver import Driver
 from app.models.driver_shift import DriverShift
 from app.models.commission_entry import CommissionEntry
+from app.repositories.shift_repo import ShiftRepo
 from app.utils.geofencing import is_outstation_location, get_location_description
 from app.config.clock_config import (
     OUTSTATION_ALLOWANCE_AMOUNT,
@@ -23,6 +24,7 @@ AUTO_CLOCKOUT_HOUR_LOCAL = 3  # 03:00 local time
 class ShiftService:
     def __init__(self, db: Session):
         self.db = db
+        self.repo = ShiftRepo(db)
 
     def _now(self) -> datetime:
         return datetime.now(timezone.utc)
@@ -45,27 +47,13 @@ class ShiftService:
         return cutoff_kl.astimezone(timezone.utc)
 
     def get_active_shift(self, driver_id: int) -> Optional[DriverShift]:
-        """Get the active shift for a driver"""
-        return (
-            self.db.query(DriverShift)
-            .filter(DriverShift.driver_id == driver_id, DriverShift.clock_out_at.is_(None))
-            .order_by(DriverShift.clock_in_at.desc())
-            .first()
-        )
+        """Get the active shift for a driver using safe projection"""
+        return self.repo.get_active_shift_light(driver_id)
 
     def _close_shift(self, shift: DriverShift, closed_at: datetime, reason: str):
-        """Close a shift with the specified closure time and reason"""
-        shift.clock_out_at = closed_at
-        shift.closure_reason = reason
-        shift.status = "COMPLETED"
-        
-        # Calculate working hours
-        total_hours = (closed_at - shift.clock_in_at).total_seconds() / 3600
-        shift.total_working_hours = total_hours
-        
-        self.db.add(shift)
-        self.db.commit()
-        self.db.refresh(shift)
+        """Close a shift using safe repository method"""
+        self.repo.close_shift_at(shift.id, closed_at, reason)
+        self.repo.calculate_working_hours(shift.id, closed_at)
 
     def clock_in(
         self,
@@ -122,22 +110,23 @@ class ShiftService:
         if not location_name:
             location_name = get_location_description(lat, lng)
 
-        # Open a new shift
-        shift = DriverShift(
-            driver_id=driver_id,
-            clock_in_at=now,
-            clock_in_lat=lat,
-            clock_in_lng=lng,
-            clock_in_location_name=location_name,
-            is_outstation=is_outstation,
-            outstation_distance_km=distance_km if is_outstation else None,
-            outstation_allowance_amount=OUTSTATION_ALLOWANCE_AMOUNT if is_outstation else 0,
-            status="ACTIVE"
-        )
+        # Open a new shift using repository
+        shift = self.repo.insert_shift(driver_id, now, lat, lng, location_name)
         
-        self.db.add(shift)
-        self.db.commit()
-        self.db.refresh(shift)
+        # Update additional fields if needed
+        if is_outstation:
+            from sqlalchemy import update
+            upd = (
+                update(DriverShift)
+                .where(DriverShift.id == shift.id)
+                .values(
+                    is_outstation=True,
+                    outstation_distance_km=distance_km,
+                    outstation_allowance_amount=OUTSTATION_ALLOWANCE_AMOUNT
+                )
+            )
+            self.db.execute(upd)
+            self.db.commit()
 
         # Create outstation allowance entry if applicable
         if is_outstation:
@@ -211,19 +200,30 @@ class ShiftService:
             "total_earnings": total_commission + shift.outstation_allowance_amount
         }
 
-    def close_stale_shifts_3am(self) -> List[DriverShift]:
+    def close_stale_shifts_3am(self) -> List[int]:
         """Admin sweep: close any forgotten shifts after 03:00 KL"""
         now = self._now()
-        closed = []
+        closed_ids = []
         
-        open_shifts = self.db.query(DriverShift).filter(DriverShift.clock_out_at.is_(None)).all()
+        # Use safe projection to get open shifts
+        from sqlalchemy import select
+        from sqlalchemy.orm import load_only
+        
+        stmt = (
+            select(DriverShift)
+            .options(load_only(DriverShift.id, DriverShift.clock_in_at))
+            .where(DriverShift.clock_out_at.is_(None))
+        )
+        open_shifts = self.db.execute(stmt).scalars().all()
+        
         for shift in open_shifts:
             cutoff = self._next_auto_cutoff_utc(shift.clock_in_at)
             if now >= cutoff:
-                self._close_shift(shift, cutoff, "AUTO_3AM_SWEEP")
-                closed.append(shift)
+                self.repo.close_shift_at(shift.id, cutoff, "AUTO_3AM_SWEEP")
+                self.repo.calculate_working_hours(shift.id, cutoff)
+                closed_ids.append(shift.id)
 
-        return closed
+        return closed_ids
 
     def _create_outstation_allowance_entry(self, shift: DriverShift) -> CommissionEntry:
         """Create commission entry for outstation allowance"""

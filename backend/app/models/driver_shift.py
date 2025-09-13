@@ -9,7 +9,7 @@ from sqlalchemy import (
     Boolean,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, deferred
 
 from .base import Base
 
@@ -43,7 +43,10 @@ class DriverShift(Base):
     # Status and metadata
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")  # ACTIVE, COMPLETED
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    closure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    # Deferred closure_reason - only loaded when explicitly accessed
+    # Safe even if column doesn't exist in database yet
+    closure_reason: Mapped[str | None] = deferred(mapped_column(Text, nullable=True))
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

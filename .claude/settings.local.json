@@ -522,7 +522,11 @@
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\routers/**)",
       "Read(/C:\\Users\\User\\Documents\\orderops\\orderops-fullstack\\backend\\app\\services/**)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(.venvScriptsactivate.bat)",
+      "Bash(set DATABASE_URL=sqlite:///./database.db)",
+      "Bash(del backendadd_closure_reason_hotfix.sql)"
     ],
     "deny": [],
     "ask": []
