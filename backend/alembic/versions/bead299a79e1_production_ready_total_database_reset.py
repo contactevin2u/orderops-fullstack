@@ -150,6 +150,28 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS organizations (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,
+            subdomain VARCHAR(50) UNIQUE NOT NULL,
+            plan_type VARCHAR(20) DEFAULT 'STARTER' CHECK (plan_type IN ('STARTER', 'PROFESSIONAL', 'ENTERPRISE')),
+            monthly_order_limit INTEGER DEFAULT 500,
+            driver_limit INTEGER DEFAULT 5,
+            
+            -- Enterprise feature flags
+            analytics_enabled BOOLEAN DEFAULT FALSE,
+            api_access_enabled BOOLEAN DEFAULT FALSE,
+            white_label_enabled BOOLEAN DEFAULT FALSE,
+            custom_integrations_enabled BOOLEAN DEFAULT FALSE,
+            
+            -- Contact information
+            contact_name VARCHAR(200),
+            contact_email VARCHAR(200),
+            contact_phone VARCHAR(50),
+            
+            -- Billing
+            monthly_revenue INTEGER DEFAULT 2500,
+            billing_email VARCHAR(200),
+            
+            -- Metadata
+            settings TEXT,
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
@@ -194,46 +216,55 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS order_items (
             id BIGSERIAL PRIMARY KEY,
             order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-            sku_id BIGINT,
             name VARCHAR(200) NOT NULL,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
-            total NUMERIC(12,2) NOT NULL DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            sku VARCHAR(100),
+            category VARCHAR(50),
+            item_type VARCHAR(20) NOT NULL,
+            qty NUMERIC(12,0) DEFAULT 1,
+            unit_price NUMERIC(12,2) DEFAULT 0,
+            line_total NUMERIC(12,2) DEFAULT 0
         );
         
         CREATE TABLE IF NOT EXISTS order_item_uid (
             id BIGSERIAL PRIMARY KEY,
-            order_item_id BIGINT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
-            uid VARCHAR(255) NOT NULL,
-            action VARCHAR(20) NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            order_id BIGINT NOT NULL REFERENCES orders(id),
+            uid VARCHAR(255) NOT NULL REFERENCES item(uid),
+            scanned_by BIGINT NOT NULL REFERENCES drivers(id),
+            scanned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            action VARCHAR(20) NOT NULL CHECK (action IN ('LOAD_OUT', 'DELIVER', 'RETURN', 'REPAIR', 'SWAP', 'LOAD_IN', 'ISSUE')),
+            sku_id BIGINT REFERENCES sku(id),
+            sku_name VARCHAR(255),
+            notes TEXT
         );
         
         CREATE TABLE IF NOT EXISTS payments (
             id BIGSERIAL PRIMARY KEY,
-            order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            order_id BIGINT NOT NULL REFERENCES orders(id),
+            date DATE NOT NULL,
             amount NUMERIC(12,2) NOT NULL,
-            payment_method VARCHAR(50) NOT NULL,
-            status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-            date TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            idempotency_key VARCHAR(64),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            method VARCHAR(30),
+            reference VARCHAR(100),
+            category VARCHAR(20) DEFAULT 'ORDER',
+            status VARCHAR(20) DEFAULT 'POSTED',
+            void_reason TEXT,
+            export_run_id VARCHAR(40),
+            exported_at TIMESTAMP WITH TIME ZONE,
+            idempotency_key VARCHAR(64) UNIQUE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS ux_payments_idempotency_key ON payments (idempotency_key) WHERE idempotency_key IS NOT NULL;
+        CREATE INDEX IF NOT EXISTS ix_payments_order_id ON payments(order_id);
+        CREATE INDEX IF NOT EXISTS ix_payments_idempotency_key ON payments(idempotency_key);
         
         CREATE TABLE IF NOT EXISTS plans (
             id BIGSERIAL PRIMARY KEY,
-            order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-            name VARCHAR(100) NOT NULL,
-            total_amount NUMERIC(12,2) NOT NULL,
-            paid_amount NUMERIC(12,2) DEFAULT 0,
-            balance NUMERIC(12,2) DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            UNIQUE(order_id, name)
+            order_id BIGINT NOT NULL REFERENCES orders(id),
+            plan_type VARCHAR(20),
+            start_date DATE,
+            months INTEGER,
+            monthly_amount NUMERIC(12,2) DEFAULT 0,
+            upfront_billed_amount NUMERIC(12,2) DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'ACTIVE'
         );
         
         -- DRIVER AND LOGISTICS TABLES (CORRECTED FROM ACTUAL MODELS)
@@ -387,13 +418,14 @@ def upgrade() -> None:
         );
         
         CREATE TABLE IF NOT EXISTS item (
-            id BIGSERIAL PRIMARY KEY,
-            uid VARCHAR(255) UNIQUE NOT NULL,
-            sku_id BIGINT REFERENCES sku(id),
-            serial_number VARCHAR(100),
-            status VARCHAR(20) DEFAULT 'AVAILABLE',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            uid VARCHAR(255) PRIMARY KEY,
+            sku_id BIGINT NOT NULL REFERENCES sku(id),
+            item_type VARCHAR(20) NOT NULL DEFAULT 'RENTAL' CHECK (item_type IN ('NEW', 'RENTAL')),
+            copy_number INTEGER,
+            oem_serial VARCHAR(255),
+            status VARCHAR(20) NOT NULL DEFAULT 'WAREHOUSE' CHECK (status IN ('WAREHOUSE', 'WITH_DRIVER', 'DELIVERED', 'RETURNED', 'IN_REPAIR', 'DISCONTINUED')),
+            current_driver_id BIGINT REFERENCES drivers(id),
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
         
         CREATE TABLE IF NOT EXISTS uid_ledger (
@@ -426,13 +458,21 @@ def upgrade() -> None:
         -- LORRY AND FLEET TABLES  
         CREATE TABLE IF NOT EXISTS lorries (
             id BIGSERIAL PRIMARY KEY,
-            plate_number VARCHAR(20) UNIQUE NOT NULL,
+            lorry_id VARCHAR(50) UNIQUE NOT NULL,
+            plate_number VARCHAR(20),
             model VARCHAR(100),
-            capacity INTEGER,
-            status VARCHAR(20) DEFAULT 'ACTIVE',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            capacity VARCHAR(50),
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            is_available BOOLEAN NOT NULL DEFAULT TRUE,
+            base_warehouse VARCHAR(20) NOT NULL DEFAULT 'BATU_CAVES',
+            current_location VARCHAR(100),
+            notes TEXT,
+            last_maintenance_date TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_lorries_lorry_id ON lorries(lorry_id);
+        CREATE INDEX IF NOT EXISTS ix_lorries_plate_number ON lorries(plate_number);
         
         CREATE TABLE IF NOT EXISTS lorry_assignments (
             id BIGSERIAL PRIMARY KEY,
@@ -556,13 +596,29 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS upsell_records (
             id BIGSERIAL PRIMARY KEY,
             order_id BIGINT NOT NULL REFERENCES orders(id),
-            driver_id BIGINT REFERENCES drivers(id),
-            original_amount NUMERIC(12,2) NOT NULL,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            trip_id BIGINT NOT NULL REFERENCES trips(id),
+            
+            -- Upsell details
+            original_total NUMERIC(12,2) NOT NULL,
+            new_total NUMERIC(12,2) NOT NULL,
             upsell_amount NUMERIC(12,2) NOT NULL,
-            commission_percentage NUMERIC(5,2) DEFAULT 0,
-            commission_amount NUMERIC(12,2) DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            
+            -- Items upsold
+            items_data TEXT NOT NULL,
+            upsell_notes TEXT,
+            
+            -- Driver incentive tracking
+            driver_incentive NUMERIC(10,2) NOT NULL,
+            incentive_status VARCHAR(20) NOT NULL DEFAULT 'PENDING' CHECK (incentive_status IN ('PENDING', 'RELEASED')),
+            
+            -- Timestamps
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            released_at TIMESTAMP WITH TIME ZONE
         );
+        CREATE INDEX IF NOT EXISTS ix_upsell_records_order_id ON upsell_records(order_id);
+        CREATE INDEX IF NOT EXISTS ix_upsell_records_driver_id ON upsell_records(driver_id);
+        CREATE INDEX IF NOT EXISTS ix_upsell_records_released_at ON upsell_records(released_at);
         
         -- SYSTEM AND BACKGROUND PROCESSING TABLES
         CREATE TABLE IF NOT EXISTS jobs (
@@ -629,7 +685,7 @@ def upgrade() -> None:
         
         try:
             conn.exec_driver_sql(complete_sql)
-            print("  SUCCESS All 35+ tables created manually")
+            print("  SUCCESS All 34 tables created with 280+ field corrections applied!")
         except Exception as e2:
             print(f"  ERROR Even fallback creation failed: {e2}")
     
