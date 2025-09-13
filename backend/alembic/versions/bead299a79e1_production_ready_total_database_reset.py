@@ -99,7 +99,6 @@ def upgrade() -> None:
         from app.models.sku import SKU
         from app.models.sku_alias import SKUAlias
         from app.models.item import Item
-        from app.models.uid_ledger import UIDLedger
         
         # Lorry and stock models
         from app.models.lorry import Lorry
@@ -112,11 +111,17 @@ def upgrade() -> None:
         from app.models.commission_entry import CommissionEntry
         from app.models.upsell_record import UpsellRecord
         
-        # System and background processing models
+        # System and background processing models  
         from app.models.job import Job
         from app.models.idempotent_request import IdempotentRequest
         from app.models.audit_log import AuditLog
         from app.models.ai_verification_log import AIVerificationLog
+        
+        # Background jobs from services (not in models directory)
+        from app.services.background_jobs import BackgroundJob
+        
+        # UID Ledger (correct class name)
+        from app.models.uid_ledger import UIDLedgerEntry
         
         print("  SUCCESS All models imported")
         
