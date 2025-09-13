@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_closure_reason_001'
-down_revision = 'ff3a4b5c6d7e'  # create_lorry_stock_transactions
+down_revision = 'b111e595b891'  # make_admin_user_id_nullable_for_driver_deliveries
 branch_labels = None
 depends_on = None
 
