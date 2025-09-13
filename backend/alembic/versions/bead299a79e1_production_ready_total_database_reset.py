@@ -133,7 +133,7 @@ def upgrade() -> None:
         print(f"  ERROR creating schema from models: {e}")
         print("  INFO Falling back to manual essential table creation...")
         
-        # Fallback: Manual creation of ALL TABLES using proven SQL schemas
+        # COMPLETE CORRECTED SCHEMA - ALL FIELDS FROM DEEP DIVE MODEL ANALYSIS 
         complete_sql = """
         -- CORE BUSINESS TABLES (CORRECTED FROM ACTUAL MODELS)
         CREATE TABLE IF NOT EXISTS users (
@@ -321,10 +321,14 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS driver_routes (
             id BIGSERIAL PRIMARY KEY,
             driver_id BIGINT NOT NULL REFERENCES drivers(id),
-            route_name VARCHAR(100) NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            route_date DATE NOT NULL,
+            name VARCHAR(60),
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_driver_routes_driver_id ON driver_routes(driver_id);
+        CREATE INDEX IF NOT EXISTS ix_driver_routes_route_date ON driver_routes(route_date);
         
         CREATE TABLE IF NOT EXISTS trips (
             id BIGSERIAL PRIMARY KEY,
@@ -591,25 +595,19 @@ def upgrade() -> None:
         
         CREATE TABLE IF NOT EXISTS idempotent_requests (
             id BIGSERIAL PRIMARY KEY,
-            idempotency_key VARCHAR(255) UNIQUE NOT NULL,
-            request_hash VARCHAR(64) NOT NULL,
-            response_data JSONB,
-            status_code INTEGER,
-            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            key VARCHAR(64) UNIQUE NOT NULL,
+            order_id BIGINT NOT NULL REFERENCES orders(id),
+            action VARCHAR(20) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_idempotent_requests_key ON idempotent_requests(key);
         
         CREATE TABLE IF NOT EXISTS audit_logs (
             id BIGSERIAL PRIMARY KEY,
             user_id BIGINT REFERENCES users(id),
             action VARCHAR(100) NOT NULL,
-            table_name VARCHAR(50),
-            record_id BIGINT,
-            old_values JSONB,
-            new_values JSONB,
-            ip_address INET,
-            user_agent TEXT,
-            timestamp TIMESTAMP WITH TIME ZONE DEFAULT now()
+            details JSONB,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
         
         CREATE TABLE IF NOT EXISTS ai_verification_logs (
