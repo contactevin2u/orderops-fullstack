@@ -1,5 +1,5 @@
 from datetime import date
-from sqlalchemy import select, func, update
+from sqlalchemy import select, func, update, insert
 from sqlalchemy.orm import Session, load_only
 from app.models.driver_shift import DriverShift
 
@@ -78,18 +78,45 @@ class ShiftRepo:
         self.db.commit()
 
     def insert_shift(self, driver_id: int, now, loc_lat, loc_lng, loc_name):
-        """Insert new shift record"""
-        s = DriverShift(
-            driver_id=driver_id,
-            clock_in_at=now,
-            clock_in_lat=loc_lat,
-            clock_in_lng=loc_lng,
-            clock_in_location_name=loc_name,
-            status="ACTIVE",
+        """Insert new shift record via Core INSERT (exclude closure_reason to avoid missing-column crashes)."""
+        tbl = DriverShift.__table__
+        stmt = (
+            insert(tbl)
+            .values(
+                driver_id=driver_id,
+                clock_in_at=now,
+                clock_in_lat=loc_lat,
+                clock_in_lng=loc_lng,
+                clock_in_location_name=loc_name,
+                # leave all clock_out_* as NULL
+                is_outstation=False,
+                outstation_distance_km=None,
+                outstation_allowance_amount=0,
+                total_working_hours=None,
+                status="ACTIVE",
+                notes=None,  # safe; exists in your schema
+                # NOTE: closure_reason intentionally NOT set here
+            )
+            .returning(
+                tbl.c.id,
+                tbl.c.driver_id,
+                tbl.c.clock_in_at,
+                tbl.c.clock_out_at,
+                tbl.c.status,
+            )
         )
-        self.db.add(s)
+        row = self.db.execute(stmt).first()
         self.db.commit()
-        self.db.refresh(s)
+
+        # Return a lightweight object with the fields callers actually use
+        class _ShiftLite:
+            __slots__ = ("id", "driver_id", "clock_in_at", "clock_out_at", "status")
+        s = _ShiftLite()
+        s.id = row.id
+        s.driver_id = row.driver_id
+        s.clock_in_at = row.clock_in_at
+        s.clock_out_at = row.clock_out_at
+        s.status = row.status
         return s
 
     def calculate_working_hours(self, shift_id: int, clock_out_at):
