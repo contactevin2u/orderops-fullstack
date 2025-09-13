@@ -190,8 +190,11 @@ def list_orders(
             )
 
     if unassigned:
-        # No trip or trip has no route yet (still not assigned to a route)
-        stmt = stmt.where(and_(or_(Trip.id.is_(None), Trip.route_id.is_(None))))
+        # Truly unassigned: no trip at all, or trip with no driver assigned
+        stmt = stmt.where(or_(
+            Trip.id.is_(None),  # No trip at all
+            Trip.driver_id.is_(None)  # Trip exists but no driver assigned
+        ))
     stmt = stmt.order_by(Order.created_at.desc()).limit(limit)
     rows = db.execute(stmt).all()
     out: list[OrderListOut] = []
