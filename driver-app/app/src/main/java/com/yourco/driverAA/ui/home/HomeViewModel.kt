@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.yourco.driverAA.domain.JobsRepository
 import com.yourco.driverAA.ui.model.HoldsUi
+import com.yourco.driverAA.util.Result
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -25,13 +26,26 @@ class HomeViewModel(
     fun refresh() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
-            val holdsRes = repo.getDriverHolds()
-            val holds = holdsRes.getOrNull()
-            val ui = HoldsUi(
-                hasActiveHolds = holds?.has_active_holds == true,
-                reasons = holds?.hold_reasons ?: emptyList()
-            )
-            _state.value = HomeUiState(loading = false, holds = ui)
+            when (val holdsRes = repo.getDriverHolds()) {
+                is Result.Success -> {
+                    val holds = holdsRes.data
+                    val ui = HoldsUi(
+                        hasActiveHolds = holds.has_active_holds == true,
+                        reasons = holds.hold_reasons ?: emptyList()
+                    )
+                    _state.value = HomeUiState(loading = false, holds = ui)
+                }
+                is Result.Error -> {
+                    _state.value = HomeUiState(
+                        loading = false, 
+                        holds = HoldsUi(false),
+                        error = holdsRes.throwable.message
+                    )
+                }
+                is Result.Loading -> {
+                    // Keep loading state
+                }
+            }
         }
     }
 
