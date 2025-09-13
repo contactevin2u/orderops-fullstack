@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20250913g_simple_cascade'
-down_revision = '20250913f_cascade_cleanup'
+down_revision = '20250913c_clean_rollback'
 branch_labels = None
 depends_on = None
 
