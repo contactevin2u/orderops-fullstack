@@ -14,8 +14,8 @@ branch_labels = None
 depends_on = None
 
 def upgrade():
-    # 1) Add the column (safe even if run once)
-    op.add_column("driver_shifts", sa.Column("closure_reason", sa.Text(), nullable=True))
+    # 1) Add the column safely (may already exist from previous migration)
+    op.execute("ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS closure_reason TEXT;")
 
     # 2) Backfill closure_reason for already-closed shifts (they existed before policy)
     # We don't guess a reason; just mark them LEGACY if missing.
