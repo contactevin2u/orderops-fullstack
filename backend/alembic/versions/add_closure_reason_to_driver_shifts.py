@@ -17,8 +17,8 @@ depends_on = None
 
 
 def upgrade():
-    # Add closure_reason column to driver_shifts table
-    op.add_column('driver_shifts', sa.Column('closure_reason', sa.Text(), nullable=True))
+    # Add closure_reason column to driver_shifts table (safe idempotent operation)
+    op.execute('ALTER TABLE driver_shifts ADD COLUMN IF NOT EXISTS closure_reason TEXT;')
 
 
 def downgrade():
