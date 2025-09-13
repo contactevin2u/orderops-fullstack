@@ -72,36 +72,50 @@ def upgrade() -> None:
     # 2. CREATE COMPLETE SCHEMA FROM MODELS
     print("STEP 2: Creating complete schema from SQLAlchemy models...")
     
-    # Import all models to ensure they're registered
+    # Import ALL models to ensure they're registered - COMPLETE LIST FROM ALL 28 MODEL FILES
     try:
         from app.models import Base
+        
+        # Core business models
         from app.models.user import User
         from app.models.customer import Customer
+        from app.models.organization import Organization
+        
+        # Order and payment models  
         from app.models.order import Order
         from app.models.order_item import OrderItem
+        from app.models.order_item_uid import OrderItemUID
         from app.models.payment import Payment
         from app.models.plan import Plan
+        
+        # Driver and logistics models
         from app.models.driver import Driver, DriverDevice
-        from app.models.trip import Trip, TripEvent
-        from app.models.lorry import Lorry
-        from app.models.sku import SKU
-        from app.models.item import Item
-        from app.models.audit_log import AuditLog
-        from app.models.commission import Commission
-        from app.models.commission_entry import CommissionEntry
-        from app.models.idempotent_request import IdempotentRequest
-        from app.models.job import Job
-        from app.models.organization import Organization
-        from app.models.upsell_record import UpsellRecord
-        from app.models.uid_ledger import UIDLedger
         from app.models.driver_shift import DriverShift
         from app.models.driver_schedule import DriverSchedule, DriverAvailabilityPattern
         from app.models.driver_route import DriverRoute
+        from app.models.trip import Trip, TripEvent
+        
+        # Inventory and SKU models
+        from app.models.sku import SKU
+        from app.models.sku_alias import SKUAlias
+        from app.models.item import Item
+        from app.models.uid_ledger import UIDLedger
+        
+        # Lorry and stock models
+        from app.models.lorry import Lorry
         from app.models.lorry_assignment import LorryAssignment, LorryStockVerification, DriverHold
         from app.models.lorry_stock import LorryStock
         from app.models.lorry_stock_transaction import LorryStockTransaction
-        from app.models.order_item_uid import OrderItemUID
-        from app.models.sku_alias import SKUAlias
+        
+        # Commission and financial models
+        from app.models.commission import Commission
+        from app.models.commission_entry import CommissionEntry
+        from app.models.upsell_record import UpsellRecord
+        
+        # System and background processing models
+        from app.models.job import Job
+        from app.models.idempotent_request import IdempotentRequest
+        from app.models.audit_log import AuditLog
         from app.models.ai_verification_log import AIVerificationLog
         
         print("  SUCCESS All models imported")
