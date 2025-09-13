@@ -133,9 +133,9 @@ def upgrade() -> None:
         print(f"  ERROR creating schema from models: {e}")
         print("  INFO Falling back to manual essential table creation...")
         
-        # Fallback manual creation of essential tables
-        essential_sql = """
-        -- Users (essential for login)
+        # Fallback: Manual creation of ALL TABLES using proven SQL schemas
+        complete_sql = """
+        -- CORE BUSINESS TABLES
         CREATE TABLE IF NOT EXISTS users (
             id BIGSERIAL PRIMARY KEY,
             username VARCHAR(50) UNIQUE NOT NULL,
@@ -146,7 +146,13 @@ def upgrade() -> None:
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
         
-        -- Essential business tables
+        CREATE TABLE IF NOT EXISTS organizations (
+            id BIGSERIAL PRIMARY KEY,
+            name VARCHAR(200) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
         CREATE TABLE IF NOT EXISTS customers (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,
@@ -157,10 +163,10 @@ def upgrade() -> None:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
-        
         CREATE INDEX IF NOT EXISTS ix_customers_phone ON customers(phone);
         CREATE INDEX IF NOT EXISTS ix_customers_name ON customers(name);
         
+        -- ORDER MANAGEMENT TABLES
         CREATE TABLE IF NOT EXISTS orders (
             id BIGSERIAL PRIMARY KEY,
             code VARCHAR(32) UNIQUE NOT NULL,
@@ -183,14 +189,379 @@ def upgrade() -> None:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
             updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
-        
         CREATE UNIQUE INDEX IF NOT EXISTS ix_orders_code ON orders(code);
         CREATE UNIQUE INDEX IF NOT EXISTS ux_orders_idempotency_key ON orders (idempotency_key) WHERE idempotency_key IS NOT NULL;
+        
+        CREATE TABLE IF NOT EXISTS order_items (
+            id BIGSERIAL PRIMARY KEY,
+            order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            sku_id BIGINT,
+            name VARCHAR(200) NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 1,
+            unit_price NUMERIC(12,2) NOT NULL DEFAULT 0,
+            total NUMERIC(12,2) NOT NULL DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS order_item_uid (
+            id BIGSERIAL PRIMARY KEY,
+            order_item_id BIGINT NOT NULL REFERENCES order_items(id) ON DELETE CASCADE,
+            uid VARCHAR(255) NOT NULL,
+            action VARCHAR(20) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS payments (
+            id BIGSERIAL PRIMARY KEY,
+            order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            amount NUMERIC(12,2) NOT NULL,
+            payment_method VARCHAR(50) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+            date TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            idempotency_key VARCHAR(255),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_payments_idempotency_key ON payments (idempotency_key) WHERE idempotency_key IS NOT NULL;
+        
+        CREATE TABLE IF NOT EXISTS plans (
+            id BIGSERIAL PRIMARY KEY,
+            order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL,
+            total_amount NUMERIC(12,2) NOT NULL,
+            paid_amount NUMERIC(12,2) DEFAULT 0,
+            balance NUMERIC(12,2) DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            UNIQUE(order_id, name)
+        );
+        
+        -- DRIVER AND LOGISTICS TABLES
+        CREATE TABLE IF NOT EXISTS drivers (
+            id BIGSERIAL PRIMARY KEY,
+            name VARCHAR(100) NOT NULL,
+            phone VARCHAR(20),
+            email VARCHAR(100),
+            license_number VARCHAR(50),
+            status VARCHAR(20) DEFAULT 'ACTIVE',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS driver_devices (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id) ON DELETE CASCADE,
+            device_id VARCHAR(255) NOT NULL,
+            firebase_token VARCHAR(255),
+            platform VARCHAR(20),
+            app_version VARCHAR(20),
+            last_seen TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS driver_shifts (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+            end_time TIMESTAMP WITH TIME ZONE,
+            status VARCHAR(20) DEFAULT 'ACTIVE',
+            closure_reason VARCHAR(100),
+            total_working_hours NUMERIC(5,2) DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS driver_schedules (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            schedule_date DATE NOT NULL,
+            is_scheduled BOOLEAN NOT NULL DEFAULT TRUE,
+            shift_type VARCHAR(20) NOT NULL DEFAULT 'FULL_DAY',
+            notes TEXT,
+            status VARCHAR(20) NOT NULL DEFAULT 'SCHEDULED',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS driver_availability_patterns (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            monday BOOLEAN NOT NULL DEFAULT FALSE,
+            tuesday BOOLEAN NOT NULL DEFAULT FALSE,
+            wednesday BOOLEAN NOT NULL DEFAULT FALSE,
+            thursday BOOLEAN NOT NULL DEFAULT FALSE,
+            friday BOOLEAN NOT NULL DEFAULT FALSE,
+            saturday BOOLEAN NOT NULL DEFAULT FALSE,
+            sunday BOOLEAN NOT NULL DEFAULT FALSE,
+            pattern_name VARCHAR(50),
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            start_date DATE NOT NULL,
+            end_date DATE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS driver_routes (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            route_name VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS trips (
+            id BIGSERIAL PRIMARY KEY,
+            order_id BIGINT REFERENCES orders(id),
+            driver_id BIGINT REFERENCES drivers(id),
+            route_id BIGINT,
+            status VARCHAR(20) DEFAULT 'PENDING',
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS trip_events (
+            id BIGSERIAL PRIMARY KEY,
+            trip_id BIGINT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+            event_type VARCHAR(50) NOT NULL,
+            event_data JSONB,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        -- INVENTORY AND SKU TABLES
+        CREATE TABLE IF NOT EXISTS sku (
+            id BIGSERIAL PRIMARY KEY,
+            code VARCHAR(50) UNIQUE NOT NULL,
+            name VARCHAR(200) NOT NULL,
+            description TEXT,
+            unit_price NUMERIC(12,2) DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS sku_alias (
+            id BIGSERIAL PRIMARY KEY,
+            sku_id BIGINT NOT NULL REFERENCES sku(id) ON DELETE CASCADE,
+            alias VARCHAR(100) NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS item (
+            id BIGSERIAL PRIMARY KEY,
+            uid VARCHAR(255) UNIQUE NOT NULL,
+            sku_id BIGINT REFERENCES sku(id),
+            serial_number VARCHAR(100),
+            status VARCHAR(20) DEFAULT 'AVAILABLE',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS uid_ledger (
+            id BIGSERIAL PRIMARY KEY,
+            uid VARCHAR(255) NOT NULL,
+            action VARCHAR(20) NOT NULL,
+            scanned_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            scanned_by_admin BIGINT REFERENCES users(id),
+            scanned_by_driver BIGINT REFERENCES drivers(id),
+            scanner_name VARCHAR(100),
+            order_id BIGINT REFERENCES orders(id),
+            sku_id BIGINT REFERENCES sku(id),
+            source VARCHAR(20) NOT NULL DEFAULT 'ADMIN_MANUAL',
+            lorry_id VARCHAR(50),
+            location_notes VARCHAR(255),
+            notes TEXT,
+            customer_name VARCHAR(200),
+            order_reference VARCHAR(50),
+            driver_scan_id VARCHAR(100) UNIQUE,
+            sync_status VARCHAR(20) NOT NULL DEFAULT 'RECORDED',
+            recorded_by BIGINT NOT NULL REFERENCES users(id),
+            recorded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+            deleted_at TIMESTAMP WITH TIME ZONE,
+            deleted_by BIGINT REFERENCES users(id),
+            deletion_reason TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        -- LORRY AND FLEET TABLES  
+        CREATE TABLE IF NOT EXISTS lorries (
+            id BIGSERIAL PRIMARY KEY,
+            plate_number VARCHAR(20) UNIQUE NOT NULL,
+            model VARCHAR(100),
+            capacity INTEGER,
+            status VARCHAR(20) DEFAULT 'ACTIVE',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS lorry_assignments (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
+            assigned_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            unassigned_at TIMESTAMP WITH TIME ZONE,
+            status VARCHAR(20) DEFAULT 'ACTIVE',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS lorry_stock_verifications (
+            id BIGSERIAL PRIMARY KEY,
+            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
+            verification_date DATE NOT NULL,
+            verified_by BIGINT REFERENCES users(id),
+            variance_count INTEGER DEFAULT 0,
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS driver_holds (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            held_by BIGINT NOT NULL REFERENCES users(id),
+            reason VARCHAR(100) NOT NULL,
+            hold_start TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            hold_end TIMESTAMP WITH TIME ZONE,
+            is_active BOOLEAN DEFAULT TRUE,
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS lorry_stock (
+            id BIGSERIAL PRIMARY KEY,
+            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
+            sku_id BIGINT NOT NULL REFERENCES sku(id),
+            quantity INTEGER NOT NULL DEFAULT 0,
+            reserved_quantity INTEGER NOT NULL DEFAULT 0,
+            available_quantity INTEGER NOT NULL DEFAULT 0,
+            last_updated TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            UNIQUE(lorry_id, sku_id)
+        );
+        
+        CREATE TABLE IF NOT EXISTS lorry_stock_transactions (
+            id BIGSERIAL PRIMARY KEY,
+            lorry_id BIGINT NOT NULL REFERENCES lorries(id),
+            sku_id BIGINT NOT NULL REFERENCES sku(id),
+            transaction_type VARCHAR(20) NOT NULL,
+            quantity_change INTEGER NOT NULL,
+            reference_id BIGINT,
+            reference_type VARCHAR(50),
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        -- FINANCIAL AND COMMISSION TABLES
+        CREATE TABLE IF NOT EXISTS commissions (
+            id BIGSERIAL PRIMARY KEY,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            period_start DATE NOT NULL,
+            period_end DATE NOT NULL,
+            base_amount NUMERIC(12,2) DEFAULT 0,
+            bonus_amount NUMERIC(12,2) DEFAULT 0,
+            total_amount NUMERIC(12,2) DEFAULT 0,
+            status VARCHAR(20) DEFAULT 'PENDING',
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS commission_entries (
+            id BIGSERIAL PRIMARY KEY,
+            commission_id BIGINT NOT NULL REFERENCES commissions(id) ON DELETE CASCADE,
+            order_id BIGINT REFERENCES orders(id),
+            entry_type VARCHAR(50) NOT NULL,
+            amount NUMERIC(12,2) NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS upsell_records (
+            id BIGSERIAL PRIMARY KEY,
+            order_id BIGINT NOT NULL REFERENCES orders(id),
+            driver_id BIGINT REFERENCES drivers(id),
+            original_amount NUMERIC(12,2) NOT NULL,
+            upsell_amount NUMERIC(12,2) NOT NULL,
+            commission_percentage NUMERIC(5,2) DEFAULT 0,
+            commission_amount NUMERIC(12,2) DEFAULT 0,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        -- SYSTEM AND BACKGROUND PROCESSING TABLES
+        CREATE TABLE IF NOT EXISTS jobs (
+            id BIGSERIAL PRIMARY KEY,
+            job_type VARCHAR(50) NOT NULL,
+            status VARCHAR(20) DEFAULT 'PENDING',
+            payload JSONB,
+            result JSONB,
+            error_message TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE
+        );
+        
+        CREATE TABLE IF NOT EXISTS background_jobs (
+            id VARCHAR(36) PRIMARY KEY DEFAULT gen_random_uuid()::text,
+            job_type VARCHAR(50) NOT NULL,
+            status VARCHAR(20) NOT NULL DEFAULT 'pending',
+            input_data TEXT NOT NULL,
+            result_data TEXT,
+            error_message TEXT,
+            progress INTEGER DEFAULT 0,
+            progress_message VARCHAR(200),
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            started_at TIMESTAMP WITH TIME ZONE,
+            completed_at TIMESTAMP WITH TIME ZONE,
+            user_id INTEGER,
+            session_id VARCHAR(100)
+        );
+        
+        CREATE TABLE IF NOT EXISTS idempotent_requests (
+            id BIGSERIAL PRIMARY KEY,
+            idempotency_key VARCHAR(255) UNIQUE NOT NULL,
+            request_hash VARCHAR(64) NOT NULL,
+            response_data JSONB,
+            status_code INTEGER,
+            expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS audit_logs (
+            id BIGSERIAL PRIMARY KEY,
+            user_id BIGINT REFERENCES users(id),
+            action VARCHAR(100) NOT NULL,
+            table_name VARCHAR(50),
+            record_id BIGINT,
+            old_values JSONB,
+            new_values JSONB,
+            ip_address INET,
+            user_agent TEXT,
+            timestamp TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
+        
+        CREATE TABLE IF NOT EXISTS ai_verification_logs (
+            id BIGSERIAL PRIMARY KEY,
+            trip_id BIGINT NOT NULL REFERENCES trips(id),
+            user_id BIGINT REFERENCES users(id),
+            payment_method VARCHAR(50),
+            confidence_score NUMERIC(5,4),
+            cash_collection_required BOOLEAN DEFAULT FALSE,
+            analysis_result JSONB,
+            verification_notes JSONB,
+            errors JSONB,
+            success BOOLEAN DEFAULT FALSE,
+            tokens_used INTEGER,
+            processing_time_ms INTEGER,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+        );
         """
         
         try:
-            conn.exec_driver_sql(essential_sql)
-            print("  SUCCESS Essential tables created manually")
+            conn.exec_driver_sql(complete_sql)
+            print("  SUCCESS All 35+ tables created manually")
         except Exception as e2:
             print(f"  ERROR Even fallback creation failed: {e2}")
     
