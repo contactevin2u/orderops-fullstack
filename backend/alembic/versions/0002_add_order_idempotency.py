@@ -18,7 +18,7 @@ depends_on = None
 
 def upgrade():
     # Ghost revision - does nothing
-    print("👻 Ghost 0002_add_order_idempotency - doing nothing")
+    print("Ghost 0002_add_order_idempotency - doing nothing")
     pass
 
 
