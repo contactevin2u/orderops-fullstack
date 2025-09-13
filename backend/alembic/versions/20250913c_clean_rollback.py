@@ -1,7 +1,7 @@
 """clean rollback migration - undo changes from reverted commits
 
 Revision ID: 20250913c_clean_rollback
-Revises: 20250913b_add_closure_reason_and_backfill
+Revises: 20250913b_closure_backfill
 Create Date: 2025-09-13 18:00:00.000000
 
 """
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '20250913c_clean_rollback'
-down_revision = '20250913b_add_closure_reason_and_backfill'
+down_revision = '20250913b_closure_backfill'
 branch_labels = None
 depends_on = None
 
