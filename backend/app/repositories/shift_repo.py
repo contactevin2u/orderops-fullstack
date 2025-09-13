@@ -1,5 +1,6 @@
 from datetime import date
 from sqlalchemy import select, func, update, insert
+from sqlalchemy.sql import func as sa_func
 from sqlalchemy.orm import Session, load_only
 from app.models.driver_shift import DriverShift
 
@@ -22,6 +23,9 @@ class ShiftRepo:
                     DriverShift.clock_in_lat,
                     DriverShift.clock_in_lng,
                     DriverShift.clock_in_location_name,
+                    DriverShift.is_outstation,
+                    DriverShift.outstation_allowance_amount,
+                    DriverShift.created_at,
                 )
             )
             .where(DriverShift.driver_id == driver_id, DriverShift.clock_out_at.is_(None))
@@ -41,6 +45,12 @@ class ShiftRepo:
                     DriverShift.clock_in_at,
                     DriverShift.clock_out_at,
                     DriverShift.status,
+                    DriverShift.clock_in_lat,
+                    DriverShift.clock_in_lng,
+                    DriverShift.clock_in_location_name,
+                    DriverShift.is_outstation,
+                    DriverShift.outstation_allowance_amount,
+                    DriverShift.created_at,
                 )
             )
             .where(
@@ -78,7 +88,7 @@ class ShiftRepo:
         self.db.commit()
 
     def insert_shift(self, driver_id: int, now, loc_lat, loc_lng, loc_name):
-        """Insert new shift record via Core INSERT (exclude closure_reason to avoid missing-column crashes)."""
+        """Insert new shift record via Core INSERT (exclude closure_reason; return all required fields)."""
         tbl = DriverShift.__table__
         stmt = (
             insert(tbl)
@@ -88,21 +98,31 @@ class ShiftRepo:
                 clock_in_lat=loc_lat,
                 clock_in_lng=loc_lng,
                 clock_in_location_name=loc_name,
-                # leave all clock_out_* as NULL
+                clock_out_at=None,
                 is_outstation=False,
                 outstation_distance_km=None,
                 outstation_allowance_amount=0,
                 total_working_hours=None,
                 status="ACTIVE",
-                notes=None,  # safe; exists in your schema
+                notes=None,
+                # ensure created_at if model doesn't default it
+                created_at=sa_func.now(),
+                updated_at=sa_func.now(),
                 # NOTE: closure_reason intentionally NOT set here
             )
             .returning(
                 tbl.c.id,
                 tbl.c.driver_id,
                 tbl.c.clock_in_at,
+                tbl.c.clock_in_lat,
+                tbl.c.clock_in_lng,
+                tbl.c.clock_in_location_name,
                 tbl.c.clock_out_at,
+                tbl.c.is_outstation,
+                tbl.c.outstation_allowance_amount,
                 tbl.c.status,
+                tbl.c.created_at,
+                tbl.c.updated_at,
             )
         )
         row = self.db.execute(stmt).first()
@@ -110,13 +130,24 @@ class ShiftRepo:
 
         # Return a lightweight object with the fields callers actually use
         class _ShiftLite:
-            __slots__ = ("id", "driver_id", "clock_in_at", "clock_out_at", "status")
+            __slots__ = (
+                "id", "driver_id", "clock_in_at", "clock_in_lat", "clock_in_lng",
+                "clock_in_location_name", "clock_out_at", "is_outstation",
+                "outstation_allowance_amount", "status", "created_at", "updated_at",
+            )
         s = _ShiftLite()
         s.id = row.id
         s.driver_id = row.driver_id
         s.clock_in_at = row.clock_in_at
+        s.clock_in_lat = row.clock_in_lat
+        s.clock_in_lng = row.clock_in_lng
+        s.clock_in_location_name = row.clock_in_location_name
         s.clock_out_at = row.clock_out_at
+        s.is_outstation = row.is_outstation
+        s.outstation_allowance_amount = row.outstation_allowance_amount
         s.status = row.status
+        s.created_at = row.created_at
+        s.updated_at = row.updated_at
         return s
 
     def calculate_working_hours(self, shift_id: int, clock_out_at):

@@ -63,24 +63,25 @@ class ShiftResponse(BaseModel):
     @classmethod
     def from_model(cls, shift: "DriverShift") -> "ShiftResponse":
         """Create ShiftResponse from DriverShift model with graceful handling of missing columns"""
+        # Be defensive: getattr with sensible defaults
         return cls(
-            id=shift.id,
-            driver_id=shift.driver_id,
-            clock_in_at=int(shift.clock_in_at.timestamp()),
-            clock_in_lat=float(shift.clock_in_lat),
-            clock_in_lng=float(shift.clock_in_lng),
+            id=getattr(shift, "id"),
+            driver_id=getattr(shift, "driver_id"),
+            clock_in_at=int(getattr(shift, "clock_in_at").timestamp()) if getattr(shift, "clock_in_at", None) else 0,
+            clock_in_lat=float(getattr(shift, "clock_in_lat", 0.0)),
+            clock_in_lng=float(getattr(shift, "clock_in_lng", 0.0)),
             clock_in_location_name=getattr(shift, 'clock_in_location_name', None),
-            clock_out_at=int(shift.clock_out_at.timestamp()) if getattr(shift, 'clock_out_at', None) else None,
-            clock_out_lat=float(shift.clock_out_lat) if getattr(shift, 'clock_out_lat', None) else None,
-            clock_out_lng=float(shift.clock_out_lng) if getattr(shift, 'clock_out_lng', None) else None,
+            clock_out_at=int(getattr(shift, "clock_out_at").timestamp()) if getattr(shift, 'clock_out_at', None) else None,
+            clock_out_lat=float(getattr(shift, "clock_out_lat")) if getattr(shift, 'clock_out_lat', None) else None,
+            clock_out_lng=float(getattr(shift, "clock_out_lng")) if getattr(shift, 'clock_out_lng', None) else None,
             clock_out_location_name=getattr(shift, 'clock_out_location_name', None),
-            is_outstation=getattr(shift, 'is_outstation', False),
-            outstation_distance_km=float(shift.outstation_distance_km) if getattr(shift, 'outstation_distance_km', None) else None,
-            outstation_allowance_amount=float(getattr(shift, 'outstation_allowance_amount', 0.0)),
-            total_working_hours=float(shift.total_working_hours) if getattr(shift, 'total_working_hours', None) else None,
+            is_outstation=bool(getattr(shift, 'is_outstation', False)),
+            outstation_distance_km=float(getattr(shift, "outstation_distance_km")) if getattr(shift, 'outstation_distance_km', None) else None,
+            outstation_allowance_amount=float(getattr(shift, 'outstation_allowance_amount', 0) or 0),
+            total_working_hours=float(getattr(shift, "total_working_hours")) if getattr(shift, 'total_working_hours', None) else None,
             status=getattr(shift, 'status', 'ACTIVE'),
             notes=getattr(shift, 'notes', None),
-            created_at=int(getattr(shift, 'created_at', shift.clock_in_at).timestamp())
+            created_at=int(getattr(shift, 'created_at').timestamp()) if getattr(shift, 'created_at', None) else int(getattr(shift, "clock_in_at").timestamp()) if getattr(shift, "clock_in_at", None) else 0
         )
 
 
