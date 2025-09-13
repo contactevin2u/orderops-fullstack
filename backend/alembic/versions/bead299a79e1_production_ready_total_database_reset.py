@@ -231,3 +231,4 @@ def downgrade() -> None:
     print("WARNING Production database reset cannot be downgraded")
     print("INFO Use database backup to restore if needed")
     print("WARNING This migration completely rebuilds the schema")
+# Force redeploy to execute total database reset migration
