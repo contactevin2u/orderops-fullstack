@@ -1,6 +1,6 @@
-"""Driver shift management service"""
+"""Driver shift management service with 3AM KL auto-close"""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
@@ -15,31 +15,80 @@ from app.config.clock_config import (
     AUTO_CLOCK_OUT_AFTER_HOURS
 )
 
+# Asia/Kuala_Lumpur timezone (UTC+8, no DST)
+KL = timezone(timedelta(hours=8))
+AUTO_CLOCKOUT_HOUR_LOCAL = 3  # 03:00 local time
+
 
 class ShiftService:
     def __init__(self, db: Session):
         self.db = db
 
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+    def _next_auto_cutoff_utc(self, start_utc: datetime) -> datetime:
+        """
+        Return the next occurrence of 03:00 KL that is on/after start_utc.
+        If a shift starts 01:00 KL -> cutoff is the same day 03:00 KL.
+        If it starts 10:00 KL -> cutoff is the next day 03:00 KL.
+        """
+        start_kl = start_utc.astimezone(KL)
+        cutoff_date = start_kl.date()
+        cutoff_kl = datetime(
+            cutoff_date.year, cutoff_date.month, cutoff_date.day,
+            AUTO_CLOCKOUT_HOUR_LOCAL, 0, 0, tzinfo=KL
+        )
+        if start_kl >= cutoff_kl:
+            # already past today's 03:00 KL -> use tomorrow 03:00 KL
+            cutoff_kl = cutoff_kl + timedelta(days=1)
+        return cutoff_kl.astimezone(timezone.utc)
+
+    def get_active_shift(self, driver_id: int) -> Optional[DriverShift]:
+        """Get the active shift for a driver"""
+        return (
+            self.db.query(DriverShift)
+            .filter(DriverShift.driver_id == driver_id, DriverShift.clock_out_at.is_(None))
+            .order_by(DriverShift.clock_in_at.desc())
+            .first()
+        )
+
+    def _close_shift(self, shift: DriverShift, closed_at: datetime, reason: str):
+        """Close a shift with the specified closure time and reason"""
+        shift.clock_out_at = closed_at
+        shift.closure_reason = reason
+        shift.status = "COMPLETED"
+        
+        # Calculate working hours
+        total_hours = (closed_at - shift.clock_in_at).total_seconds() / 3600
+        shift.total_working_hours = total_hours
+        
+        self.db.add(shift)
+        self.db.commit()
+        self.db.refresh(shift)
+
     def clock_in(
-        self, 
-        driver_id: int, 
-        lat: float, 
-        lng: float, 
-        location_name: Optional[str] = None
+        self,
+        driver_id: int,
+        location_lat: Optional[float] = None,
+        location_lng: Optional[float] = None,
+        location_name: Optional[str] = None,
+        idempotent: bool = True,
     ) -> DriverShift:
         """
-        Clock in a driver at the specified location
+        Clock in a driver with idempotent 3AM KL auto-close logic
         
         Args:
             driver_id: Driver ID
-            lat, lng: Clock-in coordinates
+            location_lat, location_lng: Clock-in coordinates
             location_name: Optional human-readable location name
+            idempotent: If True, return active shift if within same service day
         
         Returns:
-            Created DriverShift record
+            DriverShift record (existing or new)
         
         Raises:
-            ValueError: If driver already has active shift or other validation errors
+            ValueError: If driver not found/inactive, or non-idempotent with active shift
         """
         # Check if driver exists
         driver = self.db.query(Driver).filter(Driver.id == driver_id).first()
@@ -49,32 +98,34 @@ class ShiftService:
         if not driver.is_active:
             raise ValueError(f"Driver {driver.name} is not active")
 
-        # Check if driver already has an active shift
-        active_shift = self.get_active_shift(driver_id)
-        if active_shift:
-            # Auto-close stale shifts older than 24 hours (reasonable limit vs 1 week config)
-            hours_since_clock_in = (datetime.now(timezone.utc) - active_shift.clock_in_at).total_seconds() / 3600
-            if hours_since_clock_in > 24:  # 24 hours is reasonable auto-close threshold
-                print(f"AUTO-CLOSING stale shift for driver {driver_id} - shift was {hours_since_clock_in:.1f} hours old")
-                active_shift.status = "AUTO_COMPLETED"
-                active_shift.clock_out_at = datetime.now(timezone.utc)
-                active_shift.notes = f"Auto-closed after {hours_since_clock_in:.1f} hours (stale shift cleanup)"
-                self.db.commit()
-                print(f"Stale shift auto-closed: {active_shift.id}")
+        now = self._now()
+        active = self.get_active_shift(driver_id)
+
+        if active:
+            cutoff = self._next_auto_cutoff_utc(active.clock_in_at)
+            if now >= cutoff:
+                # Auto close at the policy boundary (exactly 03:00 KL)
+                self._close_shift(active, cutoff, "AUTO_3AM")
+                active = None
             else:
-                raise ValueError(f"Driver already has an active shift started at {active_shift.clock_in_at}")
+                # Within same service day → return active (idempotent)
+                if idempotent:
+                    return active
+                raise ValueError(f"Active shift already open since {active.clock_in_at.isoformat()}")
 
         # Determine if location is outstation
+        lat = location_lat or 3.1390  # Default to KL if not provided
+        lng = location_lng or 101.6869
         is_outstation, distance_km = is_outstation_location(lat, lng)
         
         # Generate location description if not provided
         if not location_name:
             location_name = get_location_description(lat, lng)
 
-        # Create new shift
+        # Open a new shift
         shift = DriverShift(
             driver_id=driver_id,
-            clock_in_at=datetime.now(timezone.utc),
+            clock_in_at=now,
             clock_in_lat=lat,
             clock_in_lng=lng,
             clock_in_location_name=location_name,
@@ -97,66 +148,32 @@ class ShiftService:
     def clock_out(
         self, 
         driver_id: int, 
-        lat: float, 
-        lng: float, 
+        lat: Optional[float] = None, 
+        lng: Optional[float] = None, 
         location_name: Optional[str] = None,
-        notes: Optional[str] = None
-    ) -> DriverShift:
-        """
-        Clock out a driver at the specified location
+        notes: Optional[str] = None,
+        reason: str = "MANUAL"
+    ) -> Optional[DriverShift]:
+        """Clock out a driver - idempotent"""
+        active = self.get_active_shift(driver_id)
+        if not active:
+            # idempotent: nothing to do
+            return None
+            
+        now = self._now()
         
-        Args:
-            driver_id: Driver ID
-            lat, lng: Clock-out coordinates
-            location_name: Optional human-readable location name
-            notes: Optional shift notes
-        
-        Returns:
-            Updated DriverShift record
-        
-        Raises:
-            ValueError: If no active shift found or other validation errors
-        """
-        # Get active shift
-        active_shift = self.get_active_shift(driver_id)
-        if not active_shift:
-            raise ValueError(f"No active shift found for driver {driver_id}")
-
-        # Generate location description if not provided
-        if not location_name:
-            location_name = get_location_description(lat, lng)
-
-        # Update shift with clock-out details
-        clock_out_time = datetime.now(timezone.utc)
-        total_hours = (clock_out_time - active_shift.clock_in_at).total_seconds() / 3600
-
-        # Log long shifts but don't block clock-out
-        if total_hours > MAX_SHIFT_DURATION_HOURS:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Long shift detected: Driver {driver_id} worked {total_hours:.1f}h (>{MAX_SHIFT_DURATION_HOURS}h)")
-
-        active_shift.clock_out_at = clock_out_time
-        active_shift.clock_out_lat = lat
-        active_shift.clock_out_lng = lng
-        active_shift.clock_out_location_name = location_name
-        active_shift.total_working_hours = total_hours
-        active_shift.status = "COMPLETED"
-        active_shift.notes = notes
-
-        self.db.commit()
-        self.db.refresh(active_shift)
-
-        return active_shift
-
-    def get_active_shift(self, driver_id: int) -> Optional[DriverShift]:
-        """Get the active shift for a driver"""
-        return self.db.query(DriverShift).filter(
-            and_(
-                DriverShift.driver_id == driver_id,
-                DriverShift.status == "ACTIVE"
-            )
-        ).first()
+        # Update clock-out location details if provided
+        if lat is not None:
+            active.clock_out_lat = lat
+        if lng is not None:
+            active.clock_out_lng = lng
+        if location_name:
+            active.clock_out_location_name = location_name
+        if notes:
+            active.notes = notes
+            
+        self._close_shift(active, now, reason)
+        return active
 
     def get_driver_shifts(
         self, 
@@ -194,33 +211,19 @@ class ShiftService:
             "total_earnings": total_commission + shift.outstation_allowance_amount
         }
 
-    def auto_clock_out_expired_shifts(self) -> List[DriverShift]:
-        """Auto clock-out shifts that have exceeded maximum duration"""
-        cutoff_time = datetime.now(timezone.utc).replace(
-            hour=datetime.now(timezone.utc).hour - int(AUTO_CLOCK_OUT_AFTER_HOURS)
-        )
+    def close_stale_shifts_3am(self) -> List[DriverShift]:
+        """Admin sweep: close any forgotten shifts after 03:00 KL"""
+        now = self._now()
+        closed = []
         
-        expired_shifts = self.db.query(DriverShift).filter(
-            and_(
-                DriverShift.status == "ACTIVE",
-                DriverShift.clock_in_at < cutoff_time
-            )
-        ).all()
+        open_shifts = self.db.query(DriverShift).filter(DriverShift.clock_out_at.is_(None)).all()
+        for shift in open_shifts:
+            cutoff = self._next_auto_cutoff_utc(shift.clock_in_at)
+            if now >= cutoff:
+                self._close_shift(shift, cutoff, "AUTO_3AM_SWEEP")
+                closed.append(shift)
 
-        for shift in expired_shifts:
-            # Auto clock-out at last known location or home base
-            shift.clock_out_at = datetime.now(timezone.utc)
-            shift.clock_out_lat = shift.clock_in_lat
-            shift.clock_out_lng = shift.clock_in_lng
-            shift.clock_out_location_name = f"Auto clock-out: {shift.clock_in_location_name}"
-            shift.total_working_hours = AUTO_CLOCK_OUT_AFTER_HOURS
-            shift.status = "COMPLETED"
-            shift.notes = f"Auto-clocked out after {AUTO_CLOCK_OUT_AFTER_HOURS} hours"
-
-        if expired_shifts:
-            self.db.commit()
-
-        return expired_shifts
+        return closed
 
     def _create_outstation_allowance_entry(self, shift: DriverShift) -> CommissionEntry:
         """Create commission entry for outstation allowance"""

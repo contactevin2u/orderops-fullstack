@@ -43,6 +43,7 @@ class DriverShift(Base):
     # Status and metadata
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="ACTIVE")  # ACTIVE, COMPLETED
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closure_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
