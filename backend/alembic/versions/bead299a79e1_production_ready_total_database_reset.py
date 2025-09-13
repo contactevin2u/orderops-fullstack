@@ -157,15 +157,13 @@ def upgrade() -> None:
         CREATE TABLE IF NOT EXISTS customers (
             id BIGSERIAL PRIMARY KEY,
             name VARCHAR(200) NOT NULL,
-            phone VARCHAR(20),
-            email VARCHAR(100),
+            phone VARCHAR(50),
             address TEXT,
             map_url TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
         CREATE INDEX IF NOT EXISTS ix_customers_phone ON customers(phone);
-        CREATE INDEX IF NOT EXISTS ix_customers_name ON customers(name);
         
         -- ORDER MANAGEMENT TABLES
         CREATE TABLE IF NOT EXISTS orders (
@@ -330,23 +328,37 @@ def upgrade() -> None:
         
         CREATE TABLE IF NOT EXISTS trips (
             id BIGSERIAL PRIMARY KEY,
-            order_id BIGINT REFERENCES orders(id),
-            driver_id BIGINT REFERENCES drivers(id),
-            route_id BIGINT,
-            status VARCHAR(20) DEFAULT 'PENDING',
+            order_id BIGINT NOT NULL REFERENCES orders(id),
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            driver_id_2 BIGINT REFERENCES drivers(id),
+            route_id BIGINT REFERENCES driver_routes(id),
+            status VARCHAR(20) NOT NULL DEFAULT 'ASSIGNED',
+            planned_at TIMESTAMP WITH TIME ZONE,
             started_at TIMESTAMP WITH TIME ZONE,
-            completed_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            delivered_at TIMESTAMP WITH TIME ZONE,
+            failure_reason TEXT,
+            pod_photo_url TEXT,
+            pod_photo_url_1 TEXT,
+            pod_photo_url_2 TEXT,
+            pod_photo_url_3 TEXT,
+            payment_method VARCHAR(30),
+            payment_reference VARCHAR(50),
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_trips_driver_id_2 ON trips(driver_id_2);
+        CREATE INDEX IF NOT EXISTS ix_trips_route_id ON trips(route_id);
+        CREATE INDEX IF NOT EXISTS ix_trips_driver_status_planned ON trips(driver_id, status, planned_at);
+        CREATE INDEX IF NOT EXISTS ix_trips_route_status ON trips(route_id, status);
         
         CREATE TABLE IF NOT EXISTS trip_events (
             id BIGSERIAL PRIMARY KEY,
             trip_id BIGINT NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
-            event_type VARCHAR(50) NOT NULL,
-            event_data JSONB,
-            timestamp TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            status VARCHAR(20) NOT NULL,
+            lat NUMERIC(10,6),
+            lng NUMERIC(10,6),
+            note TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
         
         -- INVENTORY AND SKU TABLES
@@ -498,29 +510,44 @@ def upgrade() -> None:
             created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
         );
         
-        -- FINANCIAL AND COMMISSION TABLES
+        -- FINANCIAL AND COMMISSION TABLES (CORRECTED - TRIP BASED)
         CREATE TABLE IF NOT EXISTS commissions (
             id BIGSERIAL PRIMARY KEY,
             driver_id BIGINT NOT NULL REFERENCES drivers(id),
-            period_start DATE NOT NULL,
-            period_end DATE NOT NULL,
-            base_amount NUMERIC(12,2) DEFAULT 0,
-            bonus_amount NUMERIC(12,2) DEFAULT 0,
-            total_amount NUMERIC(12,2) DEFAULT 0,
-            status VARCHAR(20) DEFAULT 'PENDING',
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            trip_id BIGINT NOT NULL REFERENCES trips(id),
+            scheme VARCHAR(20) NOT NULL,
+            rate NUMERIC(10,2) NOT NULL,
+            computed_amount NUMERIC(10,2) NOT NULL,
+            actualized_at TIMESTAMP WITH TIME ZONE,
+            actualization_reason TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_commissions_actualized_at ON commissions(actualized_at);
         
         CREATE TABLE IF NOT EXISTS commission_entries (
             id BIGSERIAL PRIMARY KEY,
-            commission_id BIGINT NOT NULL REFERENCES commissions(id) ON DELETE CASCADE,
+            driver_id BIGINT NOT NULL REFERENCES drivers(id),
+            shift_id BIGINT NOT NULL REFERENCES driver_shifts(id),
             order_id BIGINT REFERENCES orders(id),
-            entry_type VARCHAR(50) NOT NULL,
-            amount NUMERIC(12,2) NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            trip_id BIGINT REFERENCES trips(id),
+            entry_type VARCHAR(20) NOT NULL,
+            amount NUMERIC(8,2) NOT NULL,
+            description VARCHAR(500) NOT NULL,
+            driver_role VARCHAR(20),
+            status VARCHAR(20) NOT NULL DEFAULT 'EARNED',
+            base_commission_rate NUMERIC(5,4),
+            order_value NUMERIC(10,2),
+            commission_scheme VARCHAR(50),
+            earned_at TIMESTAMP WITH TIME ZONE NOT NULL,
+            paid_at TIMESTAMP WITH TIME ZONE,
+            notes TEXT,
+            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
         );
+        CREATE INDEX IF NOT EXISTS ix_commission_entries_driver_id ON commission_entries(driver_id);
+        CREATE INDEX IF NOT EXISTS ix_commission_entries_shift_id ON commission_entries(shift_id);
+        CREATE INDEX IF NOT EXISTS ix_commission_entries_order_id ON commission_entries(order_id);
+        CREATE INDEX IF NOT EXISTS ix_commission_entries_trip_id ON commission_entries(trip_id);
         
         CREATE TABLE IF NOT EXISTS upsell_records (
             id BIGSERIAL PRIMARY KEY,
