@@ -612,18 +612,18 @@ def upgrade() -> None:
     print("STEP 3: Creating emergency admin user...")
     
     try:
-        # Check if admin exists
-        admin_check = conn.exec_driver_sql("SELECT COUNT(*) FROM users WHERE role = 'admin'").scalar()
+        # Check if admin exists (using correct enum value)
+        admin_check = conn.exec_driver_sql("SELECT COUNT(*) FROM users WHERE role = 'ADMIN'").scalar()
         
         if admin_check == 0:
-            # Create emergency admin
+            # Create emergency admin with correct enum value
             conn.exec_driver_sql("""
-                INSERT INTO users (username, email, password_hash, role, created_at, updated_at) 
+                INSERT INTO users (username, password_hash, role, is_active, created_at, updated_at) 
                 VALUES (
-                    'admin', 
-                    'admin@orderops.com',
-                    '$2b$12$LQv3c1yqBwn5UurT1HfhDOhHukmNt.8cVD3B7xJNDbmJLN5ZP3TG6',
                     'admin',
+                    '$2b$12$LQv3c1yqBwn5UurT1HfhDOhHukmNt.8cVD3B7xJNDbmJLN5ZP3TG6',
+                    'ADMIN',
+                    TRUE,
                     now(),
                     now()
                 )
@@ -646,8 +646,8 @@ def upgrade() -> None:
         """).scalar()
         print(f"  TABLES: {table_count} total tables created")
         
-        # Check admin access
-        admin_count = conn.exec_driver_sql("SELECT COUNT(*) FROM users WHERE role = 'admin'").scalar()
+        # Check admin access (using correct enum value)
+        admin_count = conn.exec_driver_sql("SELECT COUNT(*) FROM users WHERE role = 'ADMIN'").scalar()
         print(f"  ADMIN: {admin_count} admin user(s) available")
             
     except Exception as e:
