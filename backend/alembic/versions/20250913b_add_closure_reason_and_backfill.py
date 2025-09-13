@@ -1,6 +1,6 @@
 """add closure_reason to driver_shifts and backfill closed rows
 
-Revision ID: 20250913b_add_closure_reason_and_backfill
+Revision ID: 20250913b_closure_backfill
 Revises: add_closure_reason_001
 Create Date: 2025-09-13
 """
@@ -8,7 +8,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = "20250913b_add_closure_reason_and_backfill"
+revision = "20250913b_closure_backfill"
 down_revision = "add_closure_reason_001"
 branch_labels = None
 depends_on = None
